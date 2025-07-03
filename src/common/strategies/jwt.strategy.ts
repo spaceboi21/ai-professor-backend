@@ -92,8 +92,8 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
         await this.tenantConnectionService.getTenantConnection(dbName);
 
       // Find student in tenant database
-      const studentCollection = tenantConnection.collection(Student.name);
-      const student = await studentCollection.findOne({
+      const studentModel = tenantConnection.collection(Student.name);
+      const student = await studentModel.findOne({
         email: payload.email,
         school_id: payload.school_id,
       });
