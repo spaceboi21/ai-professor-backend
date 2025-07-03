@@ -1,5 +1,7 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, Types } from 'mongoose';
+import { Role } from './role.schema';
+import { School } from './school.schema';
 
 @Schema({
   timestamps: {
@@ -20,7 +22,7 @@ export class User extends Document {
   @Prop()
   country_code: number;
 
-  @Prop({ type: Types.ObjectId, index: true, ref: 'schools' })
+  @Prop({ type: Types.ObjectId, index: true, ref: School.name })
   school_id: Types.ObjectId;
 
   @Prop({ required: true })
@@ -29,7 +31,7 @@ export class User extends Document {
   @Prop()
   last_loggedin: Date;
 
-  @Prop({ type: Types.ObjectId, ref: 'roles' })
+  @Prop({ type: Types.ObjectId, ref: Role.name })
   role: Types.ObjectId;
 
   @Prop()

@@ -1,5 +1,6 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, Types } from 'mongoose';
+import { School, SchoolSchema } from '../central/school.schema';
 
 @Schema({
   timestamps: {
@@ -20,7 +21,7 @@ export class Student extends Document {
   @Prop({ required: true, unique: true })
   email: string;
 
-  @Prop({ type: Types.ObjectId, index: true })
+  @Prop({ type: Types.ObjectId, index: true, ref: School.name })
   school_id: Types.ObjectId;
 
   @Prop({ required: true, select: false })
