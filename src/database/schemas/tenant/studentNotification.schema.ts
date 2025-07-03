@@ -1,5 +1,6 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, Types } from 'mongoose';
+import { Student } from './student.schema';
 
 @Schema({
   timestamps: {
@@ -12,7 +13,12 @@ export class StudentNotification extends Document {
   declare _id: Types.ObjectId;
 
   // Reference to Students_tenent._id
-  @Prop({ type: Types.ObjectId, ref: 'students', required: true, index: true })
+  @Prop({
+    type: Types.ObjectId,
+    ref: Student.name,
+    required: true,
+    index: true,
+  })
   student_id: Types.ObjectId;
 
   @Prop({ default: true })
@@ -31,4 +37,5 @@ export class StudentNotification extends Document {
   readonly updated_at?: Date;
 }
 
-export const StudentNotificationSchema = SchemaFactory.createForClass(StudentNotification);
+export const StudentNotificationSchema =
+  SchemaFactory.createForClass(StudentNotification);
