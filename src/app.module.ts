@@ -10,6 +10,7 @@ import { SeedModule } from './seeders/seed.module';
 import { UtilsModule } from './common/utils';
 import { JwtModule } from '@nestjs/jwt';
 import { LoggerMiddleware } from './common/middleware/logger.middleware';
+import { SchoolAdminModule } from './modules/school-admin/school-admin.module';
 
 @Module({
   imports: [
@@ -32,6 +33,7 @@ import { LoggerMiddleware } from './common/middleware/logger.middleware';
     RoleModule,
     SeedModule,
     UtilsModule,
+    SchoolAdminModule,
   ],
   controllers: [AppController],
   providers: [AppService],
