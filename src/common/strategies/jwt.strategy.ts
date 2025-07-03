@@ -1,6 +1,6 @@
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { PassportStrategy } from '@nestjs/passport';
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { Injectable, UnauthorizedException, Logger } from '@nestjs/common';
 import { config } from 'dotenv';
 import { Role } from 'src/database/schemas/central/role.schema';
 import { InjectModel } from '@nestjs/mongoose';
@@ -21,6 +21,8 @@ export interface JWTPayload {
 config();
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
+  private readonly logger = new Logger(JwtStrategy.name);
+
   constructor(
     @InjectModel(Role.name)
     private readonly roleModel: Model<Role>,
@@ -35,10 +37,16 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
   }
 
   async validate(payload: JWTPayload) {
+    this.logger.debug(`Validating JWT payload for user: ${payload.email}`);
+
     try {
       // Validate role exists
+
       const role = await this.roleModel.findById(payload.role_id);
       if (!role || role.name !== payload.role_name) {
+        this.logger.warn(
+          `Invalid role information for user ${payload.email}: role not found or name mismatch`,
+        );
         throw new UnauthorizedException('Invalid role information');
       }
 
@@ -46,11 +54,17 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
       if (payload.role_name === RoleEnum.STUDENT) {
         const studentData = await this.validateStudentInTenant(payload);
         if (!studentData) {
+          this.logger.warn(
+            `Student ${payload.email} not found in tenant database for school: ${payload.school_id}`,
+          );
           throw new UnauthorizedException(
             'Student not found in tenant database',
           );
         }
 
+        this.logger.log(
+          `Successfully validated student: ${payload.email} in school: ${payload.school_id}`,
+        );
         return {
           userId: payload.id,
           email: payload.email,
@@ -64,6 +78,9 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
       }
 
       // For non-student roles, return basic user info
+      this.logger.log(
+        `Successfully validated user: ${payload.email} with role: ${payload.role_name}`,
+      );
       return {
         userId: payload.id,
         email: payload.email,
@@ -74,6 +91,9 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
         },
       };
     } catch (error) {
+      this.logger.error(
+        `Token validation failed for user ${payload.email}: ${error.message}`,
+      );
       throw new UnauthorizedException(
         `Token validation failed: ${error.message}`,
       );
@@ -83,15 +103,18 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
   private async validateStudentInTenant(payload: JWTPayload) {
     try {
       // Get tenant db name
+
       const dbName = await this.tenantService.getTenantDbName(
         payload.school_id,
       );
 
       // Get tenant connection
+      this.logger.debug(`Connecting to tenant database: ${dbName}`);
       const tenantConnection =
         await this.tenantConnectionService.getTenantConnection(dbName);
 
       // Find student in tenant database
+
       const studentModel = tenantConnection.collection(Student.name);
       const student = await studentModel.findOne({
         email: payload.email,
@@ -99,9 +122,15 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
       });
 
       if (!student) {
+        this.logger.warn(
+          `Student ${payload.email} not found in tenant database ${dbName}`,
+        );
         return null;
       }
 
+      this.logger.debug(
+        `Student ${payload.email} found in tenant database ${dbName}`,
+      );
       return {
         _id: student._id,
         first_name: student.first_name,
@@ -112,6 +141,9 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
         profile_pic: student.profile_pic,
       };
     } catch (error) {
+      this.logger.error(
+        `Student validation failed for ${payload.email}: ${error.message}`,
+      );
       throw new UnauthorizedException(
         `Student validation failed: ${error.message}`,
       );
