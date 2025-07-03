@@ -1,0 +1,13 @@
+export enum RoleEnum {
+  SUPER_ADMIN = 'SUPER_ADMIN',
+  SCHOOL_ADMIN = 'SCHOOL_ADMIN',
+  PROFESSOR = 'PROFESSOR',
+  STUDENT = 'STUDENT',
+}
+
+export const ROLE_IDS = {
+  SUPER_ADMIN: '6863cea411be9016b7ccb7fc',
+  SCHOOL_ADMIN: '6863cea411be9016b7ccb7fd',
+  PROFESSOR: '6864c433bd9a07e78c77abff',
+  STUDENT: '6863cea411be9016b7ccb7fe',
+} as const;
