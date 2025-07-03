@@ -14,6 +14,9 @@ export class Role extends Document {
   @Prop({ required: true })
   name: string;
 
+  @Prop({ type: Date, default: null })
+  deleted_at: Date;
+
   // Cretae a timestamp created_at and updated_at
   readonly created_at?: Date;
   readonly updated_at?: Date;
