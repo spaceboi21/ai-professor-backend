@@ -3,6 +3,7 @@ import { Document, Types } from 'mongoose';
 import { School } from './school.schema';
 
 @Schema({
+  collection: 'global_students',
   timestamps: {
     createdAt: 'created_at',
     updatedAt: 'updated_at',

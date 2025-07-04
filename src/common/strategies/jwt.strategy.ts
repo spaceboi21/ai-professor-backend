@@ -134,12 +134,12 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
       );
       return {
         _id: student._id,
-        first_name: student.first_name,
-        last_name: student.last_name,
         email: student.email,
         school_id: student.school_id,
-        student_id: student.student_id,
-        profile_pic: student.profile_pic,
+        role: {
+          id: payload.role_id,
+          name: payload.role_name as RoleEnum,
+        },
       };
     } catch (error) {
       this.logger.error(

@@ -36,26 +36,20 @@ export class MailService {
     });
   }
 
-  async sendWelcomeEmail(
+  async sendCredentialsEmail(
     email: string,
     name: string,
     password: string,
   ): Promise<void> {
-    await this.mailerService
-      .sendMail({
-        to: email,
-        subject: 'Welcome to AI Professor 🎉',
-        template: 'welcome-email',
-        context: {
-          name,
-          password,
-        },
-      })
-      .then(() => {
-        console.info(`Welcome email sent to ${email}`);
-      })
-      .catch((error) => {
-        console.error(`Failed to send welcome email to ${email}:`, error);
-      });
+    await this.mailerService.sendMail({
+      to: email,
+      subject: 'Welcome to AI Professor - Your Account Credentials',
+      template: 'credentials-email',
+      context: {
+        name,
+        email,
+        password,
+      },
+    });
   }
 }

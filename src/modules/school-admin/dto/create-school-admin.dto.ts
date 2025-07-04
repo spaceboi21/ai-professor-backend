@@ -1,4 +1,11 @@
-import { IsEmail, IsNotEmpty, IsString, IsUrl } from 'class-validator';
+import { Transform } from 'class-transformer';
+import {
+  IsEmail,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  IsUrl,
+} from 'class-validator';
 
 export class CreateSchoolAdminDto {
   // School Admin Details
@@ -8,6 +15,7 @@ export class CreateSchoolAdminDto {
 
   @IsEmail({}, { message: 'Invalid email format' })
   @IsNotEmpty({ message: 'Email is required' })
+  @Transform(({ value }) => value.toLowerCase())
   school_email: string;
 
   @IsUrl({}, { message: 'Website URL must be a valid URL' })
@@ -17,9 +25,15 @@ export class CreateSchoolAdminDto {
   // School Admin User Details
   @IsEmail({}, { message: 'Invalid email format' })
   @IsNotEmpty({ message: 'Email is required' })
+  @Transform(({ value }) => value.toLowerCase())
   user_email: string;
 
   @IsString({ message: 'First name must be a string' })
   @IsNotEmpty({ message: 'First name is required' })
   user_first_name: string;
+
+  @IsOptional()
+  @IsString({ message: 'Last name must be a string' })
+  @IsNotEmpty({ message: 'Last name is required' })
+  user_last_name: string;
 }

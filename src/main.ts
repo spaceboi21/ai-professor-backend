@@ -2,13 +2,14 @@ import { Logger, ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
+import { NestExpressApplication } from '@nestjs/platform-express';
 
 async function bootstrap() {
   const logger = new Logger('Bootstrap');
 
   try {
     // Create the NestJS application
-    const app = await NestFactory.create(AppModule);
+    const app = await NestFactory.create<NestExpressApplication>(AppModule);
     const configService = app.get(ConfigService);
 
     const frontendOrigin = configService.get<string>('FRONT_END_BASE_URL');
@@ -22,11 +23,9 @@ async function bootstrap() {
     });
 
     app.useGlobalPipes(
-      new ValidationPipe({
-        whitelist: true,
-        transform: true,
-      }),
+      new ValidationPipe({ whitelist: true, transform: true }),
     );
+    app.setViewEngine('hbs');
 
     // Set global prefix for all routes
     app.setGlobalPrefix('api');

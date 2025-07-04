@@ -35,6 +35,7 @@ export class SchoolAdminService {
       school_website_url,
       user_email,
       user_first_name,
+      user_last_name,
     } = createSchoolAdminDto;
 
     const [existingUser, existingSchool] = await Promise.all([
@@ -85,9 +86,9 @@ export class SchoolAdminService {
 
       // Send email to the new school admin
       // Note: Email sending logic is not implemented here, but you can use a service like
-      await this.mailService.sendWelcomeEmail(
+      await this.mailService.sendCredentialsEmail(
         user_email,
-        user_first_name,
+        `${user_first_name} ${user_last_name}`,
         password,
       );
 

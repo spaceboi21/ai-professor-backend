@@ -9,12 +9,14 @@ import { RoleModule } from './modules/roles/role.module';
 import { SeedModule } from './seeders/seed.module';
 import { UtilsModule } from './common/utils';
 import { JwtModule } from '@nestjs/jwt';
+import { PassportModule } from '@nestjs/passport';
 import { LoggerMiddleware } from './common/middleware/logger.middleware';
 import { SchoolAdminModule } from './modules/school-admin/school-admin.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { SuperAdminModule } from './modules/super-admin/super-admin.module';
-import { PassportModule } from '@nestjs/passport';
 import { JwtStrategy } from './common/strategies/jwt.strategy';
+import { StudentModule } from './modules/student/student.module';
+import { MailModule } from './mail/mail.module';
 
 @Module({
   imports: [
@@ -33,6 +35,7 @@ import { JwtStrategy } from './common/strategies/jwt.strategy';
       }),
       inject: [ConfigService],
     }),
+    PassportModule,
     CentralModule,
     DatabaseModule,
     RoleModule,
@@ -41,6 +44,8 @@ import { JwtStrategy } from './common/strategies/jwt.strategy';
     SchoolAdminModule,
     AuthModule,
     SuperAdminModule,
+    StudentModule,
+    MailModule,
   ],
   controllers: [AppController],
   providers: [AppService, JwtStrategy],
