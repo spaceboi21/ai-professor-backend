@@ -41,7 +41,6 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
 
     try {
       // Validate role exists
-
       const role = await this.roleModel.findById(payload.role_id);
       if (!role || role.name !== payload.role_name) {
         this.logger.warn(
