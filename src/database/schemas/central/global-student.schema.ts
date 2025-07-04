@@ -9,7 +9,6 @@ import { School } from './school.schema';
   },
 })
 export class GlobalStudent extends Document {
-  @Prop({ type: Types.ObjectId })
   declare _id: Types.ObjectId;
 
   // Primary key (indexed)
@@ -23,6 +22,9 @@ export class GlobalStudent extends Document {
   // Reference to Schools_central._id
   @Prop({ type: Types.ObjectId, ref: School.name, index: true })
   school_id: Types.ObjectId;
+
+  @Prop({ type: Date, default: null })
+  deleted_at: Date;
 
   readonly created_at?: Date;
   readonly updated_at?: Date;

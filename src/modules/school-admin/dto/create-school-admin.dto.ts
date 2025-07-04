@@ -1,47 +1,25 @@
-import {
-  IsString,
-  IsEmail,
-  IsNotEmpty,
-  MinLength,
-  IsOptional,
-  IsPhoneNumber,
-  IsNumber,
-  Matches,
-} from 'class-validator';
-import { Type } from 'class-transformer';
+import { IsEmail, IsNotEmpty, IsString, IsUrl } from 'class-validator';
 
 export class CreateSchoolAdminDto {
-  @IsString({ message: 'First name must be a string' })
-  @IsNotEmpty({ message: 'First name is required' })
-  first_name: string;
-
-  @IsString({ message: 'Last name must be a string' })
-  @IsNotEmpty({ message: 'Last name is required' })
-  last_name: string;
+  // School Admin Details
+  @IsString({ message: 'School name must be a string' })
+  @IsNotEmpty({ message: 'School name is required' })
+  school_name: string;
 
   @IsEmail({}, { message: 'Invalid email format' })
-  email: string;
+  @IsNotEmpty({ message: 'Email is required' })
+  school_email: string;
 
-  @IsString({ message: 'Password must be a string' })
-  @MinLength(6, { message: 'Password must be at least 6 characters long' })
-  // Example: Add basic complexity rule (optional)
-  @Matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).+$/, {
-    message:
-      'Password must contain at least one uppercase letter, one lowercase letter, and one number',
-  })
-  password: string;
+  @IsUrl({}, { message: 'Website URL must be a valid URL' })
+  @IsNotEmpty({ message: 'Website URL is required' })
+  school_website_url: string;
 
-  @IsOptional({ message: 'Phone number is optional' })
-  @IsNumber({ allowNaN: false, allowInfinity: false }, { message: 'Phone number must be a valid number' })
-  @Type(() => Number)
-  phone?: number;
+  // School Admin User Details
+  @IsEmail({}, { message: 'Invalid email format' })
+  @IsNotEmpty({ message: 'Email is required' })
+  user_email: string;
 
-  @IsOptional({ message: 'Country code is optional' })
-  @IsNumber({ allowNaN: false, allowInfinity: false }, { message: 'Country code must be a valid number' })
-  @Type(() => Number)
-  country_code?: number;
-
-  @IsString({ message: 'School ID must be a string' })
-  @IsNotEmpty({ message: 'School ID is required' })
-  school_id: string;
+  @IsString({ message: 'First name must be a string' })
+  @IsNotEmpty({ message: 'First name is required' })
+  user_first_name: string;
 }

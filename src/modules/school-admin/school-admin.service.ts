@@ -1,17 +1,17 @@
 import {
-  Injectable,
   BadRequestException,
   ConflictException,
-  NotFoundException,
-  HttpStatus,
+  Injectable,
 } from '@nestjs/common';
-import { InjectModel } from '@nestjs/mongoose';
-import { Model, Types } from 'mongoose';
-import { User } from 'src/database/schemas/central/user.schema';
-import { School } from 'src/database/schemas/central/school.schema';
-import { CreateSchoolAdminDto } from './dto/create-school-admin.dto';
-import { BcryptUtil } from 'src/common/utils/bcrypt.util';
+import { InjectConnection, InjectModel } from '@nestjs/mongoose';
+import { Connection, Model, Types } from 'mongoose';
 import { ROLE_IDS } from 'src/common/constants/roles.constant';
+import { JWTUserPayload } from 'src/common/types/jwr-user.type';
+import { BcryptUtil } from 'src/common/utils/bcrypt.util';
+import { School } from 'src/database/schemas/central/school.schema';
+import { User } from 'src/database/schemas/central/user.schema';
+import { MailService } from 'src/mail/mail.service';
+import { CreateSchoolAdminDto } from './dto/create-school-admin.dto';
 
 @Injectable()
 export class SchoolAdminService {
@@ -21,62 +21,93 @@ export class SchoolAdminService {
     @InjectModel(School.name)
     private readonly schoolModel: Model<School>,
     private readonly bcryptUtil: BcryptUtil,
+    private readonly mailService: MailService,
+    @InjectConnection() private readonly connection: Connection,
   ) {}
 
-  async createSchoolAdmin(createSchoolAdminDto: CreateSchoolAdminDto) {
-    const { email, password, school_id, ...userData } = createSchoolAdminDto;
+  async createSchoolAdmin(
+    createSchoolAdminDto: CreateSchoolAdminDto,
+    user: JWTUserPayload,
+  ) {
+    const {
+      school_email,
+      school_name,
+      school_website_url,
+      user_email,
+      user_first_name,
+    } = createSchoolAdminDto;
 
-    // Validate ObjectId format
-    if (!Types.ObjectId.isValid(school_id)) {
-      throw new BadRequestException('Invalid school ID format');
-    }
+    const [existingUser, existingSchool] = await Promise.all([
+      this.userModel.exists({ email: user_email }),
+      this.schoolModel.exists({ email: school_email }),
+    ]);
 
-    // Check if school exists
-    const school = await this.schoolModel.findById(school_id);
-    if (!school) {
-      throw new NotFoundException('School not found');
-    }
-
-    // Check if user with email already exists
-    const existingUser = await this.userModel.findOne({ email });
     if (existingUser) {
       throw new ConflictException('User with this email already exists');
     }
 
+    if (existingSchool) {
+      throw new ConflictException('School with this email already exists');
+    }
+
+    const session = await this.connection.startSession();
     try {
-      // Hash password
-      const hashedPassword = await this.bcryptUtil.hashPassword(password);
+      session.startTransaction();
 
-      // Create school admin user
-      const schoolAdmin = new this.userModel({
-        ...userData,
-        email,
-        password: hashedPassword,
-        school_id: new Types.ObjectId(school_id),
-        role: new Types.ObjectId(ROLE_IDS.SCHOOL_ADMIN),
-      });
+      const db_name = school_name
+        .toLowerCase()
+        .replace(/[^a-z\s]/g, '')
+        .trim()
+        .replace(/\s+/g, '_');
 
-      const savedUser = await schoolAdmin.save();
+      const [createdSchool] = await this.schoolModel.insertMany([
+        {
+          name: school_name,
+          email: school_email,
+          website_url: school_website_url,
+          db_name,
+          created_by: new Types.ObjectId(user.id),
+        },
+      ]);
 
-      // Return user without password
-      const { password: _, ...userResponse } = savedUser.toObject();
+      const password = this.bcryptUtil.generateStrongPassword();
+
+      await this.userModel.insertMany([
+        {
+          email: user_email,
+          first_name: user_first_name,
+          school_id: createdSchool._id,
+          password: await this.bcryptUtil.hashPassword(password),
+          role: new Types.ObjectId(ROLE_IDS.SCHOOL_ADMIN),
+          created_by: new Types.ObjectId(user.id),
+        },
+      ]);
+
+      // Send email to the new school admin
+      // Note: Email sending logic is not implemented here, but you can use a service like
+      await this.mailService.sendWelcomeEmail(
+        user_email,
+        user_first_name,
+        password,
+      );
+
+      await session.commitTransaction();
 
       return {
-        message: 'School admin created successfully',
-        data: {
-          user: userResponse,
-          school: {
-            id: school._id,
-            name: school.name,
-            email: school.email,
-          },
-        },
+        message: 'School and Admin user created successfully',
+        success: true,
       };
     } catch (error) {
-      if (error.code === 11000) {
+      console.error('Error creating school admin:', error);
+      await session.abortTransaction();
+
+      if (error?.code === 11000) {
         throw new ConflictException('Email already exists');
       }
+
       throw new BadRequestException('Failed to create school admin');
+    } finally {
+      session.endSession();
     }
   }
 }

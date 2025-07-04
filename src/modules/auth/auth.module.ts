@@ -1,14 +1,13 @@
 import { Module } from '@nestjs/common';
+import { AuthService } from './auth.service';
+import { AuthController } from './auth.controller';
 import { MongooseModule } from '@nestjs/mongoose';
-import { SchoolAdminController } from './school-admin.controller';
-import { SchoolAdminService } from './school-admin.service';
 import { User, UserSchema } from 'src/database/schemas/central/user.schema';
+import { UtilsModule } from 'src/common/utils';
 import {
   School,
   SchoolSchema,
 } from 'src/database/schemas/central/school.schema';
-import { UtilsModule } from 'src/common/utils';
-import { MailModule } from 'src/mail/mail.module';
 
 @Module({
   imports: [
@@ -17,9 +16,8 @@ import { MailModule } from 'src/mail/mail.module';
       { name: School.name, schema: SchoolSchema },
     ]),
     UtilsModule,
-    MailModule,
   ],
-  controllers: [SchoolAdminController],
-  providers: [SchoolAdminService],
+  controllers: [AuthController],
+  providers: [AuthService],
 })
-export class SchoolAdminModule {}
+export class AuthModule {}

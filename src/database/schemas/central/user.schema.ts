@@ -10,7 +10,6 @@ import { School } from './school.schema';
   },
 })
 export class User extends Document {
-  @Prop({ type: Types.ObjectId })
   declare _id: Types.ObjectId;
 
   @Prop({ required: true, unique: true, index: true })
@@ -25,20 +24,27 @@ export class User extends Document {
   @Prop({ type: Types.ObjectId, index: true, ref: School.name })
   school_id: Types.ObjectId;
 
+  // This field will be always super admin _id
+  @Prop({ type: Types.ObjectId, index: true })
+  created_by: Types.ObjectId;
+
   @Prop({ required: true })
   password: string;
 
   @Prop()
   last_loggedin: Date;
 
-  @Prop({ type: Types.ObjectId, ref: Role.name })
+  @Prop({ type: Types.ObjectId, ref: Role.name, required: true, index: true })
   role: Types.ObjectId;
 
-  @Prop()
+  @Prop({ required: true, type: String })
   first_name: string;
 
   @Prop()
   last_name: string;
+
+  @Prop({ type: Date, default: null })
+  deleted_at: Date;
 
   readonly created_at?: Date;
   readonly updated_at?: Date;

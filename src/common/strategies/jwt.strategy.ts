@@ -4,11 +4,12 @@ import { Injectable, UnauthorizedException, Logger } from '@nestjs/common';
 import { config } from 'dotenv';
 import { Role } from 'src/database/schemas/central/role.schema';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { Model, Types } from 'mongoose';
 import { TenantConnectionService } from 'src/database/tenant-connection.service';
 import { RoleEnum } from '../constants/roles.constant';
 import { Student } from 'src/database/schemas/tenant/student.schema';
 import { TenantService } from 'src/modules/central/tenant.service';
+import { JWTUserPayload } from '../types/jwr-user.type';
 
 export interface JWTPayload {
   id: string;
@@ -36,12 +37,14 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
     });
   }
 
-  async validate(payload: JWTPayload) {
+  async validate(payload: JWTPayload): Promise<JWTUserPayload> {
     this.logger.debug(`Validating JWT payload for user: ${payload.email}`);
 
     try {
       // Validate role exists
-      const role = await this.roleModel.findById(payload.role_id);
+      const role = await this.roleModel.findById(
+        new Types.ObjectId(payload.role_id),
+      );
       if (!role || role.name !== payload.role_name) {
         this.logger.warn(
           `Invalid role information for user ${payload.email}: role not found or name mismatch`,
@@ -65,14 +68,13 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
           `Successfully validated student: ${payload.email} in school: ${payload.school_id}`,
         );
         return {
-          userId: payload.id,
+          id: payload.id,
           email: payload.email,
           school_id: payload.school_id,
           role: {
             id: payload.role_id,
             name: payload.role_name,
           },
-          studentData, // Include student details for student users
         };
       }
 
@@ -81,12 +83,12 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
         `Successfully validated user: ${payload.email} with role: ${payload.role_name}`,
       );
       return {
-        userId: payload.id,
+        id: payload.id,
         email: payload.email,
         school_id: payload.school_id,
         role: {
           id: payload.role_id,
-          name: payload.role_name,
+          name: payload.role_name as RoleEnum,
         },
       };
     } catch (error) {

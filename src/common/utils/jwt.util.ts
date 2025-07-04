@@ -1,12 +1,14 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
-import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
+import { JwtService } from '@nestjs/jwt';
+import { RoleEnum } from '../constants/roles.constant';
 
 export interface JWTPayload {
-  userId: string;
+  id: string;
   email: string;
-  role: string;
-  schoolDbName?: string;
+  role_id: string;
+  role_name: RoleEnum;
+  school_id?: string;
   exp?: number;
 }
 
@@ -19,12 +21,24 @@ export class JwtUtil {
 
   generateToken(payload: Omit<JWTPayload, 'exp' | 'iat'>): string {
     const expiresIn = this.configService.get<string>('JWT_EXPIRY') || '24h';
-    return this.jwtService.sign(payload, { expiresIn });
+    const secret = this.configService.get<string>('JWT_SECRET');
+    if (!secret) {
+      throw new Error('JWT_SECRET is not configured');
+    }
+    return this.jwtService.sign(payload, {
+      expiresIn,
+      secret,
+    });
   }
 
   verifyToken(token: string): JWTPayload {
     try {
-      return this.jwtService.verify<JWTPayload>(token);
+      const secret = this.configService.get<string>('JWT_SECRET');
+
+      if (!secret) {
+        throw new Error('JWT_SECRET is not configured');
+      }
+      return this.jwtService.verify<JWTPayload>(token, { secret });
     } catch (error) {
       throw new UnauthorizedException(`Invalid token: ${error.message}`);
     }

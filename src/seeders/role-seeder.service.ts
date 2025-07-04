@@ -12,7 +12,7 @@ export class RoleSeederService {
   ) {}
 
   async seed() {
-    console.log('🌱 Seeding roles...');
+    console.info('🌱 Seeding roles...');
     const operations = Object.values(RoleEnum).map((role) => ({
       updateOne: {
         filter: { _id: new Types.ObjectId(ROLE_IDS[role]), name: role },
@@ -27,6 +27,6 @@ export class RoleSeederService {
     }));
 
     const result = await this.roleModel.bulkWrite(operations);
-    console.log(`✅ ${result.upsertedCount} roles seeded.`);
+    console.info(`✅ ${result.upsertedCount} roles seeded.`);
   }
 }

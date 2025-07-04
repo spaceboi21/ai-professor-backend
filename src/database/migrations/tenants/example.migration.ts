@@ -9,7 +9,7 @@ export async function up(
   //     { $set: { deleted: false } }
   //   );
   //   await mongoose.disconnect();
-  //   console.log(`Migration up: added deleted=false to dummies in ${tenantDbName}`);
+  //   console.info(`Migration up: added deleted=false to dummies in ${tenantDbName}`);
 }
 
 export async function down(
@@ -21,5 +21,5 @@ export async function down(
   //     { $unset: { deleted: "" } }
   //   );
   //   await mongoose.disconnect();
-  //   console.log(`Migration down: removed deleted from dummies in ${tenantDbName}`);
+  //   console.info(`Migration down: removed deleted from dummies in ${tenantDbName}`);
 }

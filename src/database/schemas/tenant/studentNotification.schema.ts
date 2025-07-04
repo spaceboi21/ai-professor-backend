@@ -9,7 +9,6 @@ import { Student } from './student.schema';
   },
 })
 export class StudentNotification extends Document {
-  @Prop({ type: Types.ObjectId })
   declare _id: Types.ObjectId;
 
   // Reference to Students_tenent._id

@@ -11,6 +11,10 @@ import { UtilsModule } from './common/utils';
 import { JwtModule } from '@nestjs/jwt';
 import { LoggerMiddleware } from './common/middleware/logger.middleware';
 import { SchoolAdminModule } from './modules/school-admin/school-admin.module';
+import { AuthModule } from './modules/auth/auth.module';
+import { SuperAdminModule } from './modules/super-admin/super-admin.module';
+import { PassportModule } from '@nestjs/passport';
+import { JwtStrategy } from './common/strategies/jwt.strategy';
 
 @Module({
   imports: [
@@ -18,6 +22,7 @@ import { SchoolAdminModule } from './modules/school-admin/school-admin.module';
       isGlobal: true,
     }),
     MongooseModule.forRoot(process.env.CENTRAL_DB_URI as string),
+    PassportModule.register({ defaultStrategy: 'jwt' }),
     JwtModule.registerAsync({
       imports: [ConfigModule],
       useFactory: async (config: ConfigService) => ({
@@ -34,9 +39,11 @@ import { SchoolAdminModule } from './modules/school-admin/school-admin.module';
     SeedModule,
     UtilsModule,
     SchoolAdminModule,
+    AuthModule,
+    SuperAdminModule,
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [AppService, JwtStrategy],
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {

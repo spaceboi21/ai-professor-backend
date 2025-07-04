@@ -9,7 +9,6 @@ import { School, SchoolSchema } from '../central/school.schema';
   },
 })
 export class Student extends Document {
-  @Prop({ type: Types.ObjectId })
   declare _id: Types.ObjectId;
 
   @Prop({ required: true })

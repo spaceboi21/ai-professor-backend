@@ -8,7 +8,6 @@ import { Document, Types } from 'mongoose';
   },
 })
 export class School extends Document {
-  @Prop({ type: Types.ObjectId })
   declare _id: Types.ObjectId;
 
   @Prop({ required: true })
@@ -40,6 +39,13 @@ export class School extends Document {
 
   @Prop()
   language: string;
+
+  // This field will be always super admin _id
+  @Prop({ type: Types.ObjectId, index: true, ref: 'User' })
+  created_by: Types.ObjectId;
+
+  @Prop({ type: Date, default: null })
+  deleted_at: Date;
 
   readonly created_at?: Date;
   readonly updated_at?: Date;
