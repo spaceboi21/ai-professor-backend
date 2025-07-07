@@ -15,6 +15,10 @@ import { School } from 'src/database/schemas/central/school.schema';
 import { User } from 'src/database/schemas/central/user.schema';
 import { MailService } from 'src/mail/mail.service';
 import { CreateProfessorDto } from './dto/create-professor.dto';
+import {
+  UpdateProfessorDto,
+  UpdateProfessorPasswordDto,
+} from './dto/update-professor.dto';
 
 @Injectable()
 export class ProfessorService {
@@ -113,10 +117,133 @@ export class ProfessorService {
       };
     } catch (error) {
       this.logger.error('Error creating Professor', error?.stack || error);
+
+      throw new BadRequestException('Failed to create Professor');
+    }
+  }
+
+  async updateProfessor(id: Types.ObjectId, data: UpdateProfessorDto) {
+    // Validate ID format
+    if (!Types.ObjectId.isValid(id)) {
+      throw new BadRequestException('Invalid professor ID format');
+    }
+
+    // Find the professor by ID
+    const professor = await this.userModel.findById(id);
+    if (!professor) {
+      throw new NotFoundException('Professor not found');
+    }
+
+    // Update fields if provided
+    if (data.first_name) {
+      professor.first_name = data.first_name;
+    }
+    if (data.last_name) {
+      professor.last_name = data.last_name;
+    }
+    if (data.phone) {
+      professor.phone = data.phone;
+    }
+    if (data.country_code) {
+      professor.country_code = data.country_code;
+    }
+
+    // email is not allowed to be updated
+
+    // if (data.email) {
+    //   // Check if email already exists in central users
+    //   const existingUser = await this.userModel.find
+    //     .findOne({ email: data.email })
+    //     .where('_id')
+    //     .ne(id);
+    //   if (existingUser) {
+    //     throw new ConflictException('Email already exists in the system');
+    //   }
+    //   // Check if email already exists in global professors
+    //   const existingGlobalStudent = await this.globalStudentModel
+    //     .findOne({ email: data.email })
+    //     .where('_id')
+    //     .ne(id);
+    //   if (existingGlobalStudent) {
+    //     throw new ConflictException('Email already exists');
+    //   }
+    //   professor.email = data.email.toLowerCase();
+    // }
+
+    // Save the updated professor
+    try {
+      const updatedProfessor = await professor.save();
+      return {
+        message: 'Professor updated successfully',
+        data: {
+          id: updatedProfessor._id,
+          first_name: updatedProfessor.first_name,
+          last_name: updatedProfessor.last_name,
+          email: updatedProfessor.email,
+          phone: updatedProfessor.phone,
+          country_code: updatedProfessor.country_code,
+          school_id: updatedProfessor.school_id,
+          created_at: updatedProfessor.created_at,
+        },
+      };
+    } catch (error) {
+      console.error('Error updating Professor:', error);
       if (error?.code === 11000) {
         throw new ConflictException('Email already exists');
       }
-      throw new BadRequestException('Failed to create Professor');
+      throw new BadRequestException('Failed to update Professor');
+    }
+  }
+
+  async updateProfessorPassword(
+    id: Types.ObjectId,
+    data: UpdateProfessorPasswordDto,
+  ) {
+    // Validate ID format
+    if (!Types.ObjectId.isValid(id)) {
+      throw new BadRequestException('Invalid professor ID format');
+    }
+
+    // Find the professor by ID
+    const professor = await this.userModel.findById(id);
+    if (!professor) {
+      throw new NotFoundException('Professor not found');
+    }
+    // Validate old password
+    const isPasswordValid = await this.bcryptUtil.comparePassword(
+      data.old_password,
+      professor.password,
+    );
+
+    if (!isPasswordValid) {
+      throw new BadRequestException('Invalid old password');
+    }
+
+    // Hash the new password
+    const hashedNewPassword = await this.bcryptUtil.hashPassword(
+      data.new_password,
+    );
+    // Update the password
+    professor.password = hashedNewPassword;
+    professor.last_logged_in = new Date(); // Update last logged in time
+    try {
+      const updatedProfessor = await professor.save();
+      return {
+        message: 'Password updated successfully',
+        data: {
+          id: updatedProfessor._id,
+          first_name: updatedProfessor.first_name,
+          last_name: updatedProfessor.last_name,
+          email: updatedProfessor.email,
+          phone: updatedProfessor.phone,
+          country_code: updatedProfessor.country_code,
+          school_id: updatedProfessor.school_id,
+          created_at: updatedProfessor.created_at,
+        },
+      };
+    } catch (error) {
+      console.error('Error updating Professor password:', error);
+      throw new BadRequestException('Failed to update Professor password');
     }
   }
 }
