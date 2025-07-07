@@ -3,6 +3,7 @@ import {
   BadRequestException,
   ConflictException,
   NotFoundException,
+  Logger,
 } from '@nestjs/common';
 import { InjectConnection, InjectModel } from '@nestjs/mongoose';
 import { Connection, Model, Types } from 'mongoose';
@@ -22,6 +23,7 @@ import { JWTUserPayload } from 'src/common/types/jwr-user.type';
 
 @Injectable()
 export class StudentService {
+  private readonly logger = new Logger(StudentService.name);
   constructor(
     @InjectModel(User.name)
     private readonly userModel: Model<User>,
@@ -40,6 +42,10 @@ export class StudentService {
     adminUser: JWTUserPayload,
   ) {
     const { first_name, last_name, email, school_id } = createStudentDto;
+
+    this.logger.log(
+      `Creating student with email: ${email} for school: ${school_id}`,
+    );
 
     // Validate school exists and admin has access
     const school = await this.schoolModel.findById(school_id);
@@ -105,12 +111,16 @@ export class StudentService {
 
       const savedStudent = await newStudent.save();
 
+      this.logger.log(`Student created in tenant DB: ${savedStudent._id}`);
+
       // Create entry in global students collection
-      const globalStudent = await this.globalStudentModel.create({
+      await this.globalStudentModel.create({
         student_id: savedStudent._id,
         email,
         school_id: new Types.ObjectId(school_id),
       });
+
+      this.logger.log(`Global student entry created for: ${email}`);
 
       // Send credentials email
       await this.mailService.sendCredentialsEmail(
@@ -119,6 +129,8 @@ export class StudentService {
         generatedPassword,
         RoleEnum.STUDENT,
       );
+
+      this.logger.log(`Credentials email sent to: ${email}`);
 
       return {
         message: 'Student created successfully',
@@ -133,12 +145,10 @@ export class StudentService {
         },
       };
     } catch (error) {
-      console.error('Error creating student:', error);
-
+      this.logger.error('Error creating student', error?.stack || error);
       if (error?.code === 11000) {
         throw new ConflictException('Email already exists');
       }
-
       throw new BadRequestException('Failed to create student');
     }
   }

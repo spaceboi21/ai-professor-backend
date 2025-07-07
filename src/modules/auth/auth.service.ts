@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
@@ -22,6 +23,7 @@ import { TenantConnectionService } from 'src/database/tenant-connection.service'
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
   constructor(
     @InjectModel(User.name)
     private readonly userModel: Model<User>,
@@ -33,8 +35,10 @@ export class AuthService {
     private readonly jwtUtil: JwtUtil,
     private readonly tenantConnectionService: TenantConnectionService,
   ) {}
+
   async superAdminLogin(loginData: LoginSuperAdminDto) {
     const { email, password } = loginData;
+    this.logger.log(`SuperAdmin login attempt: ${email}`);
     const isSuperAdminExists = (await this.userModel
       .findOne({
         email,
@@ -47,6 +51,7 @@ export class AuthService {
       })) as (User & { role: Role }) | null;
 
     if (!isSuperAdminExists) {
+      this.logger.warn(`Super Admin not found: ${email}`);
       throw new NotFoundException('Super Admin does not exist');
     }
 
@@ -56,6 +61,7 @@ export class AuthService {
     );
 
     if (!isPasswordMatch) {
+      this.logger.warn(`Invalid credentials for Super Admin: ${email}`);
       throw new BadRequestException('Invalid credentials');
     }
 
@@ -70,6 +76,7 @@ export class AuthService {
       last_logged_in: new Date(),
     });
 
+    this.logger.log(`SuperAdmin login successful: ${email}`);
     return {
       message: 'Login successful',
       token,
@@ -85,7 +92,7 @@ export class AuthService {
 
   async schoolAdminLogin(loginSchoolAdminDto: LoginSchoolAdminDto) {
     const { email, password } = loginSchoolAdminDto;
-
+    this.logger.log(`SchoolAdmin login attempt: ${email}`);
     const user = (await this.userModel
       .findOne({
         email,
@@ -98,6 +105,7 @@ export class AuthService {
       })) as (User & { role: Role }) | null;
 
     if (!user) {
+      this.logger.warn(`School Admin not found: ${email}`);
       throw new NotFoundException('User not found with this email');
     }
 
@@ -107,11 +115,13 @@ export class AuthService {
     );
 
     if (!isPasswordValid) {
+      this.logger.warn(`Invalid credentials for School Admin: ${email}`);
       throw new BadRequestException('Invalid credentials');
     }
 
     const school = await this.schoolModel.findById(user.school_id);
     if (!school) {
+      this.logger.warn(`School not found for School Admin: ${email}`);
       throw new NotFoundException('School not found for this user');
     }
 
@@ -127,6 +137,7 @@ export class AuthService {
       last_logged_in: new Date(),
     });
 
+    this.logger.log(`SchoolAdmin login successful: ${email}`);
     return {
       message: 'Login successful',
       token,
@@ -143,17 +154,19 @@ export class AuthService {
 
   async studentLogin(loginStudentDto: LoginStudentDto) {
     const { email, password } = loginStudentDto;
-
+    this.logger.log(`Student login attempt: ${email}`);
     // First, find the student in the global students collection
     const globalStudent = await this.globalStudentModel.findOne({ email });
 
     if (!globalStudent) {
+      this.logger.warn(`Global student not found: ${email}`);
       throw new NotFoundException('Student not found with this email');
     }
 
     // Get the school information
     const school = await this.schoolModel.findById(globalStudent.school_id);
     if (!school) {
+      this.logger.warn(`School not found for student: ${email}`);
       throw new NotFoundException('School not found for this student');
     }
 
@@ -169,6 +182,7 @@ export class AuthService {
     }).select('+password');
 
     if (!student) {
+      this.logger.warn(`Student not found in school DB: ${email}`);
       throw new NotFoundException('Student not found in school database');
     }
 
@@ -179,6 +193,7 @@ export class AuthService {
     );
 
     if (!isPasswordValid) {
+      this.logger.warn(`Invalid credentials for Student: ${email}`);
       throw new BadRequestException('Invalid credentials');
     }
 
@@ -196,6 +211,7 @@ export class AuthService {
       last_logged_in: new Date(),
     });
 
+    this.logger.log(`Student login successful: ${email}`);
     return {
       message: 'Login successful',
       token,
@@ -212,11 +228,17 @@ export class AuthService {
   }
 
   async getMe(user: any) {
+    this.logger.log(
+      `getMe called for user id: ${user.id}, role: ${user.role.name}`,
+    );
     // user: JWTUserPayload from JwtStrategy
     if (user.role.name === RoleEnum.STUDENT) {
       // Get student details from tenant DB
       const school = await this.schoolModel.findById(user.school_id);
-      if (!school) throw new NotFoundException('School not found');
+      if (!school) {
+        this.logger.warn(`School not found for student getMe: ${user.id}`);
+        throw new NotFoundException('School not found');
+      }
 
       const tenantConnection =
         await this.tenantConnectionService.getTenantConnection(school.db_name);
@@ -228,7 +250,10 @@ export class AuthService {
         role: new Types.ObjectId(user.role.id),
       }).lean();
 
-      if (!student) throw new NotFoundException('Student not found');
+      if (!student) {
+        this.logger.warn(`Student not found in getMe: ${user.id}`);
+        throw new NotFoundException('Student not found');
+      }
 
       return {
         ...student,
@@ -243,7 +268,10 @@ export class AuthService {
         })
         .lean();
 
-      if (!dbUser) throw new NotFoundException('User not found');
+      if (!dbUser) {
+        this.logger.warn(`User not found in getMe: ${user.id}`);
+        throw new NotFoundException('User not found');
+      }
 
       return {
         ...dbUser,

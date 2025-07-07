@@ -2,6 +2,7 @@ import {
   BadRequestException,
   ConflictException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
@@ -17,6 +18,7 @@ import { CreateProfessorDto } from './dto/create-professor.dto';
 
 @Injectable()
 export class ProfessorService {
+  private readonly logger = new Logger(ProfessorService.name);
   constructor(
     @InjectModel(User.name)
     private readonly userModel: Model<User>,
@@ -34,6 +36,9 @@ export class ProfessorService {
   ) {
     const { first_name, last_name, email, school_id } = createProfessorDto;
 
+    this.logger.log(
+      `Creating professor with email: ${email} for school: ${school_id}`,
+    );
     // Validate school exists and admin has access
     const school = await this.schoolModel.findById(
       new Types.ObjectId(school_id),
@@ -83,6 +88,8 @@ export class ProfessorService {
         role: new Types.ObjectId(ROLE_IDS[RoleEnum.PROFESSOR]),
       });
 
+      this.logger.log(`Professor created in user table: ${newStudent._id}`);
+
       // Send credentials email
       await this.mailService.sendCredentialsEmail(
         email,
@@ -90,6 +97,8 @@ export class ProfessorService {
         generatedPassword,
         RoleEnum.PROFESSOR,
       );
+
+      this.logger.log(`Credentials email sent to: ${email}`);
 
       return {
         message: 'Professor created successfully',
@@ -103,12 +112,10 @@ export class ProfessorService {
         },
       };
     } catch (error) {
-      console.error('Error creating Professor:', error);
-
+      this.logger.error('Error creating Professor', error?.stack || error);
       if (error?.code === 11000) {
         throw new ConflictException('Email already exists');
       }
-
       throw new BadRequestException('Failed to create Professor');
     }
   }

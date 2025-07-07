@@ -2,6 +2,7 @@ import {
   BadRequestException,
   ConflictException,
   Injectable,
+  Logger,
 } from '@nestjs/common';
 import { InjectConnection, InjectModel } from '@nestjs/mongoose';
 import { Connection, Model, Types } from 'mongoose';
@@ -16,6 +17,7 @@ import { GlobalStudent } from 'src/database/schemas/central/global-student.schem
 
 @Injectable()
 export class SchoolAdminService {
+  private readonly logger = new Logger(SchoolAdminService.name);
   constructor(
     @InjectModel(User.name)
     private readonly userModel: Model<User>,
@@ -41,6 +43,10 @@ export class SchoolAdminService {
       user_last_name,
     } = createSchoolAdminDto;
 
+    this.logger.log(
+      `Creating school admin: ${user_email} for school: ${school_name}`,
+    );
+
     const [existingUser, existingSchool, existingGlobalStudent] =
       await Promise.all([
         this.userModel.exists({ email: user_email }),
@@ -52,13 +58,17 @@ export class SchoolAdminService {
 
     // Check if the user is already a global student;
     if (existingGlobalStudent) {
+      this.logger.warn(`Student with this email already exists: ${user_email}`);
       throw new ConflictException('Student with this email already exists');
     }
     if (existingUser) {
+      this.logger.warn(`User with this email already exists: ${user_email}`);
       throw new ConflictException('User with this email already exists');
     }
-
     if (existingSchool) {
+      this.logger.warn(
+        `School with this email already exists: ${school_email}`,
+      );
       throw new ConflictException('School with this email already exists');
     }
 
@@ -101,23 +111,22 @@ export class SchoolAdminService {
         user_email,
         `${user_first_name}${user_last_name ? ` ${user_last_name}` : ''}`,
         password,
-        RoleEnum.SCHOOL_ADMIN
+        RoleEnum.SCHOOL_ADMIN,
       );
+      this.logger.log(`Credentials email sent to: ${user_email}`);
 
       await session.commitTransaction();
-
+      this.logger.log(`Transaction committed for school admin: ${user_email}`);
       return {
         message: 'School and Admin user created successfully',
         success: true,
       };
     } catch (error) {
-      console.error('Error creating school admin:', error);
+      this.logger.error('Error creating school admin', error?.stack || error);
       await session.abortTransaction();
-
       if (error?.code === 11000) {
         throw new ConflictException('Email already exists');
       }
-
       throw new BadRequestException('Failed to create school admin');
     } finally {
       session.endSession();
