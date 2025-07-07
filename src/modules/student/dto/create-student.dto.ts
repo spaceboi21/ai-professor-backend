@@ -1,5 +1,5 @@
 import { Transform } from 'class-transformer';
-import { IsString, IsEmail, IsNotEmpty } from 'class-validator';
+import { IsString, IsEmail, IsNotEmpty, IsMongoId } from 'class-validator';
 
 export class CreateStudentDto {
   @IsString({ message: 'First name must be a string' })
@@ -16,5 +16,9 @@ export class CreateStudentDto {
 
   @IsString({ message: 'School ID must be a string' })
   @IsNotEmpty({ message: 'School ID is required' })
+  @IsMongoId({
+    message:
+      'The ID provided is not in the correct format. Please use a valid MongoDB ObjectId.',
+  })
   school_id: string;
 }
