@@ -7,9 +7,13 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { TenantConnectionService } from 'src/database/tenant-connection.service';
 import { RoleEnum } from '../constants/roles.constant';
-import { Student } from 'src/database/schemas/tenant/student.schema';
+import {
+  Student,
+  StudentSchema,
+} from 'src/database/schemas/tenant/student.schema';
 import { TenantService } from 'src/modules/central/tenant.service';
 import { JWTUserPayload } from '../types/jwr-user.type';
+import { User } from 'src/database/schemas/central/user.schema';
 
 export interface JWTPayload {
   id: string;
@@ -27,6 +31,8 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
   constructor(
     @InjectModel(Role.name)
     private readonly roleModel: Model<Role>,
+    @InjectModel(User.name)
+    private readonly userModel: Model<User>,
     private readonly tenantService: TenantService,
     private readonly tenantConnectionService: TenantConnectionService,
   ) {
@@ -39,7 +45,6 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
 
   async validate(payload: JWTPayload): Promise<JWTUserPayload> {
     this.logger.debug(`Validating JWT payload for user: ${payload.email}`);
-
     try {
       // Validate role exists
       const role = await this.roleModel.findById(
@@ -76,21 +81,34 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
             name: payload.role_name,
           },
         };
-      }
+      } else {
+        // For other roles, validate in central userModel
+        const user = await this.userModel.findOne({
+          _id: new Types.ObjectId(payload.id),
+          email: payload.email,
+          role: new Types.ObjectId(payload.role_id),
+        });
 
-      // For non-student roles, return basic user info
-      this.logger.log(
-        `Successfully validated user: ${payload.email} with role: ${payload.role_name}`,
-      );
-      return {
-        id: payload.id,
-        email: payload.email,
-        school_id: payload.school_id,
-        role: {
-          id: payload.role_id,
-          name: payload.role_name as RoleEnum,
-        },
-      };
+        if (!user) {
+          this.logger.warn(
+            `User ${payload.email} with role ${payload.role_name} not found in central users`,
+          );
+          throw new UnauthorizedException('User not found in central users');
+        }
+
+        this.logger.log(
+          `Successfully validated user: ${payload.email} with role: ${payload.role_name}`,
+        );
+        return {
+          id: user._id.toString(),
+          email: user.email,
+          school_id: user.school_id,
+          role: {
+            id: user.role.toString(),
+            name: payload.role_name as RoleEnum,
+          },
+        };
+      }
     } catch (error) {
       this.logger.error(
         `Token validation failed for user ${payload.email}: ${error.message}`,
@@ -108,7 +126,6 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
       const dbName = await this.tenantService.getTenantDbName(
         payload.school_id,
       );
-
       // Get tenant connection
       this.logger.debug(`Connecting to tenant database: ${dbName}`);
       const tenantConnection =
@@ -116,12 +133,11 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
 
       // Find student in tenant database
 
-      const studentModel = tenantConnection.collection(Student.name);
-      const student = await studentModel.findOne({
+      const StudentModel = tenantConnection.model(Student.name, StudentSchema);
+      const student = await StudentModel.findOne({
         email: payload.email,
-        school_id: payload.school_id,
+        school_id: new Types.ObjectId(payload.school_id),
       });
-
       if (!student) {
         this.logger.warn(
           `Student ${payload.email} not found in tenant database ${dbName}`,

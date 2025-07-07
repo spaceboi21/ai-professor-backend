@@ -210,4 +210,45 @@ export class AuthService {
       },
     };
   }
+
+  async getMe(user: any) {
+    // user: JWTUserPayload from JwtStrategy
+    if (user.role.name === RoleEnum.STUDENT) {
+      // Get student details from tenant DB
+      const school = await this.schoolModel.findById(user.school_id);
+      if (!school) throw new NotFoundException('School not found');
+
+      const tenantConnection =
+        await this.tenantConnectionService.getTenantConnection(school.db_name);
+
+      const StudentModel = tenantConnection.model(Student.name, StudentSchema);
+
+      const student = await StudentModel.findOne({
+        _id: user.id,
+        role: new Types.ObjectId(user.role.id),
+      }).lean();
+
+      if (!student) throw new NotFoundException('Student not found');
+
+      return {
+        ...student,
+        role: user.role, // role from JWT (already populated)
+      };
+    } else {
+      // Get user details from central DB
+      const dbUser = await this.userModel
+        .findOne({
+          _id: user.id,
+          role: new Types.ObjectId(user.role.id),
+        })
+        .lean();
+
+      if (!dbUser) throw new NotFoundException('User not found');
+
+      return {
+        ...dbUser,
+        role: user.role, // populated role object
+      };
+    }
+  }
 }
