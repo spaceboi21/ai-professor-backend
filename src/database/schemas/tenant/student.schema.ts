@@ -50,7 +50,7 @@ export class Student extends Document {
   role: Types.ObjectId;
 
   @Prop({ type: Date, default: null })
-  last_loggedin: Date;
+  last_logged_in: Date;
 
   @Prop({ type: Date, default: null })
   deleted_at: Date;

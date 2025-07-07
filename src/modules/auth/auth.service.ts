@@ -67,7 +67,7 @@ export class AuthService {
       school_id: isSuperAdminExists.school_id?.toString(),
     });
     await this.userModel.findByIdAndUpdate(isSuperAdminExists._id, {
-      last_loggedin: new Date(),
+      last_logged_in: new Date(),
     });
 
     return {
@@ -124,7 +124,7 @@ export class AuthService {
     });
 
     await this.userModel.findByIdAndUpdate(user._id, {
-      last_loggedin: new Date(),
+      last_logged_in: new Date(),
     });
 
     return {
@@ -193,7 +193,7 @@ export class AuthService {
 
     // Update last login time
     await StudentModel.findByIdAndUpdate(student._id, {
-      last_loggedin: new Date(),
+      last_logged_in: new Date(),
     });
 
     return {

@@ -32,7 +32,7 @@ export class User extends Document {
   password: string;
 
   @Prop()
-  last_loggedin: Date;
+  last_logged_in: Date;
 
   @Prop({ type: Types.ObjectId, ref: Role.name, required: true, index: true })
   role: Types.ObjectId;
