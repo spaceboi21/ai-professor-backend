@@ -117,6 +117,7 @@ export class StudentService {
         email,
         `${first_name}${last_name ? ` ${last_name}` : ''}`,
         generatedPassword,
+        RoleEnum.STUDENT,
       );
 
       return {

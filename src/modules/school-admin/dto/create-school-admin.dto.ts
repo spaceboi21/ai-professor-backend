@@ -32,7 +32,6 @@ export class CreateSchoolAdminDto {
   @IsNotEmpty({ message: 'First name is required' })
   user_first_name: string;
 
-  @IsOptional()
   @IsString({ message: 'Last name must be a string' })
   @IsNotEmpty({ message: 'Last name is required' })
   user_last_name: string;

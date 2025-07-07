@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { MailerService } from '@nestjs-modules/mailer';
 import { VerificationMail } from './type';
+import { RoleEnum } from 'src/common/constants/roles.constant';
 
 @Injectable()
 export class MailService {
@@ -40,6 +41,7 @@ export class MailService {
     email: string,
     name: string,
     password: string,
+    role: RoleEnum,
   ): Promise<void> {
     await this.mailerService.sendMail({
       to: email,
@@ -49,6 +51,7 @@ export class MailService {
         name,
         email,
         password,
+        role: role.replace(/_/g, ' ').toLowerCase(),
       },
     });
   }

@@ -16,7 +16,7 @@ export class Student extends Document {
   @Prop({ required: true })
   first_name: string;
 
-  @Prop({ required: true })
+  @Prop()
   last_name: string;
 
   @Prop({ required: true, unique: true })

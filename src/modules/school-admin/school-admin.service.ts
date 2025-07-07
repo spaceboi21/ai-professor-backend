@@ -5,7 +5,7 @@ import {
 } from '@nestjs/common';
 import { InjectConnection, InjectModel } from '@nestjs/mongoose';
 import { Connection, Model, Types } from 'mongoose';
-import { ROLE_IDS } from 'src/common/constants/roles.constant';
+import { ROLE_IDS, RoleEnum } from 'src/common/constants/roles.constant';
 import { JWTUserPayload } from 'src/common/types/jwr-user.type';
 import { BcryptUtil } from 'src/common/utils/bcrypt.util';
 import { School } from 'src/database/schemas/central/school.schema';
@@ -101,6 +101,7 @@ export class SchoolAdminService {
         user_email,
         `${user_first_name}${user_last_name ? ` ${user_last_name}` : ''}`,
         password,
+        RoleEnum.SCHOOL_ADMIN
       );
 
       await session.commitTransaction();

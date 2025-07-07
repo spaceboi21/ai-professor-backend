@@ -17,6 +17,7 @@ import { SuperAdminModule } from './modules/super-admin/super-admin.module';
 import { JwtStrategy } from './common/strategies/jwt.strategy';
 import { StudentModule } from './modules/student/student.module';
 import { MailModule } from './mail/mail.module';
+import { ProfessorModule } from './modules/professor/professor.module';
 
 @Module({
   imports: [
@@ -46,6 +47,7 @@ import { MailModule } from './mail/mail.module';
     SuperAdminModule,
     StudentModule,
     MailModule,
+    ProfessorModule,
   ],
   controllers: [AppController],
   providers: [AppService, JwtStrategy],
