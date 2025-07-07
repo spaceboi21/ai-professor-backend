@@ -5,7 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectConnection, InjectModel } from '@nestjs/mongoose';
-import { Connection, Model, Types, ClientSession } from 'mongoose';
+import { Connection, Model, Types } from 'mongoose';
 import { User } from 'src/database/schemas/central/user.schema';
 import { School } from 'src/database/schemas/central/school.schema';
 import {
@@ -80,19 +80,7 @@ export class StudentService {
       await this.tenantConnectionService.getTenantConnection(school.db_name);
     const StudentModel = tenantConnection.model(Student.name, StudentSchema);
 
-    // Start session for transaction
-    const session = await this.connection.startSession();
-    let tenantSession: ClientSession | null = null;
-
     try {
-      session.startTransaction();
-
-      // Start tenant session if available
-      if (tenantConnection.startSession) {
-        tenantSession = await tenantConnection.startSession();
-        tenantSession.startTransaction();
-      }
-
       // Double-check email uniqueness in tenant database
       const existingTenantStudent = await StudentModel.findOne({ email });
       if (existingTenantStudent) {
@@ -115,31 +103,16 @@ export class StudentService {
         created_by_role: adminUser.role.name as RoleEnum,
       });
 
-      const savedStudent = await newStudent.save(
-        tenantSession ? { session: tenantSession } : {},
-      );
+      const savedStudent = await newStudent.save();
 
       // Create entry in global students collection
-      const [globalStudent] = await this.globalStudentModel.insertMany(
-        [
-          {
-            student_id: savedStudent._id,
-            email,
-            school_id: new Types.ObjectId(school_id),
-          },
-        ],
-        { session },
-      );
+      const globalStudent = await this.globalStudentModel.create({
+        student_id: savedStudent._id,
+        email,
+        school_id: new Types.ObjectId(school_id),
+      });
 
-      // Commit tenant transaction first
-      if (tenantSession) {
-        await tenantSession.commitTransaction();
-      }
-
-      // Commit central transaction
-      await session.commitTransaction();
-
-      // Send credentials email (outside transaction to avoid rollback on email failure)
+      // Send credentials email
       await this.mailService.sendCredentialsEmail(
         email,
         `${first_name}${last_name ? ` ${last_name}` : ''}`,
@@ -161,25 +134,11 @@ export class StudentService {
     } catch (error) {
       console.error('Error creating student:', error);
 
-      // Rollback tenant transaction
-      if (tenantSession) {
-        await tenantSession.abortTransaction();
-      }
-
-      // Rollback central transaction
-      await session.abortTransaction();
-
       if (error?.code === 11000) {
         throw new ConflictException('Email already exists');
       }
 
       throw new BadRequestException('Failed to create student');
-    } finally {
-      // End sessions
-      if (tenantSession) {
-        tenantSession.endSession();
-      }
-      session.endSession();
     }
   }
 }
