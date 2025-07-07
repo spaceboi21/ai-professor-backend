@@ -9,12 +9,17 @@ import {
 } from 'src/database/schemas/central/school.schema';
 import { UtilsModule } from 'src/common/utils';
 import { MailModule } from 'src/mail/mail.module';
+import {
+  GlobalStudent,
+  GlobalStudentSchema,
+} from 'src/database/schemas/central/global-student.schema';
 
 @Module({
   imports: [
     MongooseModule.forFeature([
       { name: User.name, schema: UserSchema },
       { name: School.name, schema: SchoolSchema },
+      { name: GlobalStudent.name, schema: GlobalStudentSchema },
     ]),
     UtilsModule,
     MailModule,

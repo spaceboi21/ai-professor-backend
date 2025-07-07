@@ -8,16 +8,22 @@ import {
   School,
   SchoolSchema,
 } from 'src/database/schemas/central/school.schema';
+import {
+  GlobalStudent,
+  GlobalStudentSchema,
+} from 'src/database/schemas/central/global-student.schema';
+import { TenantConnectionService } from 'src/database/tenant-connection.service';
 
 @Module({
   imports: [
     MongooseModule.forFeature([
       { name: User.name, schema: UserSchema },
       { name: School.name, schema: SchoolSchema },
+      { name: GlobalStudent.name, schema: GlobalStudentSchema },
     ]),
     UtilsModule,
   ],
   controllers: [AuthController],
-  providers: [AuthService],
+  providers: [AuthService, TenantConnectionService],
 })
 export class AuthModule {}

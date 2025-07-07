@@ -28,7 +28,7 @@ export class User extends Document {
   @Prop({ type: Types.ObjectId, index: true })
   created_by: Types.ObjectId;
 
-  @Prop({ required: true })
+  @Prop({ required: true, select: false })
   password: string;
 
   @Prop()

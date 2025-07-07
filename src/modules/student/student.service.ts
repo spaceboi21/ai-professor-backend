@@ -4,8 +4,8 @@ import {
   ConflictException,
   NotFoundException,
 } from '@nestjs/common';
-import { InjectModel } from '@nestjs/mongoose';
-import { Model, Types } from 'mongoose';
+import { InjectConnection, InjectModel } from '@nestjs/mongoose';
+import { Connection, Model, Types, ClientSession } from 'mongoose';
 import { User } from 'src/database/schemas/central/user.schema';
 import { School } from 'src/database/schemas/central/school.schema';
 import {
@@ -32,6 +32,7 @@ export class StudentService {
     private readonly bcryptUtil: BcryptUtil,
     private readonly tenantConnectionService: TenantConnectionService,
     private readonly mailService: MailService,
+    @InjectConnection() private readonly connection: Connection,
   ) {}
 
   async createStudent(
@@ -40,18 +41,25 @@ export class StudentService {
   ) {
     const { first_name, last_name, email, school_id } = createStudentDto;
 
-    // Validate school exists
+    // Validate school exists and admin has access
     const school = await this.schoolModel.findById(school_id);
-
     if (!school) {
       throw new NotFoundException('School not found');
     }
 
+    // If admin is SCHOOL_ADMIN, ensure they belong to this school
+    if (adminUser.role.name === RoleEnum.SCHOOL_ADMIN) {
+      if (adminUser.school_id !== school_id) {
+        throw new BadRequestException(
+          'You can only create students for your own school',
+        );
+      }
+    }
+
     // Check if email already exists in central users
     const existingUser = await this.userModel.findOne({ email });
-
     if (existingUser) {
-      throw new ConflictException('Email already exists');
+      throw new ConflictException('Email already exists in the system');
     }
 
     // Check if email already exists in global students
@@ -72,44 +80,106 @@ export class StudentService {
       await this.tenantConnectionService.getTenantConnection(school.db_name);
     const StudentModel = tenantConnection.model(Student.name, StudentSchema);
 
-    // Check if student_code already exists in tenant database
-    const existingStudent = await StudentModel.findOne({ email });
-    if (existingStudent) {
-      throw new ConflictException('Student code already exists');
+    // Start session for transaction
+    const session = await this.connection.startSession();
+    let tenantSession: ClientSession | null = null;
+
+    try {
+      session.startTransaction();
+
+      // Start tenant session if available
+      if (tenantConnection.startSession) {
+        tenantSession = await tenantConnection.startSession();
+        tenantSession.startTransaction();
+      }
+
+      // Double-check email uniqueness in tenant database
+      const existingTenantStudent = await StudentModel.findOne({ email });
+      if (existingTenantStudent) {
+        throw new ConflictException(
+          'Student with this email already exists in school database',
+        );
+      }
+
+      // Create student in tenant database
+      const newStudent = new StudentModel({
+        first_name,
+        last_name,
+        email,
+        password: hashedPassword,
+        student_code: `${school.name
+          .toLowerCase()
+          .replace(/\s+/g, '')}-${Date.now()}`, // Generate school-specific student code
+        school_id: new Types.ObjectId(school_id),
+        created_by: new Types.ObjectId(adminUser?.id),
+        created_by_role: adminUser.role.name as RoleEnum,
+      });
+
+      const savedStudent = await newStudent.save(
+        tenantSession ? { session: tenantSession } : {},
+      );
+
+      // Create entry in global students collection
+      const [globalStudent] = await this.globalStudentModel.insertMany(
+        [
+          {
+            student_id: savedStudent._id,
+            email,
+            school_id: new Types.ObjectId(school_id),
+          },
+        ],
+        { session },
+      );
+
+      // Commit tenant transaction first
+      if (tenantSession) {
+        await tenantSession.commitTransaction();
+      }
+
+      // Commit central transaction
+      await session.commitTransaction();
+
+      // Send credentials email (outside transaction to avoid rollback on email failure)
+      await this.mailService.sendCredentialsEmail(
+        email,
+        `${first_name}${last_name ? ` ${last_name}` : ''}`,
+        generatedPassword,
+      );
+
+      return {
+        message: 'Student created successfully',
+        data: {
+          id: savedStudent._id,
+          first_name: savedStudent.first_name,
+          last_name: savedStudent.last_name,
+          email: savedStudent.email,
+          student_code: savedStudent.student_code,
+          school_id: savedStudent.school_id,
+          created_at: savedStudent.created_at,
+        },
+      };
+    } catch (error) {
+      console.error('Error creating student:', error);
+
+      // Rollback tenant transaction
+      if (tenantSession) {
+        await tenantSession.abortTransaction();
+      }
+
+      // Rollback central transaction
+      await session.abortTransaction();
+
+      if (error?.code === 11000) {
+        throw new ConflictException('Email already exists');
+      }
+
+      throw new BadRequestException('Failed to create student');
+    } finally {
+      // End sessions
+      if (tenantSession) {
+        tenantSession.endSession();
+      }
+      session.endSession();
     }
-
-    // Create student in tenant database
-    const newStudent = new StudentModel({
-      first_name,
-      last_name,
-      email,
-      password: hashedPassword,
-      student_code: `student-${Date.now()}`, // Generate a unique student code
-      school_id: new Types.ObjectId(school_id),
-      created_by: new Types.ObjectId(adminUser?.id),
-      created_by_role: adminUser.role.name as RoleEnum,
-    });
-
-    const savedStudent = await newStudent.save();
-
-    // Create entry in global students collection
-    const globalStudent = new this.globalStudentModel({
-      student_id: savedStudent._id,
-      email,
-      school_id: new Types.ObjectId(school_id),
-    });
-
-    await globalStudent.save();
-
-    await this.mailService.sendCredentialsEmail(
-      email,
-      `${first_name} ${last_name}`,
-      generatedPassword,
-    );
-
-    return {
-      message: 'Student created successfully',
-      data: savedStudent,
-    };
   }
 }

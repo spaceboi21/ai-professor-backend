@@ -1,7 +1,8 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, Types } from 'mongoose';
 import { School } from '../central/school.schema';
-import { RoleEnum } from 'src/common/constants/roles.constant';
+import { ROLE_IDS, RoleEnum } from 'src/common/constants/roles.constant';
+import { Role } from '../central/role.schema';
 
 @Schema({
   timestamps: {
@@ -38,6 +39,18 @@ export class Student extends Document {
 
   @Prop({ required: true, enum: RoleEnum })
   created_by_role: RoleEnum;
+
+  @Prop({
+    type: Types.ObjectId,
+    ref: Role.name,
+    required: true,
+    index: true,
+    default: new Types.ObjectId(ROLE_IDS.STUDENT),
+  })
+  role: Types.ObjectId;
+
+  @Prop({ type: Date, default: null })
+  last_loggedin: Date;
 
   @Prop({ type: Date, default: null })
   deleted_at: Date;

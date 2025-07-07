@@ -12,6 +12,7 @@ import { School } from 'src/database/schemas/central/school.schema';
 import { User } from 'src/database/schemas/central/user.schema';
 import { MailService } from 'src/mail/mail.service';
 import { CreateSchoolAdminDto } from './dto/create-school-admin.dto';
+import { GlobalStudent } from 'src/database/schemas/central/global-student.schema';
 
 @Injectable()
 export class SchoolAdminService {
@@ -20,6 +21,8 @@ export class SchoolAdminService {
     private readonly userModel: Model<User>,
     @InjectModel(School.name)
     private readonly schoolModel: Model<School>,
+    @InjectModel(GlobalStudent.name)
+    private readonly globalStudentModel: Model<GlobalStudent>,
     private readonly bcryptUtil: BcryptUtil,
     private readonly mailService: MailService,
     @InjectConnection() private readonly connection: Connection,
@@ -38,11 +41,19 @@ export class SchoolAdminService {
       user_last_name,
     } = createSchoolAdminDto;
 
-    const [existingUser, existingSchool] = await Promise.all([
-      this.userModel.exists({ email: user_email }),
-      this.schoolModel.exists({ email: school_email }),
-    ]);
+    const [existingUser, existingSchool, existingGlobalStudent] =
+      await Promise.all([
+        this.userModel.exists({ email: user_email }),
+        this.schoolModel.exists({ email: school_email }),
+        this.globalStudentModel.findOne({
+          email: user_email,
+        }),
+      ]);
 
+    // Check if the user is already a global student;
+    if (existingGlobalStudent) {
+      throw new ConflictException('Student with this email already exists');
+    }
     if (existingUser) {
       throw new ConflictException('User with this email already exists');
     }
@@ -88,7 +99,7 @@ export class SchoolAdminService {
       // Note: Email sending logic is not implemented here, but you can use a service like
       await this.mailService.sendCredentialsEmail(
         user_email,
-        `${user_first_name} ${user_last_name}`,
+        `${user_first_name}${user_last_name ? ` ${user_last_name}` : ''}`,
         password,
       );
 
