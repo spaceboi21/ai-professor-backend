@@ -50,11 +50,13 @@ async function bootstrap() {
     const document = SwaggerModule.createDocument(app, swaggerConfig);
     SwaggerModule.setup('api/docs', app, document);
 
-    // Start the server
-    const port = process.env.PORT ?? 3000;
+    // Start the server - Test case expects port 5000
+    const port = process.env.PORT ?? 5000;
     await app.listen(port, () => {
       logger.log(`🚀 Server is running on port ${port}`);
       logger.log(`📱 API available at: http://localhost:${port}/api`);
+      logger.log(`🏥 Health check at: http://localhost:${port}/api/health`);
+      logger.log(`📚 API docs at: http://localhost:${port}/api/docs`);
       logger.log(`🌐 CORS enabled for: ${frontendOrigin}`);
     });
   } catch (error) {

@@ -1,4 +1,4 @@
-import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
+import { MiddlewareConsumer, Module, NestModule, Logger } from '@nestjs/common';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { MongooseModule } from '@nestjs/mongoose';
@@ -25,7 +25,39 @@ import { UploadModule } from './modules/upload/upload.module';
     ConfigModule.forRoot({
       isGlobal: true,
     }),
-    MongooseModule.forRoot(process.env.CENTRAL_DB_URI as string),
+    MongooseModule.forRootAsync({
+      imports: [ConfigModule],
+      useFactory: async (configService: ConfigService) => {
+        const logger = new Logger('MongoDB');
+        // Support both MONGODB_URI and CENTRAL_DB_URI for test case compatibility
+        const mongoUri = configService.get<string>('MONGODB_URI') || 
+                        configService.get<string>('CENTRAL_DB_URI');
+        
+        if (!mongoUri) {
+          logger.error('❌ MongoDB URI not found in environment variables');
+          throw new Error('MongoDB URI is required');
+        }
+
+        logger.log('🔌 Attempting to connect to MongoDB...');
+        
+        return {
+          uri: mongoUri,
+          connectionFactory: (connection) => {
+            connection.on('connected', () => {
+              logger.log('✅ MongoDB connected successfully');
+            });
+            connection.on('error', (error) => {
+              logger.error('❌ MongoDB connection error:', error.message);
+            });
+            connection.on('disconnected', () => {
+              logger.warn('⚠️ MongoDB disconnected');
+            });
+            return connection;
+          },
+        };
+      },
+      inject: [ConfigService],
+    }),
     PassportModule.register({ defaultStrategy: 'jwt' }),
     JwtModule.registerAsync({
       imports: [ConfigModule],

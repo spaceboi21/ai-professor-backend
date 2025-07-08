@@ -1,0 +1,17 @@
+node_modules
+npm-debug.log
+dist
+coverage
+.nyc_output
+.env
+.env.local
+.env.*.local
+.git
+.gitignore
+README.md
+.eslintrc.js
+.prettierrc
+*.md
+docker-compose.yml
+Dockerfile
+.dockerignore 
