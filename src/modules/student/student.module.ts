@@ -22,7 +22,6 @@ import { MailModule } from 'src/mail/mail.module';
 @Module({
   imports: [
     MongooseModule.forFeature([
-      { name: Student.name, schema: StudentSchema },
       { name: User.name, schema: UserSchema },
       { name: School.name, schema: SchoolSchema },
       { name: GlobalStudent.name, schema: GlobalStudentSchema },

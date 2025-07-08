@@ -1,8 +1,6 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, Types } from 'mongoose';
-import { School } from '../central/school.schema';
 import { ROLE_IDS, RoleEnum } from 'src/common/constants/roles.constant';
-import { Role } from '../central/role.schema';
 
 @Schema({
   timestamps: {
@@ -22,7 +20,7 @@ export class Student extends Document {
   @Prop({ required: true, unique: true })
   email: string;
 
-  @Prop({ type: Types.ObjectId, index: true, ref: School.name })
+  @Prop({ type: Types.ObjectId, index: true })
   school_id: Types.ObjectId;
 
   @Prop({ required: true, select: false })
@@ -42,7 +40,7 @@ export class Student extends Document {
 
   @Prop({
     type: Types.ObjectId,
-    ref: Role.name,
+    // ref: Role.name,
     required: true,
     index: true,
     default: new Types.ObjectId(ROLE_IDS.STUDENT),

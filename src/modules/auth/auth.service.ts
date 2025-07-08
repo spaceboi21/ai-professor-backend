@@ -96,12 +96,7 @@ export class AuthService {
     const user = (await this.userModel
       .findOne({
         email,
-        role: {
-          $in: [
-            new Types.ObjectId(ROLE_IDS.SCHOOL_ADMIN),
-            new Types.ObjectId(ROLE_IDS.PROFESSOR),
-          ],
-        },
+        role: new Types.ObjectId(ROLE_IDS.SCHOOL_ADMIN),
       })
       .select('+password')
       .populate({
