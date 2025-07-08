@@ -29,9 +29,7 @@ import { SchoolAdminService } from './school-admin.service';
 @Controller('school-admin')
 @UseGuards(JwtAuthGuard, RoleGuard)
 export class SchoolAdminController {
-  constructor(
-    private readonly schoolAdminService: SchoolAdminService,
-  ) {}
+  constructor(private readonly schoolAdminService: SchoolAdminService) {}
 
   // Create a new school admin
   @Post('')

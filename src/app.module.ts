@@ -18,6 +18,7 @@ import { JwtStrategy } from './common/strategies/jwt.strategy';
 import { StudentModule } from './modules/student/student.module';
 import { MailModule } from './mail/mail.module';
 import { ProfessorModule } from './modules/professor/professor.module';
+import { UploadModule } from './modules/upload/upload.module';
 
 @Module({
   imports: [
@@ -48,6 +49,7 @@ import { ProfessorModule } from './modules/professor/professor.module';
     StudentModule,
     MailModule,
     ProfessorModule,
+    UploadModule,
   ],
   controllers: [AppController],
   providers: [AppService, JwtStrategy],

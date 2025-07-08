@@ -46,4 +46,9 @@ export class UpdateSchoolDetailsDto {
   @IsString({ message: 'Language must be a string' })
   @ApiProperty({ example: 'en', required: false })
   language?: string;
+
+  @IsOptional()
+  @IsString({ message: 'logo must be a string' })
+  @ApiProperty({ example: '/logo.png', required: false })
+  logo?: string;
 }

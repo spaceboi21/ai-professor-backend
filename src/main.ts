@@ -4,6 +4,7 @@ import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { join } from 'path';
 
 async function bootstrap() {
   const logger = new Logger('Bootstrap');
@@ -30,6 +31,13 @@ async function bootstrap() {
 
     // Set global prefix for all routes
     app.setGlobalPrefix('api');
+
+    // Serve static assets from the uploads directory
+    if (process.env.NODE_ENV !== 'production') {
+      app.useStaticAssets(join(__dirname, '..', 'uploads'), {
+        prefix: '/uploads/',
+      });
+    }
 
     // Swagger setup
     const swaggerConfig = new DocumentBuilder()

@@ -27,6 +27,11 @@ export class UpdateProfessorDto {
   @IsString()
   @ApiProperty({ example: 'Doe', required: false })
   last_name?: string;
+
+  @IsOptional()
+  @IsString()
+  @ApiProperty({ example: 'John', required: false })
+  profile_pic?: string;
 }
 
 export class UpdateProfessorPasswordDto {

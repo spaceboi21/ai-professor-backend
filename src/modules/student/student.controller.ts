@@ -7,7 +7,13 @@ import { Roles } from 'src/common/decorators/roles.decorator';
 import { RoleEnum } from 'src/common/constants/roles.constant';
 import { User } from 'src/common/decorators/user.decorator';
 import { JWTUserPayload } from 'src/common/types/jwr-user.type';
-import { ApiOperation, ApiResponse, ApiBody, ApiTags, ApiBearerAuth } from '@nestjs/swagger';
+import {
+  ApiOperation,
+  ApiResponse,
+  ApiBody,
+  ApiTags,
+  ApiBearerAuth,
+} from '@nestjs/swagger';
 
 @ApiTags('Student')
 @ApiBearerAuth()

@@ -160,6 +160,7 @@ export class SchoolAdminService {
       country_code,
       timezone,
       language,
+      logo,
     } = updateSchoolAdminDto || {};
 
     // Update fields conditionally
@@ -183,6 +184,10 @@ export class SchoolAdminService {
     }
     if (language) {
       school.language = language;
+    }
+
+    if (logo) {
+      school.logo = logo;
     }
 
     school.updated_by = new Types.ObjectId(userId);

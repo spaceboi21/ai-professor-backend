@@ -15,7 +15,13 @@ import { LoginStudentDto } from './dto/student-login.dto';
 import { JwtAuthGuard } from 'src/common/guards/jwt.guard';
 import { User } from 'src/common/decorators/user.decorator';
 import { JWTUserPayload } from 'src/common/types/jwr-user.type';
-import { ApiBearerAuth, ApiBody, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiBody,
+  ApiOperation,
+  ApiResponse,
+  ApiTags,
+} from '@nestjs/swagger';
 
 @ApiTags('Auth')
 @Controller('auth')
@@ -36,7 +42,7 @@ export class AuthController {
   // School Admin or professor Login endpoint
   @Post('school-admin/login')
   @HttpCode(HttpStatus.OK)
-   @ApiOperation({ summary: 'School Admin or Professor Login' })
+  @ApiOperation({ summary: 'School Admin or Professor Login' })
   @ApiBody({ type: LoginSchoolAdminDto })
   @ApiResponse({ status: 200, description: 'Login successful' })
   @ApiResponse({ status: 400, description: 'Invalid credentials' })

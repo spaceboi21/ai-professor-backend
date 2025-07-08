@@ -16,7 +16,7 @@ export class User extends Document {
   email: string;
 
   @Prop()
-  profile_pic: string
+  profile_pic: string;
 
   @Prop()
   phone: number;

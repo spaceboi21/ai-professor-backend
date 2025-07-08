@@ -147,6 +147,9 @@ export class ProfessorService {
     if (data.country_code) {
       professor.country_code = data.country_code;
     }
+    if (data.profile_pic) {
+      professor.profile_pic = data.profile_pic;
+    }
 
     // email is not allowed to be updated
 
