@@ -19,6 +19,7 @@ import { StudentModule } from './modules/student/student.module';
 import { MailModule } from './mail/mail.module';
 import { ProfessorModule } from './modules/professor/professor.module';
 import { UploadModule } from './modules/upload/upload.module';
+import { ModulesModule } from './modules/modules/modules.module';
 
 @Module({
   imports: [
@@ -30,16 +31,17 @@ import { UploadModule } from './modules/upload/upload.module';
       useFactory: async (configService: ConfigService) => {
         const logger = new Logger('MongoDB');
         // Support both MONGODB_URI and CENTRAL_DB_URI for test case compatibility
-        const mongoUri = configService.get<string>('MONGODB_URI') || 
-                        configService.get<string>('CENTRAL_DB_URI');
-        
+        const mongoUri =
+          configService.get<string>('MONGODB_URI') ||
+          configService.get<string>('CENTRAL_DB_URI');
+
         if (!mongoUri) {
           logger.error('❌ MongoDB URI not found in environment variables');
           throw new Error('MongoDB URI is required');
         }
 
         logger.log('🔌 Attempting to connect to MongoDB...');
-        
+
         return {
           uri: mongoUri,
           connectionFactory: (connection) => {
@@ -82,6 +84,7 @@ import { UploadModule } from './modules/upload/upload.module';
     MailModule,
     ProfessorModule,
     UploadModule,
+    ModulesModule,
   ],
   controllers: [AppController],
   providers: [AppService, JwtStrategy],

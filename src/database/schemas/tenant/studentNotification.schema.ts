@@ -3,6 +3,7 @@ import { Document, Types } from 'mongoose';
 import { Student } from './student.schema';
 
 @Schema({
+  collection: 'student_notifications',
   timestamps: {
     createdAt: 'created_at',
     updatedAt: 'updated_at',
