@@ -32,7 +32,7 @@ export class Student extends Document {
   student_code: string;
 
   @Prop()
-  profile_path: string;
+  profile_pic: string;
 
   @Prop({ type: Types.ObjectId, index: true })
   created_by: Types.ObjectId;

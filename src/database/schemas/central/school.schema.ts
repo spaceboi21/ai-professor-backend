@@ -44,6 +44,9 @@ export class School extends Document {
   @Prop({ type: Types.ObjectId, index: true, ref: 'User' })
   created_by: Types.ObjectId;
 
+  @Prop({ type: Types.ObjectId, index: true, ref: 'User' })
+  updated_by: Types.ObjectId;
+
   @Prop({ type: Date, default: null })
   deleted_at: Date;
 

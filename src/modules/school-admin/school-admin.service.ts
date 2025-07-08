@@ -14,6 +14,7 @@ import { User } from 'src/database/schemas/central/user.schema';
 import { MailService } from 'src/mail/mail.service';
 import { CreateSchoolAdminDto } from './dto/create-school-admin.dto';
 import { GlobalStudent } from 'src/database/schemas/central/global-student.schema';
+import { UpdateSchoolDetailsDto } from './dto/update-school-details.dto';
 
 @Injectable()
 export class SchoolAdminService {
@@ -130,6 +131,83 @@ export class SchoolAdminService {
       throw new BadRequestException('Failed to create school admin');
     } finally {
       session.endSession();
+    }
+  }
+
+  async updateSchoolDetails(
+    updateSchoolAdminDto: UpdateSchoolDetailsDto,
+    userId: Types.ObjectId | string,
+    schoolId: Types.ObjectId,
+  ) {
+    const school = await this.schoolModel.findById(schoolId);
+    if (!school) {
+      throw new BadRequestException('School not found');
+    }
+
+    // Authorization check
+    if (school.created_by.toString() !== userId.toString()) {
+      throw new BadRequestException(
+        'You are not authorized to update this school',
+      );
+    }
+
+    // Destructure all possible fields
+    const {
+      school_name,
+      address,
+      school_website_url,
+      phone,
+      country_code,
+      timezone,
+      language,
+    } = updateSchoolAdminDto || {};
+
+    // Update fields conditionally
+    if (school_name) {
+      school.name = school_name;
+    }
+    if (address) {
+      school.address = address;
+    }
+    if (school_website_url) {
+      school.website_url = school_website_url;
+    }
+    if (phone) {
+      school.phone = phone;
+    }
+    if (country_code) {
+      school.country_code = country_code;
+    }
+    if (timezone) {
+      school.timezone = timezone;
+    }
+    if (language) {
+      school.language = language;
+    }
+
+    school.updated_by = new Types.ObjectId(userId);
+
+    try {
+      const updatedSchool = await school.save();
+      return {
+        message: 'School details updated successfully',
+        success: true,
+        data: {
+          _id: updatedSchool._id,
+          school_name: updatedSchool.name,
+          address: updatedSchool.address,
+          school_website_url: updatedSchool.website_url,
+          phone: updatedSchool.phone,
+          country_code: updatedSchool.country_code,
+          timezone: updatedSchool.timezone,
+        },
+      };
+    } catch (error) {
+      this.logger.error(
+        `Error updating school details for school ID: ${schoolId}`,
+        error?.stack || error,
+      );
+      throw new BadRequestException('Failed to update school details');
     }
   }
 }
