@@ -8,7 +8,7 @@ export class GetFileUploadUrl {
   fileName: string;
 
   @IsNotEmpty({ message: 'mimeType is required' })
-  @ApiProperty({ example: 'Smith' })
+  @ApiProperty({ example: 'image/jpeg' })
   @IsMimeType({ message: 'Invalid mimeType format' })
   mimeType: string;
 }

@@ -14,8 +14,6 @@ export class CreateStudentDto {
   @ApiProperty({ example: 'Alice' })
   first_name: string;
 
-  @IsString({ message: 'Last name must be a string' })
-  @IsOptional()
   @ApiProperty({ example: 'Smith' })
   last_name: string;
 
