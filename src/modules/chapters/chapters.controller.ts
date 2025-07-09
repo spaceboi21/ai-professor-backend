@@ -17,6 +17,8 @@ import {
   ApiOperation,
   ApiResponse,
   ApiBearerAuth,
+  ApiQuery,
+  ApiParam,
 } from '@nestjs/swagger';
 import { ChaptersService } from './chapters.service';
 import { CreateChapterDto } from './dto/create-chapter.dto';
@@ -65,10 +67,31 @@ export class ChaptersController {
     status: 200,
     description: 'Chapters retrieved successfully',
   })
+  @ApiQuery({
+    name: 'module_id',
+    required: false,
+    type: String,
+    description: 'Optional filter by module ID',
+    example: '507f1f77bcf86cd799439011',
+  })
+  @ApiQuery({
+    name: 'page',
+    required: false,
+    type: Number,
+    description: 'Page number (default: 1)',
+    example: 1,
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    type: Number,
+    description: 'Number of items per page (default: 10, max: 100)',
+    example: 10,
+  })
   @ApiResponse({ status: 400, description: 'Bad request' })
   async findAllChapters(
     @User() user: JWTUserPayload,
-    @Query('module_id', ParseObjectIdPipe) module_id?: Types.ObjectId,
+    @Query('module_id', ParseObjectIdPipe) module_id?: string | Types.ObjectId,
     @Query() paginationDto?: PaginationDto,
   ) {
     return this.chaptersService.findAllChapters(user, module_id, paginationDto);
@@ -77,6 +100,12 @@ export class ChaptersController {
   @Get(':id')
   @Roles(RoleEnum.PROFESSOR, RoleEnum.SCHOOL_ADMIN, RoleEnum.STUDENT)
   @ApiOperation({ summary: 'Get a chapter by ID' })
+  @ApiParam({
+    name: 'id',
+    type: String,
+    description: 'Chapter ID',
+    example: '507f1f77bcf86cd799439011',
+  })
   @ApiResponse({
     status: 200,
     description: 'Chapter retrieved successfully',
@@ -92,6 +121,12 @@ export class ChaptersController {
   @Patch(':id')
   @Roles(RoleEnum.PROFESSOR, RoleEnum.SCHOOL_ADMIN)
   @ApiOperation({ summary: 'Update a chapter' })
+  @ApiParam({
+    name: 'id',
+    type: String,
+    description: 'Chapter ID',
+    example: '507f1f77bcf86cd799439011',
+  })
   @ApiResponse({
     status: 200,
     description: 'Chapter updated successfully',
@@ -109,6 +144,12 @@ export class ChaptersController {
   @Delete(':id')
   @Roles(RoleEnum.PROFESSOR, RoleEnum.SCHOOL_ADMIN)
   @ApiOperation({ summary: 'Delete a chapter' })
+  @ApiParam({
+    name: 'id',
+    type: String,
+    description: 'Chapter ID',
+    example: '507f1f77bcf86cd799439011',
+  })
   @ApiResponse({
     status: 200,
     description: 'Chapter deleted successfully',

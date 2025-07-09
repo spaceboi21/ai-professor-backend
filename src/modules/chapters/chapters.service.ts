@@ -112,7 +112,7 @@ export class ChaptersService {
 
   async findAllChapters(
     user: JWTUserPayload,
-    module_id?: Types.ObjectId,
+    module_id?: string | Types.ObjectId,
     paginationDto?: PaginationDto,
   ) {
     this.logger.log(

@@ -13,6 +13,7 @@ import {
   ApiOperation,
   ApiResponse,
   ApiTags,
+  ApiParam,
 } from '@nestjs/swagger';
 import { Types } from 'mongoose';
 import { RoleEnum } from 'src/common/constants/roles.constant';
@@ -52,6 +53,12 @@ export class SchoolAdminController {
   @Patch('/school/:id')
   @Roles(RoleEnum.SUPER_ADMIN, RoleEnum.SCHOOL_ADMIN)
   @ApiOperation({ summary: 'Update school details' })
+  @ApiParam({
+    name: 'id',
+    type: String,
+    description: 'School ID',
+    example: '507f1f77bcf86cd799439011',
+  })
   @ApiBody({ type: UpdateSchoolDetailsDto })
   @ApiResponse({
     status: 200,
