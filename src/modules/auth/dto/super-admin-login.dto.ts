@@ -11,6 +11,6 @@ export class LoginSuperAdminDto {
 
   @IsString({ message: 'First name must be a string' })
   @IsNotEmpty({ message: 'First name is required' })
-  @ApiProperty({ example: 'SuperAdmin@123' })
+  @ApiProperty({ example: 'superAdmin@123' })
   password: string;
 }

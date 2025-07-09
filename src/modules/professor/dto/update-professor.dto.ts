@@ -1,6 +1,13 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
-import { IsNotEmpty, IsNumber, IsOptional, IsString } from 'class-validator';
+import {
+  IsNotEmpty,
+  IsNumber,
+  IsOptional,
+  IsString,
+  IsUrl,
+  Matches,
+} from 'class-validator';
 
 export class UpdateProfessorDto {
   //   @IsOptional()
@@ -30,18 +37,39 @@ export class UpdateProfessorDto {
 
   @IsOptional()
   @IsString()
-  @ApiProperty({ example: 'John', required: false })
+  @IsUrl({}, { message: 'Profile picture must be a valid URL' })
+  @Matches(/\.(jpg|jpeg|png|webp)(\?.*)?$/i, {
+    message: 'Profile picture must be an image file (jpg, jpeg, png, webp)',
+  })
+  @ApiProperty({
+    example:
+      'https://bucket.s3.amazonaws.com/profile-pics/123-uuid-filename.jpg',
+    description: 'Profile picture URL from authorized upload',
+    required: false,
+  })
   profile_pic?: string;
 }
 
 export class UpdateProfessorPasswordDto {
-  @IsString()
+  @IsString({ message: 'Current password must be a string' })
   @Transform(({ value }) => value?.trim())
   @IsNotEmpty({ message: 'Old password is required' })
   @ApiProperty({ example: 'OldPassword123!' })
   old_password: string;
 
-  @IsString()
-  @ApiProperty({ example: 'NewPassword456!' })
+  @IsString({ message: 'New password must be a string' })
+  @IsNotEmpty({ message: 'New password is required' })
+  @Matches(
+    /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/,
+    {
+      message:
+        'Password must be at least 8 characters long and contain uppercase, lowercase, number, and special character',
+    },
+  )
+  @ApiProperty({
+    example: 'NewPassword123!',
+    description:
+      'Password must be at least 8 characters with uppercase, lowercase, number, and special character',
+  })
   new_password: string;
 }
