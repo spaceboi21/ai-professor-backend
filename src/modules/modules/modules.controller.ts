@@ -7,6 +7,7 @@ import {
   Param,
   Delete,
   UseGuards,
+  Query,
 } from '@nestjs/common';
 import { ParseObjectIdPipe } from '@nestjs/mongoose';
 import {
@@ -15,6 +16,8 @@ import {
   ApiOperation,
   ApiResponse,
   ApiTags,
+  ApiParam,
+  ApiQuery,
 } from '@nestjs/swagger';
 import { Types } from 'mongoose';
 import { RoleEnum } from 'src/common/constants/roles.constant';
@@ -26,6 +29,7 @@ import { JWTUserPayload } from 'src/common/types/jwr-user.type';
 import { CreateModuleDto } from './dto/create-module.dto';
 import { UpdateModuleDto } from './dto/update-module.dto';
 import { ModulesService } from './modules.service';
+import { PaginationDto } from 'src/common/dto/pagination.dto';
 
 @ApiTags('Modules')
 @ApiBearerAuth()
@@ -55,9 +59,26 @@ export class ModulesController {
     RoleEnum.STUDENT,
   )
   @ApiOperation({ summary: 'Get all modules' })
+  @ApiQuery({
+    name: 'page',
+    required: false,
+    type: Number,
+    description: 'Page number (default: 1)',
+    example: 1,
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    type: Number,
+    description: 'Number of items per page (default: 10, max: 100)',
+    example: 10,
+  })
   @ApiResponse({ status: 200, description: 'Modules retrieved successfully' })
-  async findAllModules(@User() user: JWTUserPayload) {
-    return this.modulesService.findAllModules(user);
+  async findAllModules(
+    @User() user: JWTUserPayload,
+    @Query() paginationDto?: PaginationDto,
+  ) {
+    return this.modulesService.findAllModules(user, paginationDto);
   }
 
   @Get(':id')
@@ -68,6 +89,12 @@ export class ModulesController {
     RoleEnum.STUDENT,
   )
   @ApiOperation({ summary: 'Get a module by id' })
+  @ApiParam({
+    name: 'id',
+    type: String,
+    description: 'Module ID',
+    example: '507f1f77bcf86cd799439011',
+  })
   @ApiResponse({ status: 200, description: 'Module retrieved successfully' })
   @ApiResponse({ status: 404, description: 'Module not found' })
   async findModuleById(
@@ -80,6 +107,12 @@ export class ModulesController {
   @Patch(':id')
   @Roles(RoleEnum.SUPER_ADMIN, RoleEnum.SCHOOL_ADMIN, RoleEnum.PROFESSOR)
   @ApiOperation({ summary: 'Update a module' })
+  @ApiParam({
+    name: 'id',
+    type: String,
+    description: 'Module ID',
+    example: '507f1f77bcf86cd799439011',
+  })
   @ApiBody({ type: UpdateModuleDto })
   @ApiResponse({ status: 200, description: 'Module updated successfully' })
   @ApiResponse({ status: 404, description: 'Module not found' })
@@ -94,6 +127,12 @@ export class ModulesController {
   @Delete(':id')
   @Roles(RoleEnum.SUPER_ADMIN, RoleEnum.SCHOOL_ADMIN, RoleEnum.PROFESSOR)
   @ApiOperation({ summary: 'Delete a module' })
+  @ApiParam({
+    name: 'id',
+    type: String,
+    description: 'Module ID',
+    example: '507f1f77bcf86cd799439011',
+  })
   @ApiResponse({ status: 200, description: 'Module deleted successfully' })
   @ApiResponse({ status: 404, description: 'Module not found' })
   async removeModule(

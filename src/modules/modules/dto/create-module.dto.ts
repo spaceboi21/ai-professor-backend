@@ -5,6 +5,7 @@ import {
   IsNumber,
   IsEnum,
   IsOptional,
+  IsArray,
 } from 'class-validator';
 import { DifficultyEnum } from 'src/common/constants/difficulty.constant';
 
@@ -61,4 +62,14 @@ export class CreateModuleDto {
     description: 'Difficulty level of the module',
   })
   difficulty: DifficultyEnum;
+
+  @IsArray({ message: 'Tags must be an array' })
+  @IsOptional()
+  @ApiProperty({
+    example: ['psychology', 'child-development', 'cognitive-development'],
+    description: 'Array of tags for better searching and filtering',
+    required: false,
+    type: [String],
+  })
+  tags?: string[];
 }

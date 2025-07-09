@@ -1,5 +1,11 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsString, IsNumber, IsEnum, IsOptional } from 'class-validator';
+import {
+  IsString,
+  IsNumber,
+  IsEnum,
+  IsOptional,
+  IsArray,
+} from 'class-validator';
 import { DifficultyEnum } from 'src/common/constants/difficulty.constant';
 
 export class UpdateModuleDto {
@@ -60,4 +66,14 @@ export class UpdateModuleDto {
     required: false,
   })
   difficulty?: DifficultyEnum;
+
+  @IsOptional()
+  @IsArray({ message: 'Tags must be an array' })
+  @ApiProperty({
+    example: ['psychology', 'child-development', 'cognitive-development'],
+    description: 'Array of tags for better searching and filtering',
+    required: false,
+    type: [String],
+  })
+  tags?: string[];
 }

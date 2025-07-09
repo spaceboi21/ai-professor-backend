@@ -13,6 +13,7 @@ import {
   ApiOperation,
   ApiResponse,
   ApiTags,
+  ApiParam,
 } from '@nestjs/swagger';
 import { Types } from 'mongoose';
 import { RoleEnum } from 'src/common/constants/roles.constant';
@@ -51,6 +52,12 @@ export class ProfessorController {
   @Patch(':id')
   @Roles(RoleEnum.SUPER_ADMIN, RoleEnum.SCHOOL_ADMIN, RoleEnum.PROFESSOR)
   @ApiOperation({ summary: 'Update professor details' })
+  @ApiParam({
+    name: 'id',
+    type: String,
+    description: 'Professor ID',
+    example: '507f1f77bcf86cd799439011',
+  })
   @ApiBody({ type: UpdateProfessorDto })
   @ApiResponse({ status: 200, description: 'Professor updated successfully' })
   @ApiResponse({ status: 404, description: 'Professor not found' })
@@ -64,6 +71,12 @@ export class ProfessorController {
   @Patch('/password/:id')
   @Roles(RoleEnum.PROFESSOR)
   @ApiOperation({ summary: 'Update professor password' })
+  @ApiParam({
+    name: 'id',
+    type: String,
+    description: 'Professor ID',
+    example: '507f1f77bcf86cd799439011',
+  })
   @ApiBody({ type: UpdateProfessorPasswordDto })
   @ApiResponse({ status: 200, description: 'Password updated successfully' })
   @ApiResponse({ status: 404, description: 'Professor not found' })
