@@ -15,6 +15,10 @@ import { MailService } from 'src/mail/mail.service';
 import { CreateSchoolAdminDto } from './dto/create-school-admin.dto';
 import { GlobalStudent } from 'src/database/schemas/central/global-student.schema';
 import { UpdateSchoolDetailsDto } from './dto/update-school-details.dto';
+import { StatusEnum } from 'src/common/constants/status.constant';
+import { TenantConnectionService } from 'src/database/tenant-connection.service';
+import { Student, StudentSchema } from 'src/database/schemas/tenant/student.schema';
+import { NotFoundException } from '@nestjs/common';
 
 @Injectable()
 export class SchoolAdminService {
@@ -28,6 +32,7 @@ export class SchoolAdminService {
     private readonly globalStudentModel: Model<GlobalStudent>,
     private readonly bcryptUtil: BcryptUtil,
     private readonly mailService: MailService,
+    private readonly tenantConnectionService: TenantConnectionService,
     @InjectConnection() private readonly connection: Connection,
   ) {}
 
@@ -214,5 +219,108 @@ export class SchoolAdminService {
       );
       throw new BadRequestException('Failed to update school details');
     }
+  }
+
+  async updateStudentStatus(
+    studentId: string,
+    status: StatusEnum,
+    user: JWTUserPayload,
+  ) {
+    this.logger.log(`School admin updating student status: ${studentId} to ${status}`);
+    
+    if (!Types.ObjectId.isValid(studentId)) {
+      throw new BadRequestException('Invalid student ID');
+    }
+
+    // Get school information for the authenticated school admin
+    const school = await this.schoolModel.findById(user.school_id);
+    if (!school) {
+      throw new NotFoundException('School not found');
+    }
+
+    // Get tenant connection
+    const tenantConnection = await this.tenantConnectionService.getTenantConnection(school.db_name);
+    const StudentModel = tenantConnection.model(Student.name, StudentSchema);
+
+    // Find and update student in tenant database
+    const student = await StudentModel.findById(studentId);
+    if (!student) {
+      throw new NotFoundException('Student not found');
+    }
+
+    // Verify the student belongs to the same school as the admin
+    if (!user.school_id || student.school_id.toString() !== user.school_id.toString()) {
+      throw new BadRequestException('You can only manage students from your school');
+    }
+
+    const updatedStudent = await StudentModel.findByIdAndUpdate(
+      studentId,
+      { status },
+      { new: true }
+    );
+
+    if (!updatedStudent) {
+      throw new NotFoundException('Student not found after update');
+    }
+
+    this.logger.log(`Student status updated successfully: ${studentId} to ${status}`);
+    return {
+      message: 'Student status updated successfully',
+      student: {
+        id: updatedStudent._id,
+        email: updatedStudent.email,
+        first_name: updatedStudent.first_name,
+        last_name: updatedStudent.last_name,
+        status: updatedStudent.status,
+      },
+    };
+  }
+
+  async updateProfessorStatus(
+    professorId: string,
+    status: StatusEnum,
+    user: JWTUserPayload,
+  ) {
+    this.logger.log(`School admin updating professor status: ${professorId} to ${status}`);
+    
+    if (!Types.ObjectId.isValid(professorId)) {
+      throw new BadRequestException('Invalid professor ID');
+    }
+
+    if(Types.ObjectId.isValid(user.school_id as string)){
+    // Find professor in central users table
+    const professor = await this.userModel.findOne({
+      _id: new Types.ObjectId(professorId),
+      role: new Types.ObjectId(ROLE_IDS.PROFESSOR),
+      school_id: new Types.ObjectId(user.school_id as string),
+    });
+
+    if (!professor) {
+      throw new NotFoundException('Professor not found or not in your school');
+    }
+  }
+
+    const updatedProfessor = await this.userModel.findByIdAndUpdate(
+      professorId,
+      { status },
+      { new: true }
+    ).populate('role', 'name');
+
+    if (!updatedProfessor) {
+      throw new NotFoundException('Professor not found after update');
+    }
+
+    this.logger.log(`Professor status updated successfully: ${professorId} to ${status}`);
+    return {
+      message: 'Professor status updated successfully',
+      professor: {
+        id: updatedProfessor._id,
+        email: updatedProfessor.email,
+        first_name: updatedProfessor.first_name,
+        last_name: updatedProfessor.last_name,
+        status: updatedProfessor.status,
+        role: updatedProfessor.role,
+      },
+    };
   }
 }

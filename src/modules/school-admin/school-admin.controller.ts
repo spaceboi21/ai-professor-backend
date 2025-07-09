@@ -24,6 +24,7 @@ import { JWTUserPayload } from 'src/common/types/jwr-user.type';
 import { CreateSchoolAdminDto } from './dto/create-school-admin.dto';
 import { UpdateSchoolDetailsDto } from './dto/update-school-details.dto';
 import { SchoolAdminService } from './school-admin.service';
+import { UpdateStatusDto } from 'src/common/dto/update-status.dto';
 @ApiTags('School Admin')
 @ApiBearerAuth()
 @Controller('school-admin')
@@ -64,5 +65,41 @@ export class SchoolAdminController {
     @User() user: JWTUserPayload,
   ) {
     return this.schoolAdminService.updateSchoolDetails(body, user.id, id);
+  }
+
+  // Update student status
+  @Patch('/students/:id/status')
+  @Roles(RoleEnum.SCHOOL_ADMIN)
+  @ApiOperation({ summary: 'Update student status' })
+  @ApiBody({ type: UpdateStatusDto })
+  @ApiResponse({
+    status: 200,
+    description: 'Student status updated successfully',
+  })
+  @ApiResponse({ status: 404, description: 'Student not found' })
+  async updateStudentStatus(
+    @Param('id') studentId: string,
+    @Body() updateStatusDto: UpdateStatusDto,
+    @User() user: JWTUserPayload,
+  ) {
+    return this.schoolAdminService.updateStudentStatus(studentId, updateStatusDto.status, user);
+  }
+
+  // Update professor status
+  @Patch('/professors/:id/status')
+  @Roles(RoleEnum.SCHOOL_ADMIN)
+  @ApiOperation({ summary: 'Update professor status' })
+  @ApiBody({ type: UpdateStatusDto })
+  @ApiResponse({
+    status: 200,
+    description: 'Professor status updated successfully',
+  })
+  @ApiResponse({ status: 404, description: 'Professor not found' })
+  async updateProfessorStatus(
+    @Param('id') professorId: string,
+    @Body() updateStatusDto: UpdateStatusDto,
+    @User() user: JWTUserPayload,
+  ) {
+    return this.schoolAdminService.updateProfessorStatus(professorId, updateStatusDto.status, user);
   }
 }

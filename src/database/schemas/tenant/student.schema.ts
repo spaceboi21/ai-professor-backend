@@ -1,6 +1,7 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, Types } from 'mongoose';
 import { ROLE_IDS, RoleEnum } from 'src/common/constants/roles.constant';
+import { StatusEnum, DEFAULT_STATUS } from 'src/common/constants/status.constant';
 
 @Schema({
   timestamps: {
@@ -52,6 +53,9 @@ export class Student extends Document {
 
   @Prop({ type: Date, default: null })
   deleted_at: Date;
+
+  @Prop({ enum: StatusEnum, default: DEFAULT_STATUS, index: true })
+  status: StatusEnum;
 
   readonly created_at?: Date;
   readonly updated_at?: Date;

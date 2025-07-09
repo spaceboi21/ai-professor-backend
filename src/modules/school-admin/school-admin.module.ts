@@ -13,6 +13,7 @@ import {
   GlobalStudent,
   GlobalStudentSchema,
 } from 'src/database/schemas/central/global-student.schema';
+import { TenantConnectionService } from 'src/database/tenant-connection.service';
 
 @Module({
   imports: [
@@ -25,6 +26,6 @@ import {
     MailModule,
   ],
   controllers: [SchoolAdminController],
-  providers: [SchoolAdminService],
+  providers: [SchoolAdminService, TenantConnectionService],
 })
 export class SchoolAdminModule {}

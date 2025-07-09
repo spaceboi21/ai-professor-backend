@@ -14,6 +14,8 @@ import {
 import { TenantService } from 'src/modules/central/tenant.service';
 import { JWTUserPayload } from '../types/jwr-user.type';
 import { User } from 'src/database/schemas/central/user.schema';
+import { School } from 'src/database/schemas/central/school.schema';
+import { StatusEnum } from '../constants/status.constant';
 
 export interface JWTPayload {
   id: string;
@@ -33,6 +35,8 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
     private readonly roleModel: Model<Role>,
     @InjectModel(User.name)
     private readonly userModel: Model<User>,
+    @InjectModel(School.name)
+    private readonly schoolModel: Model<School>,
     private readonly tenantService: TenantService,
     private readonly tenantConnectionService: TenantConnectionService,
   ) {
@@ -57,6 +61,11 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
         throw new UnauthorizedException('Invalid role information');
       }
 
+      // Check school status if user belongs to a school
+      if (payload.school_id) {
+        await this.validateSchoolStatus(payload.school_id, payload.email);
+      }
+
       // If user is a student, validate in tenant database
       if (payload.role_name === RoleEnum.STUDENT) {
         const studentData = await this.validateStudentInTenant(payload);
@@ -66,6 +75,16 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
           );
           throw new UnauthorizedException(
             'Student not found in tenant database',
+          );
+        }
+
+        // Check student status
+        if (studentData.status === StatusEnum.INACTIVE) {
+          this.logger.warn(
+            `Student ${payload.email} account is inactive`,
+          );
+          throw new UnauthorizedException(
+            'Your account has been deactivated. Please contact support for assistance.',
           );
         }
 
@@ -94,6 +113,16 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
             `User ${payload.email} with role ${payload.role_name} not found in central users`,
           );
           throw new UnauthorizedException('User not found in central users');
+        }
+
+        // Check user status
+        if (user.status === StatusEnum.INACTIVE) {
+          this.logger.warn(
+            `User ${payload.email} account is inactive`,
+          );
+          throw new UnauthorizedException(
+            'Your account has been deactivated. Please contact support for assistance.',
+          );
         }
 
         this.logger.log(
@@ -152,6 +181,7 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
         _id: student._id,
         email: student.email,
         school_id: student.school_id,
+        status: student.status,
         role: {
           id: payload.role_id,
           name: payload.role_name as RoleEnum,
@@ -163,6 +193,44 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
       );
       throw new UnauthorizedException(
         `Student validation failed: ${error.message}`,
+      );
+    }
+  }
+
+  private async validateSchoolStatus(
+    schoolId: string,
+    userEmail: string,
+  ): Promise<void> {
+    try {
+      const school = await this.schoolModel.findById(
+        new Types.ObjectId(schoolId),
+      );
+
+      if (!school) {
+        this.logger.warn(
+          `School not found for user ${userEmail}: ${schoolId}`,
+        );
+        throw new UnauthorizedException('School not found');
+      }
+
+      if (school.status === StatusEnum.INACTIVE) {
+        this.logger.warn(
+          `School ${schoolId} is inactive for user ${userEmail}`,
+        );
+        throw new UnauthorizedException(
+          'Your school has been deactivated. Please contact support for assistance.',
+        );
+      }
+
+      this.logger.debug(
+        `School ${schoolId} status validated successfully for user ${userEmail}`,
+      );
+    } catch (error) {
+      this.logger.error(
+        `School validation failed for user ${userEmail}: ${error.message}`,
+      );
+      throw new UnauthorizedException(
+        `School validation failed: ${error.message}`,
       );
     }
   }

@@ -20,6 +20,7 @@ import {
   StudentSchema,
 } from 'src/database/schemas/tenant/student.schema';
 import { TenantConnectionService } from 'src/database/tenant-connection.service';
+import { StatusEnum } from 'src/common/constants/status.constant';
 
 @Injectable()
 export class AuthService {
@@ -53,6 +54,12 @@ export class AuthService {
     if (!isSuperAdminExists) {
       this.logger.warn(`Super Admin not found: ${email}`);
       throw new NotFoundException('Super Admin does not exist');
+    }
+
+    // Check user status
+    if (isSuperAdminExists.status === StatusEnum.INACTIVE) {
+      this.logger.warn(`Super Admin account is inactive: ${email}`);
+      throw new BadRequestException('Your account has been deactivated. Please contact support for assistance.');
     }
 
     const isPasswordMatch = await this.bcryptUtil.comparePassword(
@@ -96,7 +103,12 @@ export class AuthService {
     const user = (await this.userModel
       .findOne({
         email,
-        role: new Types.ObjectId(ROLE_IDS.SCHOOL_ADMIN),
+        role: {
+          $in: [
+            new Types.ObjectId(ROLE_IDS.SCHOOL_ADMIN),
+            new Types.ObjectId(ROLE_IDS.PROFESSOR),
+          ],
+        },
       })
       .select('+password')
       .populate({
@@ -107,6 +119,12 @@ export class AuthService {
     if (!user) {
       this.logger.warn(`School Admin not found: ${email}`);
       throw new NotFoundException('User not found with this email');
+    }
+
+    // Check user status
+    if (user.status === StatusEnum.INACTIVE) {
+      this.logger.warn(`School Admin account is inactive: ${email}`);
+      throw new BadRequestException('Your account has been deactivated. Please contact support for assistance.');
     }
 
     const isPasswordValid = await this.bcryptUtil.comparePassword(
@@ -123,6 +141,12 @@ export class AuthService {
     if (!school) {
       this.logger.warn(`School not found for School Admin: ${email}`);
       throw new NotFoundException('School not found for this user');
+    }
+
+    // Check school status
+    if (school.status === StatusEnum.INACTIVE) {
+      this.logger.warn(`School is inactive for School Admin: ${email}`);
+      throw new BadRequestException('Your school has been deactivated. Please contact support for assistance.');
     }
 
     const token = this.jwtUtil.generateToken({
@@ -170,6 +194,12 @@ export class AuthService {
       throw new NotFoundException('School not found for this student');
     }
 
+    // Check school status
+    if (school.status === StatusEnum.INACTIVE) {
+      this.logger.warn(`School is inactive for student: ${email}`);
+      throw new BadRequestException('Your school has been deactivated. Please contact support for assistance.');
+    }
+
     // Get tenant connection for the school
     const tenantConnection =
       await this.tenantConnectionService.getTenantConnection(school.db_name);
@@ -184,6 +214,12 @@ export class AuthService {
     if (!student) {
       this.logger.warn(`Student not found in school DB: ${email}`);
       throw new NotFoundException('Student not found in school database');
+    }
+
+    // Check student status
+    if (student.status === StatusEnum.INACTIVE) {
+      this.logger.warn(`Student account is inactive: ${email}`);
+      throw new BadRequestException('Your account has been deactivated. Please contact support for assistance.');
     }
 
     // Verify password
