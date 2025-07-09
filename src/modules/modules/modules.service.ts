@@ -17,6 +17,15 @@ import { CreateModuleDto } from './dto/create-module.dto';
 import { UpdateModuleDto } from './dto/update-module.dto';
 import { JWTUserPayload } from 'src/common/types/jwr-user.type';
 import { RoleEnum } from 'src/common/constants/roles.constant';
+import {
+  attachUserDetails,
+  attachUserDetailsToEntity,
+} from 'src/common/utils/user-details.util';
+import { PaginationDto } from 'src/common/dto/pagination.dto';
+import {
+  getPaginationOptions,
+  createPaginationResult,
+} from 'src/common/utils/pagination.util';
 
 @Injectable()
 export class ModulesService {
@@ -31,8 +40,15 @@ export class ModulesService {
   ) {}
 
   async createModule(createModuleDto: CreateModuleDto, user: JWTUserPayload) {
-    const { title, subject, description, category, duration, difficulty } =
-      createModuleDto;
+    const {
+      title,
+      subject,
+      description,
+      category,
+      duration,
+      difficulty,
+      tags,
+    } = createModuleDto;
 
     this.logger.log(`Creating module: ${title} by user: ${user.id}`);
 
@@ -56,6 +72,7 @@ export class ModulesService {
         category,
         duration,
         difficulty,
+        tags: tags || [],
         created_by: new Types.ObjectId(user.id),
         created_by_role: user.role.name as RoleEnum,
       });
@@ -74,6 +91,7 @@ export class ModulesService {
           category: savedModule.category,
           duration: savedModule.duration,
           difficulty: savedModule.difficulty,
+          tags: savedModule.tags,
           created_by: savedModule.created_by,
           created_by_role: savedModule.created_by_role,
           created_at: savedModule.created_at,
@@ -86,7 +104,7 @@ export class ModulesService {
     }
   }
 
-  async findAllModules(user: JWTUserPayload) {
+  async findAllModules(user: JWTUserPayload, paginationDto?: PaginationDto) {
     this.logger.log(`Finding all modules for user: ${user.id}`);
 
     // Validate school exists
@@ -101,31 +119,33 @@ export class ModulesService {
     const ModuleModel = tenantConnection.model(Module.name, ModuleSchema);
 
     try {
+      // Get pagination options
+      const paginationOptions = getPaginationOptions(paginationDto || {});
+
+      // Get total count for pagination
+      const total = await ModuleModel.countDocuments({ deleted_at: null });
+
+      // Get paginated modules
       const modules = await ModuleModel.find({ deleted_at: null })
         .sort({ created_at: -1 })
+        .skip(paginationOptions.skip)
+        .limit(paginationOptions.limit)
         .lean();
-
-      // Get user details for created_by fields
-      const userIds = [...new Set(modules.map((module) => module.created_by))];
-      const users = await this.userModel
-        .find({ _id: { $in: userIds } })
-        .select('first_name last_name email')
-        .lean();
-
-      const userMap = users.reduce((map, user) => {
-        map[user._id.toString()] = user;
-        return map;
-      }, {});
 
       // Attach user details to modules
-      const modulesWithUsers = modules.map((module) => ({
-        ...module,
-        created_by_user: userMap[module.created_by.toString()] || null,
-      }));
+      const modulesWithUsers = await attachUserDetails(modules, this.userModel);
+
+      // Create pagination result
+      const result = createPaginationResult(
+        modulesWithUsers,
+        total,
+        paginationOptions,
+      );
 
       return {
         message: 'Modules retrieved successfully',
-        data: modulesWithUsers,
+        data: result.data,
+        pagination_data: result.pagination_data,
       };
     } catch (error) {
       this.logger.error('Error finding modules', error?.stack || error);
@@ -157,16 +177,11 @@ export class ModulesService {
         throw new NotFoundException('Module not found');
       }
 
-      // Get user details for created_by field
-      const createdByUser = await this.userModel
-        .findById(module.created_by)
-        .select('first_name last_name email')
-        .lean();
-
-      const moduleWithUser = {
-        ...module,
-        created_by_user: createdByUser || null,
-      };
+      // Attach user details to module
+      const moduleWithUser = await attachUserDetailsToEntity(
+        module,
+        this.userModel,
+      );
 
       return {
         message: 'Module retrieved successfully',
@@ -210,16 +225,11 @@ export class ModulesService {
         throw new NotFoundException('Module not found');
       }
 
-      // Get user details for created_by field
-      const createdByUser = await this.userModel
-        .findById(updatedModule.created_by)
-        .select('first_name last_name email')
-        .lean();
-
-      const moduleWithUser = {
-        ...updatedModule,
-        created_by_user: createdByUser || null,
-      };
+      // Attach user details to module
+      const moduleWithUser = await attachUserDetailsToEntity(
+        updatedModule,
+        this.userModel,
+      );
 
       return {
         message: 'Module updated successfully',

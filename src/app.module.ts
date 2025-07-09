@@ -20,6 +20,7 @@ import { MailModule } from './mail/mail.module';
 import { ProfessorModule } from './modules/professor/professor.module';
 import { UploadModule } from './modules/upload/upload.module';
 import { ModulesModule } from './modules/modules/modules.module';
+import { ChaptersModule } from './modules/chapters/chapters.module';
 
 @Module({
   imports: [
@@ -85,6 +86,7 @@ import { ModulesModule } from './modules/modules/modules.module';
     ProfessorModule,
     UploadModule,
     ModulesModule,
+    ChaptersModule,
   ],
   controllers: [AppController],
   providers: [AppService, JwtStrategy],

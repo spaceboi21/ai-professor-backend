@@ -7,6 +7,7 @@ import {
   Param,
   Delete,
   UseGuards,
+  Query,
 } from '@nestjs/common';
 import { ParseObjectIdPipe } from '@nestjs/mongoose';
 import {
@@ -26,6 +27,7 @@ import { JWTUserPayload } from 'src/common/types/jwr-user.type';
 import { CreateModuleDto } from './dto/create-module.dto';
 import { UpdateModuleDto } from './dto/update-module.dto';
 import { ModulesService } from './modules.service';
+import { PaginationDto } from 'src/common/dto/pagination.dto';
 
 @ApiTags('Modules')
 @ApiBearerAuth()
@@ -56,8 +58,11 @@ export class ModulesController {
   )
   @ApiOperation({ summary: 'Get all modules' })
   @ApiResponse({ status: 200, description: 'Modules retrieved successfully' })
-  async findAllModules(@User() user: JWTUserPayload) {
-    return this.modulesService.findAllModules(user);
+  async findAllModules(
+    @User() user: JWTUserPayload,
+    @Query() paginationDto?: PaginationDto,
+  ) {
+    return this.modulesService.findAllModules(user, paginationDto);
   }
 
   @Get(':id')
