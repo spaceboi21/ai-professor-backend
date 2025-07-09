@@ -80,9 +80,7 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
 
         // Check student status
         if (studentData.status === StatusEnum.INACTIVE) {
-          this.logger.warn(
-            `Student ${payload.email} account is inactive`,
-          );
+          this.logger.warn(`Student ${payload.email} account is inactive`);
           throw new UnauthorizedException(
             'Your account has been deactivated. Please contact support for assistance.',
           );
@@ -117,9 +115,7 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
 
         // Check user status
         if (user.status === StatusEnum.INACTIVE) {
-          this.logger.warn(
-            `User ${payload.email} account is inactive`,
-          );
+          this.logger.warn(`User ${payload.email} account is inactive`);
           throw new UnauthorizedException(
             'Your account has been deactivated. Please contact support for assistance.',
           );
@@ -207,9 +203,7 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
       );
 
       if (!school) {
-        this.logger.warn(
-          `School not found for user ${userEmail}: ${schoolId}`,
-        );
+        this.logger.warn(`School not found for user ${userEmail}: ${schoolId}`);
         throw new UnauthorizedException('School not found');
       }
 

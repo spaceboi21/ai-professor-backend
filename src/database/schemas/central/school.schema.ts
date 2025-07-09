@@ -1,6 +1,9 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, Types } from 'mongoose';
-import { StatusEnum, DEFAULT_STATUS } from 'src/common/constants/status.constant';
+import {
+  StatusEnum,
+  DEFAULT_STATUS,
+} from 'src/common/constants/status.constant';
 
 @Schema({
   timestamps: {

@@ -17,7 +17,10 @@ import { GlobalStudent } from 'src/database/schemas/central/global-student.schem
 import { UpdateSchoolDetailsDto } from './dto/update-school-details.dto';
 import { StatusEnum } from 'src/common/constants/status.constant';
 import { TenantConnectionService } from 'src/database/tenant-connection.service';
-import { Student, StudentSchema } from 'src/database/schemas/tenant/student.schema';
+import {
+  Student,
+  StudentSchema,
+} from 'src/database/schemas/tenant/student.schema';
 import { NotFoundException } from '@nestjs/common';
 
 @Injectable()
@@ -226,8 +229,10 @@ export class SchoolAdminService {
     status: StatusEnum,
     user: JWTUserPayload,
   ) {
-    this.logger.log(`School admin updating student status: ${studentId} to ${status}`);
-    
+    this.logger.log(
+      `School admin updating student status: ${studentId} to ${status}`,
+    );
+
     if (!Types.ObjectId.isValid(studentId)) {
       throw new BadRequestException('Invalid student ID');
     }
@@ -239,7 +244,8 @@ export class SchoolAdminService {
     }
 
     // Get tenant connection
-    const tenantConnection = await this.tenantConnectionService.getTenantConnection(school.db_name);
+    const tenantConnection =
+      await this.tenantConnectionService.getTenantConnection(school.db_name);
     const StudentModel = tenantConnection.model(Student.name, StudentSchema);
 
     // Find and update student in tenant database
@@ -249,21 +255,28 @@ export class SchoolAdminService {
     }
 
     // Verify the student belongs to the same school as the admin
-    if (!user.school_id || student.school_id.toString() !== user.school_id.toString()) {
-      throw new BadRequestException('You can only manage students from your school');
+    if (
+      !user.school_id ||
+      student.school_id.toString() !== user.school_id.toString()
+    ) {
+      throw new BadRequestException(
+        'You can only manage students from your school',
+      );
     }
 
     const updatedStudent = await StudentModel.findByIdAndUpdate(
       studentId,
       { status },
-      { new: true }
+      { new: true },
     );
 
     if (!updatedStudent) {
       throw new NotFoundException('Student not found after update');
     }
 
-    this.logger.log(`Student status updated successfully: ${studentId} to ${status}`);
+    this.logger.log(
+      `Student status updated successfully: ${studentId} to ${status}`,
+    );
     return {
       message: 'Student status updated successfully',
       student: {
@@ -281,36 +294,40 @@ export class SchoolAdminService {
     status: StatusEnum,
     user: JWTUserPayload,
   ) {
-    this.logger.log(`School admin updating professor status: ${professorId} to ${status}`);
-    
+    this.logger.log(
+      `School admin updating professor status: ${professorId} to ${status}`,
+    );
+
     if (!Types.ObjectId.isValid(professorId)) {
       throw new BadRequestException('Invalid professor ID');
     }
 
-    if(Types.ObjectId.isValid(user.school_id as string)){
-    // Find professor in central users table
-    const professor = await this.userModel.findOne({
-      _id: new Types.ObjectId(professorId),
-      role: new Types.ObjectId(ROLE_IDS.PROFESSOR),
-      school_id: new Types.ObjectId(user.school_id as string),
-    });
+    if (Types.ObjectId.isValid(user.school_id as string)) {
+      // Find professor in central users table
+      const professor = await this.userModel.findOne({
+        _id: new Types.ObjectId(professorId),
+        role: new Types.ObjectId(ROLE_IDS.PROFESSOR),
+        school_id: new Types.ObjectId(user.school_id as string),
+      });
 
-    if (!professor) {
-      throw new NotFoundException('Professor not found or not in your school');
+      if (!professor) {
+        throw new NotFoundException(
+          'Professor not found or not in your school',
+        );
+      }
     }
-  }
 
-    const updatedProfessor = await this.userModel.findByIdAndUpdate(
-      professorId,
-      { status },
-      { new: true }
-    ).populate('role', 'name');
+    const updatedProfessor = await this.userModel
+      .findByIdAndUpdate(professorId, { status }, { new: true })
+      .populate('role', 'name');
 
     if (!updatedProfessor) {
       throw new NotFoundException('Professor not found after update');
     }
 
-    this.logger.log(`Professor status updated successfully: ${professorId} to ${status}`);
+    this.logger.log(
+      `Professor status updated successfully: ${professorId} to ${status}`,
+    );
     return {
       message: 'Professor status updated successfully',
       professor: {

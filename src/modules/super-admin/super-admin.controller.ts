@@ -17,7 +17,10 @@ export class SuperAdminController {
     @Param('id') userId: string,
     @Body() updateStatusDto: UpdateStatusDto,
   ) {
-    return this.superAdminService.updateUserStatus(userId, updateStatusDto.status);
+    return this.superAdminService.updateUserStatus(
+      userId,
+      updateStatusDto.status,
+    );
   }
 
   @Patch('schools/:id/status')
@@ -25,6 +28,9 @@ export class SuperAdminController {
     @Param('id') schoolId: string,
     @Body() updateStatusDto: UpdateStatusDto,
   ) {
-    return this.superAdminService.updateSchoolStatus(schoolId, updateStatusDto.status);
+    return this.superAdminService.updateSchoolStatus(
+      schoolId,
+      updateStatusDto.status,
+    );
   }
 }

@@ -1,4 +1,9 @@
-import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+  Logger,
+} from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { User } from 'src/database/schemas/central/user.schema';
@@ -19,7 +24,7 @@ export class SuperAdminService {
 
   async updateUserStatus(userId: string, status: StatusEnum) {
     this.logger.log(`Updating user status: ${userId} to ${status}`);
-    
+
     if (!Types.ObjectId.isValid(userId)) {
       throw new BadRequestException('Invalid user ID');
     }
@@ -31,15 +36,16 @@ export class SuperAdminService {
     }
 
     // Super admin cannot change their own status
-    if (user.role.toString() === '6863cea411be9016b7ccb7fc') { // SUPER_ADMIN role ID
-      throw new BadRequestException('Super admin cannot change their own status');
+    if (user.role.toString() === '6863cea411be9016b7ccb7fc') {
+      // SUPER_ADMIN role ID
+      throw new BadRequestException(
+        'Super admin cannot change their own status',
+      );
     }
 
-    const updatedUser = await this.userModel.findByIdAndUpdate(
-      userId,
-      { status },
-      { new: true }
-    ).populate('role', 'name');
+    const updatedUser = await this.userModel
+      .findByIdAndUpdate(userId, { status }, { new: true })
+      .populate('role', 'name');
 
     if (!updatedUser) {
       throw new NotFoundException('User not found after update');
@@ -61,7 +67,7 @@ export class SuperAdminService {
 
   async updateSchoolStatus(schoolId: string, status: StatusEnum) {
     this.logger.log(`Updating school status: ${schoolId} to ${status}`);
-    
+
     if (!Types.ObjectId.isValid(schoolId)) {
       throw new BadRequestException('Invalid school ID');
     }
@@ -75,14 +81,16 @@ export class SuperAdminService {
     const updatedSchool = await this.schoolModel.findByIdAndUpdate(
       schoolId,
       { status },
-      { new: true }
+      { new: true },
     );
 
     if (!updatedSchool) {
       throw new NotFoundException('School not found after update');
     }
 
-    this.logger.log(`School status updated successfully: ${schoolId} to ${status}`);
+    this.logger.log(
+      `School status updated successfully: ${schoolId} to ${status}`,
+    );
     return {
       message: 'School status updated successfully',
       school: {

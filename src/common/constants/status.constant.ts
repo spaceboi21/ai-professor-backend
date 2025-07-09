@@ -3,4 +3,4 @@ export enum StatusEnum {
   INACTIVE = 'INACTIVE',
 }
 
-export const DEFAULT_STATUS = StatusEnum.ACTIVE; 
+export const DEFAULT_STATUS = StatusEnum.ACTIVE;

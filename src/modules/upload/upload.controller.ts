@@ -39,28 +39,35 @@ export class UploadController {
   ) {}
 
   @Post('profile-url')
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Generate a secure presigned upload URL for profile pictures',
-    description: 'Returns a temporary upload URL that expires in 5 minutes. File size limit: 5MB.'
+    description:
+      'Returns a temporary upload URL that expires in 5 minutes. File size limit: 5MB.',
   })
   @ApiBody({ type: GetFileUploadUrl })
-  @ApiResponse({ 
-    status: 200, 
+  @ApiResponse({
+    status: 200,
     description: 'Upload URL generated successfully',
     schema: {
       type: 'object',
       properties: {
         uploadUrl: { type: 'string', description: 'Presigned upload URL' },
         fileUrl: { type: 'string', description: 'Final file URL after upload' },
-        expiresIn: { type: 'number', description: 'URL expiry time in seconds' },
-        maxSize: { type: 'number', description: 'Maximum file size in bytes' }
-      }
-    }
+        expiresIn: {
+          type: 'number',
+          description: 'URL expiry time in seconds',
+        },
+        maxSize: { type: 'number', description: 'Maximum file size in bytes' },
+      },
+    },
   })
-  @ApiResponse({ status: 400, description: 'Invalid file type or missing parameters' })
+  @ApiResponse({
+    status: 400,
+    description: 'Invalid file type or missing parameters',
+  })
   async getProfileUploadUrl(@Body() data: GetFileUploadUrl) {
     const { fileName, mimeType } = data;
-    
+
     if (this.configService.get('NODE_ENV') === 'production') {
       return this.uploadService.generateS3UploadUrl(
         'profile-pics',
@@ -78,14 +85,15 @@ export class UploadController {
   }
 
   @Get('validate-file')
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Validate an uploaded file',
-    description: 'Verify that an uploaded file exists and is valid'
+    description: 'Verify that an uploaded file exists and is valid',
   })
-  @ApiQuery({ 
-    name: 'fileUrl', 
+  @ApiQuery({
+    name: 'fileUrl',
     description: 'The file URL to validate',
-    example: 'https://bucket.s3.amazonaws.com/profile-pics/123-uuid-filename.jpg'
+    example:
+      'https://bucket.s3.amazonaws.com/profile-pics/123-uuid-filename.jpg',
   })
   @ApiResponse({ status: 200, description: 'File is valid' })
   @ApiResponse({ status: 404, description: 'File not found or invalid' })
@@ -93,14 +101,16 @@ export class UploadController {
     // Security: Validate that the file URL belongs to our bucket
     const bucketName = this.configService.get('AWS_S3_BUCKET_NAME');
     const expectedDomain = `https://${bucketName}.s3.amazonaws.com/`;
-    
+
     if (!fileUrl.startsWith(expectedDomain)) {
-      throw new BadRequestException('Invalid file URL - must be from authorized bucket');
+      throw new BadRequestException(
+        'Invalid file URL - must be from authorized bucket',
+      );
     }
 
     // Extract the key from the URL
     const key = fileUrl.replace(expectedDomain, '');
-    
+
     // Validate key format (folder/timestamp-uuid-filename)
     const keyPattern = /^profile-pics\/\d+-[a-f0-9-]+-[a-z0-9._-]+$/;
     if (!keyPattern.test(key)) {
@@ -111,14 +121,14 @@ export class UploadController {
       message: 'File URL is valid',
       fileUrl,
       validated: true,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     };
   }
 
   @Post('profile')
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Upload profile picture (Development only)',
-    description: 'Direct file upload for development environment'
+    description: 'Direct file upload for development environment',
   })
   @ApiResponse({ status: 201, description: 'File uploaded successfully' })
   @ApiResponse({ status: 400, description: 'Invalid file or upload error' })
@@ -135,17 +145,27 @@ export class UploadController {
       }),
       fileFilter: (req, file, cb) => {
         // Security: Strict file type validation
-        const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+        const allowedTypes = [
+          'image/jpeg',
+          'image/jpg',
+          'image/png',
+          'image/webp',
+        ];
         if (!allowedTypes.includes(file.mimetype)) {
-          cb(new BadRequestException('Only image files (JPEG, PNG, WebP) are allowed'), false);
+          cb(
+            new BadRequestException(
+              'Only image files (JPEG, PNG, WebP) are allowed',
+            ),
+            false,
+          );
         } else {
           cb(null, true);
         }
       },
       limits: {
         fileSize: 5 * 1024 * 1024, // 5MB limit
-        files: 1 // Only one file at a time
-      }
+        files: 1, // Only one file at a time
+      },
     }),
   )
   uploadProfileImage(@UploadedFile() file: Express.Multer.File) {
@@ -160,13 +180,13 @@ export class UploadController {
 
     const key = `uploads/profile-pics/${file.filename}`;
     const fileUrl = `${this.configService.get('BACKEND_URL')}/${key}`;
-    
-    return { 
-      fileUrl, 
+
+    return {
+      fileUrl,
       key,
       originalName: file.originalname,
       size: file.size,
-      mimeType: file.mimetype
+      mimeType: file.mimetype,
     };
   }
 }

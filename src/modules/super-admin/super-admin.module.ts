@@ -3,7 +3,10 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { SuperAdminService } from './super-admin.service';
 import { SuperAdminController } from './super-admin.controller';
 import { User, UserSchema } from 'src/database/schemas/central/user.schema';
-import { School, SchoolSchema } from 'src/database/schemas/central/school.schema';
+import {
+  School,
+  SchoolSchema,
+} from 'src/database/schemas/central/school.schema';
 
 @Module({
   imports: [

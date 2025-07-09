@@ -89,7 +89,11 @@ export class SchoolAdminController {
     @Body() updateStatusDto: UpdateStatusDto,
     @User() user: JWTUserPayload,
   ) {
-    return this.schoolAdminService.updateStudentStatus(studentId, updateStatusDto.status, user);
+    return this.schoolAdminService.updateStudentStatus(
+      studentId,
+      updateStatusDto.status,
+      user,
+    );
   }
 
   // Update professor status
@@ -107,6 +111,10 @@ export class SchoolAdminController {
     @Body() updateStatusDto: UpdateStatusDto,
     @User() user: JWTUserPayload,
   ) {
-    return this.schoolAdminService.updateProfessorStatus(professorId, updateStatusDto.status, user);
+    return this.schoolAdminService.updateProfessorStatus(
+      professorId,
+      updateStatusDto.status,
+      user,
+    );
   }
 }

@@ -59,7 +59,9 @@ export class AuthService {
     // Check user status
     if (isSuperAdminExists.status === StatusEnum.INACTIVE) {
       this.logger.warn(`Super Admin account is inactive: ${email}`);
-      throw new BadRequestException('Your account has been deactivated. Please contact support for assistance.');
+      throw new BadRequestException(
+        'Your account has been deactivated. Please contact support for assistance.',
+      );
     }
 
     const isPasswordMatch = await this.bcryptUtil.comparePassword(
@@ -124,7 +126,9 @@ export class AuthService {
     // Check user status
     if (user.status === StatusEnum.INACTIVE) {
       this.logger.warn(`School Admin account is inactive: ${email}`);
-      throw new BadRequestException('Your account has been deactivated. Please contact support for assistance.');
+      throw new BadRequestException(
+        'Your account has been deactivated. Please contact support for assistance.',
+      );
     }
 
     const isPasswordValid = await this.bcryptUtil.comparePassword(
@@ -146,7 +150,9 @@ export class AuthService {
     // Check school status
     if (school.status === StatusEnum.INACTIVE) {
       this.logger.warn(`School is inactive for School Admin: ${email}`);
-      throw new BadRequestException('Your school has been deactivated. Please contact support for assistance.');
+      throw new BadRequestException(
+        'Your school has been deactivated. Please contact support for assistance.',
+      );
     }
 
     const token = this.jwtUtil.generateToken({
@@ -197,7 +203,9 @@ export class AuthService {
     // Check school status
     if (school.status === StatusEnum.INACTIVE) {
       this.logger.warn(`School is inactive for student: ${email}`);
-      throw new BadRequestException('Your school has been deactivated. Please contact support for assistance.');
+      throw new BadRequestException(
+        'Your school has been deactivated. Please contact support for assistance.',
+      );
     }
 
     // Get tenant connection for the school
@@ -219,7 +227,9 @@ export class AuthService {
     // Check student status
     if (student.status === StatusEnum.INACTIVE) {
       this.logger.warn(`Student account is inactive: ${email}`);
-      throw new BadRequestException('Your account has been deactivated. Please contact support for assistance.');
+      throw new BadRequestException(
+        'Your account has been deactivated. Please contact support for assistance.',
+      );
     }
 
     // Verify password

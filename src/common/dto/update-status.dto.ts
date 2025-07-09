@@ -7,4 +7,4 @@ export class UpdateStatusDto {
   })
   @IsNotEmpty()
   status: StatusEnum;
-} 
+}
