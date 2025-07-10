@@ -8,6 +8,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { User } from 'src/database/schemas/central/user.schema';
 import { StatusEnum } from 'src/common/constants/status.constant';
+import { ROLE_IDS } from 'src/common/constants/roles.constant';
 import { PaginationDto } from 'src/common/dto/pagination.dto';
 import {
   getPaginationOptions,
@@ -95,36 +96,31 @@ export class UsersService {
     };
   }
 
-  async updateUserStatus(userId: string, status: StatusEnum) {
-    this.logger.log(`Updating user status: ${userId} to ${status}`);
+  async updateUserStatus(id: Types.ObjectId, status: StatusEnum) {
+    this.logger.log(`Updating user status: ${id} to ${status}`);
 
-    if (!Types.ObjectId.isValid(userId)) {
-      throw new BadRequestException('Invalid user ID');
-    }
-
-    const user = await this.userModel.findById(userId);
+    const user = await this.userModel.findById(id);
     if (!user) {
-      this.logger.warn(`User not found: ${userId}`);
+      this.logger.warn(`User not found: ${id}`);
       throw new NotFoundException('User not found');
     }
 
     // Super admin cannot change their own status
-    if (user.role.toString() === '6863cea411be9016b7ccb7fc') {
-      // SUPER_ADMIN role ID
+    if (user.role.toString() === ROLE_IDS.SUPER_ADMIN) {
       throw new BadRequestException(
         'Super admin cannot change their own status',
       );
     }
 
     const updatedUser = await this.userModel
-      .findByIdAndUpdate(userId, { status }, { new: true })
+      .findByIdAndUpdate(id, { status }, { new: true })
       .populate('role', 'name');
 
     if (!updatedUser) {
       throw new NotFoundException('User not found after update');
     }
 
-    this.logger.log(`User status updated successfully: ${userId} to ${status}`);
+    this.logger.log(`User status updated successfully: ${id} to ${status}`);
     return {
       message: 'User status updated successfully',
       data: {

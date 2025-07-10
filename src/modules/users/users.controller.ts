@@ -91,9 +91,9 @@ export class UsersController {
   })
   @ApiResponse({ status: 404, description: 'User not found' })
   async updateUserStatus(
-    @Param('id') userId: string,
+    @Param('id', ParseObjectIdPipe) id: Types.ObjectId,
     @Body() updateStatusDto: UpdateStatusDto,
   ) {
-    return this.usersService.updateUserStatus(userId, updateStatusDto.status);
+    return this.usersService.updateUserStatus(id, updateStatusDto.status);
   }
 }

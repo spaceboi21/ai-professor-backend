@@ -20,7 +20,7 @@ import { ModulesModule } from './modules/modules/modules.module';
 import { ChaptersModule } from './modules/chapters/chapters.module';
 import { UsersModule } from './modules/users/users.module';
 import { SchoolsModule } from './modules/schools/schools.module';
-import { ProfessorsModule } from './modules/professors/professors.module';
+import { ProfessorModule } from './modules/professor/professor.module';
 import { SchoolAdminModule } from './modules/school-admin/school-admin.module';
 
 @Module({
@@ -87,7 +87,7 @@ import { SchoolAdminModule } from './modules/school-admin/school-admin.module';
     ChaptersModule,
     UsersModule,
     SchoolsModule,
-    ProfessorsModule,
+    ProfessorModule,
     SchoolAdminModule,
   ],
   controllers: [AppController],

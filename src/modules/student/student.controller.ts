@@ -113,12 +113,12 @@ export class StudentController {
   })
   @ApiResponse({ status: 404, description: 'Student not found' })
   async updateStudentStatus(
-    @Param('id') studentId: string,
+    @Param('id', ParseObjectIdPipe) id: Types.ObjectId,
     @Body() updateStatusDto: UpdateStatusDto,
     @User() user: JWTUserPayload,
   ) {
     return this.studentService.updateStudentStatus(
-      studentId,
+      id,
       updateStatusDto.status,
       user,
     );

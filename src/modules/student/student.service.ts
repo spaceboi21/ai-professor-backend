@@ -248,17 +248,11 @@ export class StudentService {
   }
 
   async updateStudentStatus(
-    studentId: string,
+    id: Types.ObjectId,
     status: StatusEnum,
     user: JWTUserPayload,
   ) {
-    this.logger.log(
-      `School admin updating student status: ${studentId} to ${status}`,
-    );
-
-    if (!Types.ObjectId.isValid(studentId)) {
-      throw new BadRequestException('Invalid student ID');
-    }
+    this.logger.log(`School admin updating student status: ${id} to ${status}`);
 
     // Get school information for the authenticated school admin
     const school = await this.schoolModel.findById(user.school_id);
@@ -272,7 +266,7 @@ export class StudentService {
     const StudentModel = tenantConnection.model(Student.name, StudentSchema);
 
     // Find and update student in tenant database
-    const student = await StudentModel.findById(studentId);
+    const student = await StudentModel.findById(id);
     if (!student) {
       throw new NotFoundException('Student not found');
     }
@@ -288,7 +282,7 @@ export class StudentService {
     }
 
     const updatedStudent = await StudentModel.findByIdAndUpdate(
-      studentId,
+      id,
       { status },
       { new: true },
     );
@@ -297,9 +291,7 @@ export class StudentService {
       throw new NotFoundException('Student not found after update');
     }
 
-    this.logger.log(
-      `Student status updated successfully: ${studentId} to ${status}`,
-    );
+    this.logger.log(`Student status updated successfully: ${id} to ${status}`);
     return {
       message: 'Student status updated successfully',
       data: {

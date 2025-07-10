@@ -97,21 +97,17 @@ export class SchoolsService {
     };
   }
 
-  async updateSchoolStatus(schoolId: string, status: StatusEnum) {
-    this.logger.log(`Updating school status: ${schoolId} to ${status}`);
+  async updateSchoolStatus(id: Types.ObjectId, status: StatusEnum) {
+    this.logger.log(`Updating school status: ${id} to ${status}`);
 
-    if (!Types.ObjectId.isValid(schoolId)) {
-      throw new BadRequestException('Invalid school ID');
-    }
-
-    const school = await this.schoolModel.findById(schoolId);
+    const school = await this.schoolModel.findById(id);
     if (!school) {
-      this.logger.warn(`School not found: ${schoolId}`);
+      this.logger.warn(`School not found: ${id}`);
       throw new NotFoundException('School not found');
     }
 
     const updatedSchool = await this.schoolModel.findByIdAndUpdate(
-      schoolId,
+      id,
       { status },
       { new: true },
     );
@@ -120,9 +116,7 @@ export class SchoolsService {
       throw new NotFoundException('School not found after update');
     }
 
-    this.logger.log(
-      `School status updated successfully: ${schoolId} to ${status}`,
-    );
+    this.logger.log(`School status updated successfully: ${id} to ${status}`);
     return {
       message: 'School status updated successfully',
       data: {

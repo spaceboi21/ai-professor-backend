@@ -92,13 +92,10 @@ export class SchoolsController {
   })
   @ApiResponse({ status: 404, description: 'School not found' })
   async updateSchoolStatus(
-    @Param('id') schoolId: string,
+    @Param('id', ParseObjectIdPipe) id: Types.ObjectId,
     @Body() updateStatusDto: UpdateStatusDto,
   ) {
-    return this.schoolsService.updateSchoolStatus(
-      schoolId,
-      updateStatusDto.status,
-    );
+    return this.schoolsService.updateSchoolStatus(id, updateStatusDto.status);
   }
 
   @Patch(':id')
