@@ -3,10 +3,6 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { UtilsModule } from 'src/common/utils';
 import { StudentService } from './student.service';
 import { StudentController } from './student.controller';
-import {
-  Student,
-  StudentSchema,
-} from 'src/database/schemas/tenant/student.schema';
 import { User, UserSchema } from 'src/database/schemas/central/user.schema';
 import {
   School,

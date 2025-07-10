@@ -1,4 +1,14 @@
-import { Controller, Post, Body, UseGuards, Req } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Body,
+  UseGuards,
+  Req,
+  Get,
+  Query,
+  Param,
+  Patch,
+} from '@nestjs/common';
 import { StudentService } from './student.service';
 import { CreateStudentDto } from './dto/create-student.dto';
 import { JwtAuthGuard } from 'src/common/guards/jwt.guard';
@@ -13,7 +23,13 @@ import {
   ApiBody,
   ApiTags,
   ApiBearerAuth,
+  ApiQuery,
+  ApiParam,
 } from '@nestjs/swagger';
+import { PaginationDto } from 'src/common/dto/pagination.dto';
+import { ParseObjectIdPipe } from '@nestjs/mongoose';
+import { UpdateStatusDto } from 'src/common/dto/update-status.dto';
+import { Types } from 'mongoose';
 
 @ApiTags('Student')
 @ApiBearerAuth()
@@ -33,5 +49,78 @@ export class StudentController {
     @User() user: JWTUserPayload,
   ) {
     return this.studentService.createStudent(createStudentDto, user);
+  }
+
+  @Get()
+  @Roles(RoleEnum.SCHOOL_ADMIN)
+  @ApiOperation({ summary: 'Get all students (School Admin only)' })
+  @ApiQuery({ name: 'page', required: false, type: Number })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  @ApiQuery({ name: 'search', required: false, type: String })
+  @ApiQuery({ name: 'status', required: false, type: String })
+  @ApiResponse({
+    status: 200,
+    description: 'Students retrieved successfully',
+  })
+  async getAllStudents(
+    @Query() paginationDto: PaginationDto,
+    @User() user: JWTUserPayload,
+    @Query('search') search?: string,
+    @Query('status') status?: string,
+  ) {
+    return this.studentService.getAllStudents(
+      paginationDto,
+      user,
+      search,
+      status,
+    );
+  }
+
+  @Get(':id')
+  @Roles(RoleEnum.SCHOOL_ADMIN)
+  @ApiOperation({ summary: 'Get student by ID (School Admin only)' })
+  @ApiParam({
+    name: 'id',
+    type: String,
+    description: 'Student ID',
+    example: '507f1f77bcf86cd799439011',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Student retrieved successfully',
+  })
+  @ApiResponse({ status: 404, description: 'Student not found' })
+  async getStudentById(
+    @Param('id', ParseObjectIdPipe) id: Types.ObjectId,
+    @User() user: JWTUserPayload,
+  ) {
+    return this.studentService.getStudentById(id, user);
+  }
+
+  @Patch(':id/status')
+  @Roles(RoleEnum.SCHOOL_ADMIN)
+  @ApiOperation({ summary: 'Update student status (School Admin only)' })
+  @ApiParam({
+    name: 'id',
+    type: String,
+    description: 'Student ID',
+    example: '507f1f77bcf86cd799439011',
+  })
+  @ApiBody({ type: UpdateStatusDto })
+  @ApiResponse({
+    status: 200,
+    description: 'Student status updated successfully',
+  })
+  @ApiResponse({ status: 404, description: 'Student not found' })
+  async updateStudentStatus(
+    @Param('id') studentId: string,
+    @Body() updateStatusDto: UpdateStatusDto,
+    @User() user: JWTUserPayload,
+  ) {
+    return this.studentService.updateStudentStatus(
+      studentId,
+      updateStatusDto.status,
+      user,
+    );
   }
 }

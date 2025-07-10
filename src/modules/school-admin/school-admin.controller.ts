@@ -1,21 +1,11 @@
-import {
-  Body,
-  Controller,
-  Param,
-  Patch,
-  Post,
-  UseGuards,
-} from '@nestjs/common';
-import { ParseObjectIdPipe } from '@nestjs/mongoose';
+import { Body, Controller, Post, Get, UseGuards } from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiBody,
   ApiOperation,
   ApiResponse,
   ApiTags,
-  ApiParam,
 } from '@nestjs/swagger';
-import { Types } from 'mongoose';
 import { RoleEnum } from 'src/common/constants/roles.constant';
 import { Roles } from 'src/common/decorators/roles.decorator';
 import { User } from 'src/common/decorators/user.decorator';
@@ -23,9 +13,7 @@ import { JwtAuthGuard } from 'src/common/guards/jwt.guard';
 import { RoleGuard } from 'src/common/guards/roles.guard';
 import { JWTUserPayload } from 'src/common/types/jwr-user.type';
 import { CreateSchoolAdminDto } from './dto/create-school-admin.dto';
-import { UpdateSchoolDetailsDto } from './dto/update-school-details.dto';
 import { SchoolAdminService } from './school-admin.service';
-import { UpdateStatusDto } from 'src/common/dto/update-status.dto';
 @ApiTags('School Admin')
 @ApiBearerAuth()
 @Controller('school-admin')
@@ -50,71 +38,15 @@ export class SchoolAdminController {
     return this.schoolAdminService.createSchoolAdmin(body, user);
   }
 
-  // update school details
-  @Patch('/school/:id')
-  @Roles(RoleEnum.SUPER_ADMIN, RoleEnum.SCHOOL_ADMIN)
-  @ApiOperation({ summary: 'Update school details' })
-  @ApiParam({
-    name: 'id',
-    type: String,
-    description: 'School ID',
-    example: '507f1f77bcf86cd799439011',
-  })
-  @ApiBody({ type: UpdateSchoolDetailsDto })
-  @ApiResponse({
-    status: 200,
-    description: 'School details updated successfully',
-  })
-  @ApiResponse({ status: 404, description: 'School not found' })
-  async updateSchoolDetails(
-    @Param('id', ParseObjectIdPipe) id: Types.ObjectId,
-    @Body() body: UpdateSchoolDetailsDto,
-    @User() user: JWTUserPayload,
-  ) {
-    return this.schoolAdminService.updateSchoolDetails(body, user.id, id);
-  }
-
-  // Update student status
-  @Patch('/students/:id/status')
+  // Get school admin dashboard info
+  @Get('dashboard')
   @Roles(RoleEnum.SCHOOL_ADMIN)
-  @ApiOperation({ summary: 'Update student status' })
-  @ApiBody({ type: UpdateStatusDto })
+  @ApiOperation({ summary: 'Get school admin dashboard information' })
   @ApiResponse({
     status: 200,
-    description: 'Student status updated successfully',
+    description: 'Dashboard information retrieved successfully',
   })
-  @ApiResponse({ status: 404, description: 'Student not found' })
-  async updateStudentStatus(
-    @Param('id') studentId: string,
-    @Body() updateStatusDto: UpdateStatusDto,
-    @User() user: JWTUserPayload,
-  ) {
-    return this.schoolAdminService.updateStudentStatus(
-      studentId,
-      updateStatusDto.status,
-      user,
-    );
-  }
-
-  // Update professor status
-  @Patch('/professors/:id/status')
-  @Roles(RoleEnum.SCHOOL_ADMIN)
-  @ApiOperation({ summary: 'Update professor status' })
-  @ApiBody({ type: UpdateStatusDto })
-  @ApiResponse({
-    status: 200,
-    description: 'Professor status updated successfully',
-  })
-  @ApiResponse({ status: 404, description: 'Professor not found' })
-  async updateProfessorStatus(
-    @Param('id') professorId: string,
-    @Body() updateStatusDto: UpdateStatusDto,
-    @User() user: JWTUserPayload,
-  ) {
-    return this.schoolAdminService.updateProfessorStatus(
-      professorId,
-      updateStatusDto.status,
-      user,
-    );
+  async getDashboard(@User() user: JWTUserPayload) {
+    return this.schoolAdminService.getDashboard(user);
   }
 }

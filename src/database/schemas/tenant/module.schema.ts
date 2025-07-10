@@ -3,6 +3,7 @@ import { Document, Types } from 'mongoose';
 import { User } from '../central/user.schema';
 import { DifficultyEnum } from 'src/common/constants/difficulty.constant';
 import { RoleEnum } from 'src/common/constants/roles.constant';
+import { DEFAULT_IMAGES } from 'src/common/constants/default-images.constant';
 
 @Schema({
   timestamps: {
@@ -33,6 +34,9 @@ export class Module extends Document {
 
   @Prop({ type: [String], default: [] })
   tags: string[];
+
+  @Prop({ default: DEFAULT_IMAGES.MODULE_THUMBNAIL })
+  thumbnail: string;
 
   @Prop({ type: Types.ObjectId, ref: User.name, required: true, index: true })
   created_by: Types.ObjectId;

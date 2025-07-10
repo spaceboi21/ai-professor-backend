@@ -15,6 +15,7 @@ import {
 import { TenantConnectionService } from 'src/database/tenant-connection.service';
 import { CreateModuleDto } from './dto/create-module.dto';
 import { UpdateModuleDto } from './dto/update-module.dto';
+import { ModuleFilterDto } from './dto/module-filter.dto';
 import { JWTUserPayload } from 'src/common/types/jwr-user.type';
 import { RoleEnum } from 'src/common/constants/roles.constant';
 import {
@@ -26,6 +27,7 @@ import {
   getPaginationOptions,
   createPaginationResult,
 } from 'src/common/utils/pagination.util';
+import { DifficultyEnum } from 'src/common/constants/difficulty.constant';
 
 @Injectable()
 export class ModulesService {
@@ -48,6 +50,7 @@ export class ModulesService {
       duration,
       difficulty,
       tags,
+      thumbnail,
     } = createModuleDto;
 
     this.logger.log(`Creating module: ${title} by user: ${user.id}`);
@@ -73,6 +76,7 @@ export class ModulesService {
         duration,
         difficulty,
         tags: tags || [],
+        thumbnail: thumbnail || '/uploads/default-module-thumbnail.jpg',
         created_by: new Types.ObjectId(user.id),
         created_by_role: user.role.name as RoleEnum,
       });
@@ -104,7 +108,11 @@ export class ModulesService {
     }
   }
 
-  async findAllModules(user: JWTUserPayload, paginationDto?: PaginationDto) {
+  async findAllModules(
+    user: JWTUserPayload,
+    paginationDto?: PaginationDto,
+    filterDto?: ModuleFilterDto,
+  ) {
     this.logger.log(`Finding all modules for user: ${user.id}`);
 
     // Validate school exists
@@ -122,25 +130,122 @@ export class ModulesService {
       // Get pagination options
       const paginationOptions = getPaginationOptions(paginationDto || {});
 
-      // Get total count for pagination
-      const total = await ModuleModel.countDocuments({ deleted_at: null });
+      // Build aggregation pipeline for fast query with text search
+      const pipeline: any[] = [
+        // Stage 1: Match documents that are not deleted
+        { $match: { deleted_at: null } },
+      ];
 
-      // Get paginated modules
-      const modules = await ModuleModel.find({ deleted_at: null })
-        .sort({ created_at: -1 })
-        .skip(paginationOptions.skip)
-        .limit(paginationOptions.limit)
-        .lean();
+      // Stage 2: Add text search for title and description
+      if (filterDto?.text) {
+        pipeline.push({
+          $match: {
+            $or: [
+              { title: { $regex: filterDto.text, $options: 'i' } },
+              { description: { $regex: filterDto.text, $options: 'i' } },
+            ],
+          },
+        });
+      }
 
-      // Attach user details to modules
-      const modulesWithUsers = await attachUserDetails(modules, this.userModel);
+      // Stage 3: Add other filters
+      const additionalFilters: any = {};
+
+      if (filterDto?.difficulty) {
+        additionalFilters.difficulty = filterDto.difficulty;
+      }
+
+      if (Object.keys(additionalFilters).length > 0) {
+        pipeline.push({ $match: additionalFilters });
+      }
+
+      // Stage 4: Add computed fields for better sorting
+      pipeline.push({
+        $addFields: {
+          title_lower: { $toLower: '$title' },
+          difficulty_order: {
+            $switch: {
+              branches: [
+                {
+                  case: { $eq: ['$difficulty', DifficultyEnum.BEGINNER] },
+                  then: 1,
+                },
+                {
+                  case: { $eq: ['$difficulty', DifficultyEnum.INTERMEDIATE] },
+                  then: 2,
+                },
+                {
+                  case: { $eq: ['$difficulty', DifficultyEnum.ADVANCED] },
+                  then: 3,
+                },
+              ],
+              default: 0,
+            },
+          },
+        },
+      });
+
+      // Stage 5: Sort
+      let sortStage: any = { created_at: -1 }; // default sort
+
+      if (filterDto?.sortBy) {
+        const sortOrder = filterDto.sortOrder === 'desc' ? -1 : 1;
+
+        switch (filterDto.sortBy) {
+          case 'title':
+            sortStage = { title_lower: sortOrder };
+            break;
+          case 'difficulty':
+            sortStage = { difficulty_order: sortOrder };
+            break;
+          case 'duration':
+            sortStage = { duration: sortOrder };
+            break;
+          case 'created_at':
+            sortStage = { created_at: sortOrder };
+            break;
+          default:
+            sortStage = { created_at: -1 };
+        }
+      }
+
+      pipeline.push({ $sort: sortStage });
+
+      // Stage 6: Get total count for pagination (faster with facet)
+      const countPipeline = [...pipeline, { $count: 'total' }];
+      const countResult = await ModuleModel.aggregate(countPipeline);
+      const total = countResult.length > 0 ? countResult[0].total : 0;
+
+      // Stage 7: Add pagination
+      pipeline.push(
+        { $skip: paginationOptions.skip },
+        { $limit: paginationOptions.limit },
+      );
+
+      // Stage 8: Project final fields
+      pipeline.push({
+        $project: {
+          _id: 1,
+          title: 1,
+          subject: 1,
+          description: 1,
+          category: 1,
+          duration: 1,
+          difficulty: 1,
+          tags: 1,
+          thumbnail: 1,
+          created_by: 1,
+          created_by_role: 1,
+          created_at: 1,
+          updated_at: 1,
+        },
+      });
+
+      // Execute aggregation
+      const modules = await ModuleModel.aggregate(pipeline);
 
       // Create pagination result
-      const result = createPaginationResult(
-        modulesWithUsers,
-        total,
-        paginationOptions,
-      );
+      const result = createPaginationResult(modules, total, paginationOptions);
 
       return {
         message: 'Modules retrieved successfully',

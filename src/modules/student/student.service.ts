@@ -20,6 +20,9 @@ import { MailService } from 'src/mail/mail.service';
 import { CreateStudentDto } from './dto/create-student.dto';
 import { RoleEnum } from 'src/common/constants/roles.constant';
 import { JWTUserPayload } from 'src/common/types/jwr-user.type';
+import { createPaginationResult, getPaginationOptions } from 'src/common/utils';
+import { PaginationDto } from 'src/common/dto/pagination.dto';
+import { StatusEnum } from 'src/common/constants/status.constant';
 
 @Injectable()
 export class StudentService {
@@ -151,5 +154,161 @@ export class StudentService {
       }
       throw new BadRequestException('Failed to create student');
     }
+  }
+
+  async getAllStudents(
+    paginationDto: PaginationDto,
+    user: JWTUserPayload,
+    search?: string,
+    status?: string,
+  ) {
+    this.logger.log('Getting all students with filters');
+
+    const { page, limit } = getPaginationOptions(paginationDto);
+
+    // Get school information for the authenticated school admin
+    const school = await this.schoolModel.findById(user.school_id);
+    if (!school) {
+      throw new NotFoundException('School not found');
+    }
+
+    // Get tenant connection
+    const tenantConnection =
+      await this.tenantConnectionService.getTenantConnection(school.db_name);
+    const StudentModel = tenantConnection.model(Student.name, StudentSchema);
+
+    // Build filter query
+    const filter: any = {
+      deleted_at: null,
+      school_id: user?.school_id ? new Types.ObjectId(user.school_id) : null,
+    };
+
+    if (search) {
+      filter.$or = [
+        { email: { $regex: search, $options: 'i' } },
+        { first_name: { $regex: search, $options: 'i' } },
+        { last_name: { $regex: search, $options: 'i' } },
+        { student_code: { $regex: search, $options: 'i' } },
+      ];
+    }
+
+    if (status) {
+      filter.status = status;
+    }
+
+    const [students, total] = await Promise.all([
+      StudentModel.find(filter)
+        .skip((page - 1) * limit)
+        .limit(limit)
+        .lean(),
+      StudentModel.countDocuments(filter),
+    ]);
+
+    const pagination = createPaginationResult(students, total, {
+      page,
+      limit,
+      skip: (page - 1) * limit,
+    });
+
+    return {
+      message: 'Students retrieved successfully',
+      ...pagination,
+    };
+  }
+
+  async getStudentById(id: Types.ObjectId, user: JWTUserPayload) {
+    this.logger.log(`Getting student by ID: ${id}`);
+
+    // Get school information for the authenticated school admin
+    const school = await this.schoolModel.findById(user.school_id);
+    if (!school) {
+      throw new NotFoundException('School not found');
+    }
+
+    // Get tenant connection
+    const tenantConnection =
+      await this.tenantConnectionService.getTenantConnection(school.db_name);
+    const StudentModel = tenantConnection.model(Student.name, StudentSchema);
+
+    const student = await StudentModel.findOne({
+      _id: id,
+      deleted_at: null,
+      school_id: user?.school_id ? new Types.ObjectId(user.school_id) : null,
+    }).lean();
+
+    if (!student) {
+      this.logger.warn(`Student not found: ${id}`);
+      throw new NotFoundException('Student not found');
+    }
+
+    return {
+      message: 'Student retrieved successfully',
+      data: student,
+    };
+  }
+
+  async updateStudentStatus(
+    studentId: string,
+    status: StatusEnum,
+    user: JWTUserPayload,
+  ) {
+    this.logger.log(
+      `School admin updating student status: ${studentId} to ${status}`,
+    );
+
+    if (!Types.ObjectId.isValid(studentId)) {
+      throw new BadRequestException('Invalid student ID');
+    }
+
+    // Get school information for the authenticated school admin
+    const school = await this.schoolModel.findById(user.school_id);
+    if (!school) {
+      throw new NotFoundException('School not found');
+    }
+
+    // Get tenant connection
+    const tenantConnection =
+      await this.tenantConnectionService.getTenantConnection(school.db_name);
+    const StudentModel = tenantConnection.model(Student.name, StudentSchema);
+
+    // Find and update student in tenant database
+    const student = await StudentModel.findById(studentId);
+    if (!student) {
+      throw new NotFoundException('Student not found');
+    }
+
+    // Verify the student belongs to the same school as the admin
+    if (
+      !user.school_id ||
+      student.school_id.toString() !== user.school_id.toString()
+    ) {
+      throw new BadRequestException(
+        'You can only manage students from your school',
+      );
+    }
+
+    const updatedStudent = await StudentModel.findByIdAndUpdate(
+      studentId,
+      { status },
+      { new: true },
+    );
+
+    if (!updatedStudent) {
+      throw new NotFoundException('Student not found after update');
+    }
+
+    this.logger.log(
+      `Student status updated successfully: ${studentId} to ${status}`,
+    );
+    return {
+      message: 'Student status updated successfully',
+      data: {
+        id: updatedStudent._id,
+        email: updatedStudent.email,
+        first_name: updatedStudent.first_name,
+        last_name: updatedStudent.last_name,
+        status: updatedStudent.status,
+      },
+    };
   }
 }

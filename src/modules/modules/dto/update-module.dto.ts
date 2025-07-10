@@ -76,4 +76,13 @@ export class UpdateModuleDto {
     type: [String],
   })
   tags?: string[];
+
+  @IsOptional()
+  @IsString({ message: 'Thumbnail must be a string' })
+  @ApiProperty({
+    example: '/images/module-thumbnails/child-development.jpg',
+    description: 'Thumbnail image path for the module',
+    required: false,
+  })
+  thumbnail?: string;
 }

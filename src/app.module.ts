@@ -11,16 +11,17 @@ import { UtilsModule } from './common/utils';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 import { LoggerMiddleware } from './common/middleware/logger.middleware';
-import { SchoolAdminModule } from './modules/school-admin/school-admin.module';
 import { AuthModule } from './modules/auth/auth.module';
-import { SuperAdminModule } from './modules/super-admin/super-admin.module';
 import { JwtStrategy } from './common/strategies/jwt.strategy';
 import { StudentModule } from './modules/student/student.module';
 import { MailModule } from './mail/mail.module';
-import { ProfessorModule } from './modules/professor/professor.module';
 import { UploadModule } from './modules/upload/upload.module';
 import { ModulesModule } from './modules/modules/modules.module';
 import { ChaptersModule } from './modules/chapters/chapters.module';
+import { UsersModule } from './modules/users/users.module';
+import { SchoolsModule } from './modules/schools/schools.module';
+import { ProfessorsModule } from './modules/professors/professors.module';
+import { SchoolAdminModule } from './modules/school-admin/school-admin.module';
 
 @Module({
   imports: [
@@ -78,15 +79,16 @@ import { ChaptersModule } from './modules/chapters/chapters.module';
     RoleModule,
     SeedModule,
     UtilsModule,
-    SchoolAdminModule,
     AuthModule,
-    SuperAdminModule,
     StudentModule,
     MailModule,
-    ProfessorModule,
     UploadModule,
     ModulesModule,
     ChaptersModule,
+    UsersModule,
+    SchoolsModule,
+    ProfessorsModule,
+    SchoolAdminModule,
   ],
   controllers: [AppController],
   providers: [AppService, JwtStrategy],

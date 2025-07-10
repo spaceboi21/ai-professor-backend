@@ -14,14 +14,7 @@ import { User } from 'src/database/schemas/central/user.schema';
 import { MailService } from 'src/mail/mail.service';
 import { CreateSchoolAdminDto } from './dto/create-school-admin.dto';
 import { GlobalStudent } from 'src/database/schemas/central/global-student.schema';
-import { UpdateSchoolDetailsDto } from './dto/update-school-details.dto';
-import { StatusEnum } from 'src/common/constants/status.constant';
 import { TenantConnectionService } from 'src/database/tenant-connection.service';
-import {
-  Student,
-  StudentSchema,
-} from 'src/database/schemas/tenant/student.schema';
-import { NotFoundException } from '@nestjs/common';
 
 @Injectable()
 export class SchoolAdminService {
@@ -142,201 +135,44 @@ export class SchoolAdminService {
     }
   }
 
-  async updateSchoolDetails(
-    updateSchoolAdminDto: UpdateSchoolDetailsDto,
-    userId: Types.ObjectId | string,
-    schoolId: Types.ObjectId,
-  ) {
-    const school = await this.schoolModel.findById(schoolId);
+  async getDashboard(user: JWTUserPayload) {
+    this.logger.log(`Getting dashboard for school admin: ${user.id}`);
+
+    // Get school information
+    const school = await this.schoolModel.findById(user.school_id);
     if (!school) {
       throw new BadRequestException('School not found');
     }
 
-    // Authorization check
-    if (school.created_by.toString() !== userId.toString()) {
-      throw new BadRequestException(
-        'You are not authorized to update this school',
-      );
-    }
-
-    // Destructure all possible fields
-    const {
-      school_name,
-      address,
-      school_website_url,
-      phone,
-      country_code,
-      timezone,
-      language,
-      logo,
-    } = updateSchoolAdminDto || {};
-
-    // Update fields conditionally
-    if (school_name) {
-      school.name = school_name;
-    }
-    if (address) {
-      school.address = address;
-    }
-    if (school_website_url) {
-      school.website_url = school_website_url;
-    }
-    if (phone) {
-      school.phone = phone;
-    }
-    if (country_code) {
-      school.country_code = country_code;
-    }
-    if (timezone) {
-      school.timezone = timezone;
-    }
-    if (language) {
-      school.language = language;
-    }
-
-    if (logo) {
-      school.logo = logo;
-    }
-
-    school.updated_by = new Types.ObjectId(userId);
-
-    try {
-      const updatedSchool = await school.save();
-      return {
-        message: 'School details updated successfully',
-        success: true,
-        data: {
-          _id: updatedSchool._id,
-          school_name: updatedSchool.name,
-          address: updatedSchool.address,
-          school_website_url: updatedSchool.website_url,
-          phone: updatedSchool.phone,
-          country_code: updatedSchool.country_code,
-          timezone: updatedSchool.timezone,
-        },
-      };
-    } catch (error) {
-      this.logger.error(
-        `Error updating school details for school ID: ${schoolId}`,
-        error?.stack || error,
-      );
-      throw new BadRequestException('Failed to update school details');
-    }
-  }
-
-  async updateStudentStatus(
-    studentId: string,
-    status: StatusEnum,
-    user: JWTUserPayload,
-  ) {
-    this.logger.log(
-      `School admin updating student status: ${studentId} to ${status}`,
-    );
-
-    if (!Types.ObjectId.isValid(studentId)) {
-      throw new BadRequestException('Invalid student ID');
-    }
-
-    // Get school information for the authenticated school admin
-    const school = await this.schoolModel.findById(user.school_id);
-    if (!school) {
-      throw new NotFoundException('School not found');
-    }
-
-    // Get tenant connection
+    // Get tenant connection for the school
     const tenantConnection =
       await this.tenantConnectionService.getTenantConnection(school.db_name);
-    const StudentModel = tenantConnection.model(Student.name, StudentSchema);
 
-    // Find and update student in tenant database
-    const student = await StudentModel.findById(studentId);
-    if (!student) {
-      throw new NotFoundException('Student not found');
-    }
-
-    // Verify the student belongs to the same school as the admin
-    if (
-      !user.school_id ||
-      student.school_id.toString() !== user.school_id.toString()
-    ) {
-      throw new BadRequestException(
-        'You can only manage students from your school',
-      );
-    }
-
-    const updatedStudent = await StudentModel.findByIdAndUpdate(
-      studentId,
-      { status },
-      { new: true },
-    );
-
-    if (!updatedStudent) {
-      throw new NotFoundException('Student not found after update');
-    }
-
-    this.logger.log(
-      `Student status updated successfully: ${studentId} to ${status}`,
-    );
-    return {
-      message: 'Student status updated successfully',
-      student: {
-        id: updatedStudent._id,
-        email: updatedStudent.email,
-        first_name: updatedStudent.first_name,
-        last_name: updatedStudent.last_name,
-        status: updatedStudent.status,
-      },
-    };
-  }
-
-  async updateProfessorStatus(
-    professorId: string,
-    status: StatusEnum,
-    user: JWTUserPayload,
-  ) {
-    this.logger.log(
-      `School admin updating professor status: ${professorId} to ${status}`,
-    );
-
-    if (!Types.ObjectId.isValid(professorId)) {
-      throw new BadRequestException('Invalid professor ID');
-    }
-
-    if (Types.ObjectId.isValid(user.school_id as string)) {
-      // Find professor in central users table
-      const professor = await this.userModel.findOne({
-        _id: new Types.ObjectId(professorId),
+    // Get counts for dashboard
+    const [studentCount, professorCount] = await Promise.all([
+      tenantConnection.model('Student').countDocuments({ deleted_at: null }),
+      this.userModel.countDocuments({
         role: new Types.ObjectId(ROLE_IDS.PROFESSOR),
-        school_id: new Types.ObjectId(user.school_id as string),
-      });
+        school_id: user.school_id
+          ? new Types.ObjectId(user.school_id)
+          : undefined,
+        deleted_at: null,
+      }),
+    ]);
 
-      if (!professor) {
-        throw new NotFoundException(
-          'Professor not found or not in your school',
-        );
-      }
-    }
-
-    const updatedProfessor = await this.userModel
-      .findByIdAndUpdate(professorId, { status }, { new: true })
-      .populate('role', 'name');
-
-    if (!updatedProfessor) {
-      throw new NotFoundException('Professor not found after update');
-    }
-
-    this.logger.log(
-      `Professor status updated successfully: ${professorId} to ${status}`,
-    );
     return {
-      message: 'Professor status updated successfully',
-      professor: {
-        id: updatedProfessor._id,
-        email: updatedProfessor.email,
-        first_name: updatedProfessor.first_name,
-        last_name: updatedProfessor.last_name,
-        status: updatedProfessor.status,
-        role: updatedProfessor.role,
+      message: 'Dashboard information retrieved successfully',
+      data: {
+        school: {
+          id: school._id,
+          name: school.name,
+          email: school.email,
+          status: school.status,
+        },
+        counts: {
+          students: studentCount,
+          professors: professorCount,
+        },
       },
     };
   }

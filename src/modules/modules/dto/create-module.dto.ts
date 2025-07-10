@@ -72,4 +72,13 @@ export class CreateModuleDto {
     type: [String],
   })
   tags?: string[];
+
+  @IsString({ message: 'Thumbnail must be a string' })
+  @IsOptional()
+  @ApiProperty({
+    example: '/images/module-thumbnails/child-development.jpg',
+    description: 'Thumbnail image path for the module',
+    required: false,
+  })
+  thumbnail?: string;
 }

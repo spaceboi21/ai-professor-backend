@@ -12,7 +12,7 @@ import { School } from './school.schema';
 export class GlobalStudent extends Document {
   declare _id: Types.ObjectId;
 
-  // Primary key (indexed)
+  // Primary key (indexed)but
   @Prop({ type: Types.ObjectId, index: true })
   student_id: Types.ObjectId;
 

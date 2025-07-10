@@ -28,8 +28,10 @@ import { RoleGuard } from 'src/common/guards/roles.guard';
 import { JWTUserPayload } from 'src/common/types/jwr-user.type';
 import { CreateModuleDto } from './dto/create-module.dto';
 import { UpdateModuleDto } from './dto/update-module.dto';
+import { ModuleFilterDto } from './dto/module-filter.dto';
 import { ModulesService } from './modules.service';
 import { PaginationDto } from 'src/common/dto/pagination.dto';
+import { DifficultyEnum } from 'src/common/constants/difficulty.constant';
 
 @ApiTags('Modules')
 @ApiBearerAuth()
@@ -58,7 +60,7 @@ export class ModulesController {
     RoleEnum.PROFESSOR,
     RoleEnum.STUDENT,
   )
-  @ApiOperation({ summary: 'Get all modules' })
+  @ApiOperation({ summary: 'Get all modules with filtering and sorting' })
   @ApiQuery({
     name: 'page',
     required: false,
@@ -73,12 +75,41 @@ export class ModulesController {
     description: 'Number of items per page (default: 10, max: 100)',
     example: 10,
   })
+  @ApiQuery({
+    name: 'text',
+    required: false,
+    type: String,
+    description: 'Search text in title and description (case-insensitive)',
+    example: 'psychology',
+  })
+  @ApiQuery({
+    name: 'difficulty',
+    required: false,
+    enum: DifficultyEnum,
+    description: 'Filter by difficulty level',
+    example: 'INTERMEDIATE',
+  })
+  @ApiQuery({
+    name: 'sortBy',
+    required: false,
+    enum: ['title', 'difficulty', 'created_at', 'duration'],
+    description: 'Sort by field',
+    example: 'title',
+  })
+  @ApiQuery({
+    name: 'sortOrder',
+    required: false,
+    enum: ['asc', 'desc'],
+    description: 'Sort order',
+    example: 'asc',
+  })
   @ApiResponse({ status: 200, description: 'Modules retrieved successfully' })
   async findAllModules(
     @User() user: JWTUserPayload,
     @Query() paginationDto?: PaginationDto,
+    @Query() filterDto?: ModuleFilterDto,
   ) {
-    return this.modulesService.findAllModules(user, paginationDto);
+    return this.modulesService.findAllModules(user, paginationDto, filterDto);
   }
 
   @Get(':id')
