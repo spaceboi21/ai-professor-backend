@@ -125,14 +125,29 @@ Tenant Databases (Per School)
 
 ## Environment Variables
 
-| Variable             | Description               | Default       |
-| -------------------- | ------------------------- | ------------- |
-| `NODE_ENV`           | Environment mode          | `development` |
-| `PORT`               | Server port               | `5000`        |
-| `MONGODB_URI`        | MongoDB connection string | Required      |
-| `JWT_SECRET`         | JWT signing secret        | Required      |
-| `JWT_EXPIRY`         | JWT token expiry          | `24h`         |
-| `FRONT_END_BASE_URL` | Frontend URL for CORS     | Required      |
+| Variable             | Description                                                 | Default       |
+| -------------------- | ----------------------------------------------------------- | ------------- |
+| `NODE_ENV`           | Environment mode                                            | `development` |
+| `PORT`               | Server port                                                 | `5000`        |
+| `MONGODB_URI`        | Central MongoDB connection string                           | Required      |
+| `CENTRAL_DB_URI`     | Alternative central database connection string              | Optional      |
+| `MONGODB_BASE_URI`   | Base URI for tenant databases (without database name)      | Required      |
+| `JWT_SECRET`         | JWT signing secret                                          | Required      |
+| `JWT_EXPIRY`         | JWT token expiry                                            | `24h`         |
+| `FRONT_END_BASE_URL` | Frontend URL for CORS                                       | Required      |
+
+### Migration Environment Variables
+
+For database migrations, you need these environment variables:
+
+- **`MONGODB_URI` or `CENTRAL_DB_URI`**: Central database connection (e.g., `mongodb://localhost:27017/ai-professor-central`)
+- **`MONGODB_BASE_URI`**: Base URI for tenant databases (e.g., `mongodb://localhost:27017`)
+
+Example values:
+```bash
+MONGODB_URI=mongodb://localhost:27017/ai-professor-central
+MONGODB_BASE_URI=mongodb://localhost:27017
+```
 
 ## API Endpoints
 
@@ -180,6 +195,93 @@ Tenant Databases (Per School)
 ### Health Check
 
 - `GET /api/health` - API health status
+
+## Database Migrations
+
+The AI Professor backend includes a comprehensive migration system for managing database schema changes across both central and tenant databases.
+
+### Migration Commands
+
+```bash
+# Run all migrations (central + tenant) for a specific tenant database
+yarn migrate --db-name school_abc_db
+
+# Run only central migrations
+yarn migrate --type central
+
+# Run only tenant migrations for a specific database
+yarn migrate --type tenant --db-name school_abc_db
+
+# Display help
+yarn migrate --help
+```
+
+### Migration Structure
+
+Migrations are organized in two directories:
+
+- **`src/database/migrations/central/`** - Central database migrations (users, schools, roles)
+- **`src/database/migrations/tenants/`** - Tenant database migrations (students, modules, chapters)
+
+### Creating Migrations
+
+Migration files should follow this naming pattern:
+```
+YYYYMMDDHHMMSS-description.migration.ts
+```
+
+#### Central Migration Example
+```typescript
+// src/database/migrations/central/20250101120000-add-user-field.migration.ts
+import mongoose from 'mongoose';
+
+export async function up(connection: mongoose.Connection) {
+  await connection.collection('users').updateMany(
+    { new_field: { $exists: false } }, 
+    { $set: { new_field: 'default_value' } }
+  );
+  console.info('Migration up: added new_field to users');
+}
+
+export async function down(connection: mongoose.Connection) {
+  await connection.collection('users').updateMany(
+    {}, 
+    { $unset: { new_field: '' } }
+  );
+  console.info('Migration down: removed new_field from users');
+}
+```
+
+#### Tenant Migration Example
+```typescript
+// src/database/migrations/tenants/20250101120000-add-student-field.migration.ts
+import mongoose from 'mongoose';
+
+export async function up(connection: mongoose.Connection, tenantDbName: string) {
+  await connection.collection('students').updateMany(
+    { new_field: { $exists: false } }, 
+    { $set: { new_field: 'default_value' } }
+  );
+  console.info(`Migration up: added new_field to students in ${tenantDbName}`);
+}
+
+export async function down(connection: mongoose.Connection, tenantDbName: string) {
+  await connection.collection('students').updateMany(
+    {}, 
+    { $unset: { new_field: '' } }
+  );
+  console.info(`Migration down: removed new_field from students in ${tenantDbName}`);
+}
+```
+
+### Migration Features
+
+- **✅ Automatic Tracking**: Migrations are tracked to prevent re-execution
+- **🔄 Execution Order**: Central migrations run first, followed by tenant migrations
+- **⚡ Fast Execution**: Only new migrations are executed
+- **🛡️ Error Handling**: Migrations stop on first failure with detailed error reporting
+- **📊 Progress Reporting**: Real-time execution status and performance metrics
+- **🎯 Selective Execution**: Run central, tenant, or all migrations as needed
 
 ## Core Functionality
 
