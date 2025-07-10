@@ -9,6 +9,7 @@ import {
   Get,
   Query,
   HttpStatus,
+  ParseFilePipe,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import {
@@ -27,6 +28,8 @@ import { v4 as uuid } from 'uuid';
 import { GetFileUploadUrl } from './dto/get-upload-url.dto';
 import { UploadService } from './upload.service';
 import { ConfigService } from '@nestjs/config';
+import { CustomFileTypeValidator } from 'src/common/utils/custom-file-type-validator.utils';
+import { MaxFileSizeValidator } from 'src/common/pipes/max-file-size-validate.pipe';
 
 @Controller('upload')
 @ApiTags('Upload')
@@ -78,7 +81,10 @@ export class UploadController {
       return {
         uploadUrl: `${this.configService.get('BACKEND_API_URL')}/upload/profile`,
         method: 'POST',
-        maxSize: 5 * 1024 * 1024, // 5MB
+        maxSize:
+          (this.configService.get<number>('MAXIMUM_FILE_SIZE') ?? 5) *
+          1024 *
+          1024, // 5MB
         expiresIn: 300, // 5 minutes
       };
     }
@@ -143,39 +149,25 @@ export class UploadController {
           cb(null, `${timestamp}-${uuid()}${ext}`);
         },
       }),
-      fileFilter: (req, file, cb) => {
-        // Security: Strict file type validation
-        const allowedTypes = [
-          'image/jpeg',
-          'image/jpg',
-          'image/png',
-          'image/webp',
-        ];
-        if (!allowedTypes.includes(file.mimetype)) {
-          cb(
-            new BadRequestException(
-              'Only image files (JPEG, PNG, WebP) are allowed',
-            ),
-            false,
-          );
-        } else {
-          cb(null, true);
-        }
-      },
-      limits: {
-        fileSize: 5 * 1024 * 1024, // 5MB limit
-        files: 1, // Only one file at a time
-      },
     }),
   )
-  uploadProfileImage(@UploadedFile() file: Express.Multer.File) {
+  uploadProfileImage(
+    @UploadedFile(
+      new ParseFilePipe({
+        validators: [
+          new CustomFileTypeValidator({
+            fileType: /^image\//,
+            errorMessage: 'Only image files (JPEG, PNG, WebP) are allowed',
+          }),
+          new MaxFileSizeValidator(new ConfigService()),
+        ],
+        fileIsRequired: true,
+      }),
+    )
+    file: Express.Multer.File,
+  ) {
     if (!file) {
       throw new BadRequestException('No file uploaded');
-    }
-
-    // Security: Additional validation
-    if (file.size > 5 * 1024 * 1024) {
-      throw new BadRequestException('File size exceeds 5MB limit');
     }
 
     const key = `uploads/profile-pics/${file.filename}`;
