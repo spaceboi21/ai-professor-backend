@@ -2,7 +2,11 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { MailerModule } from '@nestjs-modules/mailer';
 import { HandlebarsAdapter } from '@nestjs-modules/mailer/dist/adapters/handlebars.adapter';
+import { BullModule } from '@nestjs/bullmq';
 import { MailService } from './mail.service';
+import { QueueModule } from 'src/common/queue/queue.module';
+import { QueueService } from 'src/common/queue/queue.service';
+import { MailQueueProcessor } from 'src/common/processors/mail-queue.processor';
 import { join } from 'path';
 
 const templateDir = join(process.cwd(), 'src', 'mail', 'templates');
@@ -35,8 +39,12 @@ const templateDir = join(process.cwd(), 'src', 'mail', 'templates');
         },
       }),
     }),
+    BullModule.registerQueue({
+      name: 'mail-queue', // 👈 THIS LINE IS CRUCIAL
+    }),
+    QueueModule,
   ],
-  providers: [MailService],
+  providers: [MailService, QueueService, MailQueueProcessor],
   exports: [MailService],
 })
 export class MailModule {}

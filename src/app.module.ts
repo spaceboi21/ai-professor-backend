@@ -23,11 +23,24 @@ import { SchoolsModule } from './modules/schools/schools.module';
 import { ProfessorModule } from './modules/professor/professor.module';
 import { SchoolAdminModule } from './modules/school-admin/school-admin.module';
 import { BibliographyModule } from './modules/bibliography/bibliography.module';
+import { BullModule } from '@nestjs/bullmq';
+import { QueueModule } from './common/queue/queue.module';
+import { ProcessorsModule } from './common/processors/processors.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
+    }),
+    BullModule.forRootAsync({
+      imports: [ConfigModule],
+      useFactory: async (configService: ConfigService) => ({
+        connection: {
+          host: configService.get('REDIS_HOST', 'localhost'),
+          port: configService.get('REDIS_PORT', 6379),
+        },
+      }),
+      inject: [ConfigService],
     }),
     MongooseModule.forRootAsync({
       imports: [ConfigModule],
@@ -91,6 +104,8 @@ import { BibliographyModule } from './modules/bibliography/bibliography.module';
     ProfessorModule,
     SchoolAdminModule,
     BibliographyModule,
+    QueueModule,
+    ProcessorsModule,
   ],
   controllers: [AppController],
   providers: [AppService, JwtStrategy],

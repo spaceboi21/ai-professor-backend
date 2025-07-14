@@ -37,6 +37,7 @@ import { Types } from 'mongoose';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
 import { extname } from 'path';
+import { readFileSync } from 'fs';
 
 @ApiTags('Student')
 @ApiBearerAuth()
@@ -130,8 +131,11 @@ export class StudentController {
       throw new BadRequestException('CSV file is required');
     }
 
+    // Read the file from disk since we're using diskStorage
+    const fileBuffer = readFileSync(file.path);
+
     const result = await this.studentService.bulkCreateStudents(
-      file.buffer,
+      fileBuffer,
       user,
     );
 

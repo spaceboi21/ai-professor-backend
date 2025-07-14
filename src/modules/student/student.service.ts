@@ -17,6 +17,7 @@ import { GlobalStudent } from 'src/database/schemas/central/global-student.schem
 import { BcryptUtil } from 'src/common/utils/bcrypt.util';
 import { TenantConnectionService } from 'src/database/tenant-connection.service';
 import { MailService } from 'src/mail/mail.service';
+import { EmailUtil } from 'src/common/utils/email.util';
 import { CreateStudentDto } from './dto/create-student.dto';
 import { BulkCreateResult, StudentCsvRow } from './dto/bulk-create-student.dto';
 import { RoleEnum } from 'src/common/constants/roles.constant';
@@ -129,14 +130,14 @@ export class StudentService {
       this.logger.log(`Global student entry created for: ${email}`);
 
       // Send credentials email
-      await this.mailService.sendCredentialsEmail(
+      await this.mailService.queueCredentialsEmail(
         email,
         `${first_name}${last_name ? ` ${last_name}` : ''}`,
         generatedPassword,
         RoleEnum.STUDENT,
       );
 
-      this.logger.log(`Credentials email sent to: ${email}`);
+      this.logger.log(`Credentials email queued for: ${email}`);
 
       return {
         message: 'Student created successfully',
@@ -345,9 +346,11 @@ export class StudentService {
             return;
           }
 
-          // Validate email format
-          const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-          if (!emailRegex.test(row.email)) {
+          // Validate email format using common utility
+          const emailValidation = EmailUtil.validateAndNormalizeEmail(
+            row.email,
+          );
+          if (!emailValidation.isValid) {
             result.failed.push({
               row: {
                 first_name: row.first_name,
@@ -355,21 +358,6 @@ export class StudentService {
                 email: row.email,
               },
               error: 'Invalid email format',
-            });
-            return;
-          }
-
-          // For SCHOOL_ADMIN, school_id should not be provided in CSV
-          if (adminUser.role.name === RoleEnum.SCHOOL_ADMIN && row.school_id) {
-            result.failed.push({
-              row: {
-                first_name: row.first_name,
-                last_name: row.last_name || '',
-                email: row.email,
-                school_id: row.school_id,
-              },
-              error:
-                'School admin cannot specify school_id in CSV. Students will be created for your school only.',
             });
             return;
           }
@@ -395,7 +383,7 @@ export class StudentService {
           students.push({
             first_name: row.first_name.trim(),
             last_name: (row.last_name || '').trim(),
-            email: row.email.toLowerCase().trim(),
+            email: emailValidation.normalizedEmail!,
             school_id: row.school_id?.trim(),
           });
         })
@@ -448,6 +436,14 @@ export class StudentService {
       existingEmails.add(student.email),
     );
 
+    // Collect emails for queue processing
+    const emailJobs: Array<{
+      email: string;
+      name: string;
+      password: string;
+      role: RoleEnum;
+    }> = [];
+
     // Process each student
     for (const student of uniqueStudents) {
       try {
@@ -467,7 +463,9 @@ export class StudentService {
         if (adminUser.role.name === RoleEnum.SCHOOL_ADMIN) {
           // School admin can only create students for their own school
           schoolId = (adminUser.school_id as string) || '';
-          school = await this.schoolModel.findById(schoolId);
+          school = await this.schoolModel.findById(
+            new Types.ObjectId(schoolId),
+          );
           if (!school) {
             result.failed.push({
               row: student,
@@ -475,10 +473,25 @@ export class StudentService {
             });
             continue;
           }
+
+          // If school_id is provided in CSV, validate it matches the admin's school
+          if (
+            student.school_id &&
+            student.school_id.toString() !== schoolId.toString()
+          ) {
+            result.failed.push({
+              row: student,
+              error:
+                'School admin can only create students for their own school',
+            });
+            continue;
+          }
         } else if (adminUser.role.name === RoleEnum.SUPER_ADMIN) {
           // Super admin can specify school_id in CSV or use default
           schoolId = student.school_id || (adminUser.school_id as string) || '';
-          school = await this.schoolModel.findById(schoolId);
+          school = await this.schoolModel.findById(
+            new Types.ObjectId(schoolId),
+          );
           if (!school) {
             result.failed.push({
               row: student,
@@ -544,13 +557,13 @@ export class StudentService {
           school_id: new Types.ObjectId(schoolId),
         });
 
-        // Send credentials email
-        await this.mailService.sendCredentialsEmail(
-          student.email,
-          `${student.first_name}${student.last_name ? ` ${student.last_name}` : ''}`,
-          generatedPassword,
-          RoleEnum.STUDENT,
-        );
+        // Add email job to queue instead of sending directly
+        emailJobs.push({
+          email: student.email,
+          name: `${student.first_name}${student.last_name ? ` ${student.last_name}` : ''}`,
+          password: generatedPassword,
+          role: RoleEnum.STUDENT,
+        });
 
         result.success.push(student);
         result.successCount++;
@@ -565,6 +578,19 @@ export class StudentService {
           error: error.message || 'Failed to create student',
         });
         result.failedCount++;
+      }
+    }
+
+    // Queue all emails for background processing
+    if (emailJobs.length > 0) {
+      try {
+        await this.mailService.queueBulkCredentialsEmails(emailJobs);
+        this.logger.log(
+          `Queued ${emailJobs.length} email jobs for background processing`,
+        );
+      } catch (error) {
+        this.logger.error('Failed to queue email jobs:', error);
+        // Don't fail the entire operation if email queuing fails
       }
     }
 

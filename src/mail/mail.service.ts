@@ -3,12 +3,14 @@ import { MailerService } from '@nestjs-modules/mailer';
 import { VerificationMail } from './type';
 import { RoleEnum } from 'src/common/constants/roles.constant';
 import { ConfigService } from '@nestjs/config';
+import { QueueService } from 'src/common/queue/queue.service';
 
 @Injectable()
 export class MailService {
   constructor(
     private readonly mailerService: MailerService,
     private readonly configService: ConfigService,
+    private readonly queueService: QueueService,
   ) {}
 
   async sendVerificationEmail(data: VerificationMail): Promise<void> {
@@ -59,6 +61,57 @@ export class MailService {
         role: role.replace(/_/g, ' ').toLowerCase(),
         logoUrl,
       },
+    });
+  }
+
+  /**
+   * Queue credentials email for background processing
+   */
+  async queueCredentialsEmail(
+    email: string,
+    name: string,
+    password: string,
+    role: RoleEnum,
+  ): Promise<void> {
+    await this.queueService.addMailJob('send-credentials', {
+      email,
+      name,
+      password,
+      role,
+    });
+  }
+
+  /**
+   * Queue multiple credentials emails for background processing
+   */
+  async queueBulkCredentialsEmails(
+    emails: Array<{
+      email: string;
+      name: string;
+      password: string;
+      role: RoleEnum;
+    }>,
+  ): Promise<void> {
+    const jobs = emails.map(({ email, name, password, role }) => ({
+      name: 'send-credentials',
+      data: { email, name, password, role },
+    }));
+
+    await this.queueService.addBulkMailJobs(jobs);
+  }
+
+  /**
+   * Queue welcome email for background processing
+   */
+  async queueWelcomeEmail(
+    email: string,
+    name: string,
+    role: RoleEnum,
+  ): Promise<void> {
+    await this.queueService.addMailJob('send-welcome', {
+      email,
+      name,
+      role,
     });
   }
 }
