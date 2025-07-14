@@ -39,7 +39,7 @@ export class Bibliography extends Document {
   mime_type: string;
 
   @Prop({ required: true })
-  url: string;
+  path: string;
 
   @Prop({ type: Number })
   pages: number;

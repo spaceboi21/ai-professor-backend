@@ -17,6 +17,17 @@ export class UploadService {
     'image/webp',
   ];
 
+  // Bibliography file types
+  private readonly BIBLIOGRAPHY_ALLOWED_MIME_TYPES = [
+    'application/pdf',
+    'video/mp4',
+    'video/avi',
+    'video/mov',
+    'video/wmv',
+    'video/flv',
+    'video/webm',
+  ];
+
   constructor(private readonly configService: ConfigService) {
     if (this.configService.get('NODE_ENV') === 'production') {
       this.s3Client = new S3Client({
@@ -34,11 +45,19 @@ export class UploadService {
     fileName: string,
     mimeType: string,
   ) {
-    // Security: Validate mime type
-    if (!this.ALLOWED_MIME_TYPES.includes(mimeType)) {
-      throw new BadRequestException(
-        `Invalid file type. Allowed types: ${this.ALLOWED_MIME_TYPES.join(', ')}`,
-      );
+    // Security: Validate mime type based on folder
+    if (folder === 'bibliography') {
+      if (!this.BIBLIOGRAPHY_ALLOWED_MIME_TYPES.includes(mimeType)) {
+        throw new BadRequestException(
+          `Invalid bibliography file type. Allowed types: ${this.BIBLIOGRAPHY_ALLOWED_MIME_TYPES.join(', ')}`,
+        );
+      }
+    } else {
+      if (!this.ALLOWED_MIME_TYPES.includes(mimeType)) {
+        throw new BadRequestException(
+          `Invalid file type. Allowed types: ${this.ALLOWED_MIME_TYPES.join(', ')}`,
+        );
+      }
     }
 
     // Security: Sanitize filename

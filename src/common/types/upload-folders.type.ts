@@ -3,4 +3,5 @@ export type UploadFolders =
   | 'documents'
   | 'media'
   | 'backups'
-  | 'school-logos';
+  | 'school-logos'
+  | 'bibliography';

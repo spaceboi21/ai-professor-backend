@@ -6,12 +6,11 @@ import {
   UploadedFile,
   UseGuards,
   UseInterceptors,
+  UseFilters,
   Get,
   Query,
   HttpStatus,
-  ParseFilePipe,
 } from '@nestjs/common';
-import { FileInterceptor } from '@nestjs/platform-express';
 import {
   ApiBearerAuth,
   ApiBody,
@@ -26,15 +25,54 @@ import { extname } from 'path';
 import { JwtAuthGuard } from 'src/common/guards/jwt.guard';
 import { v4 as uuid } from 'uuid';
 import { GetFileUploadUrl } from './dto/get-upload-url.dto';
+import { GetBibliographyUploadUrl } from './dto/get-bibliography-upload-url.dto';
 import { UploadService } from './upload.service';
 import { ConfigService } from '@nestjs/config';
-import { CustomFileTypeValidator } from 'src/common/utils/custom-file-type-validator.utils';
-import { MaxFileSizeValidator } from 'src/common/pipes/max-file-size-validate.pipe';
+import { UploadExceptionFilter } from 'src/common/filters/upload-exception.filter';
+import { FileInterceptor } from '@nestjs/platform-express';
+
+const allowedImageTypes = ['.jpg', '.jpeg', '.png', '.webp'];
+const allowedBibliographyTypes = [
+  '.pdf',
+  '.mp4',
+  '.avi',
+  '.mov',
+  '.wmv',
+  '.flv',
+  '.webm',
+];
+
+function fileFilterForProfile(req, file, cb) {
+  const ext = extname(file.originalname).toLowerCase();
+  if (allowedImageTypes.includes(ext)) {
+    cb(null, true);
+  } else {
+    cb(
+      new BadRequestException('Only image files (JPEG, PNG, WebP) are allowed'),
+      false,
+    );
+  }
+}
+
+function fileFilterForBibliography(req, file, cb) {
+  const ext = extname(file.originalname).toLowerCase();
+  if (allowedBibliographyTypes.includes(ext)) {
+    cb(null, true);
+  } else {
+    cb(
+      new BadRequestException(
+        'Only PDF and video files (PDF, MP4, AVI, MOV, WMV, FLV, WebM) are allowed',
+      ),
+      false,
+    );
+  }
+}
 
 @Controller('upload')
 @ApiTags('Upload')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard)
+@UseFilters(UploadExceptionFilter)
 export class UploadController {
   constructor(
     private readonly uploadService: UploadService,
@@ -86,6 +124,57 @@ export class UploadController {
           1024 *
           1024, // 5MB
         expiresIn: 300, // 5 minutes
+      };
+    }
+  }
+
+  @Post('bibliography-url')
+  @ApiOperation({
+    summary:
+      'Generate a secure presigned upload URL for bibliography files (PDF/Video)',
+    description:
+      'Returns a temporary upload URL that expires in 10 minutes. File size limit: 100MB.',
+  })
+  @ApiBody({ type: GetBibliographyUploadUrl })
+  @ApiResponse({
+    status: 200,
+    description: 'Upload URL generated successfully',
+    schema: {
+      type: 'object',
+      properties: {
+        uploadUrl: { type: 'string', description: 'Presigned upload URL' },
+        fileUrl: { type: 'string', description: 'Final file URL after upload' },
+        expiresIn: {
+          type: 'number',
+          description: 'URL expiry time in seconds',
+        },
+        maxSize: { type: 'number', description: 'Maximum file size in bytes' },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Invalid file type or missing parameters',
+  })
+  async getBibliographyUploadUrl(@Body() data: GetBibliographyUploadUrl) {
+    const { fileName, mimeType } = data;
+
+    if (this.configService.get('NODE_ENV') === 'production') {
+      return this.uploadService.generateS3UploadUrl(
+        'bibliography',
+        fileName,
+        mimeType,
+      );
+    } else {
+      return {
+        uploadUrl: `${this.configService.get('BACKEND_API_URL')}/upload/bibliography`,
+        method: 'POST',
+        maxSize:
+          (this.configService.get<number>('MAXIMUM_BIBLIOGRAPHY_FILE_SIZE') ??
+            100) *
+          1024 *
+          1024, // 100MB
+        expiresIn: 600, // 10 minutes
       };
     }
   }
@@ -149,28 +238,62 @@ export class UploadController {
           cb(null, `${timestamp}-${uuid()}${ext}`);
         },
       }),
+      fileFilter: fileFilterForProfile,
+      limits: {
+        fileSize: parseInt(process.env.MAXIMUM_FILE_SIZE || '5') * 1024 * 1024, // 5MB default
+      },
     }),
   )
-  uploadProfileImage(
-    @UploadedFile(
-      new ParseFilePipe({
-        validators: [
-          new CustomFileTypeValidator({
-            fileType: /^image\//,
-            errorMessage: 'Only image files (JPEG, PNG, WebP) are allowed',
-          }),
-          new MaxFileSizeValidator(new ConfigService()),
-        ],
-        fileIsRequired: true,
-      }),
-    )
-    file: Express.Multer.File,
-  ) {
+  uploadProfileImage(@UploadedFile() file: Express.Multer.File) {
     if (!file) {
       throw new BadRequestException('No file uploaded');
     }
 
     const key = `uploads/profile-pics/${file.filename}`;
+    const fileUrl = `${this.configService.get('BACKEND_URL')}/${key}`;
+
+    return {
+      fileUrl,
+      key,
+      originalName: file.originalname,
+      size: file.size,
+      mimeType: file.mimetype,
+    };
+  }
+
+  @Post('bibliography')
+  @ApiOperation({
+    summary: 'Upload bibliography file (PDF/Video) (Development only)',
+    description: 'Direct file upload for development environment',
+  })
+  @ApiResponse({ status: 201, description: 'File uploaded successfully' })
+  @ApiResponse({ status: 400, description: 'Invalid file or upload error' })
+  @ApiConsumes('multipart/form-data')
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: diskStorage({
+        destination: './uploads/bibliography',
+        filename: (req, file, cb) => {
+          const ext = extname(file.originalname);
+          const timestamp = Date.now();
+          cb(null, `${timestamp}-${uuid()}${ext}`);
+        },
+      }),
+      fileFilter: fileFilterForBibliography,
+      limits: {
+        fileSize:
+          parseInt(process.env.MAXIMUM_BIBLIOGRAPHY_FILE_SIZE || '5') *
+          1024 *
+          1024, // 100MB default
+      },
+    }),
+  )
+  uploadBibliographyFile(@UploadedFile() file: Express.Multer.File) {
+    if (!file) {
+      throw new BadRequestException('No file uploaded');
+    }
+
+    const key = `uploads/bibliography/${file.filename}`;
     const fileUrl = `${this.configService.get('BACKEND_URL')}/${key}`;
 
     return {

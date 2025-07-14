@@ -22,6 +22,7 @@ import { UsersModule } from './modules/users/users.module';
 import { SchoolsModule } from './modules/schools/schools.module';
 import { ProfessorModule } from './modules/professor/professor.module';
 import { SchoolAdminModule } from './modules/school-admin/school-admin.module';
+import { BibliographyModule } from './modules/bibliography/bibliography.module';
 
 @Module({
   imports: [
@@ -89,6 +90,7 @@ import { SchoolAdminModule } from './modules/school-admin/school-admin.module';
     SchoolsModule,
     ProfessorModule,
     SchoolAdminModule,
+    BibliographyModule,
   ],
   controllers: [AppController],
   providers: [AppService, JwtStrategy],

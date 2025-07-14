@@ -8,6 +8,9 @@ import {
   Query,
   Param,
   Patch,
+  UseInterceptors,
+  UploadedFile,
+  BadRequestException,
 } from '@nestjs/common';
 import { StudentService } from './student.service';
 import { CreateStudentDto } from './dto/create-student.dto';
@@ -25,11 +28,15 @@ import {
   ApiBearerAuth,
   ApiQuery,
   ApiParam,
+  ApiConsumes,
 } from '@nestjs/swagger';
 import { PaginationDto } from 'src/common/dto/pagination.dto';
 import { ParseObjectIdPipe } from '@nestjs/mongoose';
 import { UpdateStatusDto } from 'src/common/dto/update-status.dto';
 import { Types } from 'mongoose';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { diskStorage } from 'multer';
+import { extname } from 'path';
 
 @ApiTags('Student')
 @ApiBearerAuth()
@@ -49,6 +56,89 @@ export class StudentController {
     @User() user: JWTUserPayload,
   ) {
     return this.studentService.createStudent(createStudentDto, user);
+  }
+
+  @Post('bulk')
+  @Roles(RoleEnum.SUPER_ADMIN, RoleEnum.SCHOOL_ADMIN)
+  @ApiOperation({ summary: 'Bulk create students from CSV file' })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        file: {
+          type: 'string',
+          format: 'binary',
+          description:
+            'CSV file containing student data (first_name, last_name, email)',
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 201,
+    description: 'Bulk student creation completed',
+    schema: {
+      type: 'object',
+      properties: {
+        message: { type: 'string' },
+        data: {
+          type: 'object',
+          properties: {
+            success: { type: 'array', items: { type: 'object' } },
+            failed: { type: 'array', items: { type: 'object' } },
+            total: { type: 'number' },
+            successCount: { type: 'number' },
+            failedCount: { type: 'number' },
+          },
+        },
+      },
+    },
+  })
+  @ApiResponse({ status: 400, description: 'Invalid CSV format or data' })
+  @ApiResponse({ status: 409, description: 'Some emails already exist' })
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: diskStorage({
+        destination: './uploads/students',
+        filename: (req, file, cb) => {
+          const uniqueSuffix =
+            Date.now() + '-' + Math.round(Math.random() * 1e9);
+          cb(null, `students-${uniqueSuffix}${extname(file.originalname)}`);
+        },
+      }),
+      fileFilter: (req, file, cb) => {
+        if (
+          file.mimetype === 'text/csv' ||
+          file.originalname.endsWith('.csv')
+        ) {
+          cb(null, true);
+        } else {
+          cb(new BadRequestException('Only CSV files are allowed'), false);
+        }
+      },
+      limits: {
+        fileSize: parseInt(process.env.MAXIMUM_FILE_SIZE || '5') * 1024 * 1024, // 5MB default
+      },
+    }),
+  )
+  async bulkCreateStudents(
+    @UploadedFile() file: Express.Multer.File,
+    @User() user: JWTUserPayload,
+  ) {
+    if (!file) {
+      throw new BadRequestException('CSV file is required');
+    }
+
+    const result = await this.studentService.bulkCreateStudents(
+      file.buffer,
+      user,
+    );
+
+    return {
+      message: 'Bulk student creation completed',
+      data: result,
+    };
   }
 
   @Get()

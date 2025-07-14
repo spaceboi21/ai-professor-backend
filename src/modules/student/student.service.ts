@@ -18,11 +18,14 @@ import { BcryptUtil } from 'src/common/utils/bcrypt.util';
 import { TenantConnectionService } from 'src/database/tenant-connection.service';
 import { MailService } from 'src/mail/mail.service';
 import { CreateStudentDto } from './dto/create-student.dto';
+import { BulkCreateResult, StudentCsvRow } from './dto/bulk-create-student.dto';
 import { RoleEnum } from 'src/common/constants/roles.constant';
 import { JWTUserPayload } from 'src/common/types/jwr-user.type';
 import { createPaginationResult, getPaginationOptions } from 'src/common/utils';
 import { PaginationDto } from 'src/common/dto/pagination.dto';
 import { StatusEnum } from 'src/common/constants/status.constant';
+import * as csv from 'csv-parser';
+import { Readable } from 'stream';
 
 @Injectable()
 export class StudentService {
@@ -302,5 +305,275 @@ export class StudentService {
         status: updatedStudent.status,
       },
     };
+  }
+
+  async bulkCreateStudents(
+    fileBuffer: Buffer,
+    adminUser: JWTUserPayload,
+  ): Promise<BulkCreateResult> {
+    this.logger.log(
+      `Bulk creating students for school: ${adminUser.school_id}`,
+    );
+
+    const result: BulkCreateResult = {
+      success: [],
+      failed: [],
+      total: 0,
+      successCount: 0,
+      failedCount: 0,
+    };
+
+    // Parse CSV file first to get all students
+    const students: StudentCsvRow[] = [];
+    const stream = Readable.from(fileBuffer);
+
+    await new Promise((resolve, reject) => {
+      stream
+        .pipe(csv())
+        .on('data', (row) => {
+          // Validate required fields
+          if (!row.first_name || !row.email) {
+            result.failed.push({
+              row: {
+                first_name: row.first_name || '',
+                last_name: row.last_name || '',
+                email: row.email || '',
+              },
+              error:
+                'Missing required fields: first_name and email are required',
+            });
+            return;
+          }
+
+          // Validate email format
+          const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+          if (!emailRegex.test(row.email)) {
+            result.failed.push({
+              row: {
+                first_name: row.first_name,
+                last_name: row.last_name || '',
+                email: row.email,
+              },
+              error: 'Invalid email format',
+            });
+            return;
+          }
+
+          // For SCHOOL_ADMIN, school_id should not be provided in CSV
+          if (adminUser.role.name === RoleEnum.SCHOOL_ADMIN && row.school_id) {
+            result.failed.push({
+              row: {
+                first_name: row.first_name,
+                last_name: row.last_name || '',
+                email: row.email,
+                school_id: row.school_id,
+              },
+              error:
+                'School admin cannot specify school_id in CSV. Students will be created for your school only.',
+            });
+            return;
+          }
+
+          // For SUPER_ADMIN, school_id is required if not provided in CSV
+          if (
+            adminUser.role.name === RoleEnum.SUPER_ADMIN &&
+            !row.school_id &&
+            !adminUser.school_id
+          ) {
+            result.failed.push({
+              row: {
+                first_name: row.first_name,
+                last_name: row.last_name || '',
+                email: row.email,
+              },
+              error:
+                'Super admin must provide school_id in CSV or have a default school_id',
+            });
+            return;
+          }
+
+          students.push({
+            first_name: row.first_name.trim(),
+            last_name: (row.last_name || '').trim(),
+            email: row.email.toLowerCase().trim(),
+            school_id: row.school_id?.trim(),
+          });
+        })
+        .on('end', resolve)
+        .on('error', reject);
+    });
+
+    result.total = students.length;
+
+    if (students.length === 0) {
+      throw new BadRequestException('No valid student data found in CSV file');
+    }
+
+    // Check for duplicate emails within the CSV
+    const emailCounts = new Map<string, number>();
+    students.forEach((student) => {
+      emailCounts.set(student.email, (emailCounts.get(student.email) || 0) + 1);
+    });
+
+    const duplicateEmails = Array.from(emailCounts.entries())
+      .filter(([_, count]) => count > 1)
+      .map(([email]) => email);
+
+    // Mark duplicates as failed
+    students.forEach((student) => {
+      if (duplicateEmails.includes(student.email)) {
+        result.failed.push({
+          row: student,
+          error: 'Duplicate email within CSV file',
+        });
+      }
+    });
+
+    // Filter out duplicates for processing
+    const uniqueStudents = students.filter(
+      (student) => !duplicateEmails.includes(student.email),
+    );
+
+    // Check existing emails in central users and global students
+    const existingEmails = new Set<string>();
+    const existingCentralUsers = await this.userModel.find({
+      email: { $in: uniqueStudents.map((s) => s.email) },
+    });
+    existingCentralUsers.forEach((user) => existingEmails.add(user.email));
+
+    const existingGlobalStudents = await this.globalStudentModel.find({
+      email: { $in: uniqueStudents.map((s) => s.email) },
+    });
+    existingGlobalStudents.forEach((student) =>
+      existingEmails.add(student.email),
+    );
+
+    // Process each student
+    for (const student of uniqueStudents) {
+      try {
+        // Skip if email already exists
+        if (existingEmails.has(student.email)) {
+          result.failed.push({
+            row: student,
+            error: 'Email already exists in the system',
+          });
+          continue;
+        }
+
+        // Determine school_id based on user role
+        let schoolId: string;
+        let school: any;
+
+        if (adminUser.role.name === RoleEnum.SCHOOL_ADMIN) {
+          // School admin can only create students for their own school
+          schoolId = (adminUser.school_id as string) || '';
+          school = await this.schoolModel.findById(schoolId);
+          if (!school) {
+            result.failed.push({
+              row: student,
+              error: 'School not found for school admin',
+            });
+            continue;
+          }
+        } else if (adminUser.role.name === RoleEnum.SUPER_ADMIN) {
+          // Super admin can specify school_id in CSV or use default
+          schoolId = student.school_id || (adminUser.school_id as string) || '';
+          school = await this.schoolModel.findById(schoolId);
+          if (!school) {
+            result.failed.push({
+              row: student,
+              error: `School not found with ID: ${schoolId}`,
+            });
+            continue;
+          }
+        } else {
+          result.failed.push({
+            row: student,
+            error: 'Unauthorized role for bulk student creation',
+          });
+          continue;
+        }
+
+        // Get tenant connection for the school
+        const tenantConnection =
+          await this.tenantConnectionService.getTenantConnection(
+            school.db_name,
+          );
+        const StudentModel = tenantConnection.model(
+          Student.name,
+          StudentSchema,
+        );
+
+        // Check existing emails in tenant database
+        const existingTenantStudent = await StudentModel.findOne({
+          email: student.email,
+        });
+        if (existingTenantStudent) {
+          result.failed.push({
+            row: student,
+            error: 'Email already exists in school database',
+          });
+          continue;
+        }
+
+        // Generate password and hash it
+        const generatedPassword = this.bcryptUtil.generateStrongPassword();
+        const hashedPassword =
+          await this.bcryptUtil.hashPassword(generatedPassword);
+
+        // Create student in tenant database
+        const newStudent = new StudentModel({
+          first_name: student.first_name,
+          last_name: student.last_name,
+          email: student.email,
+          password: hashedPassword,
+          student_code: `${school.name
+            .toLowerCase()
+            .replace(/\s+/g, '')}-${Date.now()}`, // Generate school-specific student code
+          school_id: new Types.ObjectId(schoolId),
+          created_by: new Types.ObjectId(adminUser?.id),
+          created_by_role: adminUser.role.name as RoleEnum,
+        });
+
+        const savedStudent = await newStudent.save();
+
+        // Create entry in global students collection
+        await this.globalStudentModel.create({
+          student_id: savedStudent._id,
+          email: student.email,
+          school_id: new Types.ObjectId(schoolId),
+        });
+
+        // Send credentials email
+        await this.mailService.sendCredentialsEmail(
+          student.email,
+          `${student.first_name}${student.last_name ? ` ${student.last_name}` : ''}`,
+          generatedPassword,
+          RoleEnum.STUDENT,
+        );
+
+        result.success.push(student);
+        result.successCount++;
+
+        this.logger.log(
+          `Student created successfully: ${student.email} for school: ${school.name}`,
+        );
+      } catch (error) {
+        this.logger.error(`Error creating student ${student.email}:`, error);
+        result.failed.push({
+          row: student,
+          error: error.message || 'Failed to create student',
+        });
+        result.failedCount++;
+      }
+    }
+
+    result.failedCount = result.failed.length;
+
+    this.logger.log(
+      `Bulk student creation completed. Success: ${result.successCount}, Failed: ${result.failedCount}`,
+    );
+
+    return result;
   }
 }
