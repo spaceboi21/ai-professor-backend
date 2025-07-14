@@ -25,7 +25,6 @@ import { SchoolAdminModule } from './modules/school-admin/school-admin.module';
 import { BibliographyModule } from './modules/bibliography/bibliography.module';
 import { BullModule } from '@nestjs/bullmq';
 import { QueueModule } from './common/queue/queue.module';
-import { ProcessorsModule } from './common/processors/processors.module';
 
 @Module({
   imports: [
@@ -105,7 +104,6 @@ import { ProcessorsModule } from './common/processors/processors.module';
     SchoolAdminModule,
     BibliographyModule,
     QueueModule,
-    ProcessorsModule,
   ],
   controllers: [AppController],
   providers: [AppService, JwtStrategy],

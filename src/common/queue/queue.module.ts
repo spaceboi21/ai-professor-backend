@@ -2,7 +2,6 @@ import { Module } from '@nestjs/common';
 import { QueueService } from './queue.service';
 import { QueueController } from './queue.controller';
 import { BullModule } from '@nestjs/bullmq';
-import { ProcessorsModule } from '../processors/processors.module';
 
 @Module({
   imports: [
@@ -13,7 +12,6 @@ import { ProcessorsModule } from '../processors/processors.module';
         removeOnFail: 50,
       },
     }),
-    ProcessorsModule,
   ],
   controllers: [QueueController],
   providers: [QueueService],
