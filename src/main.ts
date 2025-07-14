@@ -14,14 +14,33 @@ async function bootstrap() {
     const app = await NestFactory.create<NestExpressApplication>(AppModule);
     const configService = app.get(ConfigService);
 
-    const frontendOrigin = configService.get<string>('FRONT_END_BASE_URL');
+    // Parse multiple frontend origins from environment variable
+    const frontendOriginString = configService.get<string>('FRONT_END_BASE_URL') || 'http://localhost:3000';
+    const frontendOrigins = frontendOriginString.split(',').map(origin => origin.trim());
 
-    // CORS configuration
+    // CORS configuration with multiple domains support
     app.enableCors({
-      origin: frontendOrigin,
+      origin: (origin, callback) => {
+        // Allow requests with no origin (like mobile apps or curl requests)
+        if (!origin) return callback(null, true);
+        
+        // Check if the origin is in the allowed list
+        if (frontendOrigins.includes(origin)) {
+          return callback(null, true);
+        }
+        
+        // For development, allow localhost with any port
+        if (process.env.NODE_ENV === 'development' && origin.startsWith('http://localhost')) {
+          return callback(null, true);
+        }
+        
+        // Reject the request
+        return callback(new Error('Not allowed by CORS'), false);
+      },
       credentials: true,
       methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
       allowedHeaders: ['Content-Type', 'Authorization'],
+      exposedHeaders: ['X-Total-Count', 'X-Total-Pages'],
     });
 
     app.useGlobalPipes(
@@ -57,7 +76,7 @@ async function bootstrap() {
       logger.log(`📱 API available at: http://localhost:${port}/api`);
       logger.log(`🏥 Health check at: http://localhost:${port}/api/health`);
       logger.log(`📚 API docs at: http://localhost:${port}/api/docs`);
-      logger.log(`🌐 CORS enabled for: ${frontendOrigin}`);
+      logger.log(`🌐 CORS enabled for: ${frontendOrigins.join(', ')}`);
     });
   } catch (error) {
     logger.error('❌ Failed to start application:', error);
