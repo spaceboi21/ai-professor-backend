@@ -12,6 +12,7 @@ import { RoleEnum } from 'src/common/constants/roles.constant';
     createdAt: 'created_at',
     updatedAt: 'updated_at',
   },
+  collection: 'quiz_group',
 })
 export class QuizGroup extends Document {
   declare _id: Types.ObjectId;
