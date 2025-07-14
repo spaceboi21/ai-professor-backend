@@ -10,6 +10,9 @@ import {
   Get,
   Query,
   HttpStatus,
+  Put,
+  Req,
+  Res,
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
@@ -21,15 +24,19 @@ import {
   ApiQuery,
 } from '@nestjs/swagger';
 import { diskStorage } from 'multer';
-import { extname } from 'path';
 import { JwtAuthGuard } from 'src/common/guards/jwt.guard';
 import { v4 as uuid } from 'uuid';
 import { GetFileUploadUrl } from './dto/get-upload-url.dto';
 import { GetBibliographyUploadUrl } from './dto/get-bibliography-upload-url.dto';
 import { UploadService } from './upload.service';
 import { ConfigService } from '@nestjs/config';
+import { existsSync, writeFileSync } from 'fs';
+import { mkdirSync } from 'fs';
 import { UploadExceptionFilter } from 'src/common/filters/upload-exception.filter';
 import { FileInterceptor } from '@nestjs/platform-express';
+import { extname } from 'path';
+import { Request, Response } from 'express';
+import { IncomingMessage } from 'http';
 
 const allowedImageTypes = ['.jpg', '.jpeg', '.png', '.webp'];
 const allowedBibliographyTypes = [
@@ -118,7 +125,7 @@ export class UploadController {
     } else {
       return {
         uploadUrl: `${this.configService.get('BACKEND_API_URL')}/upload/profile`,
-        method: 'POST',
+        method: 'PUT',
         maxSize:
           (this.configService.get<number>('MAXIMUM_FILE_SIZE') ?? 5) *
           1024 *
@@ -261,6 +268,61 @@ export class UploadController {
     };
   }
 
+  @ApiOperation({
+    summary: 'Upload file via PUT with raw binary body',
+    description: `Send raw file buffer (e.g., PDF, MP4, JPEG) in the request body with the appropriate Content-Type header. Must use Postman, curl, or frontend — Swagger UI doesn't support raw binary upload.`,
+  })
+  @ApiConsumes('application/pdf', 'application/octet-stream', 'image/jpeg')
+  @ApiQuery({ name: 'filename', required: true })
+  @ApiResponse({ status: 201, description: 'File uploaded successfully' })
+  @ApiResponse({ status: 400, description: 'Invalid file' })
+  @Put('profile')
+  async uploadProfilePicture(
+    @Req() req: Request,
+    @Res() res: Response,
+    @Query('filename') filename: string,
+  ) {
+    if (!filename) {
+      throw new BadRequestException('Filename is required in query');
+    }
+
+    const contentType = req.headers['content-type'];
+    if (!contentType || !contentType.startsWith('image/')) {
+      throw new BadRequestException('Invalid or missing Content-Type');
+    }
+
+    const ext = extname(filename) || `.${contentType.split('/')[1]}`;
+    const id = `${Date.now()}-${uuid()}${ext}`;
+    const dir = './uploads/profile-pics';
+
+    if (!existsSync(dir)) {
+      mkdirSync(dir, { recursive: true });
+    }
+
+    const filePath = `${dir}/${id}`;
+    const chunks: Buffer[] = [];
+
+    req.on('data', (chunk) => {
+      chunks.push(chunk);
+    });
+
+    req.on('end', () => {
+      const buffer = Buffer.concat(chunks);
+
+      writeFileSync(filePath, buffer);
+
+      const fileUrl = `${process.env.BACKEND_URL}/uploads/profile-pics/${id}`;
+
+      res.status(201).json({
+        fileUrl,
+        key: `uploads/profile-pics/${id}`,
+        originalName: filename,
+        size: buffer.length,
+        mimeType: contentType,
+      });
+    });
+  }
+
   @Post('bibliography')
   @ApiOperation({
     summary: 'Upload bibliography file (PDF/Video) (Development only)',
@@ -268,7 +330,7 @@ export class UploadController {
   })
   @ApiResponse({ status: 201, description: 'File uploaded successfully' })
   @ApiResponse({ status: 400, description: 'Invalid file or upload error' })
-  @ApiConsumes('multipart/form-data')
+  @ApiConsumes('application/pdf', 'video/mp4', 'application/octet-stream')
   @UseInterceptors(
     FileInterceptor('file', {
       storage: diskStorage({
@@ -303,5 +365,72 @@ export class UploadController {
       size: file.size,
       mimeType: file.mimetype,
     };
+  }
+
+  @ApiOperation({
+    summary: 'Upload file via PUT with raw binary body',
+    description: `Send raw file buffer (e.g., PDF, MP4, JPEG) in the request body with the appropriate Content-Type header. Must use Postman, curl, or frontend — Swagger UI doesn't support raw binary upload.`,
+  })
+  @ApiConsumes('application/pdf', 'application/octet-stream', 'image/jpeg')
+  @ApiQuery({ name: 'filename', required: true })
+  @ApiResponse({ status: 201, description: 'File uploaded successfully' })
+  @ApiResponse({ status: 400, description: 'Invalid file' })
+  @Put('bibliography')
+  async uploadBibliographyFileBuffer(
+    @Req() req: Request,
+    @Res() res: Response,
+    @Query('filename') filename: string,
+  ) {
+    if (!filename) {
+      throw new BadRequestException('Filename is required in query');
+    }
+
+    const contentType = req.headers['content-type'];
+    const allowedTypes = [
+      'application/pdf',
+      'video/mp4',
+      'video/mpeg',
+      'video/quicktime',
+    ];
+
+    if (!contentType || !allowedTypes.includes(contentType)) {
+      throw new BadRequestException('Invalid or unsupported Content-Type');
+    }
+
+    const ext = extname(filename) || `.${contentType.split('/')[1]}`;
+    const id = `${Date.now()}-${uuid()}${ext}`;
+    const dir = './uploads/bibliography';
+
+    if (!existsSync(dir)) {
+      mkdirSync(dir, { recursive: true });
+    }
+
+    const filePath = `${dir}/${id}`;
+    const chunks: Buffer[] = [];
+
+    const incoming = req as unknown as IncomingMessage;
+
+    incoming.on('data', (chunk) => {
+      chunks.push(chunk);
+    });
+
+    incoming.on('end', () => {
+      const buffer = Buffer.concat(chunks);
+      writeFileSync(filePath, buffer);
+
+      const fileUrl = `${process.env.BACKEND_URL}/uploads/bibliography/${id}`;
+
+      res.status(201).json({
+        fileUrl,
+        key: `uploads/bibliography/${id}`,
+        originalName: filename,
+        size: buffer.length,
+        mimeType: contentType,
+      });
+    });
+
+    incoming.on('error', (err) => {
+      res.status(500).json({ error: 'Upload failed', details: err });
+    });
   }
 }

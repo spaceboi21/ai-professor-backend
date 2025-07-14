@@ -1,29 +1,32 @@
 import {
-    BadRequestException,
-    Injectable,
-    Logger,
-    NotFoundException
+  BadRequestException,
+  Injectable,
+  Logger,
+  NotFoundException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { QuizTypeEnum } from 'src/common/constants/quiz.constant';
 import { JWTUserPayload } from 'src/common/types/jwr-user.type';
 import {
-    createPaginationResult,
-    getPaginationOptions,
+  createPaginationResult,
+  getPaginationOptions,
 } from 'src/common/utils/pagination.util';
 import { School } from 'src/database/schemas/central/school.schema';
 import { User } from 'src/database/schemas/central/user.schema';
 import {
-    ChapterSchema
+  Chapter,
+  ChapterSchema,
 } from 'src/database/schemas/tenant/chapter.schema';
 import {
-    ModuleSchema
+  Module,
+  ModuleSchema,
 } from 'src/database/schemas/tenant/module.schema';
 import {
-    QuizGroupSchema
+  QuizGroup,
+  QuizGroupSchema,
 } from 'src/database/schemas/tenant/quiz-group.schema';
-import { QuizSchema } from 'src/database/schemas/tenant/quiz.schema';
+import { Quiz, QuizSchema } from 'src/database/schemas/tenant/quiz.schema';
 import { TenantConnectionService } from 'src/database/tenant-connection.service';
 import { CreateQuizGroupDto } from './dto/create-quiz-group.dto';
 import { CreateQuizDto } from './dto/create-quiz.dto';
@@ -57,9 +60,9 @@ export class QuizService {
     const connection = await this.tenantConnectionService.getTenantConnection(
       school.db_name,
     );
-    const QuizGroupModel = connection.model('QuizGroup', QuizGroupSchema);
-    const ModuleModel = connection.model('Module', ModuleSchema);
-    const ChapterModel = connection.model('Chapter', ChapterSchema);
+    const QuizGroupModel = connection.model(QuizGroup.name, QuizGroupSchema);
+    const ModuleModel = connection.model(Module.name, ModuleSchema);
+    const ChapterModel = connection.model(Chapter.name, ChapterSchema);
 
     const {
       type,
@@ -112,8 +115,12 @@ export class QuizService {
       time_left,
       category,
       type,
-      module_id: type === QuizTypeEnum.CHAPTER || type === QuizTypeEnum.MODULE ? new Types.ObjectId(module_id) : null,
-      chapter_id: type === QuizTypeEnum.CHAPTER ? new Types.ObjectId(chapter_id) : null,
+      module_id:
+        type === QuizTypeEnum.CHAPTER || type === QuizTypeEnum.MODULE
+          ? new Types.ObjectId(module_id)
+          : null,
+      chapter_id:
+        type === QuizTypeEnum.CHAPTER ? new Types.ObjectId(chapter_id) : null,
       created_by: new Types.ObjectId(user.id),
       created_by_role: user.role.name,
     };
@@ -140,10 +147,10 @@ export class QuizService {
     const connection = await this.tenantConnectionService.getTenantConnection(
       school.db_name,
     );
-    const QuizGroupModel = connection.model('QuizGroup', QuizGroupSchema);
+    const QuizGroupModel = connection.model(QuizGroup.name, QuizGroupSchema);
     // Register Module and Chapter models for populate to work
-    connection.model('Module', ModuleSchema);
-    connection.model('Chapter', ChapterSchema);
+    connection.model(Module.name, ModuleSchema);
+    connection.model(Chapter.name, ChapterSchema);
 
     const filter: any = { deleted_at: null };
 
@@ -189,10 +196,10 @@ export class QuizService {
     const connection = await this.tenantConnectionService.getTenantConnection(
       school.db_name,
     );
-    const QuizGroupModel = connection.model('QuizGroup', QuizGroupSchema);
+    const QuizGroupModel = connection.model(QuizGroup.name, QuizGroupSchema);
     // Register Module and Chapter models for populate to work
-    connection.model('Module', ModuleSchema);
-    connection.model('Chapter', ChapterSchema);
+    connection.model(Module.name, ModuleSchema);
+    connection.model(Chapter.name, ChapterSchema);
 
     const quizGroup = await QuizGroupModel.findOne({
       _id: id,
@@ -222,9 +229,9 @@ export class QuizService {
     const connection = await this.tenantConnectionService.getTenantConnection(
       school.db_name,
     );
-    const QuizGroupModel = connection.model('QuizGroup', QuizGroupSchema);
-    const ModuleModel = connection.model('Module', ModuleSchema);
-    const ChapterModel = connection.model('Chapter', ChapterSchema);
+    const QuizGroupModel = connection.model(QuizGroup.name, QuizGroupSchema);
+    const ModuleModel = connection.model(Module.name, ModuleSchema);
+    const ChapterModel = connection.model(Chapter.name, ChapterSchema);
 
     const quizGroup = await QuizGroupModel.findOne({
       _id: id,
@@ -265,9 +272,7 @@ export class QuizService {
     Object.assign(quizGroup, updateQuizGroupDto);
     await quizGroup.save();
 
-    this.logger.log(
-      `Quiz group updated with ID: ${id} by user: ${user.id}`,
-    );
+    this.logger.log(`Quiz group updated with ID: ${id} by user: ${user.id}`);
 
     return quizGroup;
   }
@@ -281,8 +286,8 @@ export class QuizService {
     const connection = await this.tenantConnectionService.getTenantConnection(
       school.db_name,
     );
-    const QuizGroupModel = connection.model('QuizGroup', QuizGroupSchema);
-    const QuizModel = connection.model('Quiz', QuizSchema);
+    const QuizGroupModel = connection.model(QuizGroup.name, QuizGroupSchema);
+    const QuizModel = connection.model(Quiz.name, QuizSchema);
 
     const quizGroup = await QuizGroupModel.findOne({
       _id: id,
@@ -317,8 +322,8 @@ export class QuizService {
     const connection = await this.tenantConnectionService.getTenantConnection(
       school.db_name,
     );
-    const QuizModel = connection.model('Quiz', QuizSchema);
-    const QuizGroupModel = connection.model('QuizGroup', QuizGroupSchema);
+    const QuizModel = connection.model(Quiz.name, QuizSchema);
+    const QuizGroupModel = connection.model(QuizGroup.name, QuizGroupSchema);
 
     const {
       quiz_group_id,
@@ -370,9 +375,7 @@ export class QuizService {
     const quiz = new QuizModel(quizData);
     await quiz.save();
 
-    this.logger.log(
-      `Quiz created with ID: ${quiz._id} by user: ${user.id}`,
-    );
+    this.logger.log(`Quiz created with ID: ${quiz._id} by user: ${user.id}`);
 
     return quiz;
   }
@@ -386,11 +389,11 @@ export class QuizService {
     const connection = await this.tenantConnectionService.getTenantConnection(
       school.db_name,
     );
-    const QuizModel = connection.model('Quiz', QuizSchema);
+    const QuizModel = connection.model(Quiz.name, QuizSchema);
     // Register QuizGroup, Module and Chapter models for populate to work
-    connection.model('QuizGroup', QuizGroupSchema);
-    connection.model('Module', ModuleSchema);
-    connection.model('Chapter', ChapterSchema);
+    connection.model(QuizGroup.name, QuizGroupSchema);
+    connection.model(Module.name, ModuleSchema);
+    connection.model(Chapter.name, ChapterSchema);
 
     const filter: any = { deleted_at: null };
 
@@ -434,11 +437,11 @@ export class QuizService {
     const connection = await this.tenantConnectionService.getTenantConnection(
       school.db_name,
     );
-    const QuizModel = connection.model('Quiz', QuizSchema);
+    const QuizModel = connection.model(Quiz.name, QuizSchema);
     // Register QuizGroup, Module and Chapter models for populate to work
-    connection.model('QuizGroup', QuizGroupSchema);
-    connection.model('Module', ModuleSchema);
-    connection.model('Chapter', ChapterSchema);
+    connection.model(QuizGroup.name, QuizGroupSchema);
+    connection.model(Module.name, ModuleSchema);
+    connection.model(Chapter.name, ChapterSchema);
 
     const quiz = await QuizModel.findOne({
       _id: id,
@@ -469,7 +472,7 @@ export class QuizService {
     const connection = await this.tenantConnectionService.getTenantConnection(
       school.db_name,
     );
-    const QuizModel = connection.model('Quiz', QuizSchema);
+    const QuizModel = connection.model(Quiz.name, QuizSchema);
 
     const quiz = await QuizModel.findOne({
       _id: id,
@@ -510,7 +513,7 @@ export class QuizService {
     const connection = await this.tenantConnectionService.getTenantConnection(
       school.db_name,
     );
-    const QuizModel = connection.model('Quiz', QuizSchema);
+    const QuizModel = connection.model(Quiz.name, QuizSchema);
 
     const quiz = await QuizModel.findOne({
       _id: id,
@@ -542,7 +545,7 @@ export class QuizService {
     const connection = await this.tenantConnectionService.getTenantConnection(
       school.db_name,
     );
-    const QuizModel = connection.model('Quiz', QuizSchema);
+    const QuizModel = connection.model(Quiz.name, QuizSchema);
 
     const lastQuiz = await QuizModel.findOne({
       quiz_group_id,

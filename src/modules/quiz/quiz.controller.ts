@@ -29,6 +29,8 @@ import { Roles } from 'src/common/decorators/roles.decorator';
 import { User } from 'src/common/decorators/user.decorator';
 import { JWTUserPayload } from 'src/common/types/jwr-user.type';
 import { RoleEnum } from 'src/common/constants/roles.constant';
+import { ParseObjectIdPipe } from '@nestjs/mongoose';
+import { Types } from 'mongoose';
 
 @ApiTags('Quiz')
 @ApiBearerAuth()
@@ -100,10 +102,7 @@ export class QuizController {
     status: 404,
     description: 'Quiz group not found',
   })
-  findQuizGroupById(
-    @Param('id') id: string,
-    @User() user: JWTUserPayload,
-  ) {
+  findQuizGroupById(@Param('id') id: string, @User() user: JWTUserPayload) {
     return this.quizService.findQuizGroupById(id, user);
   }
 
@@ -127,7 +126,7 @@ export class QuizController {
     description: 'Quiz group not found',
   })
   updateQuizGroup(
-    @Param('id') id: string,
+    @Param('id', ParseObjectIdPipe) id: Types.ObjectId,
     @Body() updateQuizGroupDto: UpdateQuizGroupDto,
     @User() user: JWTUserPayload,
   ) {
@@ -154,7 +153,7 @@ export class QuizController {
     description: 'Quiz group not found',
   })
   removeQuizGroup(
-    @Param('id') id: string,
+    @Param('id', ParseObjectIdPipe) id: Types.ObjectId,
     @User() user: JWTUserPayload,
   ) {
     return this.quizService.removeQuizGroup(id, user);
@@ -191,7 +190,8 @@ export class QuizController {
   @Roles(RoleEnum.PROFESSOR, RoleEnum.SCHOOL_ADMIN, RoleEnum.STUDENT)
   @ApiOperation({
     summary: 'Get all quiz questions',
-    description: 'Retrieve paginated list of quiz questions with optional filters',
+    description:
+      'Retrieve paginated list of quiz questions with optional filters',
   })
   @ApiResponse({
     status: 200,
@@ -224,7 +224,7 @@ export class QuizController {
     description: 'Quiz question not found',
   })
   findQuizById(
-    @Param('id') id: string,
+    @Param('id', ParseObjectIdPipe) id: Types.ObjectId,
     @User() user: JWTUserPayload,
   ) {
     return this.quizService.findQuizById(id, user);
@@ -276,10 +276,7 @@ export class QuizController {
     status: 404,
     description: 'Quiz question not found',
   })
-  removeQuiz(
-    @Param('id') id: string,
-    @User() user: JWTUserPayload,
-  ) {
+  removeQuiz(@Param('id') id: string, @User() user: JWTUserPayload) {
     return this.quizService.removeQuiz(id, user);
   }
 
@@ -289,7 +286,8 @@ export class QuizController {
   @Roles(RoleEnum.PROFESSOR, RoleEnum.SCHOOL_ADMIN, RoleEnum.STUDENT)
   @ApiOperation({
     summary: 'Get all questions for a specific quiz group',
-    description: 'Retrieve all quiz questions belonging to a specific quiz group',
+    description:
+      'Retrieve all quiz questions belonging to a specific quiz group',
   })
   @ApiParam({
     name: 'groupId',
@@ -301,7 +299,7 @@ export class QuizController {
     description: 'Quiz questions retrieved successfully',
   })
   findQuizzesByGroup(
-    @Param('groupId') groupId: string,
+    @Param('groupId', ParseObjectIdPipe) groupId: Types.ObjectId,
     @Query() filterDto: QuizFilterDto,
     @User() user: JWTUserPayload,
   ) {
@@ -325,7 +323,7 @@ export class QuizController {
     description: 'Quiz groups retrieved successfully',
   })
   findQuizGroupsByModule(
-    @Param('moduleId') moduleId: string,
+    @Param('moduleId', ParseObjectIdPipe) moduleId: Types.ObjectId,
     @Query() filterDto: QuizGroupFilterDto,
     @User() user: JWTUserPayload,
   ) {
@@ -349,11 +347,11 @@ export class QuizController {
     description: 'Quiz groups retrieved successfully',
   })
   findQuizGroupsByChapter(
-    @Param('chapterId') chapterId: string,
+    @Param('chapterId', ParseObjectIdPipe) chapterId: Types.ObjectId,
     @Query() filterDto: QuizGroupFilterDto,
     @User() user: JWTUserPayload,
   ) {
     const updatedFilter = { ...filterDto, chapter_id: chapterId };
     return this.quizService.findAllQuizGroups(user, updatedFilter);
   }
-} 
+}
