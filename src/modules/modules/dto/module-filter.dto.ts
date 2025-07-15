@@ -1,6 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { IsOptional, IsString, IsEnum, IsBoolean } from 'class-validator';
 import { DifficultyEnum } from 'src/common/constants/difficulty.constant';
+import { ProgressStatusEnum } from 'src/database/schemas/tenant/student-module-progress.schema';
 
 export enum ModuleSortBy {
   TITLE = 'title',
@@ -44,6 +45,16 @@ export class ModuleFilterDto {
     example: true,
   })
   published?: boolean;
+
+  @IsOptional()
+  @IsEnum(ProgressStatusEnum)
+  @ApiProperty({
+    description: 'Filter by progress status (only available for students)',
+    required: false,
+    enum: ProgressStatusEnum,
+    example: ProgressStatusEnum.IN_PROGRESS,
+  })
+  progress_status?: ProgressStatusEnum;
 
   @IsOptional()
   @IsEnum(ModuleSortBy)

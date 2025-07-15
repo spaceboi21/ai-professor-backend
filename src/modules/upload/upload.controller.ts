@@ -27,6 +27,7 @@ import { JwtAuthGuard } from 'src/common/guards/jwt.guard';
 import { v4 as uuid } from 'uuid';
 import { GetFileUploadUrl } from './dto/get-upload-url.dto';
 import { GetBibliographyUploadUrl } from './dto/get-bibliography-upload-url.dto';
+import { GetThumbnailUploadUrl } from './dto/get-thumbnail-upload-url.dto';
 import { UploadService } from './upload.service';
 import { ConfigService } from '@nestjs/config';
 import { existsSync, writeFileSync } from 'fs';
@@ -181,6 +182,55 @@ export class UploadController {
           1024 *
           1024, // 100MB
         expiresIn: 600, // 10 minutes
+      };
+    }
+  }
+
+  @Post('thumbnail-url')
+  @ApiOperation({
+    summary: 'Generate a secure presigned upload URL for thumbnail images',
+    description:
+      'Returns a temporary upload URL that expires in 5 minutes. File size limit: 5MB.',
+  })
+  @ApiBody({ type: GetThumbnailUploadUrl })
+  @ApiResponse({
+    status: 200,
+    description: 'Upload URL generated successfully',
+    schema: {
+      type: 'object',
+      properties: {
+        uploadUrl: { type: 'string', description: 'Presigned upload URL' },
+        fileUrl: { type: 'string', description: 'Final file URL after upload' },
+        expiresIn: {
+          type: 'number',
+          description: 'URL expiry time in seconds',
+        },
+        maxSize: { type: 'number', description: 'Maximum file size in bytes' },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Invalid file type or missing parameters',
+  })
+  async getThumbnailUploadUrl(@Body() data: GetThumbnailUploadUrl) {
+    const { fileName, mimeType } = data;
+
+    if (this.configService.get('NODE_ENV') === 'production') {
+      return this.uploadService.generateS3UploadUrl(
+        'thumbnails',
+        fileName,
+        mimeType,
+      );
+    } else {
+      return {
+        uploadUrl: `${this.configService.get('BACKEND_API_URL')}/upload/thumbnail`,
+        method: 'PUT',
+        maxSize:
+          (this.configService.get<number>('MAXIMUM_FILE_SIZE') ?? 5) *
+          1024 *
+          1024, // 5MB
+        expiresIn: 300, // 5 minutes
       };
     }
   }
@@ -345,6 +395,66 @@ export class UploadController {
 
     incoming.on('error', (err) => {
       res.status(500).json({ error: 'Upload failed', details: err });
+    });
+  }
+
+  @ApiOperation({
+    summary: 'Upload thumbnail via PUT with raw binary body',
+    description: `Send raw image buffer (JPEG, PNG, WebP) in the request body with the appropriate Content-Type header. Must use Postman, curl, or frontend — Swagger UI doesn't support raw binary upload.`,
+  })
+  @ApiConsumes(
+    'image/jpeg',
+    'image/png',
+    'image/webp',
+    'application/octet-stream',
+  )
+  @ApiQuery({ name: 'filename', required: true })
+  @ApiResponse({ status: 201, description: 'Thumbnail uploaded successfully' })
+  @ApiResponse({ status: 400, description: 'Invalid file' })
+  @Put('thumbnail')
+  async uploadThumbnail(
+    @Req() req: Request,
+    @Res() res: Response,
+    @Query('filename') filename: string,
+  ) {
+    if (!filename) {
+      throw new BadRequestException('Filename is required in query');
+    }
+
+    const contentType = req.headers['content-type'];
+    if (!contentType || !contentType.startsWith('image/')) {
+      throw new BadRequestException('Invalid or missing Content-Type');
+    }
+
+    const ext = extname(filename) || `.${contentType.split('/')[1]}`;
+    const id = `${Date.now()}-${uuid()}${ext}`;
+    const dir = './uploads/thumbnails';
+
+    if (!existsSync(dir)) {
+      mkdirSync(dir, { recursive: true });
+    }
+
+    const filePath = `${dir}/${id}`;
+    const chunks: Buffer[] = [];
+
+    req.on('data', (chunk) => {
+      chunks.push(chunk);
+    });
+
+    req.on('end', () => {
+      const buffer = Buffer.concat(chunks);
+
+      writeFileSync(filePath, buffer);
+
+      const fileUrl = `${process.env.BACKEND_URL}/uploads/thumbnails/${id}`;
+
+      res.status(201).json({
+        fileUrl,
+        key: `uploads/thumbnails/${id}`,
+        originalName: filename,
+        size: buffer.length,
+        mimeType: contentType,
+      });
     });
   }
 }

@@ -41,10 +41,10 @@ import {
   createPaginationResult,
 } from 'src/common/utils/pagination.util';
 import { DifficultyEnum } from 'src/common/constants/difficulty.constant';
-import { 
-  StudentModuleProgress, 
-  StudentModuleProgressSchema, 
-  ProgressStatusEnum 
+import {
+  StudentModuleProgress,
+  StudentModuleProgressSchema,
+  ProgressStatusEnum,
 } from 'src/database/schemas/tenant/student-module-progress.schema';
 import {
   ModuleVisibilityActionEnum,
@@ -212,15 +212,67 @@ export class ModulesService {
                   $expr: {
                     $and: [
                       { $eq: ['$module_id', '$$moduleId'] },
-                      { $eq: ['$student_id', new Types.ObjectId(user.id)] }
-                    ]
-                  }
-                }
-              }
+                      { $eq: ['$student_id', new Types.ObjectId(user.id)] },
+                    ],
+                  },
+                },
+              },
             ],
-            as: 'progress'
-          }
+            as: 'progress',
+          },
         });
+
+        // Stage 2.6: Add progress status filter for students (right after progress lookup)
+        if (filterDto?.progress_status) {
+          let matchCondition: any;
+
+          if (filterDto.progress_status === ProgressStatusEnum.NOT_STARTED) {
+            // For NOT_STARTED, match modules with no progress or explicit NOT_STARTED status
+            matchCondition = {
+              $or: [
+                { $expr: { $eq: [{ $size: '$progress' }, 0] } },
+                {
+                  $expr: {
+                    $eq: [
+                      { $arrayElemAt: ['$progress.status', 0] },
+                      ProgressStatusEnum.NOT_STARTED,
+                    ],
+                  },
+                },
+              ],
+            };
+          } else if (
+            filterDto.progress_status === ProgressStatusEnum.IN_PROGRESS
+          ) {
+            // For IN_PROGRESS, match modules with IN_PROGRESS status
+            matchCondition = {
+              $expr: {
+                $eq: [
+                  { $arrayElemAt: ['$progress.status', 0] },
+                  ProgressStatusEnum.IN_PROGRESS,
+                ],
+              },
+            };
+          } else if (
+            filterDto.progress_status === ProgressStatusEnum.COMPLETED
+          ) {
+            // For COMPLETED, match modules with COMPLETED status
+            matchCondition = {
+              $expr: {
+                $eq: [
+                  { $arrayElemAt: ['$progress.status', 0] },
+                  ProgressStatusEnum.COMPLETED,
+                ],
+              },
+            };
+          }
+
+          if (matchCondition) {
+            pipeline.push({
+              $match: matchCondition,
+            });
+          }
+        }
       }
 
       // Stage 3: Add text search for title and description
@@ -287,17 +339,32 @@ export class ModulesService {
                 case: {
                   $or: [
                     { $eq: [{ $size: '$progress' }, 0] }, // No progress record exists
-                    { $eq: [{ $arrayElemAt: ['$progress.status', 0] }, ProgressStatusEnum.NOT_STARTED] }
-                  ]
+                    {
+                      $eq: [
+                        { $arrayElemAt: ['$progress.status', 0] },
+                        ProgressStatusEnum.NOT_STARTED,
+                      ],
+                    },
+                  ],
                 },
                 then: 2, // NOT_STARTED gets middle priority
               },
               {
-                case: { $eq: [{ $arrayElemAt: ['$progress.status', 0] }, ProgressStatusEnum.IN_PROGRESS] },
+                case: {
+                  $eq: [
+                    { $arrayElemAt: ['$progress.status', 0] },
+                    ProgressStatusEnum.IN_PROGRESS,
+                  ],
+                },
                 then: 1, // IN_PROGRESS gets highest priority for ASC
               },
               {
-                case: { $eq: [{ $arrayElemAt: ['$progress.status', 0] }, ProgressStatusEnum.COMPLETED] },
+                case: {
+                  $eq: [
+                    { $arrayElemAt: ['$progress.status', 0] },
+                    ProgressStatusEnum.COMPLETED,
+                  ],
+                },
                 then: 3, // COMPLETED gets lowest priority for ASC
               },
             ],
@@ -386,9 +453,9 @@ export class ModulesService {
               module_quiz_completed: false,
               started_at: null,
               completed_at: null,
-              last_accessed_at: null
-            }
-          }
+              last_accessed_at: null,
+            },
+          },
         };
       }
 
@@ -460,7 +527,7 @@ export class ModulesService {
     user: JWTUserPayload,
   ) {
     const { school_id, ...moduleUpdateData } = updateModuleDto;
-    
+
     this.logger.log(`Updating module: ${id} by user: ${user.id}`);
 
     // Resolve school_id based on user role
@@ -507,7 +574,11 @@ export class ModulesService {
     }
   }
 
-  async removeModule(id: Types.ObjectId, user: JWTUserPayload, school_id?: string) {
+  async removeModule(
+    id: Types.ObjectId,
+    user: JWTUserPayload,
+    school_id?: string,
+  ) {
     this.logger.log(`Removing module: ${id} by user: ${user.id}`);
 
     // Resolve school_id based on user role
