@@ -66,4 +66,7 @@ export class Bibliography extends Document {
 export const BibliographySchema = SchemaFactory.createForClass(Bibliography);
 
 // Create compound index for chapter_id and sequence to ensure unique sequence per chapter
-BibliographySchema.index({ chapter_id: 1, sequence: 1 }, { unique: true });
+BibliographySchema.index(
+  { chapter_id: 1, sequence: 1, deleted_at: 1 },
+  { unique: true },
+);
