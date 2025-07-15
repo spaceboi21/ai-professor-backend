@@ -16,7 +16,12 @@ import { RoleEnum } from 'src/common/constants/roles.constant';
 export class Quiz extends Document {
   declare _id: Types.ObjectId;
 
-  @Prop({ type: Types.ObjectId, ref: QuizGroup.name, required: true, index: true })
+  @Prop({
+    type: Types.ObjectId,
+    ref: QuizGroup.name,
+    required: true,
+    index: true,
+  })
   quiz_group_id: Types.ObjectId;
 
   @Prop({ type: Types.ObjectId, ref: Module.name, index: true })
@@ -59,7 +64,7 @@ export class Quiz extends Document {
 export const QuizSchema = SchemaFactory.createForClass(Quiz);
 
 // Create indexes for better query performance
-QuizSchema.index({ quiz_group_id: 1, sequence: 1 });
+QuizSchema.index({ quiz_group_id: 1, sequence: 1, deleted_at: 1 });
 QuizSchema.index({ module_id: 1 });
 QuizSchema.index({ chapter_id: 1 });
-QuizSchema.index({ type: 1 }); 
+QuizSchema.index({ type: 1 });
