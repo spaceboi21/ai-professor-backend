@@ -1,14 +1,13 @@
 import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
-import { ModulesService } from './modules.service';
-import { ModulesController } from './modules.controller';
+import { NotificationsService } from './notifications.service';
+import { NotificationsController } from './notifications.controller';
 import { User, UserSchema } from 'src/database/schemas/central/user.schema';
 import {
   School,
   SchoolSchema,
 } from 'src/database/schemas/central/school.schema';
 import { DatabaseModule } from 'src/database/database.module';
-import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
   imports: [
@@ -17,10 +16,9 @@ import { NotificationsModule } from '../notifications/notifications.module';
       { name: School.name, schema: SchoolSchema },
     ]),
     DatabaseModule,
-    NotificationsModule,
   ],
-  controllers: [ModulesController],
-  providers: [ModulesService],
-  exports: [ModulesService],
+  controllers: [NotificationsController],
+  providers: [NotificationsService],
+  exports: [NotificationsService],
 })
-export class ModulesModule {}
+export class NotificationsModule {}

@@ -44,6 +44,12 @@ export class Module extends Document {
   @Prop({ required: true, enum: RoleEnum })
   created_by_role: RoleEnum;
 
+  @Prop({ type: Boolean, default: false, index: true })
+  published: boolean;
+
+  @Prop({ type: Date, default: null })
+  published_at: Date;
+
   @Prop({ type: Date, default: null })
   deleted_at: Date;
 

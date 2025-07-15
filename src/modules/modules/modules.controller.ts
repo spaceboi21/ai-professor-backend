@@ -29,6 +29,7 @@ import { JWTUserPayload } from 'src/common/types/jwr-user.type';
 import { CreateModuleDto } from './dto/create-module.dto';
 import { UpdateModuleDto } from './dto/update-module.dto';
 import { ModuleFilterDto } from './dto/module-filter.dto';
+import { ToggleModuleVisibilityDto } from './dto/toggle-module-visibility.dto';
 import { ModulesService } from './modules.service';
 import { PaginationDto } from 'src/common/dto/pagination.dto';
 import { DifficultyEnum } from 'src/common/constants/difficulty.constant';
@@ -51,6 +52,27 @@ export class ModulesController {
     @User() user: JWTUserPayload,
   ) {
     return this.modulesService.createModule(createModuleDto, user);
+  }
+
+  @Post('toggle-visibility')
+  @Roles(RoleEnum.SUPER_ADMIN, RoleEnum.SCHOOL_ADMIN, RoleEnum.PROFESSOR)
+  @ApiOperation({ summary: 'Toggle module visibility (publish/unpublish)' })
+  @ApiBody({ type: ToggleModuleVisibilityDto })
+  @ApiResponse({
+    status: 200,
+    description: 'Module visibility toggled successfully',
+  })
+  @ApiResponse({
+    status: 400,
+    description:
+      'Bad request - Module must have at least one chapter and one quiz group to be published',
+  })
+  @ApiResponse({ status: 404, description: 'Module not found' })
+  async toggleModuleVisibility(
+    @Body() publishModuleDto: ToggleModuleVisibilityDto,
+    @User() user: JWTUserPayload,
+  ) {
+    return this.modulesService.toggleModuleVisibility(publishModuleDto, user);
   }
 
   @Get()
@@ -88,6 +110,14 @@ export class ModulesController {
     enum: DifficultyEnum,
     description: 'Filter by difficulty level',
     example: 'INTERMEDIATE',
+  })
+  @ApiQuery({
+    name: 'published',
+    required: false,
+    type: Boolean,
+    description:
+      'Filter by published status (only available for non-student users)',
+    example: true,
   })
   @ApiQuery({
     name: 'sortBy',

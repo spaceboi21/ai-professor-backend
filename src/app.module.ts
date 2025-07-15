@@ -26,6 +26,7 @@ import { BibliographyModule } from './modules/bibliography/bibliography.module';
 import { BullModule } from '@nestjs/bullmq';
 import { QueueModule } from './common/queue/queue.module';
 import { QuizModule } from './modules/quiz/quiz.module';
+import { NotificationsModule } from './modules/notifications/notifications.module';
 
 @Module({
   imports: [
@@ -106,6 +107,7 @@ import { QuizModule } from './modules/quiz/quiz.module';
     BibliographyModule,
     QueueModule,
     QuizModule,
+    NotificationsModule,
   ],
   controllers: [AppController],
   providers: [AppService, JwtStrategy],

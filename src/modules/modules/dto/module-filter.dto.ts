@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsOptional, IsString, IsEnum } from 'class-validator';
+import { IsOptional, IsString, IsEnum, IsBoolean } from 'class-validator';
 import { DifficultyEnum } from 'src/common/constants/difficulty.constant';
 
 export enum ModuleSortBy {
@@ -33,6 +33,16 @@ export class ModuleFilterDto {
     example: DifficultyEnum.INTERMEDIATE,
   })
   difficulty?: DifficultyEnum;
+
+  @IsOptional()
+  @IsBoolean()
+  @ApiProperty({
+    description:
+      'Filter by published status (only available for non-student users)',
+    required: false,
+    example: true,
+  })
+  published?: boolean;
 
   @IsOptional()
   @IsEnum(ModuleSortBy)

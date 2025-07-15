@@ -43,5 +43,9 @@ export class Chapter extends Document {
 
 export const ChapterSchema = SchemaFactory.createForClass(Chapter);
 
-// Create compound index for module_id and sequence to ensure unique sequence per module
-ChapterSchema.index({ module_id: 1, sequence: 1 }, { unique: true });
+// Create compound index for module_id, sequence, and deleted_at to ensure unique sequence per module
+// Only active chapters (deleted_at is null) will be considered for uniqueness
+ChapterSchema.index(
+  { module_id: 1, sequence: 1, deleted_at: 1 },
+  { unique: true },
+);
