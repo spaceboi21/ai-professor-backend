@@ -174,7 +174,7 @@ export class UploadController {
     } else {
       return {
         uploadUrl: `${this.configService.get('BACKEND_API_URL')}/upload/bibliography`,
-        method: 'POST',
+        method: 'PUT',
         maxSize:
           (this.configService.get<number>('MAXIMUM_BIBLIOGRAPHY_FILE_SIZE') ??
             100) *
@@ -223,47 +223,6 @@ export class UploadController {
       fileUrl,
       validated: true,
       timestamp: new Date().toISOString(),
-    };
-  }
-
-  @Post('profile')
-  @ApiOperation({
-    summary: 'Upload profile picture (Development only)',
-    description: 'Direct file upload for development environment',
-  })
-  @ApiResponse({ status: 201, description: 'File uploaded successfully' })
-  @ApiResponse({ status: 400, description: 'Invalid file or upload error' })
-  @ApiConsumes('multipart/form-data')
-  @UseInterceptors(
-    FileInterceptor('file', {
-      storage: diskStorage({
-        destination: './uploads/profile-pics',
-        filename: (req, file, cb) => {
-          const ext = extname(file.originalname);
-          const timestamp = Date.now();
-          cb(null, `${timestamp}-${uuid()}${ext}`);
-        },
-      }),
-      fileFilter: fileFilterForProfile,
-      limits: {
-        fileSize: parseInt(process.env.MAXIMUM_FILE_SIZE || '5') * 1024 * 1024, // 5MB default
-      },
-    }),
-  )
-  uploadProfileImage(@UploadedFile() file: Express.Multer.File) {
-    if (!file) {
-      throw new BadRequestException('No file uploaded');
-    }
-
-    const key = `uploads/profile-pics/${file.filename}`;
-    const fileUrl = `${this.configService.get('BACKEND_URL')}/${key}`;
-
-    return {
-      fileUrl,
-      key,
-      originalName: file.originalname,
-      size: file.size,
-      mimeType: file.mimetype,
     };
   }
 
@@ -320,50 +279,6 @@ export class UploadController {
         mimeType: contentType,
       });
     });
-  }
-
-  @Post('bibliography')
-  @ApiOperation({
-    summary: 'Upload bibliography file (PDF/Video) (Development only)',
-    description: 'Direct file upload for development environment',
-  })
-  @ApiResponse({ status: 201, description: 'File uploaded successfully' })
-  @ApiResponse({ status: 400, description: 'Invalid file or upload error' })
-  @ApiConsumes('application/pdf', 'video/mp4', 'application/octet-stream')
-  @UseInterceptors(
-    FileInterceptor('file', {
-      storage: diskStorage({
-        destination: './uploads/bibliography',
-        filename: (req, file, cb) => {
-          const ext = extname(file.originalname);
-          const timestamp = Date.now();
-          cb(null, `${timestamp}-${uuid()}${ext}`);
-        },
-      }),
-      fileFilter: fileFilterForBibliography,
-      limits: {
-        fileSize:
-          parseInt(process.env.MAXIMUM_BIBLIOGRAPHY_FILE_SIZE || '5') *
-          1024 *
-          1024, // 100MB default
-      },
-    }),
-  )
-  uploadBibliographyFile(@UploadedFile() file: Express.Multer.File) {
-    if (!file) {
-      throw new BadRequestException('No file uploaded');
-    }
-
-    const key = `uploads/bibliography/${file.filename}`;
-    const fileUrl = `${this.configService.get('BACKEND_URL')}/${key}`;
-
-    return {
-      fileUrl,
-      key,
-      originalName: file.originalname,
-      size: file.size,
-      mimeType: file.mimetype,
-    };
   }
 
   @ApiOperation({
