@@ -20,23 +20,24 @@ async function bootstrap() {
 
     // CORS configuration with multiple domains support
     app.enableCors({
-      origin: (origin, callback) => {
-        // Allow requests with no origin (like mobile apps or curl requests)
-        if (!origin) return callback(null, true);
+      // origin: (origin, callback) => {
+      //   // Allow requests with no origin (like mobile apps or curl requests)
+      //   if (!origin) return callback(null, true);
         
-        // Check if the origin is in the allowed list
-        if (frontendOrigins.includes(origin)) {
-          return callback(null, true);
-        }
+      //   // Check if the origin is in the allowed list
+      //   if (frontendOrigins.includes(origin)) {
+      //     return callback(null, true);
+      //   }
         
-        // For development, allow localhost with any port
-        if (process.env.NODE_ENV === 'development' && origin.startsWith('http://localhost')) {
-          return callback(null, true);
-        }
+      //   // For development, allow localhost with any port
+      //   if (process.env.NODE_ENV === 'development' && origin.startsWith('http://localhost')) {
+      //     return callback(null, true);
+      //   }
         
-        // Reject the request
-        return callback(new Error('Not allowed by CORS'), false);
-      },
+      //   // Reject the request
+      //   return callback(new Error('Not allowed by CORS'), false);
+      // },
+      origin: '*',
       credentials: true,
       methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
       allowedHeaders: ['Content-Type', 'Authorization'],
