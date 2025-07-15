@@ -102,7 +102,10 @@ export class QuizController {
     status: 404,
     description: 'Quiz group not found',
   })
-  findQuizGroupById(@Param('id') id: string, @User() user: JWTUserPayload) {
+  findQuizGroupById(
+    @Param('id', ParseObjectIdPipe) id: Types.ObjectId,
+    @User() user: JWTUserPayload,
+  ) {
     return this.quizService.findQuizGroupById(id, user);
   }
 
@@ -276,7 +279,10 @@ export class QuizController {
     status: 404,
     description: 'Quiz question not found',
   })
-  removeQuiz(@Param('id') id: string, @User() user: JWTUserPayload) {
+  removeQuiz(
+    @Param('id', ParseObjectIdPipe) id: Types.ObjectId,
+    @User() user: JWTUserPayload,
+  ) {
     return this.quizService.removeQuiz(id, user);
   }
 
