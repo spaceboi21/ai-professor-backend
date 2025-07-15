@@ -27,6 +27,7 @@ import { BullModule } from '@nestjs/bull';
 import { QueueModule } from './common/queue/queue.module';
 import { QuizModule } from './modules/quiz/quiz.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
+import { ProgressModule } from './modules/progress/progress.module';
 
 @Module({
   imports: [
@@ -108,6 +109,7 @@ import { NotificationsModule } from './modules/notifications/notifications.modul
     QueueModule,
     QuizModule,
     NotificationsModule,
+    ProgressModule,
   ],
   controllers: [AppController],
   providers: [AppService, JwtStrategy],

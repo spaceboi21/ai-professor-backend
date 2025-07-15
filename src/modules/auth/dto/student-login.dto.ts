@@ -6,11 +6,11 @@ export class LoginStudentDto {
   @IsEmail({}, { message: 'Invalid email format' })
   @IsNotEmpty({ message: 'Email is required' })
   @Transform(({ value }) => value.toLowerCase())
-  @ApiProperty({ example: 'alice.smith@student.com' })
+  @ApiProperty({ example: 'shubh@yopmail.com' })
   email: string;
 
   @IsString({ message: 'Password must be a string' })
   @IsNotEmpty({ message: 'Password is required' })
-  @ApiProperty({ example: 'StudentPassword123!' })
+  @ApiProperty({ example: '+[I0{pYI72j@' })
   password: string;
 }

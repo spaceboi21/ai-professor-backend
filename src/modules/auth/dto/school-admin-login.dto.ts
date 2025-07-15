@@ -6,11 +6,11 @@ export class LoginSchoolAdminDto {
   @IsEmail({}, { message: 'Invalid email format' })
   @IsNotEmpty({ message: 'Email is required' })
   @Transform(({ value }) => value.toLowerCase())
-  @ApiProperty({ example: 'admin@springfieldhigh.edu' })
+  @ApiProperty({ example: 'techtic.anirudh@gmail.com' })
   email: string;
 
   @IsString({ message: 'First name must be a string' })
   @IsNotEmpty({ message: 'First name is required' })
-  @ApiProperty({ example: 'AdminPassword123!' })
+  @ApiProperty({ example: '|Co(>#n(-5si' })
   password: string;
 }

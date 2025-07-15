@@ -1,0 +1,1146 @@
+import {
+  Injectable,
+  BadRequestException,
+  NotFoundException,
+  Logger,
+  ForbiddenException,
+} from '@nestjs/common';
+import { InjectModel } from '@nestjs/mongoose';
+import { Model, Types } from 'mongoose';
+import { User } from 'src/database/schemas/central/user.schema';
+import { School } from 'src/database/schemas/central/school.schema';
+import {
+  StudentModuleProgress,
+  StudentModuleProgressSchema,
+  ProgressStatusEnum,
+} from 'src/database/schemas/tenant/student-module-progress.schema';
+import {
+  StudentChapterProgress,
+  StudentChapterProgressSchema,
+} from 'src/database/schemas/tenant/student-chapter-progress.schema';
+import {
+  StudentQuizAttempt,
+  StudentQuizAttemptSchema,
+  AttemptStatusEnum,
+} from 'src/database/schemas/tenant/student-quiz-attempt.schema';
+import {
+  Student,
+  StudentSchema,
+} from 'src/database/schemas/tenant/student.schema';
+import {
+  Module,
+  ModuleSchema,
+} from 'src/database/schemas/tenant/module.schema';
+import {
+  Chapter,
+  ChapterSchema,
+} from 'src/database/schemas/tenant/chapter.schema';
+import {
+  QuizGroup,
+  QuizGroupSchema,
+} from 'src/database/schemas/tenant/quiz-group.schema';
+import {
+  Quiz,
+  QuizSchema,
+} from 'src/database/schemas/tenant/quiz.schema';
+import { TenantConnectionService } from 'src/database/tenant-connection.service';
+import { JWTUserPayload } from 'src/common/types/jwr-user.type';
+import { RoleEnum } from 'src/common/constants/roles.constant';
+import { QuizTypeEnum } from 'src/common/constants/quiz.constant';
+import { StartModuleDto } from './dto/start-module.dto';
+import { StartChapterDto } from './dto/start-chapter.dto';
+import { StartQuizAttemptDto } from './dto/start-quiz-attempt.dto';
+import { SubmitQuizAnswersDto } from './dto/submit-quiz-answers.dto';
+import { ProgressFilterDto, QuizAttemptFilterDto } from './dto/progress-filter.dto';
+import { PaginationDto } from 'src/common/dto/pagination.dto';
+import {
+  getPaginationOptions,
+  createPaginationResult,
+} from 'src/common/utils/pagination.util';
+
+@Injectable()
+export class ProgressService {
+  private readonly logger = new Logger(ProgressService.name);
+
+  constructor(
+    @InjectModel(User.name)
+    private readonly userModel: Model<User>,
+    @InjectModel(School.name)
+    private readonly schoolModel: Model<School>,
+    private readonly tenantConnectionService: TenantConnectionService,
+  ) {}
+
+  // ========== MODULE PROGRESS OPERATIONS ==========
+
+  async startModule(startModuleDto: StartModuleDto, user: JWTUserPayload) {
+    const { module_id } = startModuleDto;
+
+    this.logger.log(`Student ${user.id} starting module ${module_id}`);
+
+    // Validate user is a student
+    if (user.role.name !== RoleEnum.STUDENT) {
+      throw new ForbiddenException('Only students can start modules');
+    }
+
+    // Get school and tenant connection
+    const school = await this.schoolModel.findById(user.school_id);
+    if (!school) {
+      throw new NotFoundException('School not found');
+    }
+
+    const tenantConnection = await this.tenantConnectionService.getTenantConnection(school.db_name);
+    const StudentModel = tenantConnection.model(Student.name, StudentSchema);
+    const ModuleModel = tenantConnection.model(Module.name, ModuleSchema);
+    const ChapterModel = tenantConnection.model(Chapter.name, ChapterSchema);
+    const StudentModuleProgressModel = tenantConnection.model(
+      StudentModuleProgress.name,
+      StudentModuleProgressSchema,
+    );
+
+    try {
+      // Validate student exists in tenant database
+      const student = await StudentModel.findById(user.id);
+      if (!student) {
+        throw new NotFoundException('Student not found');
+      }
+
+      // Validate module exists
+      const module = await ModuleModel.findOne({
+        _id: module_id,
+        deleted_at: null,
+      });
+      if (!module) {
+        throw new NotFoundException('Module not found');
+      }
+
+      // Get total chapters count for this module
+      const totalChapters = await ChapterModel.countDocuments({
+        module_id: new Types.ObjectId(module_id),
+        deleted_at: null,
+      });
+
+      // Check if progress already exists
+      let progress = await StudentModuleProgressModel.findOne({
+        student_id: new Types.ObjectId(user.id),
+        module_id: new Types.ObjectId(module_id),
+      });
+
+      if (progress) {
+        // Update existing progress
+        progress.status = ProgressStatusEnum.IN_PROGRESS;
+        progress.last_accessed_at = new Date();
+        if (!progress.started_at) {
+          progress.started_at = new Date();
+        }
+        progress.total_chapters = totalChapters;
+        await progress.save();
+      } else {
+        // Create new progress record
+        progress = new StudentModuleProgressModel({
+          student_id: new Types.ObjectId(user.id),
+          module_id: new Types.ObjectId(module_id),
+          status: ProgressStatusEnum.IN_PROGRESS,
+          started_at: new Date(),
+          last_accessed_at: new Date(),
+          total_chapters: totalChapters,
+          progress_percentage: 0,
+          chapters_completed: 0,
+        });
+        await progress.save();
+      }
+
+      this.logger.log(`Module progress updated for student ${user.id}, module ${module_id}`);
+
+      return {
+        message: 'Module started successfully',
+        data: {
+          progress_id: progress._id,
+          module_id: progress.module_id,
+          status: progress.status,
+          progress_percentage: progress.progress_percentage,
+          chapters_completed: progress.chapters_completed,
+          total_chapters: progress.total_chapters,
+          started_at: progress.started_at,
+        },
+      };
+    } catch (error) {
+      this.logger.error('Error starting module', error?.stack || error);
+      if (error instanceof NotFoundException || error instanceof ForbiddenException) {
+        throw error;
+      }
+      throw new BadRequestException('Failed to start module');
+    }
+  }
+
+  // ========== CHAPTER PROGRESS OPERATIONS ==========
+
+  async startChapter(startChapterDto: StartChapterDto, user: JWTUserPayload) {
+    const { chapter_id } = startChapterDto;
+
+    this.logger.log(`Student ${user.id} starting chapter ${chapter_id}`);
+
+    // Validate user is a student
+    if (user.role.name !== RoleEnum.STUDENT) {
+      throw new ForbiddenException('Only students can start chapters');
+    }
+
+    // Get school and tenant connection
+    const school = await this.schoolModel.findById(user.school_id);
+    if (!school) {
+      throw new NotFoundException('School not found');
+    }
+
+    const tenantConnection = await this.tenantConnectionService.getTenantConnection(school.db_name);
+    const StudentModel = tenantConnection.model(Student.name, StudentSchema);
+    const ChapterModel = tenantConnection.model(Chapter.name, ChapterSchema);
+    const StudentChapterProgressModel = tenantConnection.model(
+      StudentChapterProgress.name,
+      StudentChapterProgressSchema,
+    );
+
+    try {
+      // Validate student exists
+      const student = await StudentModel.findById(user.id);
+      if (!student) {
+        throw new NotFoundException('Student not found');
+      }
+
+      // Validate chapter exists
+      const chapter = await ChapterModel.findOne({
+        _id: chapter_id,
+        deleted_at: null,
+      });
+      if (!chapter) {
+        throw new NotFoundException('Chapter not found');
+      }
+
+      // Check if student can access this chapter (validate sequence)
+      await this.validateChapterAccess(user.id, chapter, tenantConnection);
+
+      // Start the module if not already started
+      await this.startModule({ module_id: chapter.module_id }, user);
+
+      // Check if chapter progress already exists
+      let progress = await StudentChapterProgressModel.findOne({
+        student_id: new Types.ObjectId(user.id),
+        chapter_id: new Types.ObjectId(chapter_id),
+      });
+
+      if (progress) {
+        // Update existing progress
+        progress.status = ProgressStatusEnum.IN_PROGRESS;
+        progress.last_accessed_at = new Date();
+        if (!progress.started_at) {
+          progress.started_at = new Date();
+        }
+        await progress.save();
+      } else {
+        // Create new progress record
+        progress = new StudentChapterProgressModel({
+          student_id: new Types.ObjectId(user.id),
+          module_id: chapter.module_id,
+          chapter_id: new Types.ObjectId(chapter_id),
+          status: ProgressStatusEnum.IN_PROGRESS,
+          started_at: new Date(),
+          last_accessed_at: new Date(),
+          chapter_sequence: chapter.sequence,
+        });
+        await progress.save();
+      }
+
+      this.logger.log(`Chapter progress updated for student ${user.id}, chapter ${chapter_id}`);
+
+      return {
+        message: 'Chapter started successfully',
+        data: {
+          progress_id: progress._id,
+          chapter_id: progress.chapter_id,
+          module_id: progress.module_id,
+          status: progress.status,
+          chapter_sequence: progress.chapter_sequence,
+          started_at: progress.started_at,
+        },
+      };
+    } catch (error) {
+      this.logger.error('Error starting chapter', error?.stack || error);
+      if (error instanceof NotFoundException || error instanceof ForbiddenException) {
+        throw error;
+      }
+      throw new BadRequestException('Failed to start chapter');
+    }
+  }
+
+  // ========== QUIZ ATTEMPT OPERATIONS ==========
+
+  async startQuizAttempt(startQuizAttemptDto: StartQuizAttemptDto, user: JWTUserPayload) {
+    const { quiz_group_id } = startQuizAttemptDto;
+
+    this.logger.log(`Student ${user.id} starting quiz attempt for quiz group ${quiz_group_id}`);
+
+    // Validate user is a student
+    if (user.role.name !== RoleEnum.STUDENT) {
+      throw new ForbiddenException('Only students can start quiz attempts');
+    }
+
+    // Get school and tenant connection
+    const school = await this.schoolModel.findById(user.school_id);
+    if (!school) {
+      throw new NotFoundException('School not found');
+    }
+
+    const tenantConnection = await this.tenantConnectionService.getTenantConnection(school.db_name);
+    const StudentModel = tenantConnection.model(Student.name, StudentSchema);
+    const QuizGroupModel = tenantConnection.model(QuizGroup.name, QuizGroupSchema);
+    const QuizModel = tenantConnection.model(Quiz.name, QuizSchema);
+    const StudentQuizAttemptModel = tenantConnection.model(
+      StudentQuizAttempt.name,
+      StudentQuizAttemptSchema,
+    );
+
+    try {
+      // Validate student exists
+      const student = await StudentModel.findById(user.id);
+      if (!student) {
+        throw new NotFoundException('Student not found');
+      }
+
+      // Validate quiz group exists
+      const quizGroup = await QuizGroupModel.findOne({
+        _id: quiz_group_id,
+        deleted_at: null,
+      });
+      if (!quizGroup) {
+        throw new NotFoundException('Quiz group not found');
+      }
+
+      // Validate access to this quiz (chapter-based validation)
+      if (quizGroup.chapter_id) {
+        await this.validateQuizAccess(user.id, quizGroup, tenantConnection);
+      }
+
+      // Check for existing in-progress attempt
+      const existingAttempt = await StudentQuizAttemptModel.findOne({
+        student_id: new Types.ObjectId(user.id),
+        quiz_group_id: new Types.ObjectId(quiz_group_id),
+        status: AttemptStatusEnum.IN_PROGRESS,
+      });
+
+      if (existingAttempt) {
+        return {
+          message: 'Quiz attempt already in progress',
+          data: {
+            attempt_id: existingAttempt._id,
+            quiz_group_id: existingAttempt.quiz_group_id,
+            status: existingAttempt.status,
+            started_at: existingAttempt.started_at,
+            attempt_number: existingAttempt.attempt_number,
+          },
+        };
+      }
+
+      // Get total questions count
+      const totalQuestions = await QuizModel.countDocuments({
+        quiz_group_id: new Types.ObjectId(quiz_group_id),
+        deleted_at: null,
+      });
+
+      // Get next attempt number
+      const lastAttempt = await StudentQuizAttemptModel.findOne({
+        student_id: new Types.ObjectId(user.id),
+        quiz_group_id: new Types.ObjectId(quiz_group_id),
+      }).sort({ attempt_number: -1 });
+
+      const nextAttemptNumber = lastAttempt ? lastAttempt.attempt_number + 1 : 1;
+
+      // Create new quiz attempt
+      const newAttempt = new StudentQuizAttemptModel({
+        student_id: new Types.ObjectId(user.id),
+        quiz_group_id: new Types.ObjectId(quiz_group_id),
+        module_id: quizGroup.module_id,
+        chapter_id: quizGroup.chapter_id,
+        status: AttemptStatusEnum.IN_PROGRESS,
+        started_at: new Date(),
+        total_questions: totalQuestions,
+        attempt_number: nextAttemptNumber,
+      });
+
+      await newAttempt.save();
+
+      this.logger.log(`Quiz attempt created for student ${user.id}, quiz group ${quiz_group_id}`);
+
+      return {
+        message: 'Quiz attempt started successfully',
+        data: {
+          attempt_id: newAttempt._id,
+          quiz_group_id: newAttempt.quiz_group_id,
+          status: newAttempt.status,
+          started_at: newAttempt.started_at,
+          total_questions: newAttempt.total_questions,
+          attempt_number: newAttempt.attempt_number,
+        },
+      };
+    } catch (error) {
+      this.logger.error('Error starting quiz attempt', error?.stack || error);
+      if (error instanceof NotFoundException || error instanceof ForbiddenException) {
+        throw error;
+      }
+      throw new BadRequestException('Failed to start quiz attempt');
+    }
+  }
+
+  async submitQuizAnswers(submitQuizAnswersDto: SubmitQuizAnswersDto, user: JWTUserPayload) {
+    const { quiz_group_id, answers, total_time_taken_minutes } = submitQuizAnswersDto;
+
+    this.logger.log(`Student ${user.id} submitting quiz answers for quiz group ${quiz_group_id}`);
+
+    // Validate user is a student
+    if (user.role.name !== RoleEnum.STUDENT) {
+      throw new ForbiddenException('Only students can submit quiz answers');
+    }
+
+    // Get school and tenant connection
+    const school = await this.schoolModel.findById(user.school_id);
+    if (!school) {
+      throw new NotFoundException('School not found');
+    }
+
+    const tenantConnection = await this.tenantConnectionService.getTenantConnection(school.db_name);
+    const QuizModel = tenantConnection.model(Quiz.name, QuizSchema);
+    const QuizGroupModel = tenantConnection.model(QuizGroup.name, QuizGroupSchema);
+    const StudentQuizAttemptModel = tenantConnection.model(
+      StudentQuizAttempt.name,
+      StudentQuizAttemptSchema,
+    );
+
+    try {
+      // Find the in-progress attempt
+      const attempt = await StudentQuizAttemptModel.findOne({
+        student_id: new Types.ObjectId(user.id),
+        quiz_group_id: new Types.ObjectId(quiz_group_id),
+        status: AttemptStatusEnum.IN_PROGRESS,
+      });
+
+      if (!attempt) {
+        throw new NotFoundException('No in-progress quiz attempt found');
+      }
+
+      // Get quiz group details
+      const quizGroup = await QuizGroupModel.findById(quiz_group_id);
+      if (!quizGroup) {
+        throw new NotFoundException('Quiz group not found');
+      }
+
+      // Get all quizzes for this group with correct answers
+      const quizzes = await QuizModel.find({
+        quiz_group_id: new Types.ObjectId(quiz_group_id),
+        deleted_at: null,
+      }).lean();
+
+      // Calculate score
+      let correctAnswers = 0;
+      const processedAnswers: Array<{
+        quiz_id: Types.ObjectId;
+        selected_answers: string[];
+        is_correct: boolean;
+        time_spent_seconds: number;
+      }> = [];
+
+      for (const answer of answers) {
+        const quiz = quizzes.find(q => q._id.toString() === answer.quiz_id.toString());
+        if (!quiz) {
+          throw new BadRequestException(`Quiz ${answer.quiz_id} not found in this group`);
+        }
+
+        // Check if answer is correct
+        const isCorrect = this.areAnswersEqual(answer.selected_answers, quiz.answer);
+        if (isCorrect) {
+          correctAnswers++;
+        }
+
+        processedAnswers.push({
+          quiz_id: new Types.ObjectId(answer.quiz_id),
+          selected_answers: answer.selected_answers,
+          is_correct: isCorrect,
+          time_spent_seconds: answer.time_spent_seconds || 0,
+        });
+      }
+
+      const scorePercentage = quizzes.length > 0 ? Math.round((correctAnswers / quizzes.length) * 100) : 0;
+      const isPassed = scorePercentage >= attempt.passing_threshold;
+
+      // Update attempt
+      attempt.status = AttemptStatusEnum.COMPLETED;
+      attempt.completed_at = new Date();
+      attempt.score_percentage = scorePercentage;
+      attempt.correct_answers = correctAnswers;
+      attempt.total_questions = quizzes.length;
+      attempt.time_taken_minutes = total_time_taken_minutes || 0;
+      attempt.is_passed = isPassed;
+      attempt.answers = processedAnswers;
+
+      await attempt.save();
+
+      // Update chapter/module progress if quiz is passed
+      if (isPassed) {
+        await this.updateProgressOnQuizCompletion(attempt, tenantConnection);
+      }
+
+      this.logger.log(`Quiz attempt completed for student ${user.id}, score: ${scorePercentage}%`);
+
+      return {
+        message: 'Quiz answers submitted successfully',
+        data: {
+          attempt_id: attempt._id,
+          score_percentage: attempt.score_percentage,
+          correct_answers: attempt.correct_answers,
+          total_questions: attempt.total_questions,
+          is_passed: attempt.is_passed,
+          time_taken_minutes: attempt.time_taken_minutes,
+          status: attempt.status,
+          completed_at: attempt.completed_at,
+        },
+      };
+    } catch (error) {
+      this.logger.error('Error submitting quiz answers', error?.stack || error);
+      if (error instanceof NotFoundException || error instanceof ForbiddenException) {
+        throw error;
+      }
+      throw new BadRequestException('Failed to submit quiz answers');
+    }
+  }
+
+  // ========== VALIDATION METHODS ==========
+
+  private async validateChapterAccess(studentId: string | Types.ObjectId, chapter: any, tenantConnection: any) {
+    // If this is the first chapter (sequence 1), allow access
+    if (chapter.sequence === 1) {
+      return true;
+    }
+
+    const StudentChapterProgressModel = tenantConnection.model(
+      StudentChapterProgress.name,
+      StudentChapterProgressSchema,
+    );
+
+    // Find the previous chapter
+    const ChapterModel = tenantConnection.model(Chapter.name, ChapterSchema);
+    const previousChapter = await ChapterModel.findOne({
+      module_id: chapter.module_id,
+      sequence: chapter.sequence - 1,
+      deleted_at: null,
+    });
+
+    if (!previousChapter) {
+      throw new BadRequestException('Previous chapter not found');
+    }
+
+    // Check if previous chapter quiz is completed
+    const previousChapterProgress = await StudentChapterProgressModel.findOne({
+      student_id: new Types.ObjectId(studentId),
+      chapter_id: previousChapter._id,
+      chapter_quiz_completed: true,
+    });
+
+    if (!previousChapterProgress) {
+      throw new ForbiddenException(
+        `You must complete the quiz for "${previousChapter.title}" before accessing this chapter`,
+      );
+    }
+
+    return true;
+  }
+
+  private async validateQuizAccess(studentId: string | Types.ObjectId, quizGroup: any, tenantConnection: any) {
+    // If this is a module-level quiz, check if all chapters are completed
+    if (quizGroup.type === QuizTypeEnum.MODULE) {
+      const StudentChapterProgressModel = tenantConnection.model(
+        StudentChapterProgress.name,
+        StudentChapterProgressSchema,
+      );
+      const ChapterModel = tenantConnection.model(Chapter.name, ChapterSchema);
+
+      // Get total chapters for this module
+      const totalChapters = await ChapterModel.countDocuments({
+        module_id: quizGroup.module_id,
+        deleted_at: null,
+      });
+
+      // Get completed chapters count
+      const completedChapters = await StudentChapterProgressModel.countDocuments({
+        student_id: new Types.ObjectId(studentId),
+        module_id: quizGroup.module_id,
+        chapter_quiz_completed: true,
+      });
+
+      if (completedChapters < totalChapters) {
+        throw new ForbiddenException(
+          'You must complete all chapter quizzes before taking the module quiz',
+        );
+      }
+    }
+
+    // If this is a chapter-level quiz, check chapter access
+    if (quizGroup.type === QuizTypeEnum.CHAPTER && quizGroup.chapter_id) {
+      const ChapterModel = tenantConnection.model(Chapter.name, ChapterSchema);
+      const chapter = await ChapterModel.findById(quizGroup.chapter_id);
+      if (chapter) {
+        await this.validateChapterAccess(studentId, chapter, tenantConnection);
+      }
+    }
+
+    return true;
+  }
+
+  // ========== PROGRESS UPDATE METHODS ==========
+
+  private async updateProgressOnQuizCompletion(attempt: any, tenantConnection: any) {
+    const QuizGroupModel = tenantConnection.model(QuizGroup.name, QuizGroupSchema);
+    const quizGroup = await QuizGroupModel.findById(attempt.quiz_group_id);
+
+    if (!quizGroup) return;
+
+    if (quizGroup.type === QuizTypeEnum.CHAPTER && attempt.chapter_id) {
+      await this.updateChapterProgressOnQuizCompletion(attempt, tenantConnection);
+    } else if (quizGroup.type === QuizTypeEnum.MODULE && attempt.module_id) {
+      await this.updateModuleProgressOnQuizCompletion(attempt, tenantConnection);
+    }
+  }
+
+  private async updateChapterProgressOnQuizCompletion(attempt: any, tenantConnection: any) {
+    const StudentChapterProgressModel = tenantConnection.model(
+      StudentChapterProgress.name,
+      StudentChapterProgressSchema,
+    );
+
+    // Update chapter progress
+    await StudentChapterProgressModel.findOneAndUpdate(
+      {
+        student_id: attempt.student_id,
+        chapter_id: attempt.chapter_id,
+      },
+      {
+        status: ProgressStatusEnum.COMPLETED,
+        completed_at: new Date(),
+        chapter_quiz_completed: true,
+        quiz_completed_at: attempt.completed_at,
+      },
+      { upsert: true },
+    );
+
+    // Update module progress
+    await this.recalculateModuleProgress(attempt.student_id, attempt.module_id, tenantConnection);
+  }
+
+  private async updateModuleProgressOnQuizCompletion(attempt: any, tenantConnection: any) {
+    const StudentModuleProgressModel = tenantConnection.model(
+      StudentModuleProgress.name,
+      StudentModuleProgressSchema,
+    );
+
+    // Update module progress
+    await StudentModuleProgressModel.findOneAndUpdate(
+      {
+        student_id: attempt.student_id,
+        module_id: attempt.module_id,
+      },
+      {
+        module_quiz_completed: true,
+        last_accessed_at: new Date(),
+      },
+    );
+
+    // Recalculate overall module progress
+    await this.recalculateModuleProgress(attempt.student_id, attempt.module_id, tenantConnection);
+  }
+
+  private async recalculateModuleProgress(studentId: Types.ObjectId, moduleId: Types.ObjectId, tenantConnection: any) {
+    const StudentModuleProgressModel = tenantConnection.model(
+      StudentModuleProgress.name,
+      StudentModuleProgressSchema,
+    );
+    const StudentChapterProgressModel = tenantConnection.model(
+      StudentChapterProgress.name,
+      StudentChapterProgressSchema,
+    );
+    const ChapterModel = tenantConnection.model(Chapter.name, ChapterSchema);
+
+    // Get total chapters for this module
+    const totalChapters = await ChapterModel.countDocuments({
+      module_id: moduleId,
+      deleted_at: null,
+    });
+
+    // Get completed chapters count
+    const completedChapters = await StudentChapterProgressModel.countDocuments({
+      student_id: studentId,
+      module_id: moduleId,
+      chapter_quiz_completed: true,
+    });
+
+    // Get module progress
+    const moduleProgress = await StudentModuleProgressModel.findOne({
+      student_id: studentId,
+      module_id: moduleId,
+    });
+
+    if (!moduleProgress) return;
+
+    // Calculate progress percentage
+    let progressPercentage = 0;
+    if (totalChapters > 0) {
+      progressPercentage = Math.round((completedChapters / totalChapters) * 90); // 90% for chapters
+      if (moduleProgress.module_quiz_completed) {
+        progressPercentage += 10; // 10% for module quiz
+      }
+    }
+
+    // Determine status
+    let status = ProgressStatusEnum.IN_PROGRESS;
+    if (progressPercentage >= 100) {
+      status = ProgressStatusEnum.COMPLETED;
+    }
+
+    // Update module progress
+    await StudentModuleProgressModel.findByIdAndUpdate(moduleProgress._id, {
+      chapters_completed: completedChapters,
+      progress_percentage: Math.min(progressPercentage, 100),
+      status: status,
+      completed_at: status === ProgressStatusEnum.COMPLETED ? new Date() : null,
+      last_accessed_at: new Date(),
+    });
+  }
+
+  // ========== UTILITY METHODS ==========
+
+  private areAnswersEqual(selected: string[], correct: string[]): boolean {
+    if (selected.length !== correct.length) {
+      return false;
+    }
+
+    const sortedSelected = [...selected].sort();
+    const sortedCorrect = [...correct].sort();
+
+    return sortedSelected.every((answer, index) => answer === sortedCorrect[index]);
+  }
+
+  // ========== PROGRESS RETRIEVAL METHODS ==========
+
+  async getStudentModuleProgress(
+    user: JWTUserPayload,
+    paginationDto?: PaginationDto,
+    filterDto?: ProgressFilterDto,
+  ) {
+    this.logger.log(`Getting module progress for student ${user.id}`);
+
+    // Validate user is a student
+    if (user.role.name !== RoleEnum.STUDENT) {
+      throw new ForbiddenException('Only students can view their own progress');
+    }
+
+    // Get school and tenant connection
+    const school = await this.schoolModel.findById(user.school_id);
+    if (!school) {
+      throw new NotFoundException('School not found');
+    }
+
+    const tenantConnection = await this.tenantConnectionService.getTenantConnection(school.db_name);
+    const StudentModuleProgressModel = tenantConnection.model(
+      StudentModuleProgress.name,
+      StudentModuleProgressSchema,
+    );
+
+    try {
+      // Build query
+      const query: any = { student_id: new Types.ObjectId(user.id) };
+
+      if (filterDto?.module_id) {
+        query.module_id = new Types.ObjectId(filterDto.module_id);
+      }
+
+      if (filterDto?.status) {
+        query.status = filterDto.status;
+      }
+
+      if (filterDto?.from_date || filterDto?.to_date) {
+        query.last_accessed_at = {};
+        if (filterDto.from_date) {
+          query.last_accessed_at.$gte = new Date(filterDto.from_date);
+        }
+        if (filterDto.to_date) {
+          query.last_accessed_at.$lte = new Date(filterDto.to_date);
+        }
+      }
+
+      // Get pagination options
+      const paginationOptions = getPaginationOptions(paginationDto || {});
+
+      // Get total count
+      const total = await StudentModuleProgressModel.countDocuments(query);
+
+      // Get paginated results
+      const progress = await StudentModuleProgressModel.find(query)
+        .populate('module_id', 'title subject description duration difficulty')
+        .sort({ last_accessed_at: -1 })
+        .skip(paginationOptions.skip)
+        .limit(paginationOptions.limit)
+        .lean();
+
+      // Create pagination result
+      const result = createPaginationResult(progress, total, paginationOptions);
+
+      return {
+        message: 'Module progress retrieved successfully',
+        data: result.data,
+        pagination_data: result.pagination_data,
+      };
+    } catch (error) {
+      this.logger.error('Error getting module progress', error?.stack || error);
+      throw new BadRequestException('Failed to retrieve module progress');
+    }
+  }
+
+  async getStudentChapterProgress(
+    user: JWTUserPayload,
+    paginationDto?: PaginationDto,
+    filterDto?: ProgressFilterDto,
+  ) {
+    this.logger.log(`Getting chapter progress for student ${user.id}`);
+
+    // Validate user is a student
+    if (user.role.name !== RoleEnum.STUDENT) {
+      throw new ForbiddenException('Only students can view their own progress');
+    }
+
+    // Get school and tenant connection
+    const school = await this.schoolModel.findById(user.school_id);
+    if (!school) {
+      throw new NotFoundException('School not found');
+    }
+
+    const tenantConnection = await this.tenantConnectionService.getTenantConnection(school.db_name);
+    const StudentChapterProgressModel = tenantConnection.model(
+      StudentChapterProgress.name,
+      StudentChapterProgressSchema,
+    );
+
+    try {
+      // Build query
+      const query: any = { student_id: new Types.ObjectId(user.id) };
+
+      if (filterDto?.module_id) {
+        query.module_id = new Types.ObjectId(filterDto.module_id);
+      }
+
+      if (filterDto?.chapter_id) {
+        query.chapter_id = new Types.ObjectId(filterDto.chapter_id);
+      }
+
+      if (filterDto?.status) {
+        query.status = filterDto.status;
+      }
+
+      if (filterDto?.from_date || filterDto?.to_date) {
+        query.last_accessed_at = {};
+        if (filterDto.from_date) {
+          query.last_accessed_at.$gte = new Date(filterDto.from_date);
+        }
+        if (filterDto.to_date) {
+          query.last_accessed_at.$lte = new Date(filterDto.to_date);
+        }
+      }
+
+      // Get pagination options
+      const paginationOptions = getPaginationOptions(paginationDto || {});
+
+      // Get total count
+      const total = await StudentChapterProgressModel.countDocuments(query);
+
+      // Get paginated results
+      const progress = await StudentChapterProgressModel.find(query)
+        .populate('module_id', 'title subject')
+        .populate('chapter_id', 'title subject sequence')
+        .sort({ chapter_sequence: 1 })
+        .skip(paginationOptions.skip)
+        .limit(paginationOptions.limit)
+        .lean();
+
+      // Create pagination result
+      const result = createPaginationResult(progress, total, paginationOptions);
+
+      return {
+        message: 'Chapter progress retrieved successfully',
+        data: result.data,
+        pagination_data: result.pagination_data,
+      };
+    } catch (error) {
+      this.logger.error('Error getting chapter progress', error?.stack || error);
+      throw new BadRequestException('Failed to retrieve chapter progress');
+    }
+  }
+
+  async getStudentQuizAttempts(
+    user: JWTUserPayload,
+    paginationDto?: PaginationDto,
+    filterDto?: QuizAttemptFilterDto,
+  ) {
+    this.logger.log(`Getting quiz attempts for student ${user.id}`);
+
+    // Validate user is a student
+    if (user.role.name !== RoleEnum.STUDENT) {
+      throw new ForbiddenException('Only students can view their own quiz attempts');
+    }
+
+    // Get school and tenant connection
+    const school = await this.schoolModel.findById(user.school_id);
+    if (!school) {
+      throw new NotFoundException('School not found');
+    }
+
+    const tenantConnection = await this.tenantConnectionService.getTenantConnection(school.db_name);
+    const StudentQuizAttemptModel = tenantConnection.model(
+      StudentQuizAttempt.name,
+      StudentQuizAttemptSchema,
+    );
+
+    try {
+      // Build query
+      const query: any = { student_id: new Types.ObjectId(user.id) };
+
+      if (filterDto?.quiz_group_id) {
+        query.quiz_group_id = new Types.ObjectId(filterDto.quiz_group_id);
+      }
+
+      if (filterDto?.module_id) {
+        query.module_id = new Types.ObjectId(filterDto.module_id);
+      }
+
+      if (filterDto?.chapter_id) {
+        query.chapter_id = new Types.ObjectId(filterDto.chapter_id);
+      }
+
+      if (filterDto?.status) {
+        query.status = filterDto.status;
+      }
+
+      if (filterDto?.from_date || filterDto?.to_date) {
+        query.started_at = {};
+        if (filterDto.from_date) {
+          query.started_at.$gte = new Date(filterDto.from_date);
+        }
+        if (filterDto.to_date) {
+          query.started_at.$lte = new Date(filterDto.to_date);
+        }
+      }
+
+      // Get pagination options
+      const paginationOptions = getPaginationOptions(paginationDto || {});
+
+      // Get total count
+      const total = await StudentQuizAttemptModel.countDocuments(query);
+
+      // Get paginated results
+      const attempts = await StudentQuizAttemptModel.find(query)
+        .populate('quiz_group_id', 'subject description type category')
+        .populate('module_id', 'title subject')
+        .populate('chapter_id', 'title subject sequence')
+        .sort({ started_at: -1 })
+        .skip(paginationOptions.skip)
+        .limit(paginationOptions.limit)
+        .lean();
+
+      // Create pagination result
+      const result = createPaginationResult(attempts, total, paginationOptions);
+
+      return {
+        message: 'Quiz attempts retrieved successfully',
+        data: result.data,
+        pagination_data: result.pagination_data,
+      };
+    } catch (error) {
+      this.logger.error('Error getting quiz attempts', error?.stack || error);
+      throw new BadRequestException('Failed to retrieve quiz attempts');
+    }
+  }
+
+  // ========== DASHBOARD METHODS ==========
+
+  async getStudentDashboard(user: JWTUserPayload) {
+    this.logger.log(`Getting dashboard data for student ${user.id}`);
+
+    // Validate user is a student
+    if (user.role.name !== RoleEnum.STUDENT) {
+      throw new ForbiddenException('Only students can view their dashboard');
+    }
+
+    // Get school and tenant connection
+    const school = await this.schoolModel.findById(user.school_id);
+    if (!school) {
+      throw new NotFoundException('School not found');
+    }
+
+    const tenantConnection = await this.tenantConnectionService.getTenantConnection(school.db_name);
+    const StudentModuleProgressModel = tenantConnection.model(
+      StudentModuleProgress.name,
+      StudentModuleProgressSchema,
+    );
+    const StudentChapterProgressModel = tenantConnection.model(
+      StudentChapterProgress.name,
+      StudentChapterProgressSchema,
+    );
+    const StudentQuizAttemptModel = tenantConnection.model(
+      StudentQuizAttempt.name,
+      StudentQuizAttemptSchema,
+    );
+
+    try {
+      const studentId = new Types.ObjectId(user.id);
+
+      // Get overall statistics
+      const [
+        totalModules,
+        inProgressModules,
+        completedModules,
+        totalQuizAttempts,
+        passedQuizzes,
+        recentActivity,
+      ] = await Promise.all([
+        StudentModuleProgressModel.countDocuments({ student_id: studentId }),
+        StudentModuleProgressModel.countDocuments({
+          student_id: studentId,
+          status: ProgressStatusEnum.IN_PROGRESS,
+        }),
+        StudentModuleProgressModel.countDocuments({
+          student_id: studentId,
+          status: ProgressStatusEnum.COMPLETED,
+        }),
+        StudentQuizAttemptModel.countDocuments({
+          student_id: studentId,
+          status: AttemptStatusEnum.COMPLETED,
+        }),
+        StudentQuizAttemptModel.countDocuments({
+          student_id: studentId,
+          status: AttemptStatusEnum.COMPLETED,
+          is_passed: true,
+        }),
+        StudentModuleProgressModel.find({ student_id: studentId })
+          .populate('module_id', 'title subject')
+          .sort({ last_accessed_at: -1 })
+          .limit(5)
+          .lean(),
+      ]);
+
+      // Calculate average progress
+      const moduleProgresses = await StudentModuleProgressModel.find({ student_id: studentId }).lean();
+      const averageProgress = moduleProgresses.length > 0
+        ? moduleProgresses.reduce((sum, progress) => sum + progress.progress_percentage, 0) / moduleProgresses.length
+        : 0;
+
+      return {
+        message: 'Dashboard data retrieved successfully',
+        data: {
+          overview: {
+            total_modules: totalModules,
+            in_progress_modules: inProgressModules,
+            completed_modules: completedModules,
+            total_quiz_attempts: totalQuizAttempts,
+            passed_quizzes: passedQuizzes,
+            average_progress: Math.round(averageProgress),
+          },
+          recent_activity: recentActivity,
+        },
+      };
+    } catch (error) {
+      this.logger.error('Error getting student dashboard', error?.stack || error);
+      throw new BadRequestException('Failed to retrieve dashboard data');
+    }
+  }
+
+  async getSchoolAdminDashboard(user: JWTUserPayload, moduleId?: string) {
+    this.logger.log(`Getting admin dashboard data for school ${user.school_id}`);
+
+    // Validate user is school admin or professor
+    if (![RoleEnum.SCHOOL_ADMIN, RoleEnum.PROFESSOR].includes(user.role.name)) {
+      throw new ForbiddenException('Only school admins and professors can view school dashboard');
+    }
+
+    // Get school and tenant connection
+    const school = await this.schoolModel.findById(user.school_id);
+    if (!school) {
+      throw new NotFoundException('School not found');
+    }
+
+    const tenantConnection = await this.tenantConnectionService.getTenantConnection(school.db_name);
+    const StudentModel = tenantConnection.model(Student.name, StudentSchema);
+    const StudentModuleProgressModel = tenantConnection.model(
+      StudentModuleProgress.name,
+      StudentModuleProgressSchema,
+    );
+    const StudentQuizAttemptModel = tenantConnection.model(
+      StudentQuizAttempt.name,
+      StudentQuizAttemptSchema,
+    );
+
+    try {
+      // Build query for specific module if provided
+      const progressQuery: any = {};
+      if (moduleId) {
+        progressQuery.module_id = new Types.ObjectId(moduleId);
+      }
+
+      // Get overall statistics
+      const [
+        totalStudents,
+        activeStudents,
+        moduleProgresses,
+        recentQuizAttempts,
+      ] = await Promise.all([
+        StudentModel.countDocuments({ deleted_at: null }),
+        StudentModuleProgressModel.distinct('student_id', progressQuery),
+        StudentModuleProgressModel.find(progressQuery)
+          .populate('student_id', 'first_name last_name email')
+          .populate('module_id', 'title subject')
+          .sort({ last_accessed_at: -1 })
+          .lean(),
+        StudentQuizAttemptModel.find(moduleId ? { module_id: new Types.ObjectId(moduleId) } : {})
+          .populate('student_id', 'first_name last_name email')
+          .populate('quiz_group_id', 'subject type')
+          .sort({ started_at: -1 })
+          .limit(10)
+          .lean(),
+      ]);
+
+      // Calculate progress statistics
+      const progressStats = {
+        not_started: 0,
+        in_progress: 0,
+        completed: 0,
+        average_progress: 0,
+      };
+
+      if (moduleProgresses.length > 0) {
+        progressStats.not_started = moduleProgresses.filter(p => p.status === ProgressStatusEnum.NOT_STARTED).length;
+        progressStats.in_progress = moduleProgresses.filter(p => p.status === ProgressStatusEnum.IN_PROGRESS).length;
+        progressStats.completed = moduleProgresses.filter(p => p.status === ProgressStatusEnum.COMPLETED).length;
+        progressStats.average_progress = Math.round(
+          moduleProgresses.reduce((sum, progress) => sum + progress.progress_percentage, 0) / moduleProgresses.length
+        );
+      }
+
+      return {
+        message: 'Admin dashboard data retrieved successfully',
+        data: {
+          overview: {
+            total_students: totalStudents,
+            active_students: activeStudents.length,
+            ...progressStats,
+          },
+          student_progress: moduleProgresses.slice(0, 20), // Limit to 20 for performance
+          recent_quiz_attempts: recentQuizAttempts,
+        },
+      };
+    } catch (error) {
+      this.logger.error('Error getting admin dashboard', error?.stack || error);
+      throw new BadRequestException('Failed to retrieve admin dashboard data');
+    }
+  }
+} 
