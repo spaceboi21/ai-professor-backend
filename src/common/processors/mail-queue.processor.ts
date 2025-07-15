@@ -1,6 +1,6 @@
-import { Processor, WorkerHost } from '@nestjs/bullmq';
+import { Process, Processor } from '@nestjs/bull';
 import { Logger } from '@nestjs/common';
-import { Job } from 'bullmq';
+import { Job } from 'bull';
 import { MailService } from 'src/mail/mail.service';
 import { RoleEnum } from 'src/common/constants/roles.constant';
 
@@ -20,62 +20,39 @@ export interface SendWelcomeJobData {
 export type MailJobData = SendCredentialsJobData | SendWelcomeJobData;
 
 @Processor('mail-queue')
-export class MailQueueProcessor extends WorkerHost {
+export class MailQueueProcessor {
   private readonly logger = new Logger(MailQueueProcessor.name);
 
-  constructor(private readonly mailService: MailService) {
-    super();
-  }
+  constructor(private readonly mailService: MailService) {}
 
-  async process(job: Job<MailJobData>): Promise<void> {
-    const { name } = job;
-
-    this.logger.log(`Processing mail job: ${name} for: ${job.data.email}`);
+  @Process('send-credentials')
+  async handleSendCredentials(job: Job<SendCredentialsJobData>): Promise<void> {
+    const { email, name, password, role } = job.data;
+    
+    this.logger.log(`Processing send-credentials job for: ${email}`);
 
     try {
-      switch (name) {
-        case 'send-credentials':
-          await this.handleSendCredentials(job.data as SendCredentialsJobData);
-          break;
-        case 'send-welcome':
-          await this.handleSendWelcome(job.data as SendWelcomeJobData);
-          break;
-        default:
-          throw new Error(`Unknown mail job type: ${name}`);
-      }
-
-      this.logger.log(`Mail job '${name}' completed for: ${job.data.email}`);
+      await this.mailService.sendCredentialsEmail(email, name, password, role);
+      this.logger.log(`Credentials email sent successfully to: ${email}`);
     } catch (error) {
-      this.logger.error(
-        `Failed to process mail job '${name}' for ${job.data.email}:`,
-        error,
-      );
-      throw error; // Re-throw to mark job as failed
+      this.logger.error(`Failed to send credentials email to ${email}:`, error);
+      throw error;
     }
   }
 
-  private async handleSendCredentials(
-    data: SendCredentialsJobData,
-  ): Promise<void> {
-    const { email, name, password, role } = data;
-    await this.mailService.sendCredentialsEmail(email, name, password, role);
-  }
+  @Process('send-welcome')
+  async handleSendWelcome(job: Job<SendWelcomeJobData>): Promise<void> {
+    const { email, name, role } = job.data;
+    
+    this.logger.log(`Processing send-welcome job for: ${email}`);
 
-  private async handleSendWelcome(data: SendWelcomeJobData): Promise<void> {
-    const { email, name, role } = data;
-    // You can add a welcome email method to MailService if needed
-    // await this.mailService.sendWelcomeEmail(email, name, role);
-    this.logger.log(`Welcome email would be sent to: ${email}`);
-  }
-
-  async onCompleted(job: Job<MailJobData>): Promise<void> {
-    this.logger.log(`Mail job '${job.name}' completed for: ${job.data.email}`);
-  }
-
-  async onFailed(job: Job<MailJobData>, err: Error): Promise<void> {
-    this.logger.error(
-      `Mail job '${job.name}' failed for ${job.data.email}:`,
-      err,
-    );
+    try {
+      // You can add a welcome email method to MailService if needed
+      // await this.mailService.sendWelcomeEmail(email, name, role);
+      this.logger.log(`Welcome email would be sent to: ${email}`);
+    } catch (error) {
+      this.logger.error(`Failed to send welcome email to ${email}:`, error);
+      throw error;
+    }
   }
 }

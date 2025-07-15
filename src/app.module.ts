@@ -23,7 +23,7 @@ import { SchoolsModule } from './modules/schools/schools.module';
 import { ProfessorModule } from './modules/professor/professor.module';
 import { SchoolAdminModule } from './modules/school-admin/school-admin.module';
 import { BibliographyModule } from './modules/bibliography/bibliography.module';
-import { BullModule } from '@nestjs/bullmq';
+import { BullModule } from '@nestjs/bull';
 import { QueueModule } from './common/queue/queue.module';
 import { QuizModule } from './modules/quiz/quiz.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
@@ -36,7 +36,7 @@ import { NotificationsModule } from './modules/notifications/notifications.modul
     BullModule.forRootAsync({
       imports: [ConfigModule],
       useFactory: async (configService: ConfigService) => ({
-        connection: {
+        redis: {
           host: configService.get('REDIS_HOST', 'localhost'),
           port: configService.get('REDIS_PORT', 6379),
         },
