@@ -280,7 +280,12 @@ export class UploadController {
     summary: 'Upload file via PUT with raw binary body',
     description: `Send raw file buffer (e.g., PDF, MP4, JPEG) in the request body with the appropriate Content-Type header. Must use Postman, curl, or frontend — Swagger UI doesn't support raw binary upload.`,
   })
-  @ApiConsumes('application/pdf', 'application/octet-stream', 'image/jpeg')
+  @ApiConsumes(
+    'image/jpeg',
+    'image/png',
+    'image/webp',
+    'application/octet-stream',
+  )
   @ApiQuery({ name: 'filename', required: true })
   @ApiResponse({ status: 201, description: 'File uploaded successfully' })
   @ApiResponse({ status: 400, description: 'Invalid file' })
@@ -295,8 +300,15 @@ export class UploadController {
     }
 
     const contentType = req.headers['content-type'];
-    if (!contentType || !contentType.startsWith('image/')) {
-      throw new BadRequestException('Invalid or missing Content-Type');
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+
+    if (
+      !contentType ||
+      !this.uploadService.validateContentType(contentType, allowedTypes)
+    ) {
+      throw new BadRequestException(
+        `Invalid or missing Content-Type. Allowed types: ${allowedTypes.join(', ')}`,
+      );
     }
 
     const ext = extname(filename) || `.${contentType.split('/')[1]}`;
@@ -308,15 +320,16 @@ export class UploadController {
     }
 
     const filePath = `${dir}/${id}`;
-    const chunks: Buffer[] = [];
 
-    req.on('data', (chunk) => {
-      chunks.push(chunk);
-    });
+    try {
+      // Use the improved file processing method
+      const { buffer, size } = await this.uploadService.processFileBuffer(
+        req,
+        filePath,
+        5 * 1024 * 1024, // 5MB limit for profile pictures
+      );
 
-    req.on('end', () => {
-      const buffer = Buffer.concat(chunks);
-
+      // Write the file
       writeFileSync(filePath, buffer);
 
       const fileUrl = `${process.env.BACKEND_URL}/uploads/profile-pics/${id}`;
@@ -325,17 +338,32 @@ export class UploadController {
         fileUrl,
         key: `uploads/profile-pics/${id}`,
         originalName: filename,
-        size: buffer.length,
+        size: size,
         mimeType: contentType,
+        message: 'Profile picture uploaded successfully',
       });
-    });
+    } catch (error) {
+      if (error instanceof BadRequestException) {
+        res.status(400).json({ error: error.message });
+      } else {
+        res
+          .status(500)
+          .json({ error: 'Upload failed', details: error.message });
+      }
+    }
   }
 
   @ApiOperation({
     summary: 'Upload file via PUT with raw binary body',
     description: `Send raw file buffer (e.g., PDF, MP4, JPEG) in the request body with the appropriate Content-Type header. Must use Postman, curl, or frontend — Swagger UI doesn't support raw binary upload.`,
   })
-  @ApiConsumes('application/pdf', 'application/octet-stream', 'image/jpeg')
+  @ApiConsumes(
+    'application/pdf',
+    'video/mp4',
+    'video/mpeg',
+    'video/quicktime',
+    'application/octet-stream',
+  )
   @ApiQuery({ name: 'filename', required: true })
   @ApiResponse({ status: 201, description: 'File uploaded successfully' })
   @ApiResponse({ status: 400, description: 'Invalid file' })
@@ -355,10 +383,20 @@ export class UploadController {
       'video/mp4',
       'video/mpeg',
       'video/quicktime',
+      'video/avi',
+      'video/mov',
+      'video/wmv',
+      'video/flv',
+      'video/webm',
     ];
 
-    if (!contentType || !allowedTypes.includes(contentType)) {
-      throw new BadRequestException('Invalid or unsupported Content-Type');
+    if (
+      !contentType ||
+      !this.uploadService.validateContentType(contentType, allowedTypes)
+    ) {
+      throw new BadRequestException(
+        `Invalid or unsupported Content-Type. Allowed types: ${allowedTypes.join(', ')}`,
+      );
     }
 
     const ext = extname(filename) || `.${contentType.split('/')[1]}`;
@@ -370,16 +408,16 @@ export class UploadController {
     }
 
     const filePath = `${dir}/${id}`;
-    const chunks: Buffer[] = [];
 
-    const incoming = req as unknown as IncomingMessage;
+    try {
+      // Use the improved file processing method
+      const { buffer, size } = await this.uploadService.processFileBuffer(
+        req,
+        filePath,
+        100 * 1024 * 1024, // 100MB limit for bibliography files
+      );
 
-    incoming.on('data', (chunk) => {
-      chunks.push(chunk);
-    });
-
-    incoming.on('end', () => {
-      const buffer = Buffer.concat(chunks);
+      // Write the file
       writeFileSync(filePath, buffer);
 
       const fileUrl = `${process.env.BACKEND_URL}/uploads/bibliography/${id}`;
@@ -388,14 +426,19 @@ export class UploadController {
         fileUrl,
         key: `uploads/bibliography/${id}`,
         originalName: filename,
-        size: buffer.length,
+        size: size,
         mimeType: contentType,
+        message: 'File uploaded successfully',
       });
-    });
-
-    incoming.on('error', (err) => {
-      res.status(500).json({ error: 'Upload failed', details: err });
-    });
+    } catch (error) {
+      if (error instanceof BadRequestException) {
+        res.status(400).json({ error: error.message });
+      } else {
+        res
+          .status(500)
+          .json({ error: 'Upload failed', details: error.message });
+      }
+    }
   }
 
   @ApiOperation({
@@ -422,8 +465,15 @@ export class UploadController {
     }
 
     const contentType = req.headers['content-type'];
-    if (!contentType || !contentType.startsWith('image/')) {
-      throw new BadRequestException('Invalid or missing Content-Type');
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+
+    if (
+      !contentType ||
+      !this.uploadService.validateContentType(contentType, allowedTypes)
+    ) {
+      throw new BadRequestException(
+        `Invalid or missing Content-Type. Allowed types: ${allowedTypes.join(', ')}`,
+      );
     }
 
     const ext = extname(filename) || `.${contentType.split('/')[1]}`;
@@ -435,15 +485,16 @@ export class UploadController {
     }
 
     const filePath = `${dir}/${id}`;
-    const chunks: Buffer[] = [];
 
-    req.on('data', (chunk) => {
-      chunks.push(chunk);
-    });
+    try {
+      // Use the improved file processing method
+      const { buffer, size } = await this.uploadService.processFileBuffer(
+        req,
+        filePath,
+        5 * 1024 * 1024, // 5MB limit for thumbnails
+      );
 
-    req.on('end', () => {
-      const buffer = Buffer.concat(chunks);
-
+      // Write the file
       writeFileSync(filePath, buffer);
 
       const fileUrl = `${process.env.BACKEND_URL}/uploads/thumbnails/${id}`;
@@ -452,9 +503,18 @@ export class UploadController {
         fileUrl,
         key: `uploads/thumbnails/${id}`,
         originalName: filename,
-        size: buffer.length,
+        size: size,
         mimeType: contentType,
+        message: 'Thumbnail uploaded successfully',
       });
-    });
+    } catch (error) {
+      if (error instanceof BadRequestException) {
+        res.status(400).json({ error: error.message });
+      } else {
+        res
+          .status(500)
+          .json({ error: 'Upload failed', details: error.message });
+      }
+    }
   }
 }

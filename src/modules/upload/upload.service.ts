@@ -17,10 +17,12 @@ export class UploadService {
     'image/webp',
   ];
 
-  // Bibliography file types
+  // Bibliography file types - updated to match controller
   private readonly BIBLIOGRAPHY_ALLOWED_MIME_TYPES = [
     'application/pdf',
     'video/mp4',
+    'video/mpeg',
+    'video/quicktime',
     'video/avi',
     'video/mov',
     'video/wmv',
@@ -80,6 +82,54 @@ export class UploadService {
       uploadUrl: url,
       fileUrl: `https://${this.configService.get('AWS_S3_BUCKET_NAME')}.s3.amazonaws.com/${key}`,
     };
+  }
+
+  // New method to process file buffer with proper error handling
+  async processFileBuffer(
+    stream: NodeJS.ReadableStream,
+    filePath: string,
+    maxSize: number = 100 * 1024 * 1024, // 100MB default
+  ): Promise<{ buffer: Buffer; size: number }> {
+    return new Promise((resolve, reject) => {
+      const chunks: Buffer[] = [];
+      let totalSize = 0;
+
+      stream.on('data', (chunk: Buffer) => {
+        totalSize += chunk.length;
+
+        // Check file size limit
+        if (totalSize > maxSize) {
+          reject(
+            new BadRequestException(
+              `File size exceeds maximum limit of ${maxSize / (1024 * 1024)}MB`,
+            ),
+          );
+          return;
+        }
+
+        chunks.push(chunk);
+      });
+
+      stream.on('end', () => {
+        if (totalSize === 0) {
+          reject(new BadRequestException('Empty file received'));
+          return;
+        }
+
+        const buffer = Buffer.concat(chunks);
+        resolve({ buffer, size: totalSize });
+      });
+
+      stream.on('error', (error) => {
+        reject(new BadRequestException(`File upload failed: ${error.message}`));
+      });
+    });
+  }
+
+  // Validate file content type
+  validateContentType(contentType: string, allowedTypes: string[]): boolean {
+    if (!contentType) return false;
+    return allowedTypes.includes(contentType);
   }
 
   private sanitizeFileName(fileName: string): string {
