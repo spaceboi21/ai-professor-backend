@@ -3,6 +3,15 @@ import { IsString, IsNotEmpty, IsOptional, IsMongoId } from 'class-validator';
 import { Types } from 'mongoose';
 
 export class CreateChapterDto {
+  @IsOptional()
+  @IsMongoId({ message: 'School ID must be a valid MongoDB ObjectId' })
+  @ApiProperty({
+    example: '507f1f77bcf86cd799439011',
+    description: 'School ID (required for super admin, optional for other roles)',
+    required: false,
+  })
+  school_id?: string | Types.ObjectId;
+
   @IsMongoId({ message: 'Module ID must be a valid MongoDB ObjectId' })
   @IsNotEmpty({ message: 'Module ID is required' })
   @ApiProperty({

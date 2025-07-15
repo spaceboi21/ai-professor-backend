@@ -6,10 +6,21 @@ import {
   IsEnum,
   IsOptional,
   IsArray,
+  IsMongoId,
 } from 'class-validator';
 import { DifficultyEnum } from 'src/common/constants/difficulty.constant';
+import { Types } from 'mongoose';
 
 export class CreateModuleDto {
+  @IsOptional()
+  @IsMongoId({ message: 'School ID must be a valid MongoDB ObjectId' })
+  @ApiProperty({
+    example: '507f1f77bcf86cd799439011',
+    description: 'School ID (required for super admin, optional for other roles)',
+    required: false,
+  })
+  school_id?: string | Types.ObjectId;
+
   @IsString({ message: 'Title must be a string' })
   @IsNotEmpty({ message: 'Title is required' })
   @ApiProperty({

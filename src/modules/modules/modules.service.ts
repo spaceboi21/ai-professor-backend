@@ -60,8 +60,34 @@ export class ModulesService {
     private readonly notificationsService: NotificationsService,
   ) {}
 
+  /**
+   * Helper method to resolve school_id based on user role
+   * For SUPER_ADMIN: school_id must be provided in the request body
+   * For other roles: use school_id from user context
+   */
+  private resolveSchoolId(
+    user: JWTUserPayload,
+    bodySchoolId?: string | Types.ObjectId,
+  ): string {
+    if (user.role.name === RoleEnum.SUPER_ADMIN) {
+      if (!bodySchoolId) {
+        throw new BadRequestException(
+          'School ID is required in request body for super admin',
+        );
+      }
+      return bodySchoolId.toString();
+    } else {
+      // For other roles, use school_id from user context
+      if (!user.school_id) {
+        throw new BadRequestException('User school ID not found');
+      }
+      return user.school_id.toString();
+    }
+  }
+
   async createModule(createModuleDto: CreateModuleDto, user: JWTUserPayload) {
     const {
+      school_id,
       title,
       subject,
       description,
@@ -74,8 +100,11 @@ export class ModulesService {
 
     this.logger.log(`Creating module: ${title} by user: ${user.id}`);
 
+    // Resolve school_id based on user role
+    const resolvedSchoolId = this.resolveSchoolId(user, school_id);
+
     // Validate school exists and user has access
-    const school = await this.schoolModel.findById(user.school_id);
+    const school = await this.schoolModel.findById(resolvedSchoolId);
     if (!school) {
       throw new NotFoundException('School not found');
     }
@@ -345,10 +374,15 @@ export class ModulesService {
     updateModuleDto: UpdateModuleDto,
     user: JWTUserPayload,
   ) {
+    const { school_id, ...moduleUpdateData } = updateModuleDto;
+    
     this.logger.log(`Updating module: ${id} by user: ${user.id}`);
 
+    // Resolve school_id based on user role
+    const resolvedSchoolId = this.resolveSchoolId(user, school_id);
+
     // Validate school exists
-    const school = await this.schoolModel.findById(user.school_id);
+    const school = await this.schoolModel.findById(resolvedSchoolId);
     if (!school) {
       throw new NotFoundException('School not found');
     }
@@ -361,7 +395,7 @@ export class ModulesService {
     try {
       const updatedModule = await ModuleModel.findOneAndUpdate(
         { _id: id, deleted_at: null },
-        { ...updateModuleDto, updated_at: new Date() },
+        { ...moduleUpdateData, updated_at: new Date() },
         { new: true },
       ).lean();
 
@@ -388,11 +422,14 @@ export class ModulesService {
     }
   }
 
-  async removeModule(id: Types.ObjectId, user: JWTUserPayload) {
+  async removeModule(id: Types.ObjectId, user: JWTUserPayload, school_id?: string) {
     this.logger.log(`Removing module: ${id} by user: ${user.id}`);
 
+    // Resolve school_id based on user role
+    const resolvedSchoolId = this.resolveSchoolId(user, school_id);
+
     // Validate school exists
-    const school = await this.schoolModel.findById(user.school_id);
+    const school = await this.schoolModel.findById(resolvedSchoolId);
     if (!school) {
       throw new NotFoundException('School not found');
     }
@@ -430,12 +467,15 @@ export class ModulesService {
     publishModuleDto: ToggleModuleVisibilityDto,
     user: JWTUserPayload,
   ) {
-    const { module_id, action } = publishModuleDto;
+    const { school_id, module_id, action } = publishModuleDto;
 
     this.logger.log(`${action} module: ${module_id} by user: ${user.id}`);
 
+    // Resolve school_id based on user role
+    const resolvedSchoolId = this.resolveSchoolId(user, school_id);
+
     // Validate school exists
-    const school = await this.schoolModel.findById(user.school_id);
+    const school = await this.schoolModel.findById(resolvedSchoolId);
     if (!school) {
       throw new NotFoundException('School not found');
     }

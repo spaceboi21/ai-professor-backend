@@ -44,7 +44,7 @@ export class BibliographyController {
   constructor(private readonly bibliographyService: BibliographyService) {}
 
   @Post()
-  @Roles(RoleEnum.PROFESSOR, RoleEnum.SCHOOL_ADMIN)
+  @Roles(RoleEnum.SUPER_ADMIN, RoleEnum.PROFESSOR, RoleEnum.SCHOOL_ADMIN)
   @ApiOperation({ summary: 'Create a new bibliography item' })
   @ApiResponse({
     status: 201,
@@ -183,7 +183,7 @@ export class BibliographyController {
   }
 
   @Patch(':id')
-  @Roles(RoleEnum.PROFESSOR, RoleEnum.SCHOOL_ADMIN)
+  @Roles(RoleEnum.SUPER_ADMIN, RoleEnum.PROFESSOR, RoleEnum.SCHOOL_ADMIN)
   @ApiOperation({ summary: 'Update bibliography by ID' })
   @ApiParam({
     name: 'id',
@@ -210,12 +210,19 @@ export class BibliographyController {
   }
 
   @Delete(':id')
-  @Roles(RoleEnum.PROFESSOR, RoleEnum.SCHOOL_ADMIN)
+  @Roles(RoleEnum.SUPER_ADMIN, RoleEnum.PROFESSOR, RoleEnum.SCHOOL_ADMIN)
   @ApiOperation({ summary: 'Delete bibliography by ID (soft delete)' })
   @ApiParam({
     name: 'id',
     description: 'Bibliography ID',
     example: '507f1f77bcf86cd799439013',
+  })
+  @ApiQuery({
+    name: 'school_id',
+    required: false,
+    type: String,
+    description: 'School ID (required for super admin, optional for other roles)',
+    example: '507f1f77bcf86cd799439011',
   })
   @ApiResponse({
     status: 200,
@@ -226,12 +233,13 @@ export class BibliographyController {
   async deleteBibliography(
     @Param('id', ParseObjectIdPipe) id: string | Types.ObjectId,
     @User() user: JWTUserPayload,
+    @Query('school_id') school_id?: string,
   ) {
-    return this.bibliographyService.deleteBibliography(id, user);
+    return this.bibliographyService.deleteBibliography(id, user, school_id);
   }
 
   @Post('reorder')
-  @Roles(RoleEnum.PROFESSOR, RoleEnum.SCHOOL_ADMIN)
+  @Roles(RoleEnum.SUPER_ADMIN, RoleEnum.PROFESSOR, RoleEnum.SCHOOL_ADMIN)
   @ApiOperation({ summary: 'Reorder bibliography items' })
   @ApiResponse({
     status: 200,

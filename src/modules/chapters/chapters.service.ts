@@ -45,18 +45,46 @@ export class ChaptersService {
     private readonly tenantConnectionService: TenantConnectionService,
   ) {}
 
+  /**
+   * Helper method to resolve school_id based on user role
+   * For SUPER_ADMIN: school_id must be provided in the request body
+   * For other roles: use school_id from user context
+   */
+  private resolveSchoolId(
+    user: JWTUserPayload,
+    bodySchoolId?: string | Types.ObjectId,
+  ): string {
+    if (user.role.name === RoleEnum.SUPER_ADMIN) {
+      if (!bodySchoolId) {
+        throw new BadRequestException(
+          'School ID is required in request body for super admin',
+        );
+      }
+      return bodySchoolId.toString();
+    } else {
+      // For other roles, use school_id from user context
+      if (!user.school_id) {
+        throw new BadRequestException('User school ID not found');
+      }
+      return user.school_id.toString();
+    }
+  }
+
   async createChapter(
     createChapterDto: CreateChapterDto,
     user: JWTUserPayload,
   ) {
-    const { module_id, title, subject, description } = createChapterDto;
+    const { school_id, module_id, title, subject, description } = createChapterDto;
 
     this.logger.log(
       `Creating chapter: ${title} for module: ${module_id} by user: ${user.id}`,
     );
 
+    // Resolve school_id based on user role
+    const resolvedSchoolId = this.resolveSchoolId(user, school_id);
+
     // Validate school exists and user has access
-    const school = await this.schoolModel.findById(user.school_id);
+    const school = await this.schoolModel.findById(resolvedSchoolId);
     if (!school) {
       throw new NotFoundException('School not found');
     }
@@ -221,10 +249,15 @@ export class ChaptersService {
     updateChapterDto: UpdateChapterDto,
     user: JWTUserPayload,
   ) {
+    const { school_id, ...chapterUpdateData } = updateChapterDto;
+    
     this.logger.log(`Updating chapter: ${id} by user: ${user.id}`);
 
+    // Resolve school_id based on user role
+    const resolvedSchoolId = this.resolveSchoolId(user, school_id);
+
     // Validate school exists
-    const school = await this.schoolModel.findById(user.school_id);
+    const school = await this.schoolModel.findById(resolvedSchoolId);
     if (!school) {
       throw new NotFoundException('School not found');
     }
@@ -237,7 +270,7 @@ export class ChaptersService {
     try {
       const updatedChapter = await ChapterModel.findOneAndUpdate(
         { _id: id, deleted_at: null },
-        { ...updateChapterDto, updated_at: new Date() },
+        { ...chapterUpdateData, updated_at: new Date() },
         { new: true },
       ).lean();
 
@@ -267,11 +300,14 @@ export class ChaptersService {
     }
   }
 
-  async removeChapter(id: string | Types.ObjectId, user: JWTUserPayload) {
+  async removeChapter(id: string | Types.ObjectId, user: JWTUserPayload, school_id?: string) {
     this.logger.log(`Removing chapter: ${id} by user: ${user.id}`);
 
+    // Resolve school_id based on user role
+    const resolvedSchoolId = this.resolveSchoolId(user, school_id);
+
     // Validate school exists
-    const school = await this.schoolModel.findById(user.school_id);
+    const school = await this.schoolModel.findById(resolvedSchoolId);
     if (!school) {
       throw new NotFoundException('School not found');
     }
@@ -309,7 +345,7 @@ export class ChaptersService {
     reorderChaptersDto: ReorderChaptersDto,
     user: JWTUserPayload,
   ) {
-    const { chapters } = reorderChaptersDto;
+    const { school_id, chapters } = reorderChaptersDto;
 
     if (!chapters || !Array.isArray(chapters) || chapters.length === 0) {
       throw new BadRequestException(
@@ -319,8 +355,11 @@ export class ChaptersService {
 
     this.logger.log(`Reordering chapters by user: ${user.id}`);
 
+    // Resolve school_id based on user role
+    const resolvedSchoolId = this.resolveSchoolId(user, school_id);
+
     // Validate school exists
-    const school = await this.schoolModel.findById(user.school_id);
+    const school = await this.schoolModel.findById(resolvedSchoolId);
     if (!school) {
       throw new NotFoundException('School not found');
     }

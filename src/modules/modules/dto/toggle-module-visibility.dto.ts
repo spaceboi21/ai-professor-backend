@@ -1,9 +1,18 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsMongoId, IsNotEmpty, IsEnum } from 'class-validator';
+import { IsMongoId, IsNotEmpty, IsEnum, IsOptional } from 'class-validator';
 import { Types } from 'mongoose';
 import { ModuleVisibilityActionEnum } from 'src/common/constants/module.constant';
 
 export class ToggleModuleVisibilityDto {
+  @IsOptional()
+  @IsMongoId({ message: 'School ID must be a valid MongoDB ObjectId' })
+  @ApiProperty({
+    example: '507f1f77bcf86cd799439011',
+    description: 'School ID (required for super admin, optional for other roles)',
+    required: false,
+  })
+  school_id?: string | Types.ObjectId;
+
   @IsMongoId({ message: 'Module ID must be a valid MongoDB ObjectId' })
   @IsNotEmpty({ message: 'Module ID is required' })
   @ApiProperty({

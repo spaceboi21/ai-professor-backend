@@ -44,7 +44,7 @@ export class ChaptersController {
   constructor(private readonly chaptersService: ChaptersService) {}
 
   @Post()
-  @Roles(RoleEnum.PROFESSOR, RoleEnum.SCHOOL_ADMIN)
+  @Roles(RoleEnum.SUPER_ADMIN, RoleEnum.PROFESSOR, RoleEnum.SCHOOL_ADMIN)
   @ApiOperation({ summary: 'Create a new chapter' })
   @ApiResponse({
     status: 201,
@@ -119,7 +119,7 @@ export class ChaptersController {
   }
 
   @Patch(':id')
-  @Roles(RoleEnum.PROFESSOR, RoleEnum.SCHOOL_ADMIN)
+  @Roles(RoleEnum.SUPER_ADMIN, RoleEnum.PROFESSOR, RoleEnum.SCHOOL_ADMIN)
   @ApiOperation({ summary: 'Update a chapter' })
   @ApiParam({
     name: 'id',
@@ -142,12 +142,19 @@ export class ChaptersController {
   }
 
   @Delete(':id')
-  @Roles(RoleEnum.PROFESSOR, RoleEnum.SCHOOL_ADMIN)
+  @Roles(RoleEnum.SUPER_ADMIN, RoleEnum.PROFESSOR, RoleEnum.SCHOOL_ADMIN)
   @ApiOperation({ summary: 'Delete a chapter' })
   @ApiParam({
     name: 'id',
     type: String,
     description: 'Chapter ID',
+    example: '507f1f77bcf86cd799439011',
+  })
+  @ApiQuery({
+    name: 'school_id',
+    required: false,
+    type: String,
+    description: 'School ID (required for super admin, optional for other roles)',
     example: '507f1f77bcf86cd799439011',
   })
   @ApiResponse({
@@ -158,12 +165,13 @@ export class ChaptersController {
   async removeChapter(
     @Param('id', ParseObjectIdPipe) id: string,
     @User() user: JWTUserPayload,
+    @Query('school_id') school_id?: string,
   ) {
-    return this.chaptersService.removeChapter(id, user);
+    return this.chaptersService.removeChapter(id, user, school_id);
   }
 
   @Post('reorder')
-  @Roles(RoleEnum.PROFESSOR, RoleEnum.SCHOOL_ADMIN)
+  @Roles(RoleEnum.SUPER_ADMIN, RoleEnum.PROFESSOR, RoleEnum.SCHOOL_ADMIN)
   @ApiOperation({ summary: 'Reorder chapters' })
   @ApiResponse({
     status: 200,

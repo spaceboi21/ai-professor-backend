@@ -194,12 +194,20 @@ export class ModulesController {
     description: 'Module ID',
     example: '507f1f77bcf86cd799439011',
   })
+  @ApiQuery({
+    name: 'school_id',
+    required: false,
+    type: String,
+    description: 'School ID (required for super admin, optional for other roles)',
+    example: '507f1f77bcf86cd799439011',
+  })
   @ApiResponse({ status: 200, description: 'Module deleted successfully' })
   @ApiResponse({ status: 404, description: 'Module not found' })
   async removeModule(
     @Param('id', ParseObjectIdPipe) id: Types.ObjectId,
     @User() user: JWTUserPayload,
+    @Query('school_id') school_id?: string,
   ) {
-    return this.modulesService.removeModule(id, user);
+    return this.modulesService.removeModule(id, user, school_id);
   }
 }

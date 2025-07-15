@@ -50,11 +50,37 @@ export class BibliographyService {
     private readonly tenantConnectionService: TenantConnectionService,
   ) {}
 
+  /**
+   * Helper method to resolve school_id based on user role
+   * For SUPER_ADMIN: school_id must be provided in the request body
+   * For other roles: use school_id from user context
+   */
+  private resolveSchoolId(
+    user: JWTUserPayload,
+    bodySchoolId?: string | Types.ObjectId,
+  ): string {
+    if (user.role.name === RoleEnum.SUPER_ADMIN) {
+      if (!bodySchoolId) {
+        throw new BadRequestException(
+          'School ID is required in request body for super admin',
+        );
+      }
+      return bodySchoolId.toString();
+    } else {
+      // For other roles, use school_id from user context
+      if (!user.school_id) {
+        throw new BadRequestException('User school ID not found');
+      }
+      return user.school_id.toString();
+    }
+  }
+
   async createBibliography(
     createBibliographyDto: CreateBibliographyDto,
     user: JWTUserPayload,
   ) {
     const {
+      school_id,
       module_id,
       chapter_id,
       title,
@@ -68,8 +94,11 @@ export class BibliographyService {
 
     this.logger.log(`Creating bibliography: ${title} by user: ${user.id}`);
 
+    // Resolve school_id based on user role
+    const resolvedSchoolId = this.resolveSchoolId(user, school_id);
+
     // Validate school exists and user has access
-    const school = await this.schoolModel.findById(user.school_id);
+    const school = await this.schoolModel.findById(resolvedSchoolId);
     if (!school) {
       throw new NotFoundException('School not found');
     }
@@ -389,10 +418,15 @@ export class BibliographyService {
     updateBibliographyDto: UpdateBibliographyDto,
     user: JWTUserPayload,
   ) {
+    const { school_id, ...bibliographyUpdateData } = updateBibliographyDto;
+    
     this.logger.log(`Updating bibliography: ${id} by user: ${user.id}`);
 
+    // Resolve school_id based on user role
+    const resolvedSchoolId = this.resolveSchoolId(user, school_id);
+
     // Validate school exists
-    const school = await this.schoolModel.findById(user.school_id);
+    const school = await this.schoolModel.findById(resolvedSchoolId);
     if (!school) {
       throw new NotFoundException('School not found');
     }
@@ -448,12 +482,12 @@ export class BibliographyService {
         id,
         {
           $set: {
-            ...updateBibliographyDto,
-            ...(updateBibliographyDto.module_id && {
-              module_id: new Types.ObjectId(updateBibliographyDto.module_id),
+            ...bibliographyUpdateData,
+            ...(bibliographyUpdateData.module_id && {
+              module_id: new Types.ObjectId(bibliographyUpdateData.module_id),
             }),
-            ...(updateBibliographyDto.chapter_id && {
-              chapter_id: new Types.ObjectId(updateBibliographyDto.chapter_id),
+            ...(bibliographyUpdateData.chapter_id && {
+              chapter_id: new Types.ObjectId(bibliographyUpdateData.chapter_id),
             }),
           },
         },
@@ -498,11 +532,14 @@ export class BibliographyService {
     }
   }
 
-  async deleteBibliography(id: string | Types.ObjectId, user: JWTUserPayload) {
+  async deleteBibliography(id: string | Types.ObjectId, user: JWTUserPayload, school_id?: string) {
     this.logger.log(`Deleting bibliography: ${id} by user: ${user.id}`);
 
+    // Resolve school_id based on user role
+    const resolvedSchoolId = this.resolveSchoolId(user, school_id);
+
     // Validate school exists
-    const school = await this.schoolModel.findById(user.school_id);
+    const school = await this.schoolModel.findById(resolvedSchoolId);
     if (!school) {
       throw new NotFoundException('School not found');
     }
@@ -562,7 +599,7 @@ export class BibliographyService {
     reorderBibliographyItemsDto: ReorderBibliographyItemsDto,
     user: JWTUserPayload,
   ) {
-    const { bibliography_items } = reorderBibliographyItemsDto;
+    const { school_id, bibliography_items } = reorderBibliographyItemsDto;
 
     if (
       !bibliography_items ||
@@ -576,8 +613,11 @@ export class BibliographyService {
 
     this.logger.log(`Reordering bibliography items by user: ${user.id}`);
 
+    // Resolve school_id based on user role
+    const resolvedSchoolId = this.resolveSchoolId(user, school_id);
+
     // Validate school exists
-    const school = await this.schoolModel.findById(user.school_id);
+    const school = await this.schoolModel.findById(resolvedSchoolId);
     if (!school) {
       throw new NotFoundException('School not found');
     }
