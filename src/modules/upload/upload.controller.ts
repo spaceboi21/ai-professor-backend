@@ -332,7 +332,7 @@ export class UploadController {
       // Write the file
       writeFileSync(filePath, buffer);
 
-      const fileUrl = `${process.env.BACKEND_URL}/uploads/profile-pics/${id}`;
+      const fileUrl = `${this.configService.get('BACKEND_API_URL')}/uploads/profile-pics/${id}`;
 
       res.status(201).json({
         fileUrl,
@@ -420,7 +420,7 @@ export class UploadController {
       // Write the file
       writeFileSync(filePath, buffer);
 
-      const fileUrl = `${process.env.BACKEND_URL}/uploads/bibliography/${id}`;
+      const fileUrl = `${this.configService.get('BACKEND_API_URL')}/uploads/bibliography/${id}`;
 
       res.status(201).json({
         fileUrl,
@@ -497,7 +497,7 @@ export class UploadController {
       // Write the file
       writeFileSync(filePath, buffer);
 
-      const fileUrl = `${process.env.BACKEND_URL}/uploads/thumbnails/${id}`;
+      const fileUrl = `${this.configService.get('BACKEND_API_URL')}/uploads/thumbnails/${id}`;
 
       res.status(201).json({
         fileUrl,

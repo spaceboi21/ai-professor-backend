@@ -4,6 +4,7 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { randomUUID } from 'crypto';
 import { UploadFolders } from 'src/common/types/upload-folders.type';
+import { Readable } from 'stream';
 
 @Injectable()
 export class UploadService {
@@ -86,7 +87,7 @@ export class UploadService {
 
   // New method to process file buffer with proper error handling
   async processFileBuffer(
-    stream: NodeJS.ReadableStream,
+    stream: Readable,
     filePath: string,
     maxSize: number = 100 * 1024 * 1024, // 100MB default
   ): Promise<{ buffer: Buffer; size: number }> {
