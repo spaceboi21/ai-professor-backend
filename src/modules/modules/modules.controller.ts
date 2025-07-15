@@ -122,9 +122,9 @@ export class ModulesController {
   @ApiQuery({
     name: 'sortBy',
     required: false,
-    enum: ['title', 'difficulty', 'created_at', 'duration'],
-    description: 'Sort by field',
-    example: 'title',
+    enum: ['title', 'difficulty', 'duration', 'created_at', 'progress_status'],
+    description: 'Sort by field. progress_status is only available for students (ASC: IN_PROGRESS → NOT_STARTED → COMPLETED, DESC: COMPLETED → NOT_STARTED → IN_PROGRESS)',
+    example: 'progress_status',
   })
   @ApiQuery({
     name: 'sortOrder',

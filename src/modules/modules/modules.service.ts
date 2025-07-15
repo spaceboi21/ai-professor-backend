@@ -41,6 +41,11 @@ import {
   createPaginationResult,
 } from 'src/common/utils/pagination.util';
 import { DifficultyEnum } from 'src/common/constants/difficulty.constant';
+import { 
+  StudentModuleProgress, 
+  StudentModuleProgressSchema, 
+  ProgressStatusEnum 
+} from 'src/database/schemas/tenant/student-module-progress.schema';
 import {
   ModuleVisibilityActionEnum,
   MODULE_CONSTANTS,
@@ -194,6 +199,30 @@ export class ModulesService {
         });
       }
 
+      // Stage 2.5: Add progress information for students (always include for students)
+      if (user.role.name === RoleEnum.STUDENT) {
+        // Left join with student progress to get progress status
+        pipeline.push({
+          $lookup: {
+            from: 'student_module_progress',
+            let: { moduleId: '$_id' },
+            pipeline: [
+              {
+                $match: {
+                  $expr: {
+                    $and: [
+                      { $eq: ['$module_id', '$$moduleId'] },
+                      { $eq: ['$student_id', new Types.ObjectId(user.id)] }
+                    ]
+                  }
+                }
+              }
+            ],
+            as: 'progress'
+          }
+        });
+      }
+
       // Stage 3: Add text search for title and description
       if (filterDto?.text) {
         pipeline.push({
@@ -226,30 +255,58 @@ export class ModulesService {
       }
 
       // Stage 5: Add computed fields for better sorting
-      pipeline.push({
-        $addFields: {
-          title_lower: { $toLower: '$title' },
-          difficulty_order: {
-            $switch: {
-              branches: [
-                {
-                  case: { $eq: ['$difficulty', DifficultyEnum.BEGINNER] },
-                  then: 1,
-                },
-                {
-                  case: { $eq: ['$difficulty', DifficultyEnum.INTERMEDIATE] },
-                  then: 2,
-                },
-                {
-                  case: { $eq: ['$difficulty', DifficultyEnum.ADVANCED] },
-                  then: 3,
-                },
-              ],
-              default: 0,
-            },
+      const addFieldsStage: any = {
+        title_lower: { $toLower: '$title' },
+        difficulty_order: {
+          $switch: {
+            branches: [
+              {
+                case: { $eq: ['$difficulty', DifficultyEnum.BEGINNER] },
+                then: 1,
+              },
+              {
+                case: { $eq: ['$difficulty', DifficultyEnum.INTERMEDIATE] },
+                then: 2,
+              },
+              {
+                case: { $eq: ['$difficulty', DifficultyEnum.ADVANCED] },
+                then: 3,
+              },
+            ],
+            default: 0,
           },
         },
-      });
+      };
+
+      // Add progress status ordering for students
+      if (user.role.name === RoleEnum.STUDENT) {
+        addFieldsStage.progress_status_order = {
+          $switch: {
+            branches: [
+              {
+                case: {
+                  $or: [
+                    { $eq: [{ $size: '$progress' }, 0] }, // No progress record exists
+                    { $eq: [{ $arrayElemAt: ['$progress.status', 0] }, ProgressStatusEnum.NOT_STARTED] }
+                  ]
+                },
+                then: 2, // NOT_STARTED gets middle priority
+              },
+              {
+                case: { $eq: [{ $arrayElemAt: ['$progress.status', 0] }, ProgressStatusEnum.IN_PROGRESS] },
+                then: 1, // IN_PROGRESS gets highest priority for ASC
+              },
+              {
+                case: { $eq: [{ $arrayElemAt: ['$progress.status', 0] }, ProgressStatusEnum.COMPLETED] },
+                then: 3, // COMPLETED gets lowest priority for ASC
+              },
+            ],
+            default: 2, // Default to NOT_STARTED priority
+          },
+        };
+      }
+
+      pipeline.push({ $addFields: addFieldsStage });
 
       // Stage 6: Sort
       let sortStage: any = { created_at: -1 }; // default sort
@@ -270,6 +327,14 @@ export class ModulesService {
           case 'created_at':
             sortStage = { created_at: sortOrder };
             break;
+          case 'progress_status':
+            // Only allow progress status sorting for students
+            if (user.role.name === RoleEnum.STUDENT) {
+              sortStage = { progress_status_order: sortOrder };
+            } else {
+              sortStage = { created_at: -1 }; // fallback for non-students
+            }
+            break;
           default:
             sortStage = { created_at: -1 };
         }
@@ -289,25 +354,45 @@ export class ModulesService {
       );
 
       // Stage 9: Project final fields
-      pipeline.push({
-        $project: {
-          _id: 1,
-          title: 1,
-          subject: 1,
-          description: 1,
-          category: 1,
-          duration: 1,
-          difficulty: 1,
-          tags: 1,
-          thumbnail: 1,
-          published: 1,
-          published_at: 1,
-          created_by: 1,
-          created_by_role: 1,
-          created_at: 1,
-          updated_at: 1,
-        },
-      });
+      const projectFields: any = {
+        _id: 1,
+        title: 1,
+        subject: 1,
+        description: 1,
+        category: 1,
+        duration: 1,
+        difficulty: 1,
+        tags: 1,
+        thumbnail: 1,
+        published: 1,
+        published_at: 1,
+        created_by: 1,
+        created_by_role: 1,
+        created_at: 1,
+        updated_at: 1,
+      };
+
+      // Add progress information for students (always include for students)
+      if (user.role.name === RoleEnum.STUDENT) {
+        projectFields.progress = {
+          $cond: {
+            if: { $gt: [{ $size: '$progress' }, 0] },
+            then: { $arrayElemAt: ['$progress', 0] },
+            else: {
+              status: ProgressStatusEnum.NOT_STARTED,
+              progress_percentage: 0,
+              chapters_completed: 0,
+              total_chapters: 0,
+              module_quiz_completed: false,
+              started_at: null,
+              completed_at: null,
+              last_accessed_at: null
+            }
+          }
+        };
+      }
+
+      pipeline.push({ $project: projectFields });
 
       // Execute aggregation
       const modules = await ModuleModel.aggregate(pipeline);

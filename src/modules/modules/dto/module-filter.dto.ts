@@ -7,6 +7,7 @@ export enum ModuleSortBy {
   DIFFICULTY = 'difficulty',
   CREATED_AT = 'created_at',
   DURATION = 'duration',
+  PROGRESS_STATUS = 'progress_status',
 }
 
 export enum SortOrder {
