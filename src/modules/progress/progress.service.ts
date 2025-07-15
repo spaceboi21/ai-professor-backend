@@ -12,8 +12,8 @@ import { School } from 'src/database/schemas/central/school.schema';
 import {
   StudentModuleProgress,
   StudentModuleProgressSchema,
-  ProgressStatusEnum,
 } from 'src/database/schemas/tenant/student-module-progress.schema';
+import { ProgressStatusEnum } from 'src/common/constants/status.constant';
 import {
   StudentChapterProgress,
   StudentChapterProgressSchema,
@@ -21,8 +21,8 @@ import {
 import {
   StudentQuizAttempt,
   StudentQuizAttemptSchema,
-  AttemptStatusEnum,
 } from 'src/database/schemas/tenant/student-quiz-attempt.schema';
+import { AttemptStatusEnum } from 'src/common/constants/status.constant';
 import {
   Student,
   StudentSchema,
@@ -39,10 +39,7 @@ import {
   QuizGroup,
   QuizGroupSchema,
 } from 'src/database/schemas/tenant/quiz-group.schema';
-import {
-  Quiz,
-  QuizSchema,
-} from 'src/database/schemas/tenant/quiz.schema';
+import { Quiz, QuizSchema } from 'src/database/schemas/tenant/quiz.schema';
 import { TenantConnectionService } from 'src/database/tenant-connection.service';
 import { JWTUserPayload } from 'src/common/types/jwr-user.type';
 import { RoleEnum } from 'src/common/constants/roles.constant';
@@ -51,7 +48,10 @@ import { StartModuleDto } from './dto/start-module.dto';
 import { StartChapterDto } from './dto/start-chapter.dto';
 import { StartQuizAttemptDto } from './dto/start-quiz-attempt.dto';
 import { SubmitQuizAnswersDto } from './dto/submit-quiz-answers.dto';
-import { ProgressFilterDto, QuizAttemptFilterDto } from './dto/progress-filter.dto';
+import {
+  ProgressFilterDto,
+  QuizAttemptFilterDto,
+} from './dto/progress-filter.dto';
 import { PaginationDto } from 'src/common/dto/pagination.dto';
 import {
   getPaginationOptions,
@@ -88,7 +88,8 @@ export class ProgressService {
       throw new NotFoundException('School not found');
     }
 
-    const tenantConnection = await this.tenantConnectionService.getTenantConnection(school.db_name);
+    const tenantConnection =
+      await this.tenantConnectionService.getTenantConnection(school.db_name);
     const StudentModel = tenantConnection.model(Student.name, StudentSchema);
     const ModuleModel = tenantConnection.model(Module.name, ModuleSchema);
     const ChapterModel = tenantConnection.model(Chapter.name, ChapterSchema);
@@ -149,7 +150,9 @@ export class ProgressService {
         await progress.save();
       }
 
-      this.logger.log(`Module progress updated for student ${user.id}, module ${module_id}`);
+      this.logger.log(
+        `Module progress updated for student ${user.id}, module ${module_id}`,
+      );
 
       return {
         message: 'Module started successfully',
@@ -165,7 +168,10 @@ export class ProgressService {
       };
     } catch (error) {
       this.logger.error('Error starting module', error?.stack || error);
-      if (error instanceof NotFoundException || error instanceof ForbiddenException) {
+      if (
+        error instanceof NotFoundException ||
+        error instanceof ForbiddenException
+      ) {
         throw error;
       }
       throw new BadRequestException('Failed to start module');
@@ -190,7 +196,8 @@ export class ProgressService {
       throw new NotFoundException('School not found');
     }
 
-    const tenantConnection = await this.tenantConnectionService.getTenantConnection(school.db_name);
+    const tenantConnection =
+      await this.tenantConnectionService.getTenantConnection(school.db_name);
     const StudentModel = tenantConnection.model(Student.name, StudentSchema);
     const ChapterModel = tenantConnection.model(Chapter.name, ChapterSchema);
     const StudentChapterProgressModel = tenantConnection.model(
@@ -248,7 +255,9 @@ export class ProgressService {
         await progress.save();
       }
 
-      this.logger.log(`Chapter progress updated for student ${user.id}, chapter ${chapter_id}`);
+      this.logger.log(
+        `Chapter progress updated for student ${user.id}, chapter ${chapter_id}`,
+      );
 
       return {
         message: 'Chapter started successfully',
@@ -263,7 +272,10 @@ export class ProgressService {
       };
     } catch (error) {
       this.logger.error('Error starting chapter', error?.stack || error);
-      if (error instanceof NotFoundException || error instanceof ForbiddenException) {
+      if (
+        error instanceof NotFoundException ||
+        error instanceof ForbiddenException
+      ) {
         throw error;
       }
       throw new BadRequestException('Failed to start chapter');
@@ -272,10 +284,15 @@ export class ProgressService {
 
   // ========== QUIZ ATTEMPT OPERATIONS ==========
 
-  async startQuizAttempt(startQuizAttemptDto: StartQuizAttemptDto, user: JWTUserPayload) {
+  async startQuizAttempt(
+    startQuizAttemptDto: StartQuizAttemptDto,
+    user: JWTUserPayload,
+  ) {
     const { quiz_group_id } = startQuizAttemptDto;
 
-    this.logger.log(`Student ${user.id} starting quiz attempt for quiz group ${quiz_group_id}`);
+    this.logger.log(
+      `Student ${user.id} starting quiz attempt for quiz group ${quiz_group_id}`,
+    );
 
     // Validate user is a student
     if (user.role.name !== RoleEnum.STUDENT) {
@@ -288,9 +305,13 @@ export class ProgressService {
       throw new NotFoundException('School not found');
     }
 
-    const tenantConnection = await this.tenantConnectionService.getTenantConnection(school.db_name);
+    const tenantConnection =
+      await this.tenantConnectionService.getTenantConnection(school.db_name);
     const StudentModel = tenantConnection.model(Student.name, StudentSchema);
-    const QuizGroupModel = tenantConnection.model(QuizGroup.name, QuizGroupSchema);
+    const QuizGroupModel = tenantConnection.model(
+      QuizGroup.name,
+      QuizGroupSchema,
+    );
     const QuizModel = tenantConnection.model(Quiz.name, QuizSchema);
     const StudentQuizAttemptModel = tenantConnection.model(
       StudentQuizAttempt.name,
@@ -350,7 +371,9 @@ export class ProgressService {
         quiz_group_id: new Types.ObjectId(quiz_group_id),
       }).sort({ attempt_number: -1 });
 
-      const nextAttemptNumber = lastAttempt ? lastAttempt.attempt_number + 1 : 1;
+      const nextAttemptNumber = lastAttempt
+        ? lastAttempt.attempt_number + 1
+        : 1;
 
       // Create new quiz attempt
       const newAttempt = new StudentQuizAttemptModel({
@@ -366,7 +389,9 @@ export class ProgressService {
 
       await newAttempt.save();
 
-      this.logger.log(`Quiz attempt created for student ${user.id}, quiz group ${quiz_group_id}`);
+      this.logger.log(
+        `Quiz attempt created for student ${user.id}, quiz group ${quiz_group_id}`,
+      );
 
       return {
         message: 'Quiz attempt started successfully',
@@ -381,17 +406,26 @@ export class ProgressService {
       };
     } catch (error) {
       this.logger.error('Error starting quiz attempt', error?.stack || error);
-      if (error instanceof NotFoundException || error instanceof ForbiddenException) {
+      if (
+        error instanceof NotFoundException ||
+        error instanceof ForbiddenException
+      ) {
         throw error;
       }
       throw new BadRequestException('Failed to start quiz attempt');
     }
   }
 
-  async submitQuizAnswers(submitQuizAnswersDto: SubmitQuizAnswersDto, user: JWTUserPayload) {
-    const { quiz_group_id, answers, total_time_taken_minutes } = submitQuizAnswersDto;
+  async submitQuizAnswers(
+    submitQuizAnswersDto: SubmitQuizAnswersDto,
+    user: JWTUserPayload,
+  ) {
+    const { quiz_group_id, answers, total_time_taken_minutes } =
+      submitQuizAnswersDto;
 
-    this.logger.log(`Student ${user.id} submitting quiz answers for quiz group ${quiz_group_id}`);
+    this.logger.log(
+      `Student ${user.id} submitting quiz answers for quiz group ${quiz_group_id}`,
+    );
 
     // Validate user is a student
     if (user.role.name !== RoleEnum.STUDENT) {
@@ -404,9 +438,13 @@ export class ProgressService {
       throw new NotFoundException('School not found');
     }
 
-    const tenantConnection = await this.tenantConnectionService.getTenantConnection(school.db_name);
+    const tenantConnection =
+      await this.tenantConnectionService.getTenantConnection(school.db_name);
     const QuizModel = tenantConnection.model(Quiz.name, QuizSchema);
-    const QuizGroupModel = tenantConnection.model(QuizGroup.name, QuizGroupSchema);
+    const QuizGroupModel = tenantConnection.model(
+      QuizGroup.name,
+      QuizGroupSchema,
+    );
     const StudentQuizAttemptModel = tenantConnection.model(
       StudentQuizAttempt.name,
       StudentQuizAttemptSchema,
@@ -446,13 +484,20 @@ export class ProgressService {
       }> = [];
 
       for (const answer of answers) {
-        const quiz = quizzes.find(q => q._id.toString() === answer.quiz_id.toString());
+        const quiz = quizzes.find(
+          (q) => q._id.toString() === answer.quiz_id.toString(),
+        );
         if (!quiz) {
-          throw new BadRequestException(`Quiz ${answer.quiz_id} not found in this group`);
+          throw new BadRequestException(
+            `Quiz ${answer.quiz_id} not found in this group`,
+          );
         }
 
         // Check if answer is correct
-        const isCorrect = this.areAnswersEqual(answer.selected_answers, quiz.answer);
+        const isCorrect = this.areAnswersEqual(
+          answer.selected_answers,
+          quiz.answer,
+        );
         if (isCorrect) {
           correctAnswers++;
         }
@@ -465,7 +510,10 @@ export class ProgressService {
         });
       }
 
-      const scorePercentage = quizzes.length > 0 ? Math.round((correctAnswers / quizzes.length) * 100) : 0;
+      const scorePercentage =
+        quizzes.length > 0
+          ? Math.round((correctAnswers / quizzes.length) * 100)
+          : 0;
       const isPassed = scorePercentage >= attempt.passing_threshold;
 
       // Update attempt
@@ -485,7 +533,9 @@ export class ProgressService {
         await this.updateProgressOnQuizCompletion(attempt, tenantConnection);
       }
 
-      this.logger.log(`Quiz attempt completed for student ${user.id}, score: ${scorePercentage}%`);
+      this.logger.log(
+        `Quiz attempt completed for student ${user.id}, score: ${scorePercentage}%`,
+      );
 
       return {
         message: 'Quiz answers submitted successfully',
@@ -502,7 +552,10 @@ export class ProgressService {
       };
     } catch (error) {
       this.logger.error('Error submitting quiz answers', error?.stack || error);
-      if (error instanceof NotFoundException || error instanceof ForbiddenException) {
+      if (
+        error instanceof NotFoundException ||
+        error instanceof ForbiddenException
+      ) {
         throw error;
       }
       throw new BadRequestException('Failed to submit quiz answers');
@@ -511,7 +564,11 @@ export class ProgressService {
 
   // ========== VALIDATION METHODS ==========
 
-  private async validateChapterAccess(studentId: string | Types.ObjectId, chapter: any, tenantConnection: any) {
+  private async validateChapterAccess(
+    studentId: string | Types.ObjectId,
+    chapter: any,
+    tenantConnection: any,
+  ) {
     // If this is the first chapter (sequence 1), allow access
     if (chapter.sequence === 1) {
       return true;
@@ -550,7 +607,11 @@ export class ProgressService {
     return true;
   }
 
-  private async validateQuizAccess(studentId: string | Types.ObjectId, quizGroup: any, tenantConnection: any) {
+  private async validateQuizAccess(
+    studentId: string | Types.ObjectId,
+    quizGroup: any,
+    tenantConnection: any,
+  ) {
     // If this is a module-level quiz, check if all chapters are completed
     if (quizGroup.type === QuizTypeEnum.MODULE) {
       const StudentChapterProgressModel = tenantConnection.model(
@@ -566,11 +627,12 @@ export class ProgressService {
       });
 
       // Get completed chapters count
-      const completedChapters = await StudentChapterProgressModel.countDocuments({
-        student_id: new Types.ObjectId(studentId),
-        module_id: quizGroup.module_id,
-        chapter_quiz_completed: true,
-      });
+      const completedChapters =
+        await StudentChapterProgressModel.countDocuments({
+          student_id: new Types.ObjectId(studentId),
+          module_id: quizGroup.module_id,
+          chapter_quiz_completed: true,
+        });
 
       if (completedChapters < totalChapters) {
         throw new ForbiddenException(
@@ -593,20 +655,35 @@ export class ProgressService {
 
   // ========== PROGRESS UPDATE METHODS ==========
 
-  private async updateProgressOnQuizCompletion(attempt: any, tenantConnection: any) {
-    const QuizGroupModel = tenantConnection.model(QuizGroup.name, QuizGroupSchema);
+  private async updateProgressOnQuizCompletion(
+    attempt: any,
+    tenantConnection: any,
+  ) {
+    const QuizGroupModel = tenantConnection.model(
+      QuizGroup.name,
+      QuizGroupSchema,
+    );
     const quizGroup = await QuizGroupModel.findById(attempt.quiz_group_id);
 
     if (!quizGroup) return;
 
     if (quizGroup.type === QuizTypeEnum.CHAPTER && attempt.chapter_id) {
-      await this.updateChapterProgressOnQuizCompletion(attempt, tenantConnection);
+      await this.updateChapterProgressOnQuizCompletion(
+        attempt,
+        tenantConnection,
+      );
     } else if (quizGroup.type === QuizTypeEnum.MODULE && attempt.module_id) {
-      await this.updateModuleProgressOnQuizCompletion(attempt, tenantConnection);
+      await this.updateModuleProgressOnQuizCompletion(
+        attempt,
+        tenantConnection,
+      );
     }
   }
 
-  private async updateChapterProgressOnQuizCompletion(attempt: any, tenantConnection: any) {
+  private async updateChapterProgressOnQuizCompletion(
+    attempt: any,
+    tenantConnection: any,
+  ) {
     const StudentChapterProgressModel = tenantConnection.model(
       StudentChapterProgress.name,
       StudentChapterProgressSchema,
@@ -628,10 +705,17 @@ export class ProgressService {
     );
 
     // Update module progress
-    await this.recalculateModuleProgress(attempt.student_id, attempt.module_id, tenantConnection);
+    await this.recalculateModuleProgress(
+      attempt.student_id,
+      attempt.module_id,
+      tenantConnection,
+    );
   }
 
-  private async updateModuleProgressOnQuizCompletion(attempt: any, tenantConnection: any) {
+  private async updateModuleProgressOnQuizCompletion(
+    attempt: any,
+    tenantConnection: any,
+  ) {
     const StudentModuleProgressModel = tenantConnection.model(
       StudentModuleProgress.name,
       StudentModuleProgressSchema,
@@ -650,10 +734,18 @@ export class ProgressService {
     );
 
     // Recalculate overall module progress
-    await this.recalculateModuleProgress(attempt.student_id, attempt.module_id, tenantConnection);
+    await this.recalculateModuleProgress(
+      attempt.student_id,
+      attempt.module_id,
+      tenantConnection,
+    );
   }
 
-  private async recalculateModuleProgress(studentId: Types.ObjectId, moduleId: Types.ObjectId, tenantConnection: any) {
+  private async recalculateModuleProgress(
+    studentId: Types.ObjectId,
+    moduleId: Types.ObjectId,
+    tenantConnection: any,
+  ) {
     const StudentModuleProgressModel = tenantConnection.model(
       StudentModuleProgress.name,
       StudentModuleProgressSchema,
@@ -720,7 +812,9 @@ export class ProgressService {
     const sortedSelected = [...selected].sort();
     const sortedCorrect = [...correct].sort();
 
-    return sortedSelected.every((answer, index) => answer === sortedCorrect[index]);
+    return sortedSelected.every(
+      (answer, index) => answer === sortedCorrect[index],
+    );
   }
 
   // ========== PROGRESS RETRIEVAL METHODS ==========
@@ -743,7 +837,8 @@ export class ProgressService {
       throw new NotFoundException('School not found');
     }
 
-    const tenantConnection = await this.tenantConnectionService.getTenantConnection(school.db_name);
+    const tenantConnection =
+      await this.tenantConnectionService.getTenantConnection(school.db_name);
     const StudentModuleProgressModel = tenantConnection.model(
       StudentModuleProgress.name,
       StudentModuleProgressSchema,
@@ -817,7 +912,8 @@ export class ProgressService {
       throw new NotFoundException('School not found');
     }
 
-    const tenantConnection = await this.tenantConnectionService.getTenantConnection(school.db_name);
+    const tenantConnection =
+      await this.tenantConnectionService.getTenantConnection(school.db_name);
     const StudentChapterProgressModel = tenantConnection.model(
       StudentChapterProgress.name,
       StudentChapterProgressSchema,
@@ -873,7 +969,10 @@ export class ProgressService {
         pagination_data: result.pagination_data,
       };
     } catch (error) {
-      this.logger.error('Error getting chapter progress', error?.stack || error);
+      this.logger.error(
+        'Error getting chapter progress',
+        error?.stack || error,
+      );
       throw new BadRequestException('Failed to retrieve chapter progress');
     }
   }
@@ -887,7 +986,9 @@ export class ProgressService {
 
     // Validate user is a student
     if (user.role.name !== RoleEnum.STUDENT) {
-      throw new ForbiddenException('Only students can view their own quiz attempts');
+      throw new ForbiddenException(
+        'Only students can view their own quiz attempts',
+      );
     }
 
     // Get school and tenant connection
@@ -896,7 +997,8 @@ export class ProgressService {
       throw new NotFoundException('School not found');
     }
 
-    const tenantConnection = await this.tenantConnectionService.getTenantConnection(school.db_name);
+    const tenantConnection =
+      await this.tenantConnectionService.getTenantConnection(school.db_name);
     const StudentQuizAttemptModel = tenantConnection.model(
       StudentQuizAttempt.name,
       StudentQuizAttemptSchema,
@@ -978,7 +1080,8 @@ export class ProgressService {
       throw new NotFoundException('School not found');
     }
 
-    const tenantConnection = await this.tenantConnectionService.getTenantConnection(school.db_name);
+    const tenantConnection =
+      await this.tenantConnectionService.getTenantConnection(school.db_name);
     const StudentModuleProgressModel = tenantConnection.model(
       StudentModuleProgress.name,
       StudentModuleProgressSchema,
@@ -1030,10 +1133,16 @@ export class ProgressService {
       ]);
 
       // Calculate average progress
-      const moduleProgresses = await StudentModuleProgressModel.find({ student_id: studentId }).lean();
-      const averageProgress = moduleProgresses.length > 0
-        ? moduleProgresses.reduce((sum, progress) => sum + progress.progress_percentage, 0) / moduleProgresses.length
-        : 0;
+      const moduleProgresses = await StudentModuleProgressModel.find({
+        student_id: studentId,
+      }).lean();
+      const averageProgress =
+        moduleProgresses.length > 0
+          ? moduleProgresses.reduce(
+              (sum, progress) => sum + progress.progress_percentage,
+              0,
+            ) / moduleProgresses.length
+          : 0;
 
       return {
         message: 'Dashboard data retrieved successfully',
@@ -1050,17 +1159,24 @@ export class ProgressService {
         },
       };
     } catch (error) {
-      this.logger.error('Error getting student dashboard', error?.stack || error);
+      this.logger.error(
+        'Error getting student dashboard',
+        error?.stack || error,
+      );
       throw new BadRequestException('Failed to retrieve dashboard data');
     }
   }
 
   async getSchoolAdminDashboard(user: JWTUserPayload, moduleId?: string) {
-    this.logger.log(`Getting admin dashboard data for school ${user.school_id}`);
+    this.logger.log(
+      `Getting admin dashboard data for school ${user.school_id}`,
+    );
 
     // Validate user is school admin or professor
     if (![RoleEnum.SCHOOL_ADMIN, RoleEnum.PROFESSOR].includes(user.role.name)) {
-      throw new ForbiddenException('Only school admins and professors can view school dashboard');
+      throw new ForbiddenException(
+        'Only school admins and professors can view school dashboard',
+      );
     }
 
     // Get school and tenant connection
@@ -1069,7 +1185,8 @@ export class ProgressService {
       throw new NotFoundException('School not found');
     }
 
-    const tenantConnection = await this.tenantConnectionService.getTenantConnection(school.db_name);
+    const tenantConnection =
+      await this.tenantConnectionService.getTenantConnection(school.db_name);
     const StudentModel = tenantConnection.model(Student.name, StudentSchema);
     const StudentModuleProgressModel = tenantConnection.model(
       StudentModuleProgress.name,
@@ -1101,7 +1218,9 @@ export class ProgressService {
           .populate('module_id', 'title subject')
           .sort({ last_accessed_at: -1 })
           .lean(),
-        StudentQuizAttemptModel.find(moduleId ? { module_id: new Types.ObjectId(moduleId) } : {})
+        StudentQuizAttemptModel.find(
+          moduleId ? { module_id: new Types.ObjectId(moduleId) } : {},
+        )
           .populate('student_id', 'first_name last_name email')
           .populate('quiz_group_id', 'subject type')
           .sort({ started_at: -1 })
@@ -1118,11 +1237,20 @@ export class ProgressService {
       };
 
       if (moduleProgresses.length > 0) {
-        progressStats.not_started = moduleProgresses.filter(p => p.status === ProgressStatusEnum.NOT_STARTED).length;
-        progressStats.in_progress = moduleProgresses.filter(p => p.status === ProgressStatusEnum.IN_PROGRESS).length;
-        progressStats.completed = moduleProgresses.filter(p => p.status === ProgressStatusEnum.COMPLETED).length;
+        progressStats.not_started = moduleProgresses.filter(
+          (p) => p.status === ProgressStatusEnum.NOT_STARTED,
+        ).length;
+        progressStats.in_progress = moduleProgresses.filter(
+          (p) => p.status === ProgressStatusEnum.IN_PROGRESS,
+        ).length;
+        progressStats.completed = moduleProgresses.filter(
+          (p) => p.status === ProgressStatusEnum.COMPLETED,
+        ).length;
         progressStats.average_progress = Math.round(
-          moduleProgresses.reduce((sum, progress) => sum + progress.progress_percentage, 0) / moduleProgresses.length
+          moduleProgresses.reduce(
+            (sum, progress) => sum + progress.progress_percentage,
+            0,
+          ) / moduleProgresses.length,
         );
       }
 
@@ -1143,4 +1271,4 @@ export class ProgressService {
       throw new BadRequestException('Failed to retrieve admin dashboard data');
     }
   }
-} 
+}

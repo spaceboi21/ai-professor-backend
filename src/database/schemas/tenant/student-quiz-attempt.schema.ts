@@ -5,13 +5,7 @@ import { Module } from './module.schema';
 import { Chapter } from './chapter.schema';
 import { QuizGroup } from './quiz-group.schema';
 import { Quiz } from './quiz.schema';
-
-export enum AttemptStatusEnum {
-  IN_PROGRESS = 'IN_PROGRESS',
-  COMPLETED = 'COMPLETED',
-  TIMEOUT = 'TIMEOUT',
-  ABANDONED = 'ABANDONED',
-}
+import { AttemptStatusEnum } from 'src/common/constants/status.constant';
 
 @Schema({
   timestamps: {
@@ -23,10 +17,20 @@ export enum AttemptStatusEnum {
 export class StudentQuizAttempt extends Document {
   declare _id: Types.ObjectId;
 
-  @Prop({ type: Types.ObjectId, ref: Student.name, required: true, index: true })
+  @Prop({
+    type: Types.ObjectId,
+    ref: Student.name,
+    required: true,
+    index: true,
+  })
   student_id: Types.ObjectId;
 
-  @Prop({ type: Types.ObjectId, ref: QuizGroup.name, required: true, index: true })
+  @Prop({
+    type: Types.ObjectId,
+    ref: QuizGroup.name,
+    required: true,
+    index: true,
+  })
   quiz_group_id: Types.ObjectId;
 
   @Prop({ type: Types.ObjectId, ref: Module.name, index: true })
@@ -35,7 +39,11 @@ export class StudentQuizAttempt extends Document {
   @Prop({ type: Types.ObjectId, ref: Chapter.name, index: true })
   chapter_id: Types.ObjectId;
 
-  @Prop({ enum: AttemptStatusEnum, default: AttemptStatusEnum.IN_PROGRESS, index: true })
+  @Prop({
+    enum: AttemptStatusEnum,
+    default: AttemptStatusEnum.IN_PROGRESS,
+    index: true,
+  })
   status: AttemptStatusEnum;
 
   @Prop({ type: Date, default: Date.now })
@@ -67,13 +75,15 @@ export class StudentQuizAttempt extends Document {
 
   // Store individual question answers
   @Prop({
-    type: [{
-      quiz_id: { type: Types.ObjectId, ref: Quiz.name, required: true },
-      selected_answers: [String],
-      is_correct: Boolean,
-      time_spent_seconds: Number,
-    }],
-    default: []
+    type: [
+      {
+        quiz_id: { type: Types.ObjectId, ref: Quiz.name, required: true },
+        selected_answers: [String],
+        is_correct: Boolean,
+        time_spent_seconds: Number,
+      },
+    ],
+    default: [],
   })
   answers: Array<{
     quiz_id: Types.ObjectId;
@@ -86,11 +96,15 @@ export class StudentQuizAttempt extends Document {
   readonly updated_at?: Date;
 }
 
-export const StudentQuizAttemptSchema = SchemaFactory.createForClass(StudentQuizAttempt);
+export const StudentQuizAttemptSchema =
+  SchemaFactory.createForClass(StudentQuizAttempt);
 
 // Create compound indexes for better query performance
 StudentQuizAttemptSchema.index({ student_id: 1, quiz_group_id: 1 });
-StudentQuizAttemptSchema.index({ student_id: 1, quiz_group_id: 1, attempt_number: 1 }, { unique: true });
+StudentQuizAttemptSchema.index(
+  { student_id: 1, quiz_group_id: 1, attempt_number: 1 },
+  { unique: true },
+);
 StudentQuizAttemptSchema.index({ student_id: 1, module_id: 1 });
 StudentQuizAttemptSchema.index({ student_id: 1, chapter_id: 1 });
 StudentQuizAttemptSchema.index({ student_id: 1, status: 1 });
@@ -98,4 +112,4 @@ StudentQuizAttemptSchema.index({ quiz_group_id: 1, status: 1 });
 StudentQuizAttemptSchema.index({ score_percentage: 1 });
 StudentQuizAttemptSchema.index({ is_passed: 1 });
 StudentQuizAttemptSchema.index({ started_at: 1 });
-StudentQuizAttemptSchema.index({ completed_at: 1 }); 
+StudentQuizAttemptSchema.index({ completed_at: 1 });

@@ -3,7 +3,7 @@ import { Document, Types } from 'mongoose';
 import { Student } from './student.schema';
 import { Module } from './module.schema';
 import { Chapter } from './chapter.schema';
-import { ProgressStatusEnum } from './student-module-progress.schema';
+import { ProgressStatusEnum } from 'src/common/constants/status.constant';
 
 @Schema({
   timestamps: {
@@ -15,16 +15,30 @@ import { ProgressStatusEnum } from './student-module-progress.schema';
 export class StudentChapterProgress extends Document {
   declare _id: Types.ObjectId;
 
-  @Prop({ type: Types.ObjectId, ref: Student.name, required: true, index: true })
+  @Prop({
+    type: Types.ObjectId,
+    ref: Student.name,
+    required: true,
+    index: true,
+  })
   student_id: Types.ObjectId;
 
   @Prop({ type: Types.ObjectId, ref: Module.name, required: true, index: true })
   module_id: Types.ObjectId;
 
-  @Prop({ type: Types.ObjectId, ref: Chapter.name, required: true, index: true })
+  @Prop({
+    type: Types.ObjectId,
+    ref: Chapter.name,
+    required: true,
+    index: true,
+  })
   chapter_id: Types.ObjectId;
 
-  @Prop({ enum: ProgressStatusEnum, default: ProgressStatusEnum.NOT_STARTED, index: true })
+  @Prop({
+    enum: ProgressStatusEnum,
+    default: ProgressStatusEnum.NOT_STARTED,
+    index: true,
+  })
   status: ProgressStatusEnum;
 
   @Prop({ type: Date })
@@ -49,14 +63,23 @@ export class StudentChapterProgress extends Document {
   readonly updated_at?: Date;
 }
 
-export const StudentChapterProgressSchema = SchemaFactory.createForClass(StudentChapterProgress);
+export const StudentChapterProgressSchema = SchemaFactory.createForClass(
+  StudentChapterProgress,
+);
 
 // Create compound indexes for better query performance
-StudentChapterProgressSchema.index({ student_id: 1, chapter_id: 1 }, { unique: true });
+StudentChapterProgressSchema.index(
+  { student_id: 1, chapter_id: 1 },
+  { unique: true },
+);
 StudentChapterProgressSchema.index({ student_id: 1, module_id: 1 });
-StudentChapterProgressSchema.index({ student_id: 1, module_id: 1, chapter_sequence: 1 });
+StudentChapterProgressSchema.index({
+  student_id: 1,
+  module_id: 1,
+  chapter_sequence: 1,
+});
 StudentChapterProgressSchema.index({ student_id: 1, status: 1 });
 StudentChapterProgressSchema.index({ chapter_id: 1, status: 1 });
 StudentChapterProgressSchema.index({ module_id: 1, status: 1 });
 StudentChapterProgressSchema.index({ chapter_quiz_completed: 1 });
-StudentChapterProgressSchema.index({ last_accessed_at: 1 }); 
+StudentChapterProgressSchema.index({ last_accessed_at: 1 });

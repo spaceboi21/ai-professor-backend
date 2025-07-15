@@ -2,12 +2,7 @@ import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, Types } from 'mongoose';
 import { Student } from './student.schema';
 import { Module } from './module.schema';
-
-export enum ProgressStatusEnum {
-  NOT_STARTED = 'NOT_STARTED',
-  IN_PROGRESS = 'IN_PROGRESS',
-  COMPLETED = 'COMPLETED',
-}
+import { ProgressStatusEnum } from 'src/common/constants/status.constant';
 
 @Schema({
   timestamps: {
@@ -19,13 +14,22 @@ export enum ProgressStatusEnum {
 export class StudentModuleProgress extends Document {
   declare _id: Types.ObjectId;
 
-  @Prop({ type: Types.ObjectId, ref: Student.name, required: true, index: true })
+  @Prop({
+    type: Types.ObjectId,
+    ref: Student.name,
+    required: true,
+    index: true,
+  })
   student_id: Types.ObjectId;
 
   @Prop({ type: Types.ObjectId, ref: Module.name, required: true, index: true })
   module_id: Types.ObjectId;
 
-  @Prop({ enum: ProgressStatusEnum, default: ProgressStatusEnum.NOT_STARTED, index: true })
+  @Prop({
+    enum: ProgressStatusEnum,
+    default: ProgressStatusEnum.NOT_STARTED,
+    index: true,
+  })
   status: ProgressStatusEnum;
 
   @Prop({ type: Date })
@@ -53,11 +57,16 @@ export class StudentModuleProgress extends Document {
   readonly updated_at?: Date;
 }
 
-export const StudentModuleProgressSchema = SchemaFactory.createForClass(StudentModuleProgress);
+export const StudentModuleProgressSchema = SchemaFactory.createForClass(
+  StudentModuleProgress,
+);
 
 // Create compound indexes for better query performance
-StudentModuleProgressSchema.index({ student_id: 1, module_id: 1 }, { unique: true });
+StudentModuleProgressSchema.index(
+  { student_id: 1, module_id: 1 },
+  { unique: true },
+);
 StudentModuleProgressSchema.index({ student_id: 1, status: 1 });
 StudentModuleProgressSchema.index({ module_id: 1, status: 1 });
 StudentModuleProgressSchema.index({ progress_percentage: 1 });
-StudentModuleProgressSchema.index({ last_accessed_at: 1 }); 
+StudentModuleProgressSchema.index({ last_accessed_at: 1 });

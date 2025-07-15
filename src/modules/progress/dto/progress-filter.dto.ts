@@ -1,8 +1,16 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsOptional, IsEnum, IsMongoId, IsDateString } from 'class-validator';
+import {
+  IsOptional,
+  IsString,
+  IsEnum,
+  IsMongoId,
+  IsDateString,
+} from 'class-validator';
+import {
+  ProgressStatusEnum,
+  AttemptStatusEnum,
+} from 'src/common/constants/status.constant';
 import { Types } from 'mongoose';
-import { ProgressStatusEnum } from 'src/database/schemas/tenant/student-module-progress.schema';
-import { AttemptStatusEnum } from 'src/database/schemas/tenant/student-quiz-attempt.schema';
 
 export class ProgressFilterDto {
   @IsOptional()
@@ -105,4 +113,4 @@ export class QuizAttemptFilterDto {
     required: false,
   })
   to_date?: string;
-} 
+}

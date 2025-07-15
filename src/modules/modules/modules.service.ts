@@ -44,8 +44,8 @@ import { DifficultyEnum } from 'src/common/constants/difficulty.constant';
 import {
   StudentModuleProgress,
   StudentModuleProgressSchema,
-  ProgressStatusEnum,
 } from 'src/database/schemas/tenant/student-module-progress.schema';
+import { ProgressStatusEnum } from 'src/common/constants/status.constant';
 import {
   ModuleVisibilityActionEnum,
   MODULE_CONSTANTS,
@@ -223,7 +223,10 @@ export class ModulesService {
         });
 
         // Stage 2.6: Add progress status filter for students (right after progress lookup)
-        if (filterDto?.progress_status) {
+        if (
+          filterDto?.progress_status &&
+          filterDto.progress_status !== ProgressStatusEnum.ALL
+        ) {
           let matchCondition: any;
 
           if (filterDto.progress_status === ProgressStatusEnum.NOT_STARTED) {
