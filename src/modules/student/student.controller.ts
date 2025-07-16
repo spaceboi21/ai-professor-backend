@@ -8,12 +8,14 @@ import {
   Query,
   Param,
   Patch,
+  Delete,
   UseInterceptors,
   UploadedFile,
   BadRequestException,
 } from '@nestjs/common';
 import { StudentService } from './student.service';
 import { CreateStudentDto } from './dto/create-student.dto';
+import { UpdateStudentDto } from './dto/update-student.dto';
 import { JwtAuthGuard } from 'src/common/guards/jwt.guard';
 import { RoleGuard } from 'src/common/guards/roles.guard';
 import { Roles } from 'src/common/decorators/roles.decorator';
@@ -141,12 +143,19 @@ export class StudentController {
   }
 
   @Get()
-  @Roles(RoleEnum.SCHOOL_ADMIN)
-  @ApiOperation({ summary: 'Get all students (School Admin only)' })
+  @Roles(RoleEnum.SUPER_ADMIN, RoleEnum.SCHOOL_ADMIN)
+  @ApiOperation({ summary: 'Get all students' })
   @ApiQuery({ name: 'page', required: false, type: Number })
   @ApiQuery({ name: 'limit', required: false, type: Number })
   @ApiQuery({ name: 'search', required: false, type: String })
   @ApiQuery({ name: 'status', required: false, enum: StatusEnum })
+  @ApiQuery({
+    name: 'school_id',
+    required: false,
+    type: String,
+    description:
+      'School ID (required for SUPER_ADMIN, optional for SCHOOL_ADMIN)',
+  })
   @ApiResponse({
     status: 200,
     description: 'Students retrieved successfully',
@@ -157,23 +166,32 @@ export class StudentController {
     @User() user: JWTUserPayload,
     @Query('search') search?: string,
     @Query('status') status?: StatusEnum,
+    @Query('school_id', ParseObjectIdPipe) school_id?: Types.ObjectId,
   ) {
     return this.studentService.getAllStudents(
       paginationDto,
       user,
       search,
       status,
+      school_id,
     );
   }
 
   @Get(':id')
-  @Roles(RoleEnum.SCHOOL_ADMIN)
-  @ApiOperation({ summary: 'Get student by ID (School Admin only)' })
+  @Roles(RoleEnum.SUPER_ADMIN, RoleEnum.SCHOOL_ADMIN)
+  @ApiOperation({ summary: 'Get student by ID' })
   @ApiParam({
     name: 'id',
     type: String,
     description: 'Student ID',
     example: '507f1f77bcf86cd799439011',
+  })
+  @ApiQuery({
+    name: 'school_id',
+    required: false,
+    type: String,
+    description:
+      'School ID (required for SUPER_ADMIN, optional for SCHOOL_ADMIN)',
   })
   @ApiResponse({
     status: 200,
@@ -184,13 +202,82 @@ export class StudentController {
   async getStudentById(
     @Param('id', ParseObjectIdPipe) id: Types.ObjectId,
     @User() user: JWTUserPayload,
+    @Query('school_id', ParseObjectIdPipe) school_id?: Types.ObjectId,
   ) {
-    return this.studentService.getStudentById(id, user);
+    return this.studentService.getStudentById(id, user, school_id);
+  }
+
+  @Patch(':id')
+  @Roles(RoleEnum.SUPER_ADMIN, RoleEnum.SCHOOL_ADMIN)
+  @ApiOperation({ summary: 'Update student details' })
+  @ApiParam({
+    name: 'id',
+    type: String,
+    description: 'Student ID',
+    example: '507f1f77bcf86cd799439011',
+  })
+  @ApiBody({ type: UpdateStudentDto })
+  @ApiQuery({
+    name: 'school_id',
+    required: false,
+    type: String,
+    description:
+      'School ID (required for SUPER_ADMIN, optional for SCHOOL_ADMIN)',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Student updated successfully',
+    type: StudentResponseDto,
+  })
+  @ApiResponse({ status: 404, description: 'Student not found' })
+  @ApiResponse({ status: 409, description: 'Email already exists' })
+  async updateStudent(
+    @Param('id', ParseObjectIdPipe) id: Types.ObjectId,
+    @Body() updateStudentDto: UpdateStudentDto,
+    @User() user: JWTUserPayload,
+    @Query('school_id', ParseObjectIdPipe) school_id?: Types.ObjectId,
+  ) {
+    return this.studentService.updateStudent(
+      id,
+      updateStudentDto,
+      user,
+      school_id,
+    );
+  }
+
+  @Delete(':id')
+  @Roles(RoleEnum.SUPER_ADMIN, RoleEnum.SCHOOL_ADMIN)
+  @ApiOperation({ summary: 'Delete student (soft delete)' })
+  @ApiParam({
+    name: 'id',
+    type: String,
+    description: 'Student ID',
+    example: '507f1f77bcf86cd799439011',
+  })
+  @ApiQuery({
+    name: 'school_id',
+    required: false,
+    type: String,
+    description:
+      'School ID (required for SUPER_ADMIN, optional for SCHOOL_ADMIN)',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Student deleted successfully',
+    type: StudentResponseDto,
+  })
+  @ApiResponse({ status: 404, description: 'Student not found' })
+  async deleteStudent(
+    @Param('id', ParseObjectIdPipe) id: Types.ObjectId,
+    @User() user: JWTUserPayload,
+    @Query('school_id', ParseObjectIdPipe) school_id?: Types.ObjectId,
+  ) {
+    return this.studentService.deleteStudent(id, user, school_id);
   }
 
   @Patch(':id/status')
-  @Roles(RoleEnum.SCHOOL_ADMIN)
-  @ApiOperation({ summary: 'Update student status (School Admin only)' })
+  @Roles(RoleEnum.SUPER_ADMIN, RoleEnum.SCHOOL_ADMIN)
+  @ApiOperation({ summary: 'Update student status' })
   @ApiParam({
     name: 'id',
     type: String,
@@ -198,6 +285,13 @@ export class StudentController {
     example: '507f1f77bcf86cd799439011',
   })
   @ApiBody({ type: UpdateStatusDto })
+  @ApiQuery({
+    name: 'school_id',
+    required: false,
+    type: String,
+    description:
+      'School ID (required for SUPER_ADMIN, optional for SCHOOL_ADMIN)',
+  })
   @ApiResponse({
     status: 200,
     description: 'Student status updated successfully',
@@ -208,11 +302,13 @@ export class StudentController {
     @Param('id', ParseObjectIdPipe) id: Types.ObjectId,
     @Body() updateStatusDto: UpdateStatusDto,
     @User() user: JWTUserPayload,
+    @Query('school_id', ParseObjectIdPipe) school_id?: Types.ObjectId,
   ) {
     return this.studentService.updateStudentStatus(
       id,
       updateStatusDto.status,
       user,
+      school_id,
     );
   }
 }

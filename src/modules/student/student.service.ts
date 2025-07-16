@@ -19,6 +19,7 @@ import { TenantConnectionService } from 'src/database/tenant-connection.service'
 import { MailService } from 'src/mail/mail.service';
 import { EmailUtil } from 'src/common/utils/email.util';
 import { CreateStudentDto } from './dto/create-student.dto';
+import { UpdateStudentDto } from './dto/update-student.dto';
 import { BulkCreateResult, StudentCsvRow } from './dto/bulk-create-student.dto';
 import { RoleEnum } from 'src/common/constants/roles.constant';
 import { JWTUserPayload } from 'src/common/types/jwr-user.type';
@@ -165,13 +166,38 @@ export class StudentService {
     user: JWTUserPayload,
     search?: string,
     status?: string,
+    school_id?: Types.ObjectId,
   ) {
     this.logger.log('Getting all students with filters');
 
     const { page, limit } = getPaginationOptions(paginationDto);
 
-    // Get school information for the authenticated school admin
-    const school = await this.schoolModel.findById(user.school_id);
+    // Determine school_id based on user role
+    let targetSchoolId: string;
+    let school: any;
+
+    if (user.role.name === RoleEnum.SCHOOL_ADMIN) {
+      // School admin can only access their own school
+      targetSchoolId = user.school_id as string;
+      if (!targetSchoolId) {
+        throw new BadRequestException('School admin must have a school_id');
+      }
+    } else if (user.role.name === RoleEnum.SUPER_ADMIN) {
+      // Super admin can specify school_id or use their default
+      targetSchoolId = school_id?.toString() || (user.school_id as string);
+      if (!targetSchoolId) {
+        throw new BadRequestException(
+          'Super admin must provide school_id parameter',
+        );
+      }
+    } else {
+      throw new BadRequestException('Unauthorized role for accessing students');
+    }
+
+    // Get school information
+    school = await this.schoolModel.findById(
+      new Types.ObjectId(targetSchoolId),
+    );
     if (!school) {
       throw new NotFoundException('School not found');
     }
@@ -184,7 +210,7 @@ export class StudentService {
     // Build filter query
     const filter: any = {
       deleted_at: null,
-      school_id: user?.school_id ? new Types.ObjectId(user.school_id) : null,
+      school_id: new Types.ObjectId(targetSchoolId),
     };
 
     if (search) {
@@ -220,11 +246,39 @@ export class StudentService {
     };
   }
 
-  async getStudentById(id: Types.ObjectId, user: JWTUserPayload) {
+  async getStudentById(
+    id: Types.ObjectId,
+    user: JWTUserPayload,
+    school_id?: Types.ObjectId,
+  ) {
     this.logger.log(`Getting student by ID: ${id}`);
 
-    // Get school information for the authenticated school admin
-    const school = await this.schoolModel.findById(user.school_id);
+    // Determine school_id based on user role
+    let targetSchoolId: string;
+    let school: any;
+
+    if (user.role.name === RoleEnum.SCHOOL_ADMIN) {
+      // School admin can only access their own school
+      targetSchoolId = user.school_id as string;
+      if (!targetSchoolId) {
+        throw new BadRequestException('School admin must have a school_id');
+      }
+    } else if (user.role.name === RoleEnum.SUPER_ADMIN) {
+      // Super admin can specify school_id or use their default
+      targetSchoolId = school_id?.toString() || (user.school_id as string);
+      if (!targetSchoolId) {
+        throw new BadRequestException(
+          'Super admin must provide school_id parameter',
+        );
+      }
+    } else {
+      throw new BadRequestException('Unauthorized role for accessing students');
+    }
+
+    // Get school information
+    school = await this.schoolModel.findById(
+      new Types.ObjectId(targetSchoolId),
+    );
     if (!school) {
       throw new NotFoundException('School not found');
     }
@@ -235,9 +289,9 @@ export class StudentService {
     const StudentModel = tenantConnection.model(Student.name, StudentSchema);
 
     const student = await StudentModel.findOne({
-      _id: id,
+      _id: new Types.ObjectId(id),
       deleted_at: null,
-      school_id: user?.school_id ? new Types.ObjectId(user.school_id) : null,
+      school_id: new Types.ObjectId(targetSchoolId),
     }).lean();
 
     if (!student) {
@@ -251,15 +305,293 @@ export class StudentService {
     };
   }
 
+  async updateStudent(
+    id: Types.ObjectId,
+    updateStudentDto: UpdateStudentDto,
+    user: JWTUserPayload,
+    school_id?: Types.ObjectId,
+  ) {
+    this.logger.log(`Updating student: ${id}`);
+
+    // Determine school_id based on user role
+    let targetSchoolId: string;
+    let school: any;
+
+    if (user.role.name === RoleEnum.SCHOOL_ADMIN) {
+      // School admin can only access their own school
+      targetSchoolId = user.school_id as string;
+      if (!targetSchoolId) {
+        throw new BadRequestException('School admin must have a school_id');
+      }
+    } else if (user.role.name === RoleEnum.SUPER_ADMIN) {
+      // Super admin can specify school_id or use their default
+      targetSchoolId = school_id?.toString() || (user.school_id as string);
+      if (!targetSchoolId) {
+        throw new BadRequestException(
+          'Super admin must provide school_id parameter',
+        );
+      }
+    } else {
+      throw new BadRequestException('Unauthorized role for updating students');
+    }
+
+    // Get school information
+    school = await this.schoolModel.findById(
+      new Types.ObjectId(targetSchoolId),
+    );
+    if (!school) {
+      throw new NotFoundException('School not found');
+    }
+
+    // Get tenant connection
+    const tenantConnection =
+      await this.tenantConnectionService.getTenantConnection(school.db_name);
+    const StudentModel = tenantConnection.model(Student.name, StudentSchema);
+
+    // Find the student
+    const student = await StudentModel.findOne({
+      _id: new Types.ObjectId(id),
+      deleted_at: null,
+      school_id: new Types.ObjectId(targetSchoolId),
+    }).select('+password');
+
+    if (!student) {
+      throw new NotFoundException('Student not found');
+    }
+
+    // Store original email for comparison
+    const originalEmail = student.email;
+    let shouldSendEmail = false;
+    let newPassword = '';
+
+    // If email is being updated, check for conflicts
+    if (updateStudentDto.email && updateStudentDto.email !== student.email) {
+      // Check if email already exists in central users
+      const existingUser = await this.userModel.findOne({
+        email: updateStudentDto.email,
+        _id: { $ne: new Types.ObjectId(id) },
+      });
+      if (existingUser) {
+        throw new ConflictException('Email already exists in the system');
+      }
+
+      // Check if email already exists in global students
+      const existingGlobalStudent = await this.globalStudentModel.findOne({
+        email: updateStudentDto.email,
+        student_id: { $ne: new Types.ObjectId(id) },
+      });
+      if (existingGlobalStudent) {
+        throw new ConflictException('Student with this email already exists');
+      }
+
+      // Check if email already exists in tenant database
+      const existingTenantStudent = await StudentModel.findOne({
+        email: updateStudentDto.email,
+        _id: { $ne: new Types.ObjectId(id) },
+      });
+      if (existingTenantStudent) {
+        throw new ConflictException('Email already exists in school database');
+      }
+
+      // Generate new password for email update
+      newPassword = this.bcryptUtil.generateStrongPassword();
+      const hashedPassword = await this.bcryptUtil.hashPassword(newPassword);
+      student.password = hashedPassword;
+      shouldSendEmail = true;
+    }
+
+    // Update fields if provided
+    if (updateStudentDto.first_name !== undefined) {
+      student.first_name = updateStudentDto.first_name;
+    }
+    if (updateStudentDto.last_name !== undefined) {
+      student.last_name = updateStudentDto.last_name;
+    }
+    if (updateStudentDto.email !== undefined) {
+      student.email = updateStudentDto.email;
+    }
+
+    // Save the updated student
+    try {
+      const updatedStudent = await student.save();
+
+      // Update global student entry if email was changed
+      if (updateStudentDto.email && updateStudentDto.email !== originalEmail) {
+        await this.globalStudentModel.updateOne(
+          { student_id: new Types.ObjectId(id) },
+          { email: updateStudentDto.email },
+        );
+      }
+
+      // Send email notification if email was updated
+      if (shouldSendEmail && updateStudentDto.email) {
+        await this.mailService.queueCredentialsEmail(
+          updateStudentDto.email,
+          `${updatedStudent.first_name}${updatedStudent.last_name ? ` ${updatedStudent.last_name}` : ''}`,
+          newPassword,
+          RoleEnum.STUDENT,
+        );
+
+        this.logger.log(
+          `Credentials email queued for updated email: ${updateStudentDto.email}`,
+        );
+      }
+
+      this.logger.log(`Student updated successfully: ${id}`);
+
+      return {
+        message: 'Student updated successfully',
+        data: {
+          id: updatedStudent._id,
+          first_name: updatedStudent.first_name,
+          last_name: updatedStudent.last_name,
+          email: updatedStudent.email,
+          student_code: updatedStudent.student_code,
+          school_id: updatedStudent.school_id,
+          status: updatedStudent.status,
+          updated_at: updatedStudent.updated_at,
+        },
+      };
+    } catch (error) {
+      this.logger.error('Error updating student', error?.stack || error);
+      if (error?.code === 11000) {
+        throw new ConflictException('Email already exists');
+      }
+      throw new BadRequestException('Failed to update student');
+    }
+  }
+
+  async deleteStudent(
+    id: Types.ObjectId,
+    user: JWTUserPayload,
+    school_id?: Types.ObjectId,
+  ) {
+    this.logger.log(`Deleting student: ${id}`);
+
+    // Determine school_id based on user role
+    let targetSchoolId: string;
+    let school: any;
+
+    if (user.role.name === RoleEnum.SCHOOL_ADMIN) {
+      // School admin can only access their own school
+      targetSchoolId = user.school_id as string;
+      if (!targetSchoolId) {
+        throw new BadRequestException('School admin must have a school_id');
+      }
+    } else if (user.role.name === RoleEnum.SUPER_ADMIN) {
+      // Super admin can specify school_id or use their default
+      targetSchoolId = school_id?.toString() || (user.school_id as string);
+      if (!targetSchoolId) {
+        throw new BadRequestException(
+          'Super admin must provide school_id parameter',
+        );
+      }
+    } else {
+      throw new BadRequestException('Unauthorized role for deleting students');
+    }
+
+    // Get school information
+    school = await this.schoolModel.findById(
+      new Types.ObjectId(targetSchoolId),
+    );
+    if (!school) {
+      throw new NotFoundException('School not found');
+    }
+
+    // Get tenant connection
+    const tenantConnection =
+      await this.tenantConnectionService.getTenantConnection(school.db_name);
+    const StudentModel = tenantConnection.model(Student.name, StudentSchema);
+
+    // Find the student
+    const student = await StudentModel.findOne({
+      _id: new Types.ObjectId(id),
+      deleted_at: null,
+      school_id: new Types.ObjectId(targetSchoolId),
+    });
+
+    if (!student) {
+      throw new NotFoundException('Student not found');
+    }
+
+    // Soft delete the student
+    try {
+      const deletedStudent = await StudentModel.findByIdAndUpdate(
+        id,
+        {
+          deleted_at: new Date(),
+          status: StatusEnum.INACTIVE,
+        },
+        { new: true },
+      );
+
+      if (!deletedStudent) {
+        throw new NotFoundException('Student not found or already deleted');
+      }
+
+      // Also soft delete from global students collection
+      await this.globalStudentModel.updateOne(
+        { student_id: new Types.ObjectId(id) },
+        { deleted_at: new Date() },
+      );
+
+      this.logger.log(`Student deleted successfully: ${id}`);
+
+      return {
+        message: 'Student deleted successfully',
+        data: {
+          id: deletedStudent._id,
+          email: deletedStudent.email,
+          first_name: deletedStudent.first_name,
+          last_name: deletedStudent.last_name,
+          deleted_at: deletedStudent.deleted_at,
+        },
+      };
+    } catch (error) {
+      this.logger.error('Error deleting student', error?.stack || error);
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
+      throw new BadRequestException('Failed to delete student');
+    }
+  }
+
   async updateStudentStatus(
     id: Types.ObjectId,
     status: StatusEnum,
     user: JWTUserPayload,
+    school_id?: Types.ObjectId,
   ) {
-    this.logger.log(`School admin updating student status: ${id} to ${status}`);
+    this.logger.log(`Updating student status: ${id} to ${status}`);
 
-    // Get school information for the authenticated school admin
-    const school = await this.schoolModel.findById(user.school_id);
+    // Determine school_id based on user role
+    let targetSchoolId: string;
+    let school: any;
+
+    if (user.role.name === RoleEnum.SCHOOL_ADMIN) {
+      // School admin can only access their own school
+      targetSchoolId = user.school_id as string;
+      if (!targetSchoolId) {
+        throw new BadRequestException('School admin must have a school_id');
+      }
+    } else if (user.role.name === RoleEnum.SUPER_ADMIN) {
+      // Super admin can specify school_id or use their default
+      targetSchoolId = school_id?.toString() || (user.school_id as string);
+      if (!targetSchoolId) {
+        throw new BadRequestException(
+          'Super admin must provide school_id parameter',
+        );
+      }
+    } else {
+      throw new BadRequestException(
+        'Unauthorized role for updating student status',
+      );
+    }
+
+    // Get school information
+    school = await this.schoolModel.findById(
+      new Types.ObjectId(targetSchoolId),
+    );
     if (!school) {
       throw new NotFoundException('School not found');
     }
@@ -270,19 +602,14 @@ export class StudentService {
     const StudentModel = tenantConnection.model(Student.name, StudentSchema);
 
     // Find and update student in tenant database
-    const student = await StudentModel.findById(id);
+    const student = await StudentModel.findOne({
+      _id: new Types.ObjectId(id),
+      deleted_at: null,
+      school_id: new Types.ObjectId(targetSchoolId),
+    });
+
     if (!student) {
       throw new NotFoundException('Student not found');
-    }
-
-    // Verify the student belongs to the same school as the admin
-    if (
-      !user.school_id ||
-      student.school_id.toString() !== user.school_id.toString()
-    ) {
-      throw new BadRequestException(
-        'You can only manage students from your school',
-      );
     }
 
     const updatedStudent = await StudentModel.findByIdAndUpdate(
