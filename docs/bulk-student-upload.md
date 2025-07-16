@@ -185,7 +185,6 @@ const response = await fetch('/api/students/bulk', {
 });
 
 const result = await response.json();
-console.log(result);
 ```
 
 ## Notes

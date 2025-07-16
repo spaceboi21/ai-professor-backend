@@ -4,7 +4,10 @@ import { User } from '../central/user.schema';
 import { Module } from './module.schema';
 import { Chapter } from './chapter.schema';
 import { DifficultyEnum } from 'src/common/constants/difficulty.constant';
-import { QuizCategoryEnum, QuizTypeEnum } from 'src/common/constants/quiz.constant';
+import {
+  QuizCategoryEnum,
+  QuizTypeEnum,
+} from 'src/common/constants/quiz.constant';
 import { RoleEnum } from 'src/common/constants/roles.constant';
 
 @Schema({
@@ -60,4 +63,7 @@ export const QuizGroupSchema = SchemaFactory.createForClass(QuizGroup);
 QuizGroupSchema.index({ module_id: 1, type: 1 });
 QuizGroupSchema.index({ chapter_id: 1, type: 1 });
 QuizGroupSchema.index({ category: 1 });
-QuizGroupSchema.index({ difficulty: 1 }); 
+QuizGroupSchema.index({ difficulty: 1 });
+
+// Additional indexes for aggregation optimization
+QuizGroupSchema.index({ chapter_id: 1, deleted_at: 1 });

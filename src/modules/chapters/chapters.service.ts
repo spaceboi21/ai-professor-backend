@@ -17,6 +17,20 @@ import {
   Chapter,
   ChapterSchema,
 } from 'src/database/schemas/tenant/chapter.schema';
+import {
+  Bibliography,
+  BibliographySchema,
+} from 'src/database/schemas/tenant/bibliography.schema';
+import {
+  QuizGroup,
+  QuizGroupSchema,
+} from 'src/database/schemas/tenant/quiz-group.schema';
+import {
+  StudentChapterProgress,
+  StudentChapterProgressSchema,
+} from 'src/database/schemas/tenant/student-chapter-progress.schema';
+import { BibliographyTypeEnum } from 'src/common/constants/bibliography-type.constant';
+import { ProgressStatusEnum } from 'src/common/constants/status.constant';
 import { TenantConnectionService } from 'src/database/tenant-connection.service';
 import { CreateChapterDto } from './dto/create-chapter.dto';
 import { UpdateChapterDto } from './dto/update-chapter.dto';
@@ -74,7 +88,8 @@ export class ChaptersService {
     createChapterDto: CreateChapterDto,
     user: JWTUserPayload,
   ) {
-    const { school_id, module_id, title, subject, description } = createChapterDto;
+    const { school_id, module_id, title, subject, description } =
+      createChapterDto;
 
     this.logger.log(
       `Creating chapter: ${title} for module: ${module_id} by user: ${user.id}`,
@@ -159,23 +174,180 @@ export class ChaptersService {
     const ChapterModel = tenantConnection.model(Chapter.name, ChapterSchema);
 
     try {
-      const query: any = { deleted_at: null };
-      if (module_id) {
-        query.module_id = module_id;
-      }
-
       // Get pagination options
       const paginationOptions = getPaginationOptions(paginationDto || {});
 
-      // Get total count for pagination
-      const total = await ChapterModel.countDocuments(query);
+      // Build aggregation pipeline
+      const pipeline: any[] = [
+        // Stage 1: Match chapters that are not deleted
+        { $match: { deleted_at: null } },
+      ];
 
-      // Get paginated chapters
-      const chapters = await ChapterModel.find(query)
-        .sort({ sequence: 1 })
-        .skip(paginationOptions.skip)
-        .limit(paginationOptions.limit)
-        .lean();
+      // Stage 2: Add module filter if provided
+      if (module_id) {
+        pipeline.push({
+          $match: { module_id: new Types.ObjectId(module_id.toString()) },
+        });
+      }
+
+      // Stage 3: Add content information for all users
+      // Lookup bibliography items
+      pipeline.push({
+        $lookup: {
+          from: 'bibliographies',
+          let: { chapterId: '$_id' },
+          pipeline: [
+            {
+              $match: {
+                $expr: {
+                  $and: [
+                    { $eq: ['$chapter_id', '$$chapterId'] },
+                    { $eq: ['$deleted_at', null] },
+                  ],
+                },
+              },
+            },
+          ],
+          as: 'bibliography',
+        },
+      });
+
+      // Lookup quiz groups
+      pipeline.push({
+        $lookup: {
+          from: 'quiz_group',
+          let: { chapterId: '$_id' },
+          pipeline: [
+            {
+              $match: {
+                $expr: {
+                  $and: [
+                    { $eq: ['$chapter_id', '$$chapterId'] },
+                    { $eq: ['$deleted_at', null] },
+                  ],
+                },
+              },
+            },
+          ],
+          as: 'quiz_groups',
+        },
+      });
+
+      // Stage 4: Add computed fields for all users
+      const addFieldsStage: any = {
+        // Check for video content
+        hasVideo: {
+          $gt: [
+            {
+              $size: {
+                $filter: {
+                  input: '$bibliography',
+                  cond: { $eq: ['$$this.type', BibliographyTypeEnum.VIDEO] },
+                },
+              },
+            },
+            0,
+          ],
+        },
+        // Check for PDF content
+        hasPdf: {
+          $gt: [
+            {
+              $size: {
+                $filter: {
+                  input: '$bibliography',
+                  cond: { $eq: ['$$this.type', BibliographyTypeEnum.PDF] },
+                },
+              },
+            },
+            0,
+          ],
+        },
+        // Check for quiz content
+        hasQuiz: { $gt: [{ $size: '$quiz_groups' }, 0] },
+        // Get bibliography count
+        bibliography_count: { $size: '$bibliography' },
+        // Get quiz count
+        quiz_count: { $size: '$quiz_groups' },
+      };
+
+      // Add student progress lookup and status field only for students
+      if (user.role.name === RoleEnum.STUDENT) {
+        // Lookup student progress
+        pipeline.push({
+          $lookup: {
+            from: 'student_chapter_progress',
+            let: { chapterId: '$_id' },
+            pipeline: [
+              {
+                $match: {
+                  $expr: {
+                    $and: [
+                      { $eq: ['$chapter_id', '$$chapterId'] },
+                      { $eq: ['$student_id', new Types.ObjectId(user.id)] },
+                    ],
+                  },
+                },
+              },
+            ],
+            as: 'progress',
+          },
+        });
+
+        // Add status field for students
+        addFieldsStage.status = {
+          $cond: {
+            if: { $gt: [{ $size: '$progress' }, 0] },
+            then: { $arrayElemAt: ['$progress.status', 0] },
+            else: ProgressStatusEnum.NOT_STARTED,
+          },
+        };
+      }
+
+      pipeline.push({ $addFields: addFieldsStage });
+
+      // Stage 5: Project final fields
+      const projectFields: any = {
+        _id: 1,
+        module_id: 1,
+        title: 1,
+        subject: 1,
+        description: 1,
+        sequence: 1,
+        created_by: 1,
+        created_by_role: 1,
+        created_at: 1,
+        updated_at: 1,
+        hasVideo: 1,
+        hasPdf: 1,
+        hasQuiz: 1,
+        bibliography_count: 1,
+        quiz_count: 1,
+      };
+
+      // Add status field only for students
+      if (user.role.name === RoleEnum.STUDENT) {
+        projectFields.status = 1;
+      }
+
+      pipeline.push({ $project: projectFields });
+
+      // Stage 6: Sort by sequence
+      pipeline.push({ $sort: { sequence: 1 } });
+
+      // Stage 7: Get total count for pagination
+      const countPipeline = [...pipeline, { $count: 'total' }];
+      const countResult = await ChapterModel.aggregate(countPipeline);
+      const total = countResult.length > 0 ? countResult[0].total : 0;
+
+      // Stage 8: Add pagination
+      pipeline.push(
+        { $skip: paginationOptions.skip },
+        { $limit: paginationOptions.limit },
+      );
+
+      // Execute aggregation
+      const chapters = await ChapterModel.aggregate(pipeline);
 
       // Attach user details to chapters
       const chaptersWithUsers = await attachUserDetails(
@@ -216,14 +388,169 @@ export class ChaptersService {
     const ChapterModel = tenantConnection.model(Chapter.name, ChapterSchema);
 
     try {
-      const chapter = await ChapterModel.findOne({
-        _id: id,
-        deleted_at: null,
-      }).lean();
+      // Build aggregation pipeline
+      const pipeline: any[] = [
+        // Stage 1: Match the specific chapter
+        {
+          $match: {
+            _id: new Types.ObjectId(id.toString()),
+            deleted_at: null,
+          },
+        },
+      ];
 
-      if (!chapter) {
+      // Stage 2: Add content information for all users
+      // Lookup bibliography items
+      pipeline.push({
+        $lookup: {
+          from: 'bibliographies',
+          let: { chapterId: '$_id' },
+          pipeline: [
+            {
+              $match: {
+                $expr: {
+                  $and: [
+                    { $eq: ['$chapter_id', '$$chapterId'] },
+                    { $eq: ['$deleted_at', null] },
+                  ],
+                },
+              },
+            },
+          ],
+          as: 'bibliography',
+        },
+      });
+
+      // Lookup quiz groups
+      pipeline.push({
+        $lookup: {
+          from: 'quiz_group',
+          let: { chapterId: '$_id' },
+          pipeline: [
+            {
+              $match: {
+                $expr: {
+                  $and: [
+                    { $eq: ['$chapter_id', '$$chapterId'] },
+                    { $eq: ['$deleted_at', null] },
+                  ],
+                },
+              },
+            },
+          ],
+          as: 'quiz_groups',
+        },
+      });
+
+      // Stage 3: Add computed fields for all users
+      const addFieldsStage: any = {
+        // Check for video content
+        hasVideo: {
+          $gt: [
+            {
+              $size: {
+                $filter: {
+                  input: '$bibliography',
+                  cond: {
+                    $eq: ['$$this.type', BibliographyTypeEnum.VIDEO],
+                  },
+                },
+              },
+            },
+            0,
+          ],
+        },
+        // Check for PDF content
+        hasPdf: {
+          $gt: [
+            {
+              $size: {
+                $filter: {
+                  input: '$bibliography',
+                  cond: { $eq: ['$$this.type', BibliographyTypeEnum.PDF] },
+                },
+              },
+            },
+            0,
+          ],
+        },
+        // Check for quiz content
+        hasQuiz: { $gt: [{ $size: '$quiz_groups' }, 0] },
+        // Get bibliography count
+        bibliography_count: { $size: '$bibliography' },
+        // Get quiz count
+        quiz_count: { $size: '$quiz_groups' },
+      };
+
+      // Add student progress lookup and status field only for students
+      if (user.role.name === RoleEnum.STUDENT) {
+        // Lookup student progress
+        pipeline.push({
+          $lookup: {
+            from: 'student_chapter_progress',
+            let: { chapterId: '$_id' },
+            pipeline: [
+              {
+                $match: {
+                  $expr: {
+                    $and: [
+                      { $eq: ['$chapter_id', '$$chapterId'] },
+                      { $eq: ['$student_id', new Types.ObjectId(user.id)] },
+                    ],
+                  },
+                },
+              },
+            ],
+            as: 'progress',
+          },
+        });
+
+        // Add status field for students
+        addFieldsStage.status = {
+          $cond: {
+            if: { $gt: [{ $size: '$progress' }, 0] },
+            then: { $arrayElemAt: ['$progress.status', 0] },
+            else: ProgressStatusEnum.NOT_STARTED,
+          },
+        };
+      }
+
+      pipeline.push({ $addFields: addFieldsStage });
+
+      // Stage 4: Project final fields
+      const projectFields: any = {
+        _id: 1,
+        module_id: 1,
+        title: 1,
+        subject: 1,
+        description: 1,
+        sequence: 1,
+        created_by: 1,
+        created_by_role: 1,
+        created_at: 1,
+        updated_at: 1,
+        hasVideo: 1,
+        hasPdf: 1,
+        hasQuiz: 1,
+        bibliography_count: 1,
+        quiz_count: 1,
+      };
+
+      // Add status field only for students
+      if (user.role.name === RoleEnum.STUDENT) {
+        projectFields.status = 1;
+      }
+
+      pipeline.push({ $project: projectFields });
+
+      // Execute aggregation
+      const chapters = await ChapterModel.aggregate(pipeline);
+
+      if (chapters.length === 0) {
         throw new NotFoundException('Chapter not found');
       }
+
+      const chapter = chapters[0];
 
       // Attach user details to chapter
       const chapterWithUser = await attachUserDetailsToEntity(
@@ -250,7 +577,7 @@ export class ChaptersService {
     user: JWTUserPayload,
   ) {
     const { school_id, ...chapterUpdateData } = updateChapterDto;
-    
+
     this.logger.log(`Updating chapter: ${id} by user: ${user.id}`);
 
     // Resolve school_id based on user role
@@ -300,7 +627,11 @@ export class ChaptersService {
     }
   }
 
-  async removeChapter(id: string | Types.ObjectId, user: JWTUserPayload, school_id?: string) {
+  async removeChapter(
+    id: string | Types.ObjectId,
+    user: JWTUserPayload,
+    school_id?: string,
+  ) {
     this.logger.log(`Removing chapter: ${id} by user: ${user.id}`);
 
     // Resolve school_id based on user role

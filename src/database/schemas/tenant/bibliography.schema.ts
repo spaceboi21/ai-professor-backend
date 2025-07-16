@@ -70,3 +70,7 @@ BibliographySchema.index(
   { chapter_id: 1, sequence: 1, deleted_at: 1 },
   { unique: true },
 );
+
+// Additional indexes for aggregation optimization
+BibliographySchema.index({ chapter_id: 1, deleted_at: 1 });
+BibliographySchema.index({ chapter_id: 1, type: 1, deleted_at: 1 });

@@ -83,3 +83,10 @@ StudentChapterProgressSchema.index({ chapter_id: 1, status: 1 });
 StudentChapterProgressSchema.index({ module_id: 1, status: 1 });
 StudentChapterProgressSchema.index({ chapter_quiz_completed: 1 });
 StudentChapterProgressSchema.index({ last_accessed_at: 1 });
+
+// Additional index for aggregation optimization
+StudentChapterProgressSchema.index({
+  student_id: 1,
+  chapter_id: 1,
+  deleted_at: 1,
+});

@@ -37,7 +37,6 @@ export async function attachUserDetails<T extends EntityWithUser>(
     .select('first_name last_name email')
     .lean();
 
-  console.log('users', users)
   // Create a map for quick lookup
   const userMap = users.reduce(
     (map, user) => {
