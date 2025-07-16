@@ -55,15 +55,38 @@ export class StudentService {
       `Creating student with email: ${email} for school: ${school_id}`,
     );
 
+    // Determine school_id based on user role
+    let targetSchoolId: string;
+
+    if (adminUser.role.name === RoleEnum.SCHOOL_ADMIN) {
+      // School admin can only access their own school
+      targetSchoolId = adminUser.school_id as string;
+      if (!targetSchoolId) {
+        throw new BadRequestException('School admin must have a school_id');
+      }
+    } else if (adminUser.role.name === RoleEnum.SUPER_ADMIN) {
+      // Super admin can specify school_id or use their default
+      targetSchoolId = school_id?.toString() || (adminUser.school_id as string);
+      if (!targetSchoolId) {
+        throw new BadRequestException(
+          'Super admin must provide school_id parameter',
+        );
+      }
+    } else {
+      throw new BadRequestException('Unauthorized role for accessing students');
+    }
+
     // Validate school exists and admin has access
-    const school = await this.schoolModel.findById(school_id);
+    const school = await this.schoolModel.findById(
+      new Types.ObjectId(targetSchoolId),
+    );
     if (!school) {
       throw new NotFoundException('School not found');
     }
 
     // If admin is SCHOOL_ADMIN, ensure they belong to this school
     if (adminUser.role.name === RoleEnum.SCHOOL_ADMIN) {
-      if (adminUser.school_id?.toString() !== school_id?.toString()) {
+      if (adminUser.school_id?.toString() !== targetSchoolId.toString()) {
         throw new BadRequestException(
           'You can only create students for your own school',
         );
@@ -76,12 +99,36 @@ export class StudentService {
       throw new ConflictException('Email already exists in the system');
     }
 
-    // Check if email already exists in global students
+    // Check if email exists in global students (including deleted ones)
     const existingGlobalStudent = await this.globalStudentModel.findOne({
       email,
     });
+
     if (existingGlobalStudent) {
-      throw new ConflictException('Student with this email already exists');
+      // Check if the student is deleted in the tenant database
+      const tenantConnection =
+        await this.tenantConnectionService.getTenantConnection(school.db_name);
+      const StudentModel = tenantConnection.model(Student.name, StudentSchema);
+
+      const deletedStudent = await StudentModel.findOne({
+        _id: existingGlobalStudent.student_id,
+        deleted_at: { $ne: null },
+      });
+
+      if (deletedStudent) {
+        // Remove the deleted student entries from both global and tenant databases
+        this.logger.log(`Removing deleted student entry for email: ${email}`);
+
+        await Promise.all([
+          this.globalStudentModel.deleteOne({ email }),
+          StudentModel.deleteOne({ _id: existingGlobalStudent.student_id }),
+        ]);
+
+        this.logger.log(`Deleted student entries removed for email: ${email}`);
+      } else {
+        // Student exists and is not deleted
+        throw new ConflictException('Student with this email already exists');
+      }
     }
 
     // Generate a random password
@@ -166,7 +213,7 @@ export class StudentService {
     user: JWTUserPayload,
     search?: string,
     status?: string,
-    school_id?: Types.ObjectId,
+    school_id?: string,
   ) {
     this.logger.log('Getting all students with filters');
 
@@ -193,11 +240,12 @@ export class StudentService {
     } else {
       throw new BadRequestException('Unauthorized role for accessing students');
     }
-
+    console.log({ targetSchoolId });
     // Get school information
     school = await this.schoolModel.findById(
       new Types.ObjectId(targetSchoolId),
     );
+    console.log({ school });
     if (!school) {
       throw new NotFoundException('School not found');
     }
@@ -249,7 +297,7 @@ export class StudentService {
   async getStudentById(
     id: Types.ObjectId,
     user: JWTUserPayload,
-    school_id?: Types.ObjectId,
+    school_id?: string,
   ) {
     this.logger.log(`Getting student by ID: ${id}`);
 
@@ -309,7 +357,7 @@ export class StudentService {
     id: Types.ObjectId,
     updateStudentDto: UpdateStudentDto,
     user: JWTUserPayload,
-    school_id?: Types.ObjectId,
+    school_id?: string,
   ) {
     this.logger.log(`Updating student: ${id}`);
 
@@ -381,7 +429,56 @@ export class StudentService {
         student_id: { $ne: new Types.ObjectId(id) },
       });
       if (existingGlobalStudent) {
-        throw new ConflictException('Student with this email already exists');
+        // Check if the student is deleted in the tenant database
+        const studentSchool = await this.schoolModel.findById(
+          existingGlobalStudent.school_id,
+        );
+        if (studentSchool) {
+          const tenantConnection =
+            await this.tenantConnectionService.getTenantConnection(
+              studentSchool.db_name,
+            );
+          const StudentModel = tenantConnection.model(
+            Student.name,
+            StudentSchema,
+          );
+
+          const deletedStudent = await StudentModel.findOne({
+            _id: existingGlobalStudent.student_id,
+            deleted_at: { $ne: null },
+          });
+
+          if (deletedStudent) {
+            // Remove the deleted student entries from both global and tenant databases
+            this.logger.log(
+              `Removing deleted student entry for email: ${updateStudentDto.email}`,
+            );
+
+            await Promise.all([
+              this.globalStudentModel.deleteOne({
+                email: updateStudentDto.email,
+              }),
+              StudentModel.deleteOne({ _id: existingGlobalStudent.student_id }),
+            ]);
+
+            this.logger.log(
+              `Deleted student entries removed for email: ${updateStudentDto.email}`,
+            );
+          } else {
+            // Student exists and is not deleted
+            throw new ConflictException(
+              'Student with this email already exists',
+            );
+          }
+        } else {
+          // If school doesn't exist, remove the orphaned global entry
+          await this.globalStudentModel.deleteOne({
+            email: updateStudentDto.email,
+          });
+          this.logger.log(
+            `Removed orphaned global student entry for email: ${updateStudentDto.email}`,
+          );
+        }
       }
 
       // Check if email already exists in tenant database
@@ -390,7 +487,29 @@ export class StudentService {
         _id: { $ne: new Types.ObjectId(id) },
       });
       if (existingTenantStudent) {
-        throw new ConflictException('Email already exists in school database');
+        // Check if the student is deleted
+        if (existingTenantStudent.deleted_at) {
+          // Remove the deleted student entry
+          this.logger.log(
+            `Removing deleted student entry for email: ${updateStudentDto.email} in current school`,
+          );
+
+          await Promise.all([
+            StudentModel.deleteOne({ _id: existingTenantStudent._id }),
+            this.globalStudentModel.deleteOne({
+              email: updateStudentDto.email,
+            }),
+          ]);
+
+          this.logger.log(
+            `Deleted student entry removed for email: ${updateStudentDto.email}`,
+          );
+        } else {
+          // Student exists and is not deleted
+          throw new ConflictException(
+            'Email already exists in school database',
+          );
+        }
       }
 
       // Generate new password for email update
@@ -409,6 +528,9 @@ export class StudentService {
     }
     if (updateStudentDto.email !== undefined) {
       student.email = updateStudentDto.email;
+    }
+    if (updateStudentDto.status !== undefined) {
+      student.status = updateStudentDto.status;
     }
 
     // Save the updated student
@@ -464,7 +586,7 @@ export class StudentService {
   async deleteStudent(
     id: Types.ObjectId,
     user: JWTUserPayload,
-    school_id?: Types.ObjectId,
+    school_id?: string,
   ) {
     this.logger.log(`Deleting student: ${id}`);
 
@@ -560,7 +682,7 @@ export class StudentService {
     id: Types.ObjectId,
     status: StatusEnum,
     user: JWTUserPayload,
-    school_id?: Types.ObjectId,
+    school_id?: string,
   ) {
     this.logger.log(`Updating student status: ${id} to ${status}`);
 
@@ -613,7 +735,7 @@ export class StudentService {
     }
 
     const updatedStudent = await StudentModel.findByIdAndUpdate(
-      id,
+      new Types.ObjectId(id),
       { status },
       { new: true },
     );
@@ -759,9 +881,76 @@ export class StudentService {
     const existingGlobalStudents = await this.globalStudentModel.find({
       email: { $in: uniqueStudents.map((s) => s.email) },
     });
-    existingGlobalStudents.forEach((student) =>
-      existingEmails.add(student.email),
-    );
+
+    // Check for deleted students and remove them
+    const deletedStudentEmails = new Set<string>();
+    for (const globalStudent of existingGlobalStudents) {
+      // Find the school for this global student
+      const studentSchool = await this.schoolModel.findById(
+        globalStudent.school_id,
+      );
+      if (!studentSchool) {
+        // If school doesn't exist, consider it as a deleted entry
+        deletedStudentEmails.add(globalStudent.email);
+        continue;
+      }
+
+      // Check if the student is deleted in the tenant database
+      const tenantConnection =
+        await this.tenantConnectionService.getTenantConnection(
+          studentSchool.db_name,
+        );
+      const StudentModel = tenantConnection.model(Student.name, StudentSchema);
+
+      const deletedStudent = await StudentModel.findOne({
+        _id: globalStudent.student_id,
+        deleted_at: { $ne: null },
+      });
+
+      if (deletedStudent) {
+        deletedStudentEmails.add(globalStudent.email);
+      } else {
+        existingEmails.add(globalStudent.email);
+      }
+    }
+
+    // Remove deleted student entries
+    if (deletedStudentEmails.size > 0) {
+      this.logger.log(
+        `Removing ${deletedStudentEmails.size} deleted student entries`,
+      );
+
+      for (const email of deletedStudentEmails) {
+        const globalStudent = existingGlobalStudents.find(
+          (gs) => gs.email === email,
+        );
+        if (globalStudent) {
+          const studentSchool = await this.schoolModel.findById(
+            globalStudent.school_id,
+          );
+          if (studentSchool) {
+            const tenantConnection =
+              await this.tenantConnectionService.getTenantConnection(
+                studentSchool.db_name,
+              );
+            const StudentModel = tenantConnection.model(
+              Student.name,
+              StudentSchema,
+            );
+
+            await Promise.all([
+              this.globalStudentModel.deleteOne({ email }),
+              StudentModel.deleteOne({ _id: globalStudent.student_id }),
+            ]);
+          } else {
+            // If school doesn't exist, just remove from global
+            await this.globalStudentModel.deleteOne({ email });
+          }
+        }
+      }
+
+      this.logger.log(`Deleted student entries removed`);
+    }
 
     // Collect emails for queue processing
     const emailJobs: Array<{
@@ -849,11 +1038,29 @@ export class StudentService {
           email: student.email,
         });
         if (existingTenantStudent) {
-          result.failed.push({
-            row: student,
-            error: 'Email already exists in school database',
-          });
-          continue;
+          // Check if the student is deleted
+          if (existingTenantStudent.deleted_at) {
+            // Remove the deleted student entry
+            this.logger.log(
+              `Removing deleted student entry for email: ${student.email} in school: ${school.name}`,
+            );
+
+            await Promise.all([
+              StudentModel.deleteOne({ _id: existingTenantStudent._id }),
+              this.globalStudentModel.deleteOne({ email: student.email }),
+            ]);
+
+            this.logger.log(
+              `Deleted student entry removed for email: ${student.email}`,
+            );
+          } else {
+            // Student exists and is not deleted
+            result.failed.push({
+              row: student,
+              error: 'Email already exists in school database',
+            });
+            continue;
+          }
         }
 
         // Generate password and hash it

@@ -24,6 +24,7 @@ export class CreateStudentDto {
   @ApiProperty({ example: 'alice.smith@student.com' })
   email: string;
 
+  @IsOptional()
   @IsString({ message: 'School ID must be a string' })
   @IsNotEmpty({ message: 'School ID is required' })
   @ApiProperty({ example: '60d21b4667d0d8992e610c85' })
@@ -31,5 +32,5 @@ export class CreateStudentDto {
     message:
       'The ID provided is not in the correct format. Please use a valid MongoDB ObjectId.',
   })
-  school_id: string;
+  school_id?: string;
 }

@@ -1,6 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
-import { IsString, IsEmail, IsOptional } from 'class-validator';
+import { IsString, IsEmail, IsOptional, IsEnum } from 'class-validator';
+import { StatusEnum } from 'src/common/constants/status.constant';
 
 export class UpdateStudentDto {
   @IsString({ message: 'First name must be a string' })
@@ -18,4 +19,14 @@ export class UpdateStudentDto {
   @IsOptional()
   @ApiProperty({ example: 'alice.smith@student.com', required: false })
   email?: string;
+
+  @IsEnum(StatusEnum, { message: 'Status must be a valid status' })
+  @IsOptional()
+  @ApiProperty({
+    enum: StatusEnum,
+    example: StatusEnum.ACTIVE,
+    required: false,
+    description: 'Student status (ACTIVE, INACTIVE)',
+  })
+  status?: StatusEnum;
 }

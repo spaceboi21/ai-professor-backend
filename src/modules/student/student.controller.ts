@@ -166,7 +166,7 @@ export class StudentController {
     @User() user: JWTUserPayload,
     @Query('search') search?: string,
     @Query('status') status?: StatusEnum,
-    @Query('school_id', ParseObjectIdPipe) school_id?: Types.ObjectId,
+    @Query('school_id') school_id?: string,
   ) {
     return this.studentService.getAllStudents(
       paginationDto,
@@ -202,14 +202,14 @@ export class StudentController {
   async getStudentById(
     @Param('id', ParseObjectIdPipe) id: Types.ObjectId,
     @User() user: JWTUserPayload,
-    @Query('school_id', ParseObjectIdPipe) school_id?: Types.ObjectId,
+    @Query('school_id') school_id?: string,
   ) {
     return this.studentService.getStudentById(id, user, school_id);
   }
 
   @Patch(':id')
   @Roles(RoleEnum.SUPER_ADMIN, RoleEnum.SCHOOL_ADMIN)
-  @ApiOperation({ summary: 'Update student details' })
+  @ApiOperation({ summary: 'Update student details (including status)' })
   @ApiParam({
     name: 'id',
     type: String,
@@ -235,7 +235,7 @@ export class StudentController {
     @Param('id', ParseObjectIdPipe) id: Types.ObjectId,
     @Body() updateStudentDto: UpdateStudentDto,
     @User() user: JWTUserPayload,
-    @Query('school_id', ParseObjectIdPipe) school_id?: Types.ObjectId,
+    @Query('school_id') school_id?: string,
   ) {
     return this.studentService.updateStudent(
       id,
@@ -270,7 +270,7 @@ export class StudentController {
   async deleteStudent(
     @Param('id', ParseObjectIdPipe) id: Types.ObjectId,
     @User() user: JWTUserPayload,
-    @Query('school_id', ParseObjectIdPipe) school_id?: Types.ObjectId,
+    @Query('school_id') school_id?: string,
   ) {
     return this.studentService.deleteStudent(id, user, school_id);
   }
@@ -302,8 +302,9 @@ export class StudentController {
     @Param('id', ParseObjectIdPipe) id: Types.ObjectId,
     @Body() updateStatusDto: UpdateStatusDto,
     @User() user: JWTUserPayload,
-    @Query('school_id', ParseObjectIdPipe) school_id?: Types.ObjectId,
+    @Query('school_id') school_id?: string,
   ) {
+    console.log({ user });
     return this.studentService.updateStudentStatus(
       id,
       updateStatusDto.status,
