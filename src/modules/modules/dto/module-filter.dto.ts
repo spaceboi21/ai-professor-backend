@@ -1,4 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
+import { Transform } from 'class-transformer';
 import { IsOptional, IsString, IsEnum, IsBoolean } from 'class-validator';
 import { DifficultyEnum } from 'src/common/constants/difficulty.constant';
 import { ProgressStatusEnum } from 'src/common/constants/status.constant';
@@ -38,6 +39,7 @@ export class ModuleFilterDto {
 
   @IsOptional()
   @IsBoolean()
+  @Transform(({ value }) => value === 'true')
   @ApiProperty({
     description:
       'Filter by published status (only available for non-student users)',
