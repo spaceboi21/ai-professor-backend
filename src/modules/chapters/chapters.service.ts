@@ -17,18 +17,7 @@ import {
   Chapter,
   ChapterSchema,
 } from 'src/database/schemas/tenant/chapter.schema';
-import {
-  Bibliography,
-  BibliographySchema,
-} from 'src/database/schemas/tenant/bibliography.schema';
-import {
-  QuizGroup,
-  QuizGroupSchema,
-} from 'src/database/schemas/tenant/quiz-group.schema';
-import {
-  StudentChapterProgress,
-  StudentChapterProgressSchema,
-} from 'src/database/schemas/tenant/student-chapter-progress.schema';
+
 import { BibliographyTypeEnum } from 'src/common/constants/bibliography-type.constant';
 import { ProgressStatusEnum } from 'src/common/constants/status.constant';
 import { TenantConnectionService } from 'src/database/tenant-connection.service';
@@ -88,8 +77,7 @@ export class ChaptersService {
     createChapterDto: CreateChapterDto,
     user: JWTUserPayload,
   ) {
-    const { school_id, module_id, title, subject, description } =
-      createChapterDto;
+    const { school_id, module_id, title, description } = createChapterDto;
 
     this.logger.log(
       `Creating chapter: ${title} for module: ${module_id} by user: ${user.id}`,
@@ -126,7 +114,6 @@ export class ChaptersService {
       const newChapter = new ChapterModel({
         module_id: new Types.ObjectId(module_id),
         title,
-        subject,
         description,
         sequence: nextSequence,
         created_by: new Types.ObjectId(user.id),
@@ -311,7 +298,6 @@ export class ChaptersService {
         _id: 1,
         module_id: 1,
         title: 1,
-        subject: 1,
         description: 1,
         sequence: 1,
         created_by: 1,
@@ -522,7 +508,6 @@ export class ChaptersService {
         _id: 1,
         module_id: 1,
         title: 1,
-        subject: 1,
         description: 1,
         sequence: 1,
         created_by: 1,

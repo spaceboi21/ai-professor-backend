@@ -19,9 +19,6 @@ export class Chapter extends Document {
   @Prop({ required: true })
   title: string;
 
-  @Prop({ required: true })
-  subject: string;
-
   @Prop()
   description: string;
 

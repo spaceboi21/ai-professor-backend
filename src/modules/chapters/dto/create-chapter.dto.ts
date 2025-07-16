@@ -7,7 +7,8 @@ export class CreateChapterDto {
   @IsMongoId({ message: 'School ID must be a valid MongoDB ObjectId' })
   @ApiProperty({
     example: '507f1f77bcf86cd799439011',
-    description: 'School ID (required for super admin, optional for other roles)',
+    description:
+      'School ID (required for super admin, optional for other roles)',
     required: false,
   })
   school_id?: string | Types.ObjectId;
@@ -27,14 +28,6 @@ export class CreateChapterDto {
     description: 'Chapter title',
   })
   title: string;
-
-  @IsString({ message: 'Subject must be a string' })
-  @IsNotEmpty({ message: 'Subject is required' })
-  @ApiProperty({
-    example: "Piaget's Theory",
-    description: 'Short topic focus of the chapter',
-  })
-  subject: string;
 
   @IsString({ message: 'Description must be a string' })
   @IsOptional()

@@ -7,7 +7,8 @@ export class UpdateChapterDto {
   @IsMongoId({ message: 'School ID must be a valid MongoDB ObjectId' })
   @ApiProperty({
     example: '507f1f77bcf86cd799439011',
-    description: 'School ID (required for super admin, optional for other roles)',
+    description:
+      'School ID (required for super admin, optional for other roles)',
     required: false,
   })
   school_id?: string | Types.ObjectId;
@@ -29,15 +30,6 @@ export class UpdateChapterDto {
     required: false,
   })
   title?: string;
-
-  @IsOptional()
-  @IsString({ message: 'Subject must be a string' })
-  @ApiProperty({
-    example: "Piaget's Theory",
-    description: 'Short topic focus of the chapter',
-    required: false,
-  })
-  subject?: string;
 
   @IsOptional()
   @IsString({ message: 'Description must be a string' })
