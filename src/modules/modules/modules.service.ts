@@ -815,4 +815,210 @@ export class ModulesService {
       throw new BadRequestException(`Failed to ${action.toLowerCase()} module`);
     }
   }
+
+  async getModuleOverview(user: JWTUserPayload) {
+    this.logger.log(`Getting module overview for student: ${user.id}`);
+
+    // Validate school exists
+    const school = await this.schoolModel.findById(user.school_id);
+    if (!school) {
+      throw new NotFoundException('School not found');
+    }
+
+    // Get tenant connection for the school
+    const tenantConnection =
+      await this.tenantConnectionService.getTenantConnection(school.db_name);
+    const ModuleModel = tenantConnection.model(Module.name, ModuleSchema);
+
+    try {
+      // Build aggregation pipeline for module overview
+      const pipeline: any[] = [
+        // Stage 1: Match published modules only
+        { $match: { deleted_at: null, published: true } },
+
+        // Stage 2: Lookup student progress for each module
+        {
+          $lookup: {
+            from: 'student_module_progress',
+            let: { moduleId: '$_id' },
+            pipeline: [
+              {
+                $match: {
+                  $expr: {
+                    $and: [
+                      { $eq: ['$module_id', '$$moduleId'] },
+                      { $eq: ['$student_id', new Types.ObjectId(user.id)] },
+                    ],
+                  },
+                },
+              },
+            ],
+            as: 'progress',
+          },
+        },
+
+        // Stage 3: Add computed fields
+        {
+          $addFields: {
+            // Determine status based on progress
+            status: {
+              $cond: {
+                if: { $gt: [{ $size: '$progress' }, 0] },
+                then: { $arrayElemAt: ['$progress.status', 0] },
+                else: ProgressStatusEnum.NOT_STARTED,
+              },
+            },
+            // Get progress percentage
+            progress_percentage: {
+              $cond: {
+                if: { $gt: [{ $size: '$progress' }, 0] },
+                then: { $arrayElemAt: ['$progress.progress_percentage', 0] },
+                else: 0,
+              },
+            },
+            // Get last accessed date
+            last_accessed_at: {
+              $cond: {
+                if: { $gt: [{ $size: '$progress' }, 0] },
+                then: { $arrayElemAt: ['$progress.last_accessed_at', 0] },
+                else: null,
+              },
+            },
+          },
+        },
+
+        // Stage 4: Group to calculate statistics
+        {
+          $group: {
+            _id: null,
+            total_modules: { $sum: 1 },
+            total_progress: { $sum: '$progress_percentage' },
+            completed_modules: {
+              $sum: {
+                $cond: [
+                  { $eq: ['$status', ProgressStatusEnum.COMPLETED] },
+                  1,
+                  0,
+                ],
+              },
+            },
+            in_progress_modules: {
+              $sum: {
+                $cond: [
+                  { $eq: ['$status', ProgressStatusEnum.IN_PROGRESS] },
+                  1,
+                  0,
+                ],
+              },
+            },
+            not_started_modules: {
+              $sum: {
+                $cond: [
+                  { $eq: ['$status', ProgressStatusEnum.NOT_STARTED] },
+                  1,
+                  0,
+                ],
+              },
+            },
+            // Collect all modules for recent calculation
+            all_modules: {
+              $push: {
+                _id: '$_id',
+                title: '$title',
+                subject: '$subject',
+                status: '$status',
+                progress_percentage: '$progress_percentage',
+                last_accessed_at: '$last_accessed_at',
+              },
+            },
+          },
+        },
+
+        // Stage 5: Add computed overall progress percentage
+        {
+          $addFields: {
+            overall_progress_percentage: {
+              $cond: {
+                if: { $gt: ['$total_modules', 0] },
+                then: {
+                  $round: [
+                    { $divide: ['$total_progress', '$total_modules'] },
+                    2,
+                  ],
+                },
+                else: 0,
+              },
+            },
+          },
+        },
+
+        // Stage 6: Unwind to get individual modules back for recent calculation
+        {
+          $unwind: '$all_modules',
+        },
+
+        // Stage 7: Sort by last accessed date (most recent first), then by progress
+        {
+          $sort: {
+            'all_modules.last_accessed_at': -1,
+            'all_modules.progress_percentage': -1,
+          },
+        },
+
+        // Stage 8: Group again to get recent modules
+        {
+          $group: {
+            _id: null,
+            total_modules: { $first: '$total_modules' },
+            completed_modules: { $first: '$completed_modules' },
+            in_progress_modules: { $first: '$in_progress_modules' },
+            not_started_modules: { $first: '$not_started_modules' },
+            overall_progress_percentage: {
+              $first: '$overall_progress_percentage',
+            },
+            recent_modules: { $push: '$all_modules' },
+          },
+        },
+
+        // Stage 9: Project final structure
+        {
+          $project: {
+            _id: 0,
+            total_modules: 1,
+            completed_modules: 1,
+            in_progress_modules: 1,
+            not_started_modules: 1,
+            overall_progress_percentage: 1,
+            recent_modules: { $slice: ['$recent_modules', 5] },
+          },
+        },
+      ];
+
+      // Execute aggregation
+      const result = await ModuleModel.aggregate(pipeline);
+
+      if (result.length === 0) {
+        // No modules found, return empty overview
+        return {
+          message: 'Module overview retrieved successfully',
+          data: {
+            total_modules: 0,
+            completed_modules: 0,
+            in_progress_modules: 0,
+            not_started_modules: 0,
+            overall_progress_percentage: 0,
+            recent_modules: [],
+          },
+        };
+      }
+
+      return {
+        message: 'Module overview retrieved successfully',
+        data: result[0],
+      };
+    } catch (error) {
+      this.logger.error('Error getting module overview', error?.stack || error);
+      throw new BadRequestException('Failed to retrieve module overview');
+    }
+  }
 }

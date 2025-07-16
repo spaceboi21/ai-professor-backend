@@ -419,7 +419,7 @@ export class BibliographyService {
     user: JWTUserPayload,
   ) {
     const { school_id, ...bibliographyUpdateData } = updateBibliographyDto;
-    
+
     this.logger.log(`Updating bibliography: ${id} by user: ${user.id}`);
 
     // Resolve school_id based on user role
@@ -532,7 +532,11 @@ export class BibliographyService {
     }
   }
 
-  async deleteBibliography(id: string | Types.ObjectId, user: JWTUserPayload, school_id?: string) {
+  async deleteBibliography(
+    id: string | Types.ObjectId,
+    user: JWTUserPayload,
+    school_id?: string,
+  ) {
     this.logger.log(`Deleting bibliography: ${id} by user: ${user.id}`);
 
     // Resolve school_id based on user role

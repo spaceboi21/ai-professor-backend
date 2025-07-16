@@ -38,6 +38,7 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
 import { extname } from 'path';
 import { readFileSync } from 'fs';
+import { StatusEnum } from 'src/common/constants/status.constant';
 
 @ApiTags('Student')
 @ApiBearerAuth()
@@ -151,7 +152,7 @@ export class StudentController {
   @ApiQuery({ name: 'page', required: false, type: Number })
   @ApiQuery({ name: 'limit', required: false, type: Number })
   @ApiQuery({ name: 'search', required: false, type: String })
-  @ApiQuery({ name: 'status', required: false, type: String })
+  @ApiQuery({ name: 'status', required: false, enum: StatusEnum })
   @ApiResponse({
     status: 200,
     description: 'Students retrieved successfully',
@@ -160,7 +161,7 @@ export class StudentController {
     @Query() paginationDto: PaginationDto,
     @User() user: JWTUserPayload,
     @Query('search') search?: string,
-    @Query('status') status?: string,
+    @Query('status') status?: StatusEnum,
   ) {
     return this.studentService.getAllStudents(
       paginationDto,
