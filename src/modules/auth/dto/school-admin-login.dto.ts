@@ -9,8 +9,8 @@ export class LoginSchoolAdminDto {
   @ApiProperty({ example: 'techtic.anirudh@gmail.com' })
   email: string;
 
-  @IsString({ message: 'First name must be a string' })
-  @IsNotEmpty({ message: 'First name is required' })
+  @IsString({ message: 'Password must be a string' })
+  @IsNotEmpty({ message: 'Password is required' })
   @ApiProperty({ example: '|Co(>#n(-5si' })
   password: string;
 }

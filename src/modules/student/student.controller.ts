@@ -39,6 +39,11 @@ import { diskStorage } from 'multer';
 import { extname } from 'path';
 import { readFileSync } from 'fs';
 import { StatusEnum } from 'src/common/constants/status.constant';
+import {
+  StudentResponseDto,
+  StudentListResponseDto,
+  BulkCreateStudentResponseDto,
+} from './dto/student-response.dto';
 
 @ApiTags('Student')
 @ApiBearerAuth()
@@ -51,7 +56,11 @@ export class StudentController {
   @Roles(RoleEnum.SUPER_ADMIN, RoleEnum.SCHOOL_ADMIN)
   @ApiOperation({ summary: 'Create a new student' })
   @ApiBody({ type: CreateStudentDto })
-  @ApiResponse({ status: 201, description: 'Student created successfully' })
+  @ApiResponse({
+    status: 201,
+    description: 'Student created successfully',
+    type: StudentResponseDto,
+  })
   @ApiResponse({ status: 409, description: 'Email already exists' })
   async createStudent(
     @Body() createStudentDto: CreateStudentDto,
@@ -80,22 +89,7 @@ export class StudentController {
   @ApiResponse({
     status: 201,
     description: 'Bulk student creation completed',
-    schema: {
-      type: 'object',
-      properties: {
-        message: { type: 'string' },
-        data: {
-          type: 'object',
-          properties: {
-            success: { type: 'array', items: { type: 'object' } },
-            failed: { type: 'array', items: { type: 'object' } },
-            total: { type: 'number' },
-            successCount: { type: 'number' },
-            failedCount: { type: 'number' },
-          },
-        },
-      },
-    },
+    type: BulkCreateStudentResponseDto,
   })
   @ApiResponse({ status: 400, description: 'Invalid CSV format or data' })
   @ApiResponse({ status: 409, description: 'Some emails already exist' })
@@ -156,6 +150,7 @@ export class StudentController {
   @ApiResponse({
     status: 200,
     description: 'Students retrieved successfully',
+    type: StudentListResponseDto,
   })
   async getAllStudents(
     @Query() paginationDto: PaginationDto,
@@ -183,6 +178,7 @@ export class StudentController {
   @ApiResponse({
     status: 200,
     description: 'Student retrieved successfully',
+    type: StudentResponseDto,
   })
   @ApiResponse({ status: 404, description: 'Student not found' })
   async getStudentById(
@@ -205,6 +201,7 @@ export class StudentController {
   @ApiResponse({
     status: 200,
     description: 'Student status updated successfully',
+    type: StudentResponseDto,
   })
   @ApiResponse({ status: 404, description: 'Student not found' })
   async updateStudentStatus(

@@ -9,8 +9,8 @@ export class LoginSuperAdminDto {
   @ApiProperty({ example: 'superadmin.aiprofessor@yopmail.com' })
   email: string;
 
-  @IsString({ message: 'First name must be a string' })
-  @IsNotEmpty({ message: 'First name is required' })
+  @IsString({ message: 'Password must be a string' })
+  @IsNotEmpty({ message: 'Password is required' })
   @ApiProperty({ example: 'superAdmin@123' })
   password: string;
 }

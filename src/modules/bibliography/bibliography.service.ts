@@ -760,13 +760,15 @@ export class BibliographyService {
     );
 
     try {
+      // Get the highest sequence number for this chapter, including soft-deleted records
+      // This ensures we don't conflict with the compound index that includes deleted_at
       const lastBibliography = await BibliographyModel.findOne({
         chapter_id: new Types.ObjectId(chapter_id),
-        deleted_at: null,
       })
         .sort({ sequence: -1 })
         .select('sequence')
         .lean();
+
       return lastBibliography ? lastBibliography.sequence + 1 : 1;
     } catch (error) {
       this.logger.error('Error getting next sequence', error?.stack || error);

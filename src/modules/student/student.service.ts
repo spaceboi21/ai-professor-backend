@@ -62,7 +62,7 @@ export class StudentService {
 
     // If admin is SCHOOL_ADMIN, ensure they belong to this school
     if (adminUser.role.name === RoleEnum.SCHOOL_ADMIN) {
-      if (adminUser.school_id !== school_id) {
+      if (adminUser.school_id?.toString() !== school_id?.toString()) {
         throw new BadRequestException(
           'You can only create students for your own school',
         );

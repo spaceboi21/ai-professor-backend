@@ -19,6 +19,7 @@ import {
   ApiBearerAuth,
   ApiQuery,
   ApiParam,
+  ApiBody,
 } from '@nestjs/swagger';
 import { ChaptersService } from './chapters.service';
 import { CreateChapterDto } from './dto/create-chapter.dto';
@@ -46,6 +47,7 @@ export class ChaptersController {
   @Post()
   @Roles(RoleEnum.SUPER_ADMIN, RoleEnum.PROFESSOR, RoleEnum.SCHOOL_ADMIN)
   @ApiOperation({ summary: 'Create a new chapter' })
+  @ApiBody({ type: CreateChapterDto })
   @ApiResponse({
     status: 201,
     description: 'Chapter created successfully',
@@ -127,6 +129,7 @@ export class ChaptersController {
     description: 'Chapter ID',
     example: '507f1f77bcf86cd799439011',
   })
+  @ApiBody({ type: UpdateChapterDto })
   @ApiResponse({
     status: 200,
     description: 'Chapter updated successfully',
@@ -154,7 +157,8 @@ export class ChaptersController {
     name: 'school_id',
     required: false,
     type: String,
-    description: 'School ID (required for super admin, optional for other roles)',
+    description:
+      'School ID (required for super admin, optional for other roles)',
     example: '507f1f77bcf86cd799439011',
   })
   @ApiResponse({
@@ -173,6 +177,7 @@ export class ChaptersController {
   @Post('reorder')
   @Roles(RoleEnum.SUPER_ADMIN, RoleEnum.PROFESSOR, RoleEnum.SCHOOL_ADMIN)
   @ApiOperation({ summary: 'Reorder chapters' })
+  @ApiBody({ type: ReorderChaptersDto })
   @ApiResponse({
     status: 200,
     description: 'Chapters reordered successfully',
