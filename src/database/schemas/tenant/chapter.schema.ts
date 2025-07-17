@@ -46,3 +46,11 @@ ChapterSchema.index(
   { module_id: 1, sequence: 1, deleted_at: 1 },
   { unique: true },
 );
+
+// Create compound index for module_id, title, and deleted_at to ensure unique titles per module
+// Only active chapters (deleted_at is null) will be considered for uniqueness
+// Note: Title uniqueness is enforced case-insensitively in the application layer
+ChapterSchema.index(
+  { module_id: 1, title: 1, deleted_at: 1 },
+  { unique: true },
+);

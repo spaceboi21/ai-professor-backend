@@ -54,7 +54,10 @@ export class ChaptersController {
   })
   @ApiResponse({ status: 400, description: 'Bad request' })
   @ApiResponse({ status: 404, description: 'Module not found' })
-  @ApiResponse({ status: 409, description: 'Sequence conflict' })
+  @ApiResponse({
+    status: 409,
+    description: 'Sequence conflict or duplicate chapter title',
+  })
   async createChapter(
     @Body() createChapterDto: CreateChapterDto,
     @User() user: JWTUserPayload,
@@ -135,7 +138,10 @@ export class ChaptersController {
     description: 'Chapter updated successfully',
   })
   @ApiResponse({ status: 404, description: 'Chapter not found' })
-  @ApiResponse({ status: 409, description: 'Sequence conflict' })
+  @ApiResponse({
+    status: 409,
+    description: 'Sequence conflict or duplicate chapter title',
+  })
   async updateChapter(
     @Param('id', ParseObjectIdPipe) id: string,
     @Body() updateChapterDto: UpdateChapterDto,

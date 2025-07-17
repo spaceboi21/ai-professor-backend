@@ -843,6 +843,7 @@ export class ProgressService {
       StudentModuleProgress.name,
       StudentModuleProgressSchema,
     );
+    const ModuleModel = tenantConnection.model(Module.name, ModuleSchema);
 
     try {
       // Build query
@@ -918,7 +919,8 @@ export class ProgressService {
       StudentChapterProgress.name,
       StudentChapterProgressSchema,
     );
-
+    const ModuleModel = tenantConnection.model(Module.name, ModuleSchema);
+    const ChapterModel = tenantConnection.model(Chapter.name, ChapterSchema);
     try {
       // Build query
       const query: any = { student_id: new Types.ObjectId(user.id) };

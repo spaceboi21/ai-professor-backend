@@ -73,6 +73,52 @@ export class ChaptersService {
     }
   }
 
+  /**
+   * Helper method to check if a chapter title already exists in the same module
+   * @param module_id - The module ID
+   * @param title - The chapter title to check
+   * @param excludeChapterId - Optional chapter ID to exclude from check (for updates)
+   * @param user - User context for tenant connection
+   * @returns Promise<boolean> - true if title exists, false otherwise
+   */
+  private async checkChapterTitleExists(
+    module_id: string | Types.ObjectId,
+    title: string,
+    user: JWTUserPayload,
+    excludeChapterId?: string | Types.ObjectId,
+  ): Promise<boolean> {
+    // Validate school
+    const school = await this.schoolModel.findById(user.school_id);
+    if (!school) {
+      throw new NotFoundException('School not found');
+    }
+
+    // Get tenant connection
+    const tenantConnection =
+      await this.tenantConnectionService.getTenantConnection(school.db_name);
+    const ChapterModel = tenantConnection.model(Chapter.name, ChapterSchema);
+
+    // Normalize input title (trim + lowercase)
+    const normalizedTitle = title.trim().toLowerCase();
+
+    // Build case-insensitive query using aggregation expression
+    const query: any = {
+      module_id: new Types.ObjectId(module_id.toString()),
+      deleted_at: null,
+      $expr: {
+        $eq: [{ $toLower: '$title' }, normalizedTitle],
+      },
+    };
+
+    // Exclude the chapter being updated
+    if (excludeChapterId) {
+      query._id = { $ne: new Types.ObjectId(excludeChapterId.toString()) };
+    }
+
+    const exists = await ChapterModel.exists(query);
+    return !!exists;
+  }
+
   async createChapter(
     createChapterDto: CreateChapterDto,
     user: JWTUserPayload,
@@ -106,6 +152,19 @@ export class ChaptersService {
       });
       if (!module) {
         throw new NotFoundException('Module not found');
+      }
+
+      // Check if another chapter with the same (trimmed, case-insensitive) title exists in this module
+      const titleExists = await this.checkChapterTitleExists(
+        module_id,
+        title,
+        user,
+      );
+
+      if (titleExists) {
+        throw new ConflictException(
+          `Chapter with title "${title.trim()}" already exists in this module`,
+        );
       }
 
       // Get next sequence number for this module
@@ -580,9 +639,40 @@ export class ChaptersService {
     const ChapterModel = tenantConnection.model(Chapter.name, ChapterSchema);
 
     try {
+      // If title is being updated, check for duplicates
+      if (chapterUpdateData.title) {
+        // Get the current chapter to retrieve module_id
+        const currentChapter = await ChapterModel.findOne({
+          _id: id,
+          deleted_at: null,
+        });
+
+        if (!currentChapter) {
+          throw new NotFoundException('Chapter not found');
+        }
+
+        // Check if another chapter with the same (trimmed, case-insensitive) title exists in this module
+        const titleExists = await this.checkChapterTitleExists(
+          currentChapter.module_id,
+          chapterUpdateData.title,
+          user,
+          id, // Exclude current chapter from duplicate check
+        );
+
+        if (titleExists) {
+          throw new ConflictException(
+            `Chapter with title "${chapterUpdateData.title.trim()}" already exists in this module`,
+          );
+        }
+      }
+
       const updatedChapter = await ChapterModel.findOneAndUpdate(
         { _id: id, deleted_at: null },
-        { ...chapterUpdateData, updated_at: new Date() },
+        {
+          title: chapterUpdateData.title,
+          ...chapterUpdateData,
+          updated_at: new Date(),
+        },
         { new: true },
       ).lean();
 
