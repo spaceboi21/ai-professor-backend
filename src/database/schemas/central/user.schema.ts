@@ -38,7 +38,7 @@ export class User extends Document {
   @Prop({ required: true, select: false })
   password: string;
 
-  @Prop()
+  @Prop({ type: Date, default: null })
   last_logged_in: Date;
 
   @Prop({ type: Types.ObjectId, ref: Role.name, required: true, index: true })
