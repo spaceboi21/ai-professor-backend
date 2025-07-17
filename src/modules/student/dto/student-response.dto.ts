@@ -81,6 +81,12 @@ export class StudentResponseDto {
   status: StatusEnum;
 
   @ApiProperty({
+    example: false,
+    description: 'Whether the student was created via CSV bulk upload',
+  })
+  is_csv_upload: boolean;
+
+  @ApiProperty({
     example: '2024-01-15T10:30:00.000Z',
     description: 'Creation timestamp',
   })

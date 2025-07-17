@@ -160,9 +160,10 @@ export class StudentService {
         student_code: `${school.name
           .toLowerCase()
           .replace(/\s+/g, '')}-${Date.now()}`, // Generate school-specific student code
-        school_id: new Types.ObjectId(school_id),
+        school_id: new Types.ObjectId(targetSchoolId),
         created_by: new Types.ObjectId(adminUser?.id),
         created_by_role: adminUser.role.name as RoleEnum,
+        is_csv_upload: false, // Mark as non-CSV upload
       });
 
       const savedStudent = await newStudent.save();
@@ -173,7 +174,7 @@ export class StudentService {
       await this.globalStudentModel.create({
         student_id: savedStudent._id,
         email,
-        school_id: new Types.ObjectId(school_id),
+        school_id: new Types.ObjectId(targetSchoolId),
       });
 
       this.logger.log(`Global student entry created for: ${email}`);
@@ -761,9 +762,10 @@ export class StudentService {
   async bulkCreateStudents(
     fileBuffer: Buffer,
     adminUser: JWTUserPayload,
+    school_id?: string,
   ): Promise<BulkCreateResult> {
     this.logger.log(
-      `Bulk creating students for school: ${adminUser.school_id}`,
+      `Bulk creating students for user: ${adminUser.id}, role: ${adminUser.role.name}`,
     );
 
     const result: BulkCreateResult = {
@@ -812,29 +814,10 @@ export class StudentService {
             return;
           }
 
-          // For SUPER_ADMIN, school_id is required if not provided in CSV
-          if (
-            adminUser.role.name === RoleEnum.SUPER_ADMIN &&
-            !row.school_id &&
-            !adminUser.school_id
-          ) {
-            result.failed.push({
-              row: {
-                first_name: row.first_name,
-                last_name: row.last_name || '',
-                email: row.email,
-              },
-              error:
-                'Super admin must provide school_id in CSV or have a default school_id',
-            });
-            return;
-          }
-
           students.push({
             first_name: row.first_name.trim(),
             last_name: (row.last_name || '').trim(),
             email: emailValidation.normalizedEmail!,
-            school_id: row.school_id?.trim(),
           });
         })
         .on('end', resolve)
@@ -990,22 +973,9 @@ export class StudentService {
             });
             continue;
           }
-
-          // If school_id is provided in CSV, validate it matches the admin's school
-          if (
-            student.school_id &&
-            student.school_id.toString() !== schoolId.toString()
-          ) {
-            result.failed.push({
-              row: student,
-              error:
-                'School admin can only create students for their own school',
-            });
-            continue;
-          }
         } else if (adminUser.role.name === RoleEnum.SUPER_ADMIN) {
-          // Super admin can specify school_id in CSV or use default
-          schoolId = student.school_id || (adminUser.school_id as string) || '';
+          // Super admin uses the provided school_id parameter
+          schoolId = school_id || '';
           school = await this.schoolModel.findById(
             new Types.ObjectId(schoolId),
           );
@@ -1081,6 +1051,7 @@ export class StudentService {
           school_id: new Types.ObjectId(schoolId),
           created_by: new Types.ObjectId(adminUser?.id),
           created_by_role: adminUser.role.name as RoleEnum,
+          is_csv_upload: true, // Mark as CSV upload
         });
 
         const savedStudent = await newStudent.save();
@@ -1138,7 +1109,10 @@ export class StudentService {
     return result;
   }
 
-  async resetPassword(userId: string, resetPasswordDto: ResetStudentPasswordDto) {
+  async resetPassword(
+    userId: string,
+    resetPasswordDto: ResetStudentPasswordDto,
+  ) {
     const { old_password, new_password } = resetPasswordDto;
     this.logger.log(`Resetting password for student: ${userId}`);
 
@@ -1161,7 +1135,8 @@ export class StudentService {
     }
 
     // Get tenant connection for the school
-    const tenantConnection = await this.tenantConnectionService.getTenantConnection(school.db_name);
+    const tenantConnection =
+      await this.tenantConnectionService.getTenantConnection(school.db_name);
     const StudentModel = tenantConnection.model(Student.name, StudentSchema);
 
     // Find the student in the tenant database
@@ -1184,15 +1159,17 @@ export class StudentService {
 
     // Hash the new password
     const hashedNewPassword = await this.bcryptUtil.hashPassword(new_password);
-    
+
     // Update the password
     student.password = hashedNewPassword;
     student.last_logged_in = new Date();
-    
+
     try {
       const updatedStudent = await student.save();
-      this.logger.log(`Password updated successfully for student: ${student.email}`);
-      
+      this.logger.log(
+        `Password updated successfully for student: ${student.email}`,
+      );
+
       return {
         message: 'Password updated successfully',
         data: {

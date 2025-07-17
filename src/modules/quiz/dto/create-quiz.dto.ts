@@ -25,7 +25,8 @@ export class CreateQuizDto {
   @IsString({ message: 'Question must be a string' })
   @IsNotEmpty({ message: 'Question is required' })
   @ApiProperty({
-    example: 'What is the most effective way to establish rapport with a client?',
+    example:
+      'What is the most effective way to establish rapport with a client?',
     description: 'The question text',
   })
   question: string;
@@ -104,4 +105,4 @@ export class CreateQuizDto {
     required: false,
   })
   chapter_id?: string | Types.ObjectId;
-} 
+}

@@ -84,10 +84,17 @@ export class StudentController {
           type: 'string',
           format: 'binary',
           description:
-            'CSV file containing student data (first_name, last_name, email)',
+            'CSV file containing student data (first_name, last_name, email). School ID is determined by user role and parameters.',
         },
       },
     },
+  })
+  @ApiQuery({
+    name: 'school_id',
+    required: false,
+    type: String,
+    description:
+      'School ID (required for SUPER_ADMIN, ignored for SCHOOL_ADMIN who use their own school)',
   })
   @ApiResponse({
     status: 201,
@@ -124,9 +131,15 @@ export class StudentController {
   async bulkCreateStudents(
     @UploadedFile() file: Express.Multer.File,
     @User() user: JWTUserPayload,
+    @Query('school_id') school_id?: string,
   ) {
     if (!file) {
       throw new BadRequestException('CSV file is required');
+    }
+
+    // Validate school_id for SUPER_ADMIN
+    if (user.role.name === RoleEnum.SUPER_ADMIN && !school_id) {
+      throw new BadRequestException('School ID is required for super admin');
     }
 
     // Read the file from disk since we're using diskStorage
@@ -135,6 +148,7 @@ export class StudentController {
     const result = await this.studentService.bulkCreateStudents(
       fileBuffer,
       user,
+      school_id,
     );
 
     return {
@@ -326,6 +340,9 @@ export class StudentController {
     @Body() resetPasswordDto: ResetStudentPasswordDto,
     @User() user: JWTUserPayload,
   ) {
-    return this.studentService.resetPassword(user.id.toString(), resetPasswordDto);
+    return this.studentService.resetPassword(
+      user.id.toString(),
+      resetPasswordDto,
+    );
   }
 }

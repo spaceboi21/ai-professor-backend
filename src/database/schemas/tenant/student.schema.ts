@@ -60,6 +60,9 @@ export class Student extends Document {
   @Prop({ enum: StatusEnum, default: DEFAULT_STATUS, index: true })
   status: StatusEnum;
 
+  @Prop({ type: Boolean, default: false })
+  is_csv_upload: boolean;
+
   readonly created_at?: Date;
   readonly updated_at?: Date;
 }

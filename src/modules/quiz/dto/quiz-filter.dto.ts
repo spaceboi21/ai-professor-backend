@@ -104,4 +104,4 @@ export class QuizFilterDto extends PaginationDto {
     required: false,
   })
   chapter_id?: string | Types.ObjectId;
-} 
+}

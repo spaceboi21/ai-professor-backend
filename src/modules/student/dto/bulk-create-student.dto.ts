@@ -16,7 +16,6 @@ export interface StudentCsvRow {
   first_name: string;
   last_name: string;
   email: string;
-  school_id?: string; // Optional for super admin to specify school
 }
 
 export interface BulkCreateResult {
