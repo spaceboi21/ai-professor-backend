@@ -50,6 +50,12 @@ export class MailService {
     role: RoleEnum,
   ): Promise<void> {
     const logoUrl = this.configService.get<string>('LOGO_URL');
+    const portal_url =
+      role === RoleEnum.STUDENT
+        ? this.configService.get<string>('STUDENT_PORTAL_URL')
+        : role === RoleEnum.PROFESSOR || role === RoleEnum.SCHOOL_ADMIN
+          ? this.configService.get<string>('SCHOOL_PORTAL_URL')
+          : this.configService.get<string>('ADMIN_PORTAL_URL');
     await this.mailerService.sendMail({
       to: email,
       subject: 'Welcome to AI Professor - Your Account Credentials',
@@ -60,6 +66,7 @@ export class MailService {
         password,
         role: role.replace(/_/g, ' ').toLowerCase(),
         logoUrl,
+        portal_url,
       },
     });
   }
