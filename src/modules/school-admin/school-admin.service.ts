@@ -3,6 +3,7 @@ import {
   ConflictException,
   Injectable,
   Logger,
+  NotFoundException,
 } from '@nestjs/common';
 import { InjectConnection, InjectModel } from '@nestjs/mongoose';
 import { Connection, Model, Types } from 'mongoose';
@@ -13,6 +14,7 @@ import { School } from 'src/database/schemas/central/school.schema';
 import { User } from 'src/database/schemas/central/user.schema';
 import { MailService } from 'src/mail/mail.service';
 import { CreateSchoolAdminDto } from './dto/create-school-admin.dto';
+import { ResetPasswordDto } from './dto/reset-password.dto';
 import { GlobalStudent } from 'src/database/schemas/central/global-student.schema';
 import { TenantConnectionService } from 'src/database/tenant-connection.service';
 
@@ -175,5 +177,62 @@ export class SchoolAdminService {
         },
       },
     };
+  }
+
+  async resetPassword(userId: string, resetPasswordDto: ResetPasswordDto) {
+    const { old_password, new_password } = resetPasswordDto;
+    this.logger.log(`Resetting password for user: ${userId}`);
+
+    // Find the school admin by ID
+    const user = await this.userModel.findById(new Types.ObjectId(userId)).select('+password');
+    if (!user) {
+      this.logger.warn(`School admin not found: ${userId}`);
+      throw new NotFoundException('User not found');
+    }
+
+    // Check if user is school admin or professor
+    const userRoleId = user.role.toString();
+    if (userRoleId !== ROLE_IDS.SCHOOL_ADMIN && userRoleId !== ROLE_IDS.PROFESSOR) {
+      this.logger.warn(`Invalid user role for password reset: ${user.role}`);
+      throw new BadRequestException('Invalid user type for password reset');
+    }
+
+    // Validate old password
+    const isPasswordValid = await this.bcryptUtil.comparePassword(
+      old_password,
+      user.password,
+    );
+
+    if (!isPasswordValid) {
+      this.logger.warn(`Invalid old password for user: ${userId}`);
+      throw new BadRequestException('Invalid old password');
+    }
+
+    // Hash the new password
+    const hashedNewPassword = await this.bcryptUtil.hashPassword(new_password);
+    
+    // Update the password
+    user.password = hashedNewPassword;
+    user.last_logged_in = new Date();
+    
+    try {
+      const updatedUser = await user.save();
+      this.logger.log(`Password updated successfully for user: ${user.email}`);
+      
+      return {
+        message: 'Password updated successfully',
+        data: {
+          id: updatedUser._id,
+          email: updatedUser.email,
+          first_name: updatedUser.first_name,
+          last_name: updatedUser.last_name,
+          school_id: updatedUser.school_id,
+          created_at: updatedUser.created_at,
+        },
+      };
+    } catch (error) {
+      this.logger.error('Error updating password:', error);
+      throw new BadRequestException('Failed to update password');
+    }
   }
 }

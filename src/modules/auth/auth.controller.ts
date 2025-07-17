@@ -12,6 +12,8 @@ import { AuthService } from './auth.service';
 import { LoginSuperAdminDto } from './dto/super-admin-login.dto';
 import { LoginSchoolAdminDto } from './dto/school-admin-login.dto';
 import { LoginStudentDto } from './dto/student-login.dto';
+import { ForgotPasswordDto } from './dto/forgot-password.dto';
+import { SetNewPasswordDto } from './dto/set-new-password.dto';
 import { JwtAuthGuard } from 'src/common/guards/jwt.guard';
 import { User } from 'src/common/decorators/user.decorator';
 import { JWTUserPayload } from 'src/common/types/jwr-user.type';
@@ -34,7 +36,7 @@ export class AuthController {
   @ApiOperation({ summary: 'Super Admin Login' })
   @ApiBody({ type: LoginSuperAdminDto })
   @ApiResponse({ status: 200, description: 'Login successful' })
-  @ApiResponse({ status: 400, description: 'Invalid credentials' })
+  @ApiResponse({ status: 400, description: 'Invalid email or password' })
   async superAdminLogin(@Body() loginData: LoginSuperAdminDto) {
     return this.authService.superAdminLogin(loginData);
   }
@@ -45,7 +47,7 @@ export class AuthController {
   @ApiOperation({ summary: 'School Admin or Professor Login' })
   @ApiBody({ type: LoginSchoolAdminDto })
   @ApiResponse({ status: 200, description: 'Login successful' })
-  @ApiResponse({ status: 400, description: 'Invalid credentials' })
+  @ApiResponse({ status: 400, description: 'Invalid email or password' })
   async loginSchoolAdmin(@Body() body: LoginSchoolAdminDto) {
     return this.authService.schoolAdminLogin(body);
   }
@@ -56,7 +58,7 @@ export class AuthController {
   @ApiOperation({ summary: 'Student Login' })
   @ApiBody({ type: LoginStudentDto })
   @ApiResponse({ status: 200, description: 'Login successful' })
-  @ApiResponse({ status: 400, description: 'Invalid credentials' })
+  @ApiResponse({ status: 400, description: 'Invalid email or password' })
   async loginStudent(@Body() body: LoginStudentDto) {
     return this.authService.studentLogin(body);
   }
@@ -68,5 +70,27 @@ export class AuthController {
   @ApiResponse({ status: 200, description: 'User info' })
   async getMe(@User() user: JWTUserPayload) {
     return this.authService.getMe(user);
+  }
+
+  @Post('forgot-password')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Request password reset for school admin or professor' })
+  @ApiBody({ type: ForgotPasswordDto })
+  @ApiResponse({ status: 200, description: 'Password reset link sent successfully' })
+  @ApiResponse({ status: 404, description: 'User not found with this email' })
+  @ApiResponse({ status: 400, description: 'Account is deactivated' })
+  async forgotPassword(@Body() forgotPasswordDto: ForgotPasswordDto) {
+    return this.authService.forgotPassword(forgotPasswordDto);
+  }
+
+  @Post('set-new-password')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Set new password using reset token' })
+  @ApiBody({ type: SetNewPasswordDto })
+  @ApiResponse({ status: 200, description: 'Password updated successfully' })
+  @ApiResponse({ status: 400, description: 'Invalid or expired token' })
+  @ApiResponse({ status: 404, description: 'User not found' })
+  async setNewPassword(@Body() setNewPasswordDto: SetNewPasswordDto) {
+    return this.authService.setNewPassword(setNewPasswordDto);
   }
 }

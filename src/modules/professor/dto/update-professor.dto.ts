@@ -60,7 +60,7 @@ export class UpdateProfessorPasswordDto {
   @IsString({ message: 'New password must be a string' })
   @IsNotEmpty({ message: 'New password is required' })
   @Matches(
-    /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/,
+    /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?])[A-Za-z\d!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]{8,}$/,
     {
       message:
         'Password must be at least 8 characters long and contain uppercase, lowercase, number, and special character',

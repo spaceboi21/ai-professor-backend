@@ -5,6 +5,7 @@ import {
   ApiOperation,
   ApiResponse,
   ApiTags,
+  ApiParam,
 } from '@nestjs/swagger';
 import { RoleEnum } from 'src/common/constants/roles.constant';
 import { Roles } from 'src/common/decorators/roles.decorator';
@@ -13,6 +14,7 @@ import { JwtAuthGuard } from 'src/common/guards/jwt.guard';
 import { RoleGuard } from 'src/common/guards/roles.guard';
 import { JWTUserPayload } from 'src/common/types/jwr-user.type';
 import { CreateSchoolAdminDto } from './dto/create-school-admin.dto';
+import { ResetPasswordDto } from './dto/reset-password.dto';
 import { SchoolAdminService } from './school-admin.service';
 @ApiTags('School Admin')
 @ApiBearerAuth()
@@ -48,5 +50,20 @@ export class SchoolAdminController {
   })
   async getDashboard(@User() user: JWTUserPayload) {
     return this.schoolAdminService.getDashboard(user);
+  }
+
+  // Reset password endpoint
+  @Post('reset-password')
+  @Roles(RoleEnum.SCHOOL_ADMIN, RoleEnum.PROFESSOR)
+  @ApiOperation({ summary: 'Reset password for authenticated school admin or professor' })
+  @ApiBody({ type: ResetPasswordDto })
+  @ApiResponse({ status: 200, description: 'Password updated successfully' })
+  @ApiResponse({ status: 404, description: 'User not found' })
+  @ApiResponse({ status: 400, description: 'Invalid old password' })
+  async resetPassword(
+    @Body() resetPasswordDto: ResetPasswordDto,
+    @User() user: JWTUserPayload,
+  ) {
+    return this.schoolAdminService.resetPassword(user.id.toString(), resetPasswordDto);
   }
 }

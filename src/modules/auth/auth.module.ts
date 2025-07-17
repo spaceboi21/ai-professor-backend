@@ -13,6 +13,7 @@ import {
   GlobalStudentSchema,
 } from 'src/database/schemas/central/global-student.schema';
 import { TenantConnectionService } from 'src/database/tenant-connection.service';
+import { MailModule } from 'src/mail/mail.module';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { TenantConnectionService } from 'src/database/tenant-connection.service'
       { name: GlobalStudent.name, schema: GlobalStudentSchema },
     ]),
     UtilsModule,
+    MailModule,
   ],
   controllers: [AuthController],
   providers: [AuthService, TenantConnectionService],

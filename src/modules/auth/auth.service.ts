@@ -13,6 +13,8 @@ import { ROLE_IDS, RoleEnum } from 'src/common/constants/roles.constant';
 import { Role } from 'src/database/schemas/central/role.schema';
 import { LoginSchoolAdminDto } from './dto/school-admin-login.dto';
 import { LoginStudentDto } from './dto/student-login.dto';
+import { ForgotPasswordDto } from './dto/forgot-password.dto';
+import { SetNewPasswordDto } from './dto/set-new-password.dto';
 import { School } from 'src/database/schemas/central/school.schema';
 import { GlobalStudent } from 'src/database/schemas/central/global-student.schema';
 import {
@@ -21,6 +23,8 @@ import {
 } from 'src/database/schemas/tenant/student.schema';
 import { TenantConnectionService } from 'src/database/tenant-connection.service';
 import { StatusEnum } from 'src/common/constants/status.constant';
+import { MailService } from 'src/mail/mail.service';
+import { ConfigService } from '@nestjs/config';
 
 @Injectable()
 export class AuthService {
@@ -35,6 +39,8 @@ export class AuthService {
     private readonly bcryptUtil: BcryptUtil,
     private readonly jwtUtil: JwtUtil,
     private readonly tenantConnectionService: TenantConnectionService,
+    private readonly mailService: MailService,
+    private readonly configService: ConfigService,
   ) {}
 
   async superAdminLogin(loginData: LoginSuperAdminDto) {
@@ -70,8 +76,8 @@ export class AuthService {
     );
 
     if (!isPasswordMatch) {
-      this.logger.warn(`Invalid credentials for Super Admin: ${email}`);
-      throw new BadRequestException('Invalid credentials');
+      this.logger.warn(`Invalid email or password for Super Admin: ${email}`);
+      throw new BadRequestException('Invalid email or password');
     }
 
     const token = await this.jwtUtil.generateToken({
@@ -137,8 +143,8 @@ export class AuthService {
     );
 
     if (!isPasswordValid) {
-      this.logger.warn(`Invalid credentials for School Admin: ${email}`);
-      throw new BadRequestException('Invalid credentials');
+      this.logger.warn(`Invalid email or password for School Admin: ${email}`);
+      throw new BadRequestException('Invalid email or password');
     }
 
     const school = await this.schoolModel.findById(user.school_id);
@@ -239,8 +245,8 @@ export class AuthService {
     );
 
     if (!isPasswordValid) {
-      this.logger.warn(`Invalid credentials for Student: ${email}`);
-      throw new BadRequestException('Invalid credentials');
+      this.logger.warn(`Invalid email or password for Student: ${email}`);
+      throw new BadRequestException('Invalid email or password');
     }
 
     // Generate JWT token
@@ -323,6 +329,127 @@ export class AuthService {
         ...dbUser,
         role: user.role, // populated role object
       };
+    }
+  }
+
+  async forgotPassword(forgotPasswordDto: ForgotPasswordDto) {
+    const { email } = forgotPasswordDto;
+    this.logger.log(`Forgot password request for email: ${email}`);
+
+    // Find school admin or professor with this email
+    const user = await this.userModel.findOne({
+      email,
+      role: {
+        $in: [
+          new Types.ObjectId(ROLE_IDS.SCHOOL_ADMIN),
+          new Types.ObjectId(ROLE_IDS.PROFESSOR),
+        ],
+      },
+    }).populate({
+      path: 'role',
+      select: 'name',
+    });
+
+    if (!user) {
+      this.logger.warn(`User not found for forgot password: ${email}`);
+      throw new NotFoundException('User not found with this email');
+    }
+
+    // Check user status
+    if (user.status === StatusEnum.INACTIVE) {
+      this.logger.warn(`User account is inactive for forgot password: ${email}`);
+      throw new BadRequestException(
+        'Your account has been deactivated. Please contact support for assistance.',
+      );
+    }
+
+    // Generate reset token (valid for 1 hour)
+    const resetToken = this.jwtUtil.generateToken({
+      id: user._id.toString(),
+      email: user.email,
+      role_id: user.role._id.toString(),
+      role_name: (user.role as any).name as RoleEnum,
+      school_id: user.school_id?.toString(),
+    });
+
+    // Create reset password link - serve from backend
+    const backendUrl = this.configService.get<string>('BACKEND_URL') || 'http://localhost:3000';
+    const resetPasswordLink = `${backendUrl}/static/reset-password.html?token=${resetToken}`;
+
+    // Send email
+    try {
+      await this.mailService.sendPasswordResetEmail(
+        email,
+        `${user.first_name}${user.last_name ? ` ${user.last_name}` : ''}`,
+        resetPasswordLink,
+      );
+      this.logger.log(`Password reset email sent to: ${email}`);
+    } catch (error) {
+      this.logger.error(`Failed to send password reset email to: ${email}`, error);
+      throw new BadRequestException('Failed to send password reset email');
+    }
+
+    return {
+      message: 'Password reset link has been sent to your email',
+    };
+  }
+
+  async setNewPassword(setNewPasswordDto: SetNewPasswordDto) {
+    const { token, new_password } = setNewPasswordDto;
+    this.logger.log('Setting new password with token');
+
+    try {
+      // Verify the token
+      const payload = this.jwtUtil.verifyToken(token);
+      
+      // Find the user
+      const user = await this.userModel.findById(payload.id).select('+password');
+      if (!user) {
+        this.logger.warn(`User not found for password reset: ${payload.id}`);
+        throw new NotFoundException('Invalid reset token');
+      }
+
+      // Check if user is school admin or professor
+      const userRoleId = user.role.toString();
+      if (userRoleId !== ROLE_IDS.SCHOOL_ADMIN && userRoleId !== ROLE_IDS.PROFESSOR) {
+        this.logger.warn(`Invalid user role for password reset: ${user.role}`);
+        throw new BadRequestException('Invalid user type for password reset');
+      }
+
+      // Check user status
+      if (user.status === StatusEnum.INACTIVE) {
+        this.logger.warn(`User account is inactive for password reset: ${user.email}`);
+        throw new BadRequestException(
+          'Your account has been deactivated. Please contact support for assistance.',
+        );
+      }
+
+      // Hash the new password
+      const hashedPassword = await this.bcryptUtil.hashPassword(new_password);
+      
+      // Update the password
+      user.password = hashedPassword;
+      user.last_logged_in = new Date();
+      
+      await user.save();
+
+      this.logger.log(`Password updated successfully for user: ${user.email}`);
+      
+      return {
+        message: 'Password updated successfully',
+        data: {
+          id: user._id,
+          email: user.email,
+          first_name: user.first_name,
+          last_name: user.last_name,
+        },
+      };
+    } catch (error) {
+      if (error instanceof NotFoundException || error instanceof BadRequestException) {
+        throw error;
+      }
+      this.logger.error('Error setting new password:', error);
+      throw new BadRequestException('Invalid or expired reset token');
     }
   }
 }

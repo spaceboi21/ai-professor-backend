@@ -28,11 +28,17 @@ import { QueueModule } from './common/queue/queue.module';
 import { QuizModule } from './modules/quiz/quiz.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { ProgressModule } from './modules/progress/progress.module';
+import { ServeStaticModule } from '@nestjs/serve-static';
+import { join } from 'path';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
+    }),
+    ServeStaticModule.forRoot({
+      rootPath: join(__dirname, '..', 'static'),
+      serveRoot: '/static',
     }),
     BullModule.forRootAsync({
       imports: [ConfigModule],
@@ -88,6 +94,10 @@ import { ProgressModule } from './modules/progress/progress.module';
         },
       }),
       inject: [ConfigService],
+    }),
+    ServeStaticModule.forRoot({
+      rootPath: join(__dirname, '..', 'static'),
+      serveRoot: '/static',
     }),
     PassportModule,
     CentralModule,
