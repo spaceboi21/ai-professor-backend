@@ -3,9 +3,7 @@ import {
   Body,
   Controller,
   Post,
-  UploadedFile,
   UseGuards,
-  UseInterceptors,
   UseFilters,
   Get,
   Query,
@@ -22,7 +20,6 @@ import {
   ApiTags,
   ApiQuery,
 } from '@nestjs/swagger';
-import { diskStorage } from 'multer';
 import { JwtAuthGuard } from 'src/common/guards/jwt.guard';
 import { v4 as uuid } from 'uuid';
 import { GetFileUploadUrl } from './dto/get-upload-url.dto';
@@ -33,10 +30,8 @@ import { ConfigService } from '@nestjs/config';
 import { existsSync, writeFileSync } from 'fs';
 import { mkdirSync } from 'fs';
 import { UploadExceptionFilter } from 'src/common/filters/upload-exception.filter';
-import { FileInterceptor } from '@nestjs/platform-express';
 import { extname } from 'path';
 import { Request, Response } from 'express';
-import { IncomingMessage } from 'http';
 
 const allowedImageTypes = ['.jpg', '.jpeg', '.png', '.webp'];
 const allowedBibliographyTypes = [
@@ -47,6 +42,8 @@ const allowedBibliographyTypes = [
   '.wmv',
   '.flv',
   '.webm',
+  '.ppt',
+  '.pptx',
 ];
 
 function fileFilterForProfile(req, file, cb) {
@@ -68,7 +65,7 @@ function fileFilterForBibliography(req, file, cb) {
   } else {
     cb(
       new BadRequestException(
-        'Only PDF and video files (PDF, MP4, AVI, MOV, WMV, FLV, WebM) are allowed',
+        'Only PDF, video files (PDF, MP4, AVI, MOV, WMV, FLV, WebM), and PowerPoint files (PPT, PPTX) are allowed',
       ),
       false,
     );
@@ -138,7 +135,7 @@ export class UploadController {
   @Post('bibliography-url')
   @ApiOperation({
     summary:
-      'Generate a secure presigned upload URL for bibliography files (PDF/Video)',
+      'Generate a secure presigned upload URL for bibliography files (PDF/Video/PowerPoint)',
     description:
       'Returns a temporary upload URL that expires in 10 minutes. File size limit: 100MB.',
   })
@@ -278,6 +275,106 @@ export class UploadController {
 
   @ApiOperation({
     summary: 'Upload file via PUT with raw binary body',
+    description: `Send raw file buffer (e.g., PDF, MP4, PPT, PPTX) in the request body with the appropriate Content-Type header. Must use Postman, curl, or frontend — Swagger UI doesn't support raw binary upload.`,
+  })
+  @ApiConsumes(
+    'application/pdf',
+    'video/mp4',
+    'video/mpeg',
+    'video/quicktime',
+    'video/avi',
+    'video/mov',
+    'video/wmv',
+    'video/flv',
+    'video/webm',
+    'application/vnd.ms-powerpoint',
+    'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    'application/octet-stream',
+  )
+  @ApiQuery({ name: 'filename', required: true })
+  @ApiResponse({ status: 201, description: 'File uploaded successfully' })
+  @ApiResponse({ status: 400, description: 'Invalid file' })
+  @Put('bibliography')
+  async uploadBibliographyFileBuffer(
+    @Req() req: Request,
+    @Res() res: Response,
+    @Query('filename') filename: string,
+  ) {
+    if (!filename) {
+      throw new BadRequestException('Filename is required in query');
+    }
+
+    const contentType = req.headers['content-type'];
+    const allowedTypes = [
+      'application/pdf',
+      'video/mp4',
+      'video/mpeg',
+      'video/quicktime',
+      'video/avi',
+      'video/mov',
+      'video/wmv',
+      'video/flv',
+      'video/webm',
+      'application/vnd.ms-powerpoint',
+      'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    ];
+
+    if (
+      !contentType ||
+      !this.uploadService.validateContentType(contentType, allowedTypes)
+    ) {
+      throw new BadRequestException(
+        `Invalid or unsupported Content-Type. Allowed types: ${allowedTypes.join(', ')}`,
+      );
+    }
+
+    const ext = extname(filename) || `.${contentType.split('/')[1]}`;
+    const id = `${Date.now()}-${uuid()}${ext}`;
+    const dir = './uploads/bibliography';
+
+    if (!existsSync(dir)) {
+      mkdirSync(dir, { recursive: true });
+    }
+
+    const filePath = `${dir}/${id}`;
+
+    try {
+      // Use the improved file processing method
+      const { buffer, size } = await this.uploadService.processFileBuffer(
+        req,
+        filePath,
+        (this.configService.get<number>('MAXIMUM_BIBLIOGRAPHY_FILE_SIZE') ??
+          100) *
+          1024 *
+          1024, // Use env variable for bibliography files
+      );
+
+      // Write the file
+      writeFileSync(filePath, buffer);
+
+      const fileUrl = `${this.configService.get('BACKEND_API_URL')}/uploads/bibliography/${id}`;
+
+      res.status(201).json({
+        fileUrl,
+        key: `uploads/bibliography/${id}`,
+        originalName: filename,
+        size: size,
+        mimeType: contentType,
+        message: 'File uploaded successfully',
+      });
+    } catch (error) {
+      if (error instanceof BadRequestException) {
+        res.status(400).json({ error: error.message });
+      } else {
+        res
+          .status(500)
+          .json({ error: 'Upload failed', details: error.message });
+      }
+    }
+  }
+
+  @ApiOperation({
+    summary: 'Upload file via PUT with raw binary body',
     description: `Send raw file buffer (e.g., PDF, MP4, JPEG) in the request body with the appropriate Content-Type header. Must use Postman, curl, or frontend — Swagger UI doesn't support raw binary upload.`,
   })
   @ApiConsumes(
@@ -326,7 +423,9 @@ export class UploadController {
       const { buffer, size } = await this.uploadService.processFileBuffer(
         req,
         filePath,
-        5 * 1024 * 1024, // 5MB limit for profile pictures
+        (this.configService.get<number>('MAXIMUM_FILE_SIZE') ?? 5) *
+          1024 *
+          1024, // Use env variable for profile pictures
       );
 
       // Write the file
@@ -341,94 +440,6 @@ export class UploadController {
         size: size,
         mimeType: contentType,
         message: 'Profile picture uploaded successfully',
-      });
-    } catch (error) {
-      if (error instanceof BadRequestException) {
-        res.status(400).json({ error: error.message });
-      } else {
-        res
-          .status(500)
-          .json({ error: 'Upload failed', details: error.message });
-      }
-    }
-  }
-
-  @ApiOperation({
-    summary: 'Upload file via PUT with raw binary body',
-    description: `Send raw file buffer (e.g., PDF, MP4, JPEG) in the request body with the appropriate Content-Type header. Must use Postman, curl, or frontend — Swagger UI doesn't support raw binary upload.`,
-  })
-  @ApiConsumes(
-    'application/pdf',
-    'video/mp4',
-    'video/mpeg',
-    'video/quicktime',
-    'application/octet-stream',
-  )
-  @ApiQuery({ name: 'filename', required: true })
-  @ApiResponse({ status: 201, description: 'File uploaded successfully' })
-  @ApiResponse({ status: 400, description: 'Invalid file' })
-  @Put('bibliography')
-  async uploadBibliographyFileBuffer(
-    @Req() req: Request,
-    @Res() res: Response,
-    @Query('filename') filename: string,
-  ) {
-    if (!filename) {
-      throw new BadRequestException('Filename is required in query');
-    }
-
-    const contentType = req.headers['content-type'];
-    const allowedTypes = [
-      'application/pdf',
-      'video/mp4',
-      'video/mpeg',
-      'video/quicktime',
-      'video/avi',
-      'video/mov',
-      'video/wmv',
-      'video/flv',
-      'video/webm',
-    ];
-
-    if (
-      !contentType ||
-      !this.uploadService.validateContentType(contentType, allowedTypes)
-    ) {
-      throw new BadRequestException(
-        `Invalid or unsupported Content-Type. Allowed types: ${allowedTypes.join(', ')}`,
-      );
-    }
-
-    const ext = extname(filename) || `.${contentType.split('/')[1]}`;
-    const id = `${Date.now()}-${uuid()}${ext}`;
-    const dir = './uploads/bibliography';
-
-    if (!existsSync(dir)) {
-      mkdirSync(dir, { recursive: true });
-    }
-
-    const filePath = `${dir}/${id}`;
-
-    try {
-      // Use the improved file processing method
-      const { buffer, size } = await this.uploadService.processFileBuffer(
-        req,
-        filePath,
-        100 * 1024 * 1024, // 100MB limit for bibliography files
-      );
-
-      // Write the file
-      writeFileSync(filePath, buffer);
-
-      const fileUrl = `${this.configService.get('BACKEND_API_URL')}/uploads/bibliography/${id}`;
-
-      res.status(201).json({
-        fileUrl,
-        key: `uploads/bibliography/${id}`,
-        originalName: filename,
-        size: size,
-        mimeType: contentType,
-        message: 'File uploaded successfully',
       });
     } catch (error) {
       if (error instanceof BadRequestException) {
@@ -491,7 +502,9 @@ export class UploadController {
       const { buffer, size } = await this.uploadService.processFileBuffer(
         req,
         filePath,
-        5 * 1024 * 1024, // 5MB limit for thumbnails
+        (this.configService.get<number>('MAXIMUM_FILE_SIZE') ?? 5) *
+          1024 *
+          1024, // Use env variable for thumbnails
       );
 
       // Write the file
