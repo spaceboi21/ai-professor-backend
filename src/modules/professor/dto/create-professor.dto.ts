@@ -13,6 +13,8 @@ export class CreateProfessorDto {
     description: 'Last name of the professor',
     required: false,
   })
+  @IsString({ message: 'Last name must be a string' })
+  @IsOptional()
   last_name: string;
 
   @ApiProperty({
