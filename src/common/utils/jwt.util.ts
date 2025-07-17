@@ -19,14 +19,19 @@ export class JwtUtil {
     private readonly configService: ConfigService,
   ) {}
 
-  generateToken(payload: Omit<JWTPayload, 'exp' | 'iat'>): string {
-    const expiresIn = this.configService.get<string>('JWT_EXPIRY') || '24h';
+  generateToken(
+    payload: Omit<JWTPayload, 'exp' | 'iat'>,
+    expiresIn?: string,
+  ): string {
+    const defaultExpiresIn =
+      this.configService.get<string>('JWT_EXPIRY') || '24h';
+    const tokenExpiresIn = expiresIn || defaultExpiresIn;
     const secret = this.configService.get<string>('JWT_SECRET');
     if (!secret) {
       throw new Error('JWT_SECRET is not configured');
     }
     return this.jwtService.sign(payload, {
-      expiresIn,
+      expiresIn: tokenExpiresIn,
       secret,
     });
   }

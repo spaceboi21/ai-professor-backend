@@ -1,6 +1,12 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
-import { IsEmail, IsNotEmpty, IsString } from 'class-validator';
+import {
+  IsEmail,
+  IsNotEmpty,
+  IsString,
+  IsOptional,
+  IsBoolean,
+} from 'class-validator';
 
 export class LoginSchoolAdminDto {
   @IsEmail({}, { message: 'Invalid email format' })
@@ -13,4 +19,13 @@ export class LoginSchoolAdminDto {
   @IsNotEmpty({ message: 'Password is required' })
   @ApiProperty({ example: '|Co(>#n(-5si' })
   password: string;
+
+  @IsOptional()
+  @IsBoolean({ message: 'Remember me must be a boolean' })
+  @ApiProperty({
+    example: false,
+    required: false,
+    description: 'If true, token will be valid for 30 days, otherwise 1 day',
+  })
+  rememberMe?: boolean;
 }
