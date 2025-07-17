@@ -11,11 +11,12 @@ import { StatusEnum } from 'src/common/constants/status.constant';
 import { PaginationDto } from 'src/common/dto/pagination.dto';
 import { UpdateSchoolDetailsDto } from 'src/modules/school-admin/dto/update-school-details.dto';
 import { JWTUserPayload } from 'src/common/types/jwr-user.type';
-import { RoleEnum } from 'src/common/constants/roles.constant';
+import { ROLE_IDS, RoleEnum } from 'src/common/constants/roles.constant';
 import {
   getPaginationOptions,
   createPaginationResult,
 } from 'src/common/utils/pagination.util';
+import { User } from 'src/database/schemas/central/user.schema';
 
 @Injectable()
 export class SchoolsService {
@@ -24,6 +25,8 @@ export class SchoolsService {
   constructor(
     @InjectModel(School.name)
     private readonly schoolModel: Model<School>,
+    @InjectModel(User.name)
+    private readonly userModel: Model<User>,
   ) {}
 
   async getAllSchools(
@@ -86,14 +89,34 @@ export class SchoolsService {
 
     // School admin can only access their own school
     if (user.role.name === RoleEnum.SCHOOL_ADMIN) {
-      if (school._id.toString() !== user.school_id) {
+      if (school._id.toString() !== user.school_id?.toString()) {
         throw new BadRequestException('You can only access your own school');
       }
     }
 
+    // find the super admin who is attached to this school
+    const superAdmin = await this.userModel.findOne(
+      {
+        school_id: new Types.ObjectId(school._id.toString()),
+        role: new Types.ObjectId(ROLE_IDS.SCHOOL_ADMIN),
+      },
+      {
+        _id: 1,
+        email: 1,
+        first_name: 1,
+        last_name: 1,
+        created_at: 1,
+        last_logged_in: 1,
+        status: 1,
+      },
+    );
+
     return {
       message: 'School retrieved successfully',
-      data: school,
+      data: {
+        ...school,
+        super_admin: superAdmin,
+      },
     };
   }
 
