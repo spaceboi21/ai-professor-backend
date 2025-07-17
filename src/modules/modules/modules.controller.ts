@@ -143,56 +143,57 @@ export class ModulesController {
     return this.modulesService.findAllModules(user, paginationDto, filterDto);
   }
 
-  @Get('overview')
-  @Roles(RoleEnum.STUDENT)
-  @ApiOperation({
-    summary: 'Get module overview with progress statistics (Student)',
-  })
-  @ApiResponse({
-    status: 200,
-    description: 'Module overview retrieved successfully',
-    schema: {
-      type: 'object',
-      properties: {
-        message: {
-          type: 'string',
-          example: 'Module overview retrieved successfully',
-        },
-        data: {
-          type: 'object',
-          properties: {
-            total_modules: { type: 'number', example: 10 },
-            completed_modules: { type: 'number', example: 3 },
-            in_progress_modules: { type: 'number', example: 2 },
-            not_started_modules: { type: 'number', example: 5 },
-            overall_progress_percentage: { type: 'number', example: 35.5 },
-            recent_modules: {
-              type: 'array',
-              items: {
-                type: 'object',
-                properties: {
-                  _id: { type: 'string' },
-                  title: { type: 'string' },
-                  subject: { type: 'string' },
-                  status: { type: 'string' },
-                  progress_percentage: { type: 'number' },
-                  last_accessed_at: { type: 'string' },
-                },
-              },
-            },
-          },
-        },
-      },
-    },
-  })
-  @ApiResponse({ status: 400, description: 'Bad request' })
-  @ApiResponse({
-    status: 403,
-    description: 'Access denied - Only students can view module overview',
-  })
-  async getModuleOverview(@User() user: JWTUserPayload) {
-    return this.modulesService.getModuleOverview(user);
-  }
+  // not in use
+  // @Get('overview')
+  // @Roles(RoleEnum.STUDENT)
+  // @ApiOperation({
+  //   summary: 'Get module overview with progress statistics (Student)',
+  // })
+  // @ApiResponse({
+  //   status: 200,
+  //   description: 'Module overview retrieved successfully',
+  //   schema: {
+  //     type: 'object',
+  //     properties: {
+  //       message: {
+  //         type: 'string',
+  //         example: 'Module overview retrieved successfully',
+  //       },
+  //       data: {
+  //         type: 'object',
+  //         properties: {
+  //           total_modules: { type: 'number', example: 10 },
+  //           completed_modules: { type: 'number', example: 3 },
+  //           in_progress_modules: { type: 'number', example: 2 },
+  //           not_started_modules: { type: 'number', example: 5 },
+  //           overall_progress_percentage: { type: 'number', example: 35.5 },
+  //           recent_modules: {
+  //             type: 'array',
+  //             items: {
+  //               type: 'object',
+  //               properties: {
+  //                 _id: { type: 'string' },
+  //                 title: { type: 'string' },
+  //                 subject: { type: 'string' },
+  //                 status: { type: 'string' },
+  //                 progress_percentage: { type: 'number' },
+  //                 last_accessed_at: { type: 'string' },
+  //               },
+  //             },
+  //           },
+  //         },
+  //       },
+  //     },
+  //   },
+  // })
+  // @ApiResponse({ status: 400, description: 'Bad request' })
+  // @ApiResponse({
+  //   status: 403,
+  //   description: 'Access denied - Only students can view module overview',
+  // })
+  // async getModuleOverview(@User() user: JWTUserPayload) {
+  //   return this.modulesService.getModuleOverview(user);
+  // }
 
   @Get(':id')
   @Roles(
