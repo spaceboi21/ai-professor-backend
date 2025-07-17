@@ -16,6 +16,7 @@ import {
 import { StudentService } from './student.service';
 import { CreateStudentDto } from './dto/create-student.dto';
 import { UpdateStudentDto } from './dto/update-student.dto';
+import { ResetStudentPasswordDto } from './dto/reset-password.dto';
 import { JwtAuthGuard } from 'src/common/guards/jwt.guard';
 import { RoleGuard } from 'src/common/guards/roles.guard';
 import { Roles } from 'src/common/decorators/roles.decorator';
@@ -311,5 +312,20 @@ export class StudentController {
       user,
       school_id,
     );
+  }
+
+  // Reset password endpoint for students
+  @Post('reset-password')
+  @Roles(RoleEnum.STUDENT)
+  @ApiOperation({ summary: 'Reset password for authenticated student' })
+  @ApiBody({ type: ResetStudentPasswordDto })
+  @ApiResponse({ status: 200, description: 'Password updated successfully' })
+  @ApiResponse({ status: 404, description: 'Student not found' })
+  @ApiResponse({ status: 400, description: 'Invalid old password' })
+  async resetPassword(
+    @Body() resetPasswordDto: ResetStudentPasswordDto,
+    @User() user: JWTUserPayload,
+  ) {
+    return this.studentService.resetPassword(user.id.toString(), resetPasswordDto);
   }
 }

@@ -78,7 +78,7 @@ The password management system provides two main features:
 - `400`: Invalid or expired token
 - `404`: User not found
 
-### 4. Reset Password (Authenticated)
+### 4. Reset Password (School Admin/Professor - Authenticated)
 
 **Endpoint**: `POST /api/school-admin/reset-password`
 
@@ -114,6 +114,45 @@ Authorization: Bearer <jwt_token>
 
 **Error Responses**:
 - `404`: User not found
+- `400`: Invalid old password
+
+### 5. Reset Password (Student - Authenticated)
+
+**Endpoint**: `POST /api/students/reset-password`
+
+**Description**: Reset password for authenticated student with old password verification. User ID is extracted from JWT token.
+
+**Headers**:
+```
+Authorization: Bearer <jwt_token>
+```
+
+**Request Body**:
+```json
+{
+  "old_password": "OldPassword123!",
+  "new_password": "NewPassword123!"
+}
+```
+
+**Response**:
+```json
+{
+  "message": "Password updated successfully",
+  "data": {
+    "id": "507f1f77bcf86cd799439011",
+    "email": "student@school.edu",
+    "first_name": "Alice",
+    "last_name": "Smith",
+    "student_code": "springfieldhigh-1703123456789",
+    "school_id": "507f1f77bcf86cd799439012",
+    "created_at": "2024-01-01T00:00:00.000Z"
+  }
+}
+```
+
+**Error Responses**:
+- `404`: Student not found
 - `400`: Invalid old password
 
 ## Password Requirements
@@ -197,9 +236,17 @@ To test the password management functionality:
      -d '{"token": "your-token", "new_password": "NewPassword123!"}'
    ```
 
-4. **Reset Password Test**:
+4. **Reset Password Test (School Admin/Professor)**:
    ```bash
    curl -X POST http://localhost:5000/api/school-admin/reset-password \
+     -H "Content-Type: application/json" \
+     -H "Authorization: Bearer your-jwt-token" \
+     -d '{"old_password": "OldPassword123!", "new_password": "NewPassword123!"}'
+   ```
+
+5. **Reset Password Test (Student)**:
+   ```bash
+   curl -X POST http://localhost:5000/api/students/reset-password \
      -H "Content-Type: application/json" \
      -H "Authorization: Bearer your-jwt-token" \
      -d '{"old_password": "OldPassword123!", "new_password": "NewPassword123!"}'

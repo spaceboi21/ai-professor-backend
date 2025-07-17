@@ -21,6 +21,7 @@ import { EmailUtil } from 'src/common/utils/email.util';
 import { CreateStudentDto } from './dto/create-student.dto';
 import { UpdateStudentDto } from './dto/update-student.dto';
 import { BulkCreateResult, StudentCsvRow } from './dto/bulk-create-student.dto';
+import { ResetStudentPasswordDto } from './dto/reset-password.dto';
 import { RoleEnum } from 'src/common/constants/roles.constant';
 import { JWTUserPayload } from 'src/common/types/jwr-user.type';
 import { createPaginationResult, getPaginationOptions } from 'src/common/utils';
@@ -1135,5 +1136,78 @@ export class StudentService {
     );
 
     return result;
+  }
+
+  async resetPassword(userId: string, resetPasswordDto: ResetStudentPasswordDto) {
+    const { old_password, new_password } = resetPasswordDto;
+    this.logger.log(`Resetting password for student: ${userId}`);
+
+    // Get the student's school information from JWT token
+    // We need to get the school from the global student collection
+    const globalStudent = await this.globalStudentModel.findOne({
+      student_id: new Types.ObjectId(userId),
+    });
+
+    if (!globalStudent) {
+      this.logger.warn(`Global student not found: ${userId}`);
+      throw new NotFoundException('Student not found');
+    }
+
+    // Get the school information
+    const school = await this.schoolModel.findById(globalStudent.school_id);
+    if (!school) {
+      this.logger.warn(`School not found for student: ${userId}`);
+      throw new NotFoundException('School not found');
+    }
+
+    // Get tenant connection for the school
+    const tenantConnection = await this.tenantConnectionService.getTenantConnection(school.db_name);
+    const StudentModel = tenantConnection.model(Student.name, StudentSchema);
+
+    // Find the student in the tenant database
+    const student = await StudentModel.findById(userId).select('+password');
+    if (!student) {
+      this.logger.warn(`Student not found in tenant DB: ${userId}`);
+      throw new NotFoundException('Student not found');
+    }
+
+    // Validate old password
+    const isPasswordValid = await this.bcryptUtil.comparePassword(
+      old_password,
+      student.password,
+    );
+
+    if (!isPasswordValid) {
+      this.logger.warn(`Invalid old password for student: ${userId}`);
+      throw new BadRequestException('Invalid old password');
+    }
+
+    // Hash the new password
+    const hashedNewPassword = await this.bcryptUtil.hashPassword(new_password);
+    
+    // Update the password
+    student.password = hashedNewPassword;
+    student.last_logged_in = new Date();
+    
+    try {
+      const updatedStudent = await student.save();
+      this.logger.log(`Password updated successfully for student: ${student.email}`);
+      
+      return {
+        message: 'Password updated successfully',
+        data: {
+          id: updatedStudent._id,
+          email: updatedStudent.email,
+          first_name: updatedStudent.first_name,
+          last_name: updatedStudent.last_name,
+          student_code: updatedStudent.student_code,
+          school_id: updatedStudent.school_id,
+          created_at: updatedStudent.created_at,
+        },
+      };
+    } catch (error) {
+      this.logger.error('Error updating student password:', error);
+      throw new BadRequestException('Failed to update password');
+    }
   }
 }

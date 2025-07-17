@@ -336,8 +336,8 @@ export class AuthService {
     const { email } = forgotPasswordDto;
     this.logger.log(`Forgot password request for email: ${email}`);
 
-    // Find school admin or professor with this email
-    const user = await this.userModel.findOne({
+    // First, check if email exists in school admin/professor users
+    const schoolUser = await this.userModel.findOne({
       email,
       role: {
         $in: [
@@ -350,14 +350,64 @@ export class AuthService {
       select: 'name',
     });
 
-    if (!user) {
+    if (schoolUser) {
+      // Handle school admin/professor forgot password
+      return this.handleSchoolUserForgotPassword(schoolUser);
+    }
+
+    // If not found in school users, check if it's a student
+    const globalStudent = await this.globalStudentModel.findOne({ email });
+    if (!globalStudent) {
       this.logger.warn(`User not found for forgot password: ${email}`);
       throw new NotFoundException('User not found with this email');
     }
 
+    // Get the school information for the student
+    const school = await this.schoolModel.findById(globalStudent.school_id);
+    if (!school) {
+      this.logger.warn(`School not found for student: ${email}`);
+      throw new NotFoundException('School not found for this student');
+    }
+
+    // Check school status
+    if (school.status === StatusEnum.INACTIVE) {
+      this.logger.warn(`School is inactive for student: ${email}`);
+      throw new BadRequestException(
+        'Your school has been deactivated. Please contact support for assistance.',
+      );
+    }
+
+    // Get tenant connection for the school
+    const tenantConnection = await this.tenantConnectionService.getTenantConnection(school.db_name);
+    const StudentModel = tenantConnection.model(Student.name, StudentSchema);
+
+    // Find the student in the tenant database
+    const student = await StudentModel.findOne({
+      email,
+      deleted_at: null,
+    });
+
+    if (!student) {
+      this.logger.warn(`Student not found in school DB: ${email}`);
+      throw new NotFoundException('Student not found in school database');
+    }
+
+    // Check student status
+    if (student.status === StatusEnum.INACTIVE) {
+      this.logger.warn(`Student account is inactive: ${email}`);
+      throw new BadRequestException(
+        'Your account has been deactivated. Please contact support for assistance.',
+      );
+    }
+
+    // Handle student forgot password
+    return this.handleStudentForgotPassword(student, school);
+  }
+
+  private async handleSchoolUserForgotPassword(user: any) {
     // Check user status
     if (user.status === StatusEnum.INACTIVE) {
-      this.logger.warn(`User account is inactive for forgot password: ${email}`);
+      this.logger.warn(`User account is inactive for forgot password: ${user.email}`);
       throw new BadRequestException(
         'Your account has been deactivated. Please contact support for assistance.',
       );
@@ -379,13 +429,45 @@ export class AuthService {
     // Send email
     try {
       await this.mailService.sendPasswordResetEmail(
-        email,
+        user.email,
         `${user.first_name}${user.last_name ? ` ${user.last_name}` : ''}`,
         resetPasswordLink,
       );
-      this.logger.log(`Password reset email sent to: ${email}`);
+      this.logger.log(`Password reset email sent to school user: ${user.email}`);
     } catch (error) {
-      this.logger.error(`Failed to send password reset email to: ${email}`, error);
+      this.logger.error(`Failed to send password reset email to: ${user.email}`, error);
+      throw new BadRequestException('Failed to send password reset email');
+    }
+
+    return {
+      message: 'Password reset link has been sent to your email',
+    };
+  }
+
+  private async handleStudentForgotPassword(student: any, school: any) {
+    // Generate reset token for student (valid for 1 hour)
+    const resetToken = this.jwtUtil.generateToken({
+      id: student._id.toString(),
+      email: student.email,
+      role_id: ROLE_IDS.STUDENT,
+      role_name: RoleEnum.STUDENT,
+      school_id: school._id.toString(),
+    });
+
+    // Create reset password link - serve from backend
+    const backendUrl = this.configService.get<string>('BACKEND_URL') || 'http://localhost:3000';
+    const resetPasswordLink = `${backendUrl}/static/reset-password.html?token=${resetToken}`;
+
+    // Send email
+    try {
+      await this.mailService.sendPasswordResetEmail(
+        student.email,
+        `${student.first_name}${student.last_name ? ` ${student.last_name}` : ''}`,
+        resetPasswordLink,
+      );
+      this.logger.log(`Password reset email sent to student: ${student.email}`);
+    } catch (error) {
+      this.logger.error(`Failed to send password reset email to: ${student.email}`, error);
       throw new BadRequestException('Failed to send password reset email');
     }
 
@@ -402,48 +484,12 @@ export class AuthService {
       // Verify the token
       const payload = this.jwtUtil.verifyToken(token);
       
-      // Find the user
-      const user = await this.userModel.findById(payload.id).select('+password');
-      if (!user) {
-        this.logger.warn(`User not found for password reset: ${payload.id}`);
-        throw new NotFoundException('Invalid reset token');
+      // Check if it's a student or school user based on role
+      if (payload.role_name === RoleEnum.STUDENT) {
+        return this.handleStudentPasswordReset(payload, new_password);
+      } else {
+        return this.handleSchoolUserPasswordReset(payload, new_password);
       }
-
-      // Check if user is school admin or professor
-      const userRoleId = user.role.toString();
-      if (userRoleId !== ROLE_IDS.SCHOOL_ADMIN && userRoleId !== ROLE_IDS.PROFESSOR) {
-        this.logger.warn(`Invalid user role for password reset: ${user.role}`);
-        throw new BadRequestException('Invalid user type for password reset');
-      }
-
-      // Check user status
-      if (user.status === StatusEnum.INACTIVE) {
-        this.logger.warn(`User account is inactive for password reset: ${user.email}`);
-        throw new BadRequestException(
-          'Your account has been deactivated. Please contact support for assistance.',
-        );
-      }
-
-      // Hash the new password
-      const hashedPassword = await this.bcryptUtil.hashPassword(new_password);
-      
-      // Update the password
-      user.password = hashedPassword;
-      user.last_logged_in = new Date();
-      
-      await user.save();
-
-      this.logger.log(`Password updated successfully for user: ${user.email}`);
-      
-      return {
-        message: 'Password updated successfully',
-        data: {
-          id: user._id,
-          email: user.email,
-          first_name: user.first_name,
-          last_name: user.last_name,
-        },
-      };
     } catch (error) {
       if (error instanceof NotFoundException || error instanceof BadRequestException) {
         throw error;
@@ -451,5 +497,100 @@ export class AuthService {
       this.logger.error('Error setting new password:', error);
       throw new BadRequestException('Invalid or expired reset token');
     }
+  }
+
+  private async handleSchoolUserPasswordReset(payload: any, new_password: string) {
+    // Find the school user
+    const user = await this.userModel.findById(payload.id).select('+password');
+    if (!user) {
+      this.logger.warn(`School user not found for password reset: ${payload.id}`);
+      throw new NotFoundException('Invalid reset token');
+    }
+
+    // Check if user is school admin or professor
+    const userRoleId = user.role.toString();
+    if (userRoleId !== ROLE_IDS.SCHOOL_ADMIN && userRoleId !== ROLE_IDS.PROFESSOR) {
+      this.logger.warn(`Invalid user role for password reset: ${user.role}`);
+      throw new BadRequestException('Invalid user type for password reset');
+    }
+
+    // Check user status
+    if (user.status === StatusEnum.INACTIVE) {
+      this.logger.warn(`User account is inactive for password reset: ${user.email}`);
+      throw new BadRequestException(
+        'Your account has been deactivated. Please contact support for assistance.',
+      );
+    }
+
+    // Hash the new password
+    const hashedPassword = await this.bcryptUtil.hashPassword(new_password);
+    
+    // Update the password
+    user.password = hashedPassword;
+    user.last_logged_in = new Date();
+    
+    await user.save();
+
+    this.logger.log(`Password updated successfully for school user: ${user.email}`);
+    
+    return {
+      message: 'Password updated successfully',
+      data: {
+        id: user._id,
+        email: user.email,
+        first_name: user.first_name,
+        last_name: user.last_name,
+      },
+    };
+  }
+
+  private async handleStudentPasswordReset(payload: any, new_password: string) {
+    // Get the school information
+    const school = await this.schoolModel.findById(payload.school_id);
+    if (!school) {
+      this.logger.warn(`School not found for student password reset: ${payload.school_id}`);
+      throw new NotFoundException('School not found');
+    }
+
+    // Get tenant connection for the school
+    const tenantConnection = await this.tenantConnectionService.getTenantConnection(school.db_name);
+    const StudentModel = tenantConnection.model(Student.name, StudentSchema);
+
+    // Find the student in the tenant database
+    const student = await StudentModel.findById(payload.id).select('+password');
+    if (!student) {
+      this.logger.warn(`Student not found for password reset: ${payload.id}`);
+      throw new NotFoundException('Invalid reset token');
+    }
+
+    // Check student status
+    if (student.status === StatusEnum.INACTIVE) {
+      this.logger.warn(`Student account is inactive for password reset: ${student.email}`);
+      throw new BadRequestException(
+        'Your account has been deactivated. Please contact support for assistance.',
+      );
+    }
+
+    // Hash the new password
+    const hashedPassword = await this.bcryptUtil.hashPassword(new_password);
+    
+    // Update the password
+    student.password = hashedPassword;
+    student.last_logged_in = new Date();
+    
+    await student.save();
+
+    this.logger.log(`Password updated successfully for student: ${student.email}`);
+    
+    return {
+      message: 'Password updated successfully',
+      data: {
+        id: student._id,
+        email: student.email,
+        first_name: student.first_name,
+        last_name: student.last_name,
+        student_code: student.student_code,
+      },
+    };
   }
 }
