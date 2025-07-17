@@ -74,7 +74,7 @@ export class AuthController {
 
   @Post('forgot-password')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Request password reset for school admin or professor' })
+  @ApiOperation({ summary: 'Request password reset for school admin or professor or student' })
   @ApiBody({ type: ForgotPasswordDto })
   @ApiResponse({ status: 200, description: 'Password reset link sent successfully' })
   @ApiResponse({ status: 404, description: 'User not found with this email' })
