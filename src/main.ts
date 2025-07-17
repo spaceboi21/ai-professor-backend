@@ -15,7 +15,7 @@ async function bootstrap() {
     const configService = app.get(ConfigService);
 
     // Parse multiple frontend origins from environment variable
-    const frontendOriginString = configService.get<string>('FRONT_END_BASE_URL') || 'http://localhost:3000';
+    const frontendOriginString = configService.get<string>('ALLOWED_CORS_URLS') || 'http://localhost:3000';
     const frontendOrigins = frontendOriginString.split(',').map(origin => origin.trim());
 
     // CORS configuration with multiple domains support
