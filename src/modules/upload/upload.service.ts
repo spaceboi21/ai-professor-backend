@@ -29,6 +29,8 @@ export class UploadService {
     'video/wmv',
     'video/flv',
     'video/webm',
+    'application/vnd.ms-powerpoint',
+    'application/vnd.openxmlformats-officedocument.presentationml.presentation',
   ];
 
   constructor(private readonly configService: ConfigService) {
