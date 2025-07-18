@@ -251,6 +251,8 @@ export class ProfessorService {
     user: JWTUserPayload,
     search?: string,
     status?: string,
+    sortBy?: string,
+    sortOrder?: 'asc' | 'desc',
   ) {
     this.logger.log('Getting all professors with filters');
 
@@ -275,13 +277,49 @@ export class ProfessorService {
       filter.status = status;
     }
 
+    // Build sort object
+    const sort: any = {};
+    if (sortBy) {
+      const order = sortOrder === 'desc' ? -1 : 1;
+      sort[sortBy] = order;
+    } else {
+      // Default sorting by created_at descending (newest first)
+      sort.created_at = -1;
+    }
+
     const [professors, total] = await Promise.all([
-      this.userModel
-        .find(filter)
-        .populate('role', 'name')
-        .skip((page - 1) * limit)
-        .limit(limit)
-        .lean(),
+      this.userModel.aggregate([
+        { $match: filter },
+        {
+          $lookup: {
+            from: 'roles',
+            localField: 'role',
+            foreignField: '_id',
+            as: 'roleData',
+          },
+        },
+        {
+          $addFields: {
+            name: {
+              $concat: [
+                '$first_name',
+                {
+                  $cond: {
+                    if: '$last_name',
+                    then: { $concat: [' ', '$last_name'] },
+                    else: '',
+                  },
+                },
+              ],
+            },
+            role: { $arrayElemAt: ['$roleData', 0] },
+          },
+        },
+        { $unset: 'roleData' },
+        { $sort: sort },
+        { $skip: (page - 1) * limit },
+        { $limit: limit },
+      ]),
       this.userModel.countDocuments(filter),
     ]);
 

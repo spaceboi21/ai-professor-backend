@@ -34,6 +34,7 @@ import {
   ApiConsumes,
 } from '@nestjs/swagger';
 import { PaginationDto } from 'src/common/dto/pagination.dto';
+import { SortingDto } from 'src/common/dto/sorting.dto';
 import { ParseObjectIdPipe } from '@nestjs/mongoose';
 import { UpdateStatusDto } from 'src/common/dto/update-status.dto';
 import { Types } from 'mongoose';
@@ -171,6 +172,20 @@ export class StudentController {
     description:
       'School ID (required for SUPER_ADMIN, optional for SCHOOL_ADMIN)',
   })
+  @ApiQuery({
+    name: 'sortBy',
+    required: false,
+    type: String,
+    enum: ['name', 'email', 'created_at', 'updated_at'],
+    description: 'Field to sort by (name = first_name + last_name)',
+  })
+  @ApiQuery({
+    name: 'sortOrder',
+    required: false,
+    type: String,
+    enum: ['asc', 'desc'],
+    description: 'Sort order (asc or desc)',
+  })
   @ApiResponse({
     status: 200,
     description: 'Students retrieved successfully',
@@ -182,6 +197,8 @@ export class StudentController {
     @Query('search') search?: string,
     @Query('status') status?: StatusEnum,
     @Query('school_id') school_id?: string,
+    @Query('sortBy') sortBy?: string,
+    @Query('sortOrder') sortOrder?: 'asc' | 'desc',
   ) {
     return this.studentService.getAllStudents(
       paginationDto,
@@ -189,6 +206,8 @@ export class StudentController {
       search,
       status,
       school_id,
+      sortBy,
+      sortOrder,
     );
   }
 

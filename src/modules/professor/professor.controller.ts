@@ -33,6 +33,7 @@ import {
 import { ProfessorService } from './professor.service';
 import { UpdateStatusDto } from 'src/common/dto/update-status.dto';
 import { PaginationDto } from 'src/common/dto/pagination.dto';
+import { SortingDto } from 'src/common/dto/sorting.dto';
 
 @ApiTags('Professor')
 @ApiBearerAuth()
@@ -99,6 +100,20 @@ export class ProfessorController {
   @ApiQuery({ name: 'limit', required: false, type: Number })
   @ApiQuery({ name: 'search', required: false, type: String })
   @ApiQuery({ name: 'status', required: false, type: String })
+  @ApiQuery({
+    name: 'sortBy',
+    required: false,
+    type: String,
+    enum: ['name', 'email', 'created_at', 'updated_at'],
+    description: 'Field to sort by (name = first_name + last_name)',
+  })
+  @ApiQuery({
+    name: 'sortOrder',
+    required: false,
+    type: String,
+    enum: ['asc', 'desc'],
+    description: 'Sort order (asc or desc)',
+  })
   @ApiResponse({
     status: 200,
     description: 'Professors retrieved successfully',
@@ -108,12 +123,16 @@ export class ProfessorController {
     @User() user: JWTUserPayload,
     @Query('search') search?: string,
     @Query('status') status?: string,
+    @Query('sortBy') sortBy?: string,
+    @Query('sortOrder') sortOrder?: 'asc' | 'desc',
   ) {
     return this.professorService.getAllProfessors(
       paginationDto,
       user,
       search,
       status,
+      sortBy,
+      sortOrder,
     );
   }
 
