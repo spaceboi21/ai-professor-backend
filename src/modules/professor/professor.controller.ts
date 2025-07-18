@@ -166,7 +166,7 @@ export class ProfessorController {
     );
   }
 
-  @Delete('delete/:id')
+  @Delete(':id')
   @Roles(RoleEnum.SUPER_ADMIN, RoleEnum.SCHOOL_ADMIN)
   @ApiOperation({ summary: 'Soft delete a professor' })
   @ApiParam({
