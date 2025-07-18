@@ -132,24 +132,16 @@ export class SchoolAdminService {
         success: true,
       };
     } catch (error) {
-      console.log("error", error?.message, error); 
       this.logger.error('Error creating school admin', error?.stack || error);
       await session.abortTransaction();
-
-      // If it's already a NestJS exception, re-throw it
-      if (
-        error instanceof ConflictException ||
-        error instanceof BadRequestException ||
-        error instanceof NotFoundException
-      ) {
-        throw error;
-      }
       if (error?.code === 11000) {
         throw new ConflictException(
           error?.message || 'Failed to create school admin',
         );
       }
-      throw new BadRequestException('Failed to create school admin');
+      throw new BadRequestException(
+        error?.message || 'Failed to create school admin',
+      );
     } finally {
       session.endSession();
     }
@@ -238,24 +230,19 @@ export class SchoolAdminService {
     user.password = hashedNewPassword;
     user.last_logged_in = new Date();
 
-    try {
-      const updatedUser = await user.save();
-      this.logger.log(`Password updated successfully for user: ${user.email}`);
+    const updatedUser = await user.save();
+    this.logger.log(`Password updated successfully for user: ${user.email}`);
 
-      return {
-        message: 'Password updated successfully',
-        data: {
-          id: updatedUser._id,
-          email: updatedUser.email,
-          first_name: updatedUser.first_name,
-          last_name: updatedUser.last_name,
-          school_id: updatedUser.school_id,
-          created_at: updatedUser.created_at,
-        },
-      };
-    } catch (error) {
-      this.logger.error('Error updating password:', error);
-      throw new BadRequestException('Failed to update password');
-    }
+    return {
+      message: 'Password updated successfully',
+      data: {
+        id: updatedUser._id,
+        email: updatedUser.email,
+        first_name: updatedUser.first_name,
+        last_name: updatedUser.last_name,
+        school_id: updatedUser.school_id,
+        created_at: updatedUser.created_at,
+      },
+    };
   }
 }
