@@ -6,7 +6,9 @@ import {
   IsNotEmpty,
   IsMongoId,
   IsOptional,
+  IsEnum,
 } from 'class-validator';
+import { StatusEnum } from 'src/common/constants/status.constant';
 
 export class CreateStudentDto {
   @IsString({ message: 'First name must be a string' })
@@ -33,4 +35,14 @@ export class CreateStudentDto {
       'The ID provided is not in the correct format. Please use a valid MongoDB ObjectId.',
   })
   school_id?: string;
+
+  @ApiProperty({
+    enum: StatusEnum,
+    example: StatusEnum.ACTIVE,
+    description: 'Student status (ACTIVE or INACTIVE)',
+    required: false,
+  })
+  @IsEnum(StatusEnum, { message: 'Status must be ACTIVE or INACTIVE' })
+  @IsOptional()
+  status?: StatusEnum;
 }

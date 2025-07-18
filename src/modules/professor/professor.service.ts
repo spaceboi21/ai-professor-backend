@@ -44,7 +44,7 @@ export class ProfessorService {
     createProfessorDto: CreateProfessorDto,
     adminUser: JWTUserPayload,
   ) {
-    const { first_name, last_name, email, school_id } = createProfessorDto;
+    const { first_name, last_name, email, school_id, status } = createProfessorDto;
 
     this.logger.log(
       `Creating professor with email: ${email} for school: ${school_id}`,
@@ -93,6 +93,7 @@ export class ProfessorService {
         email,
         password: hashedPassword,
         school_id: new Types.ObjectId(school_id),
+        status: status || StatusEnum.ACTIVE, // Use provided status or default to ACTIVE
         created_by: new Types.ObjectId(adminUser?.id),
         created_by_role: adminUser.role.name as RoleEnum,
         role: new Types.ObjectId(ROLE_IDS[RoleEnum.PROFESSOR]),
@@ -118,6 +119,7 @@ export class ProfessorService {
           last_name: newStudent.last_name,
           email: newStudent.email,
           school_id: newStudent.school_id,
+          status: newStudent.status,
           created_at: newStudent.created_at,
         },
       };
