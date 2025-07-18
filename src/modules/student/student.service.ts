@@ -235,12 +235,12 @@ export class StudentService {
       if (!targetSchoolId) {
         throw new BadRequestException('School admin must have a school_id');
       }
-    } else if (user.role.name === RoleEnum.SUPER_ADMIN) {
+    } else if (user.role.name === RoleEnum.SUPER_ADMIN || user.role.name === RoleEnum.PROFESSOR) {
       // Super admin can specify school_id or use their default
       targetSchoolId = school_id?.toString() || (user.school_id as string);
       if (!targetSchoolId) {
         throw new BadRequestException(
-          'Super admin must provide school_id parameter',
+          'Super admin or professor must provide school_id parameter',
         );
       }
     } else {
