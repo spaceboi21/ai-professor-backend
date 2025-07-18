@@ -192,6 +192,7 @@ export class AuthService {
         last_name: user.last_name,
         school_id: school._id.toString(),
         role: user.role._id.toString(),
+        role_name: user.role.name as RoleEnum,
       },
     };
   }
