@@ -11,6 +11,7 @@ import {
 export enum BibliographyFileType {
   PDF = 'PDF',
   VIDEO = 'VIDEO',
+  POWERPOINT = 'POWERPOINT',
 }
 
 export class GetBibliographyUploadUrl {
@@ -33,16 +34,18 @@ export class GetBibliographyUploadUrl {
   @ApiProperty({
     example: 'application/pdf',
     description:
-      'MIME type - must be application/pdf for PDFs or video/* for videos',
+      'MIME type - must be application/pdf for PDFs, video/* for videos, or application/vnd.ms-powerpoint/application/vnd.openxmlformats-officedocument.presentationml.presentation for PowerPoint files',
   })
   mimeType: string;
 
-  @IsEnum(BibliographyFileType, { message: 'File type must be PDF or VIDEO' })
+  @IsEnum(BibliographyFileType, {
+    message: 'File type must be PDF or VIDEO or POWERPOINT',
+  })
   @IsNotEmpty({ message: 'File type is required' })
   @ApiProperty({
     enum: BibliographyFileType,
     example: BibliographyFileType.PDF,
-    description: 'Type of bibliography file (PDF or VIDEO)',
+    description: 'Type of bibliography file (PDF or VIDEO or POWERPOINT)',
   })
   fileType: BibliographyFileType;
 }

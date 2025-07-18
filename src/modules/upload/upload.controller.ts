@@ -65,7 +65,7 @@ function fileFilterForBibliography(req, file, cb) {
   } else {
     cb(
       new BadRequestException(
-        'Only PDF, video files (PDF, MP4, AVI, MOV, WMV, FLV, WebM), and PowerPoint files (PPT, PPTX) are allowed',
+        'Only PDF, video files (MP4, AVI, MOV, WMV, FLV, WebM), and PowerPoint files (PPT, PPTX) are allowed',
       ),
       false,
     );
@@ -137,7 +137,7 @@ export class UploadController {
     summary:
       'Generate a secure presigned upload URL for bibliography files (PDF/Video/PowerPoint)',
     description:
-      'Returns a temporary upload URL that expires in 10 minutes. File size limit: 100MB.',
+      'Returns a temporary upload URL that expires in 10 minutes. File size limit: 100MB. Supports PDF, video files (MP4, AVI, MOV, WMV, FLV, WebM), and PowerPoint files (PPT, PPTX).',
   })
   @ApiBody({ type: GetBibliographyUploadUrl })
   @ApiResponse({

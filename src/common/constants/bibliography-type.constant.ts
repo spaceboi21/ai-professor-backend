@@ -5,4 +5,5 @@ export enum BibliographyTypeEnum {
   CASE_STUDY = 'CASE_STUDY',
   IMAGE = 'IMAGE',
   LINK = 'LINK',
+  POWERPOINT = 'POWERPOINT',
 }

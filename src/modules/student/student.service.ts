@@ -50,7 +50,7 @@ export class StudentService {
     createStudentDto: CreateStudentDto,
     adminUser: JWTUserPayload,
   ) {
-    const { first_name, last_name, email, school_id } = createStudentDto;
+    const { first_name, last_name, email, school_id, status } = createStudentDto;
 
     this.logger.log(
       `Creating student with email: ${email} for school: ${school_id}`,
@@ -161,6 +161,7 @@ export class StudentService {
           .toLowerCase()
           .replace(/\s+/g, '')}-${Date.now()}`, // Generate school-specific student code
         school_id: new Types.ObjectId(targetSchoolId),
+        status: status || StatusEnum.ACTIVE, // Use provided status or default to ACTIVE
         created_by: new Types.ObjectId(adminUser?.id),
         created_by_role: adminUser.role.name as RoleEnum,
         is_csv_upload: false, // Mark as non-CSV upload
@@ -198,6 +199,7 @@ export class StudentService {
           email: savedStudent.email,
           student_code: savedStudent.student_code,
           school_id: savedStudent.school_id,
+          status: savedStudent.status,
           created_at: savedStudent.created_at,
         },
       };

@@ -113,6 +113,14 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
           throw new UnauthorizedException('User not found in central users');
         }
 
+        // Check if user is deleted
+        if (user.deleted_at) {
+          this.logger.warn(`User ${payload.email} account has been deleted`);
+          throw new UnauthorizedException(
+            'Your account has been deleted. Please contact support for assistance.',
+          );
+        }
+
         // Check user status
         if (user.status === StatusEnum.INACTIVE) {
           this.logger.warn(`User ${payload.email} account is inactive`);

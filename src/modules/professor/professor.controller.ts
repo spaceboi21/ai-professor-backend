@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Patch,
@@ -182,5 +183,23 @@ export class ProfessorController {
       updateStatusDto.status,
       user,
     );
+  }
+
+  @Delete(':id')
+  @Roles(RoleEnum.SUPER_ADMIN, RoleEnum.SCHOOL_ADMIN)
+  @ApiOperation({ summary: 'Soft delete a professor' })
+  @ApiParam({
+    name: 'id',
+    type: String,
+    description: 'Professor ID',
+    example: '507f1f77bcf86cd799439011',
+  })
+  @ApiResponse({ status: 200, description: 'Professor deleted successfully' })
+  @ApiResponse({ status: 404, description: 'Professor not found' })
+  async deleteProfessor(
+    @Param('id', ParseObjectIdPipe) id: Types.ObjectId,
+    @User() user: JWTUserPayload,
+  ) {
+    return this.professorService.deleteProfessor(id, user);
   }
 }

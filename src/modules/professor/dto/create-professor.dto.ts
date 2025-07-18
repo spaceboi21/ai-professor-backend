@@ -1,6 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
-import { IsString, IsEmail, IsNotEmpty, IsOptional } from 'class-validator';
+import { IsString, IsEmail, IsNotEmpty, IsOptional, IsEnum } from 'class-validator';
+import { StatusEnum } from 'src/common/constants/status.constant';
 
 export class CreateProfessorDto {
   @ApiProperty({ example: 'John', description: 'First name of the professor' })
@@ -32,4 +33,14 @@ export class CreateProfessorDto {
   @IsString({ message: 'School ID must be a string' })
   @IsNotEmpty({ message: 'School ID is required' })
   school_id: string;
+
+  @ApiProperty({
+    enum: StatusEnum,
+    example: StatusEnum.ACTIVE,
+    description: 'Professor status (ACTIVE or INACTIVE)',
+    required: false,
+  })
+  @IsEnum(StatusEnum, { message: 'Status must be ACTIVE or INACTIVE' })
+  @IsOptional()
+  status?: StatusEnum;
 }
