@@ -86,11 +86,11 @@ export class SchoolAdminService {
         .trim()
         .replace(/\s+/g, '_');
 
-        const dbNameExists = await this.schoolModel.exists({ db_name });
-        if (dbNameExists) {
-          this.logger.warn(`School with this name already exists: ${db_name}`);
-          throw new ConflictException('School with this name already exists');
-        }
+      const dbNameExists = await this.schoolModel.exists({ db_name });
+      if (dbNameExists) {
+        this.logger.warn(`School with this name already exists: ${db_name}`);
+        throw new ConflictException('School with this name already exists');
+      }
 
       const [createdSchool] = await this.schoolModel.insertMany([
         {
@@ -132,10 +132,22 @@ export class SchoolAdminService {
         success: true,
       };
     } catch (error) {
+      console.log("error", error?.message, error); 
       this.logger.error('Error creating school admin', error?.stack || error);
       await session.abortTransaction();
+
+      // If it's already a NestJS exception, re-throw it
+      if (
+        error instanceof ConflictException ||
+        error instanceof BadRequestException ||
+        error instanceof NotFoundException
+      ) {
+        throw error;
+      }
       if (error?.code === 11000) {
-        throw new ConflictException(error?.message || 'Failed to create school admin');
+        throw new ConflictException(
+          error?.message || 'Failed to create school admin',
+        );
       }
       throw new BadRequestException('Failed to create school admin');
     } finally {
@@ -190,7 +202,9 @@ export class SchoolAdminService {
     this.logger.log(`Resetting password for user: ${userId}`);
 
     // Find the school admin by ID
-    const user = await this.userModel.findById(new Types.ObjectId(userId)).select('+password');
+    const user = await this.userModel
+      .findById(new Types.ObjectId(userId))
+      .select('+password');
     if (!user) {
       this.logger.warn(`School admin not found: ${userId}`);
       throw new NotFoundException('User not found');
@@ -198,7 +212,10 @@ export class SchoolAdminService {
 
     // Check if user is school admin or professor
     const userRoleId = user.role.toString();
-    if (userRoleId !== ROLE_IDS.SCHOOL_ADMIN && userRoleId !== ROLE_IDS.PROFESSOR) {
+    if (
+      userRoleId !== ROLE_IDS.SCHOOL_ADMIN &&
+      userRoleId !== ROLE_IDS.PROFESSOR
+    ) {
       this.logger.warn(`Invalid user role for password reset: ${user.role}`);
       throw new BadRequestException('Invalid user type for password reset');
     }
@@ -216,15 +233,15 @@ export class SchoolAdminService {
 
     // Hash the new password
     const hashedNewPassword = await this.bcryptUtil.hashPassword(new_password);
-    
+
     // Update the password
     user.password = hashedNewPassword;
     user.last_logged_in = new Date();
-    
+
     try {
       const updatedUser = await user.save();
       this.logger.log(`Password updated successfully for user: ${user.email}`);
-      
+
       return {
         message: 'Password updated successfully',
         data: {
