@@ -130,7 +130,10 @@ export class ProfessorService {
 
   async updateProfessor(id: Types.ObjectId, data: UpdateProfessorDto) {
     // Find the professor by ID
-    const professor = await this.userModel.findById(id);
+    const professor = await this.userModel.findOne({
+      _id: id,
+      deleted_at: null, // Exclude deleted professors
+    });
     if (!professor) {
       throw new NotFoundException('Professor not found');
     }
@@ -204,7 +207,10 @@ export class ProfessorService {
     data: UpdateProfessorPasswordDto,
   ) {
     // Find the professor by ID
-    const professor = await this.userModel.findById(id);
+    const professor = await this.userModel.findOne({
+      _id: id,
+      deleted_at: null, // Exclude deleted professors
+    });
     if (!professor) {
       throw new NotFoundException('Professor not found');
     }
@@ -258,7 +264,7 @@ export class ProfessorService {
 
     // Build filter query
     const filter: any = {
-      deleted_at: null,
+      deleted_at: null, // Exclude deleted professors
       role: new Types.ObjectId(ROLE_IDS.PROFESSOR),
       school_id: user?.school_id ? new Types.ObjectId(user.school_id) : null,
     };
@@ -303,7 +309,7 @@ export class ProfessorService {
     const professor = await this.userModel
       .findOne({
         _id: id,
-        deleted_at: null,
+        deleted_at: null, // Exclude deleted professors
         role: new Types.ObjectId(ROLE_IDS.PROFESSOR),
         school_id: user?.school_id ? new Types.ObjectId(user.school_id) : null,
       })
@@ -333,6 +339,7 @@ export class ProfessorService {
     // Find professor in central users table
     const professor = await this.userModel.findOne({
       _id: id,
+      deleted_at: null, // Exclude deleted professors
       role: new Types.ObjectId(ROLE_IDS.PROFESSOR),
       school_id: user?.school_id ? new Types.ObjectId(user.school_id) : null,
     });
@@ -361,6 +368,68 @@ export class ProfessorService {
         last_name: updatedProfessor.last_name,
         status: updatedProfessor.status,
         role: updatedProfessor.role,
+      },
+    };
+  }
+
+  async deleteProfessor(id: Types.ObjectId, user: JWTUserPayload) {
+    this.logger.log(`Soft deleting professor: ${id}`);
+
+    // Find professor in central users table
+    const professor = await this.userModel.findOne({
+      _id: new Types.ObjectId(id),
+      role: new Types.ObjectId(ROLE_IDS.PROFESSOR),
+      deleted_at: null, // Only find non-deleted professors
+    });
+
+    if (!professor) {
+      throw new NotFoundException('Professor not found');
+    }
+
+    // If user is SCHOOL_ADMIN, ensure they can only delete professors from their school
+    if (user.role.name === RoleEnum.SCHOOL_ADMIN) {
+      if (user.school_id?.toString() !== professor.school_id?.toString()) {
+        throw new BadRequestException(
+          'You can only delete professors from your own school',
+        );
+      }
+    }
+
+    // Check if professor is already deleted
+    if (professor.deleted_at) {
+      throw new BadRequestException('Professor is already deleted');
+    }
+
+    // Soft delete the professor by setting deleted_at timestamp
+    const deletedProfessor = await this.userModel
+      .findByIdAndUpdate(
+        new Types.ObjectId(id),
+        { 
+          deleted_at: new Date(),
+          status: StatusEnum.INACTIVE // Also set status to inactive
+        },
+        { new: true }
+      )
+      .populate('role', 'name');
+
+    if (!deletedProfessor) {
+      throw new NotFoundException('Professor not found after deletion');
+    }
+
+    this.logger.log(
+      `Professor soft deleted successfully: ${id} by user: ${user.email}`,
+    );
+
+    return {
+      message: 'Professor deleted successfully',
+      data: {
+        id: deletedProfessor._id,
+        email: deletedProfessor.email,
+        first_name: deletedProfessor.first_name,
+        last_name: deletedProfessor.last_name,
+        deleted_at: deletedProfessor.deleted_at,
+        status: deletedProfessor.status,
+        role: deletedProfessor.role,
       },
     };
   }
