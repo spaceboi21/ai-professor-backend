@@ -86,6 +86,12 @@ export class SchoolAdminService {
         .trim()
         .replace(/\s+/g, '_');
 
+        const dbNameExists = await this.schoolModel.exists({ db_name });
+        if (dbNameExists) {
+          this.logger.warn(`School with this name already exists: ${db_name}`);
+          throw new ConflictException('School with this name already exists');
+        }
+
       const [createdSchool] = await this.schoolModel.insertMany([
         {
           name: school_name,
@@ -129,7 +135,7 @@ export class SchoolAdminService {
       this.logger.error('Error creating school admin', error?.stack || error);
       await session.abortTransaction();
       if (error?.code === 11000) {
-        throw new ConflictException('Email already exists');
+        throw new ConflictException(error?.message || 'Failed to create school admin');
       }
       throw new BadRequestException('Failed to create school admin');
     } finally {
