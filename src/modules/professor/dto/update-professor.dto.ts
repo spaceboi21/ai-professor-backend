@@ -1,6 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import {
+  IsEnum,
   IsNotEmpty,
   IsNumber,
   IsOptional,
@@ -8,6 +9,7 @@ import {
   IsUrl,
   Matches,
 } from 'class-validator';
+import { StatusEnum } from 'src/common/constants/status.constant';
 
 export class UpdateProfessorDto {
   //   @IsOptional()
@@ -48,6 +50,16 @@ export class UpdateProfessorDto {
     required: false,
   })
   profile_pic?: string;
+
+  @ApiProperty({
+    enum: StatusEnum,
+    example: StatusEnum.ACTIVE,
+    description: 'Professor status (ACTIVE or INACTIVE)',
+    required: false,
+  })
+  @IsEnum(StatusEnum, { message: 'Status must be ACTIVE or INACTIVE' })
+  @IsOptional()
+  status?: StatusEnum;
 }
 
 export class UpdateProfessorPasswordDto {

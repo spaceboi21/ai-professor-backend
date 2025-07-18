@@ -156,6 +156,9 @@ export class ProfessorService {
     if (data.profile_pic) {
       professor.profile_pic = data.profile_pic;
     }
+    if (data.status) {
+      professor.status = data.status;
+    }
 
     // email is not allowed to be updated
 
