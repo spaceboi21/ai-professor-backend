@@ -148,6 +148,7 @@ export class QuizService {
       school.db_name,
     );
     const QuizGroupModel = connection.model(QuizGroup.name, QuizGroupSchema);
+    const QuizModel = connection.model(Quiz.name, QuizSchema);
     // Register Module and Chapter models for populate to work
     connection.model(Module.name, ModuleSchema);
     connection.model(Chapter.name, ChapterSchema);
@@ -171,20 +172,18 @@ export class QuizService {
       filter.chapter_id = new Types.ObjectId(filterDto.chapter_id);
     }
 
-    const paginationOptions = getPaginationOptions(filter || {});
+    const quizGroups = await QuizGroupModel.findOne(filter).lean();
 
-    const [quizGroups, total] = await Promise.all([
-      QuizGroupModel.find(filter)
-        .sort({ created_at: -1 })
-        .skip(paginationOptions.skip)
-        .limit(paginationOptions.limit)
-        .populate('module_id', 'title subject')
-        .populate('chapter_id', 'title subject')
-        .exec(),
-      QuizGroupModel.countDocuments(filter),
-    ]);
+    if (!quizGroups?._id) {
+      throw new NotFoundException('Quiz group not found');
+    }
 
-    return createPaginationResult(quizGroups, total, paginationOptions);
+    const quiz = await QuizModel.find({ quiz_group_id: quizGroups._id }).sort({
+      sequence: 1,
+      created_at: -1,
+    });
+
+    return { ...quizGroups, quiz };
   }
 
   async findQuizGroupById(id: string | Types.ObjectId, user: JWTUserPayload) {
