@@ -32,6 +32,7 @@ export class MailService {
     userName: string,
     resetPasswordLink: string,
   ) {
+    const logoUrl = this.configService.get<string>('LOGO_URL');
     await this.mailerService.sendMail({
       to: email,
       subject: 'Password Reset Request',
@@ -39,6 +40,7 @@ export class MailService {
       context: {
         userName,
         resetPasswordLink,
+        logoUrl,
       },
     });
   }
