@@ -9,6 +9,7 @@ import {
   ArrayMinSize,
   IsNumber,
   Min,
+  ValidateIf,
 } from 'class-validator';
 import { Types } from 'mongoose';
 import { QuizQuestionTypeEnum } from 'src/common/constants/quiz.constant';
@@ -43,6 +44,7 @@ export class CreateQuizDto {
   type: QuizQuestionTypeEnum;
 
   @IsArray({ message: 'Options must be an array' })
+  @ValidateIf((o) => o?.type?.toUpperCase() !== QuizQuestionTypeEnum.SCENARIO_BASED)
   @ArrayMinSize(2, { message: 'At least 2 options are required' })
   @IsString({ each: true, message: 'Each option must be a string' })
   @ApiProperty({

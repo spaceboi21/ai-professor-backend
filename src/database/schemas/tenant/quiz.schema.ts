@@ -36,7 +36,7 @@ export class Quiz extends Document {
   @Prop({ required: true, enum: QuizQuestionTypeEnum })
   type: QuizQuestionTypeEnum;
 
-  @Prop({ required: true, type: [String] })
+  @Prop({ required: false, type: [String], default: [] })
   options: string[]; // Array of all the options
 
   @Prop({ type: [String] })
