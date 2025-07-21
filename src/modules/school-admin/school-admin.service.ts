@@ -80,9 +80,11 @@ export class SchoolAdminService {
     try {
       session.startTransaction();
 
+      // Allow numbers and lowercase letters in db_name, replace all other characters except spaces
+      // Numbers in database names are generally safe and supported by MongoDB and most RDBMS.
       const db_name = school_name
         .toLowerCase()
-        .replace(/[^a-z\s]/g, '')
+        .replace(/[^a-z0-9\s]/g, '')
         .trim()
         .replace(/\s+/g, '_');
 
