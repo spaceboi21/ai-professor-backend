@@ -299,6 +299,8 @@ export class QuizController {
     name: 'groupId',
     description: 'Quiz group ID',
     example: '507f1f77bcf86cd799439011',
+    type: 'string',
+    format: 'mongoId',
   })
   @ApiResponse({
     status: 200,
@@ -323,6 +325,8 @@ export class QuizController {
     name: 'moduleId',
     description: 'Module ID',
     example: '507f1f77bcf86cd799439011',
+    type: 'string',
+    format: 'mongoId',
   })
   @ApiResponse({
     status: 200,
