@@ -108,6 +108,7 @@ export class SchoolAdminService {
         {
           email: user_email,
           first_name: user_first_name,
+          last_name: user_last_name,
           school_id: createdSchool._id,
           password: await this.bcryptUtil.hashPassword(password),
           role: new Types.ObjectId(ROLE_IDS.SCHOOL_ADMIN),
