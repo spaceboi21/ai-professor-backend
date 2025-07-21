@@ -12,7 +12,6 @@ import {
 import { Types } from 'mongoose';
 import { DifficultyEnum } from 'src/common/constants/difficulty.constant';
 import {
-  QuizCategoryEnum,
   QuizTypeEnum,
 } from 'src/common/constants/quiz.constant';
 
@@ -54,16 +53,13 @@ export class CreateQuizGroupDto {
   })
   time_left: number;
 
-  @IsEnum(QuizCategoryEnum, {
-    message: 'Category must be ASSESSMENT, COMMUNICATION, ANXIETY, or TRAUMA',
-  })
+  @IsString({ message: 'Category must be a string' })
   @IsNotEmpty({ message: 'Category is required' })
   @ApiProperty({
-    example: QuizCategoryEnum.COMMUNICATION,
-    enum: QuizCategoryEnum,
+    example: 'COMMUNICATION',
     description: 'Category of the quiz group',
   })
-  category: QuizCategoryEnum;
+  category: string;
 
   @IsEnum(QuizTypeEnum, {
     message: 'Type must be MODULE or CHAPTER',

@@ -39,7 +39,7 @@ export class Quiz extends Document {
   @Prop({ required: true, type: [String] })
   options: string[]; // Array of all the options
 
-  @Prop({ required: true, type: [String] })
+  @Prop({ type: [String] })
   answer: string[]; // Array of correct options
 
   @Prop()

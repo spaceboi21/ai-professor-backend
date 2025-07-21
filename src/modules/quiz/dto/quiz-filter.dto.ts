@@ -1,26 +1,22 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsEnum, IsOptional, IsMongoId } from 'class-validator';
+import { IsEnum, IsOptional, IsMongoId, IsString } from 'class-validator';
 import { Types } from 'mongoose';
 import { DifficultyEnum } from 'src/common/constants/difficulty.constant';
 import {
-  QuizCategoryEnum,
   QuizTypeEnum,
   QuizQuestionTypeEnum,
 } from 'src/common/constants/quiz.constant';
 import { PaginationDto } from 'src/common/dto/pagination.dto';
 
 export class QuizGroupFilterDto extends PaginationDto {
-  @IsEnum(QuizCategoryEnum, {
-    message: 'Category must be ASSESSMENT, COMMUNICATION, ANXIETY, or TRAUMA',
-  })
+  @IsString({ message: 'Category must be a string' })
   @IsOptional()
   @ApiProperty({
-    example: QuizCategoryEnum.COMMUNICATION,
-    enum: QuizCategoryEnum,
+    example: 'COMMUNICATION',
     description: 'Filter by quiz category',
     required: false,
   })
-  category?: QuizCategoryEnum;
+  category?: string;
 
   @IsEnum(DifficultyEnum, {
     message: 'Difficulty must be BEGINNER, INTERMEDIATE, or ADVANCED',

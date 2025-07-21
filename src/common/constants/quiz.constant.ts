@@ -1,9 +1,3 @@
-export enum QuizCategoryEnum {
-  ASSESSMENT = 'ASSESSMENT',
-  COMMUNICATION = 'COMMUNICATION',
-  ANXIETY = 'ANXIETY',
-  TRAUMA = 'TRAUMA',
-}
 
 export enum QuizTypeEnum {
   MODULE = 'MODULE',
@@ -14,4 +8,4 @@ export enum QuizQuestionTypeEnum {
   MULTI_SELECT = 'MULTI_SELECT',
   SINGLE_SELECT = 'SINGLE_SELECT',
   SCENARIO_BASED = 'SCENARIO_BASED',
-} 
+}

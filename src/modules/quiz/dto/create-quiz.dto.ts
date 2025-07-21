@@ -58,14 +58,15 @@ export class CreateQuizDto {
   options: string[];
 
   @IsArray({ message: 'Answer must be an array' })
-  @ArrayMinSize(1, { message: 'At least 1 correct answer is required' })
   @IsString({ each: true, message: 'Each answer must be a string' })
   @ApiProperty({
     example: ['Listen actively and show empathy'],
     description: 'Array of correct options (must be from the options array)',
     type: [String],
+    required: false,
   })
-  answer: string[];
+  @IsOptional()
+  answer?: string[];
 
   @IsString({ message: 'Explanation must be a string' })
   @IsOptional()

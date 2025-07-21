@@ -5,7 +5,6 @@ import { Module } from './module.schema';
 import { Chapter } from './chapter.schema';
 import { DifficultyEnum } from 'src/common/constants/difficulty.constant';
 import {
-  QuizCategoryEnum,
   QuizTypeEnum,
 } from 'src/common/constants/quiz.constant';
 import { RoleEnum } from 'src/common/constants/roles.constant';
@@ -32,8 +31,8 @@ export class QuizGroup extends Document {
   @Prop({ required: true, type: Number, min: 1 })
   time_left: number; // in minutes
 
-  @Prop({ required: true, enum: QuizCategoryEnum })
-  category: QuizCategoryEnum;
+  @Prop({ required: true })
+  category: string;
 
   @Prop({ type: Types.ObjectId, ref: Module.name, index: true })
   module_id: Types.ObjectId;
