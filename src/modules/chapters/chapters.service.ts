@@ -355,6 +355,31 @@ export class ChaptersService {
             as: 'progress',
           },
         });
+        pipeline.push({
+          $lookup: {
+            from: 'student_chapter_progress',
+            let: { chapterId: '$_id' },
+            pipeline: [
+              {
+                $match: {
+                  $expr: {
+                    $and: [
+                      { $eq: ['$chapter_id', '$$chapterId'] },
+                      { $eq: ['$student_id', new Types.ObjectId(user.id)] },
+                    ],
+                  },
+                },
+              },
+              {
+                $project: {
+                  status: 1,
+                  chapter_quiz_completed: 1,
+                },
+              },
+            ],
+            as: 'progress',
+          },
+        });
 
         // Add status field for students
         addFieldsStage.status = {
@@ -410,6 +435,25 @@ export class ChaptersService {
 
       // Execute aggregation
       const chapters = await ChapterModel.aggregate(pipeline);
+
+      if (
+        user.role.name === RoleEnum.STUDENT &&
+        Array.isArray(chapters) &&
+        chapters.length > 0
+      ) {
+        // First chapter always unlocked
+        chapters[0].is_locked = false;
+
+        for (let i = 1; i < chapters.length; i++) {
+          const prev = chapters[i - 1];
+          const isPrevCompleted =
+            prev.progress?.[0]?.status === ProgressStatusEnum.COMPLETED;
+          const isPrevQuizCompleted =
+            prev.progress?.[0]?.chapter_quiz_completed === true;
+
+          chapters[i].is_locked = !(isPrevCompleted && isPrevQuizCompleted);
+        }
+      }
 
       // Attach user details to chapters
       const chaptersWithUsers = await attachUserDetails(
