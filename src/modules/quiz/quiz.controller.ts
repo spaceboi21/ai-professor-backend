@@ -1,36 +1,35 @@
 import {
-  Controller,
-  Get,
-  Post,
   Body,
-  Patch,
-  Param,
+  Controller,
   Delete,
-  UseGuards,
+  Get,
+  Param,
+  Patch,
+  Post,
   Query,
+  UseGuards,
 } from '@nestjs/common';
+import { ParseObjectIdPipe } from '@nestjs/mongoose';
 import {
-  ApiTags,
-  ApiOperation,
-  ApiResponse,
   ApiBearerAuth,
+  ApiOperation,
   ApiParam,
-  ApiQuery,
+  ApiResponse,
+  ApiTags
 } from '@nestjs/swagger';
-import { QuizService } from './quiz.service';
-import { CreateQuizGroupDto } from './dto/create-quiz-group.dto';
-import { UpdateQuizGroupDto } from './dto/update-quiz-group.dto';
-import { CreateQuizDto } from './dto/create-quiz.dto';
-import { UpdateQuizDto } from './dto/update-quiz.dto';
-import { QuizGroupFilterDto, QuizFilterDto } from './dto/quiz-filter.dto';
-import { JwtAuthGuard } from 'src/common/guards/jwt.guard';
-import { RoleGuard } from 'src/common/guards/roles.guard';
+import { Types } from 'mongoose';
+import { RoleEnum } from 'src/common/constants/roles.constant';
 import { Roles } from 'src/common/decorators/roles.decorator';
 import { User } from 'src/common/decorators/user.decorator';
+import { JwtAuthGuard } from 'src/common/guards/jwt.guard';
+import { RoleGuard } from 'src/common/guards/roles.guard';
 import { JWTUserPayload } from 'src/common/types/jwr-user.type';
-import { RoleEnum } from 'src/common/constants/roles.constant';
-import { ParseObjectIdPipe } from '@nestjs/mongoose';
-import { Types } from 'mongoose';
+import { CreateQuizGroupDto } from './dto/create-quiz-group.dto';
+import { CreateQuizDto } from './dto/create-quiz.dto';
+import { QuizFilterDto, QuizGroupFilterDto } from './dto/quiz-filter.dto';
+import { UpdateQuizGroupDto } from './dto/update-quiz-group.dto';
+import { UpdateQuizDto } from './dto/update-quiz.dto';
+import { QuizService } from './quiz.service';
 
 @ApiTags('Quiz')
 @ApiBearerAuth()
@@ -93,6 +92,8 @@ export class QuizController {
     name: 'id',
     description: 'Quiz group ID',
     example: '507f1f77bcf86cd799439011',
+    type: 'string',
+    format: 'mongoId',
   })
   @ApiResponse({
     status: 200,
@@ -119,6 +120,8 @@ export class QuizController {
     name: 'id',
     description: 'Quiz group ID',
     example: '507f1f77bcf86cd799439011',
+    type: 'string',
+    format: 'mongoId',
   })
   @ApiResponse({
     status: 200,
@@ -146,6 +149,8 @@ export class QuizController {
     name: 'id',
     description: 'Quiz group ID',
     example: '507f1f77bcf86cd799439011',
+    type: 'string',
+    format: 'mongoId',
   })
   @ApiResponse({
     status: 200,
@@ -217,6 +222,8 @@ export class QuizController {
     name: 'id',
     description: 'Quiz question ID',
     example: '507f1f77bcf86cd799439011',
+    type: 'string',
+    format: 'mongoId',
   })
   @ApiResponse({
     status: 200,
@@ -243,6 +250,8 @@ export class QuizController {
     name: 'id',
     description: 'Quiz question ID',
     example: '507f1f77bcf86cd799439011',
+    type: 'string',
+    format: 'mongoId',
   })
   @ApiResponse({
     status: 200,
@@ -270,6 +279,8 @@ export class QuizController {
     name: 'id',
     description: 'Quiz question ID',
     example: '507f1f77bcf86cd799439011',
+    type: 'string',
+    format: 'mongoId',
   })
   @ApiResponse({
     status: 200,
@@ -308,10 +319,9 @@ export class QuizController {
   })
   findQuizzesByGroup(
     @Param('groupId', ParseObjectIdPipe) groupId: Types.ObjectId,
-    @Query() filterDto: QuizFilterDto,
     @User() user: JWTUserPayload,
   ) {
-    const updatedFilter = { ...filterDto, quiz_group_id: groupId };
+    const updatedFilter = { quiz_group_id: groupId };
     return this.quizService.findAllQuizzes(user, updatedFilter);
   }
 
@@ -351,6 +361,8 @@ export class QuizController {
     name: 'chapterId',
     description: 'Chapter ID',
     example: '507f1f77bcf86cd799439011',
+    type: 'string',
+    format: 'mongoId',
   })
   @ApiResponse({
     status: 200,

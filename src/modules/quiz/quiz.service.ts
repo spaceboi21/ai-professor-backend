@@ -403,21 +403,18 @@ export class QuizService {
       filter.chapter_id = new Types.ObjectId(filterDto.chapter_id);
     }
 
-    const paginationOptions = getPaginationOptions(filterDto || {});
-
-    const [quizzes, total] = await Promise.all([
+    const [quizzes] = await Promise.all([
       QuizModel.find(filter)
         .sort({ sequence: 1, created_at: -1 })
-        .skip(paginationOptions.skip)
-        .limit(paginationOptions.limit)
         .populate('quiz_group_id', 'subject category difficulty')
         .populate('module_id', 'title subject')
         .populate('chapter_id', 'title subject')
         .exec(),
-      QuizModel.countDocuments(filter),
+      // QuizModel.countDocuments(filter),
     ]);
 
-    return createPaginationResult(quizzes, total, paginationOptions);
+    // return createPaginationResult(quizzes, total, paginationOptions);
+    return quizzes;
   }
 
   async findQuizById(id: string | Types.ObjectId, user: JWTUserPayload) {
