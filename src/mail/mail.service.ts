@@ -13,20 +13,6 @@ export class MailService {
     private readonly queueService: QueueService,
   ) {}
 
-  async sendVerificationEmail(data: VerificationMail): Promise<void> {
-    const { email, name, verificationCode } = data;
-
-    await this.mailerService.sendMail({
-      to: email,
-      subject: 'Email Verification',
-      template: 'verification-email',
-      context: {
-        name,
-        verificationCode,
-      },
-    });
-  }
-
   async sendPasswordResetEmail(
     email: string,
     userName: string,

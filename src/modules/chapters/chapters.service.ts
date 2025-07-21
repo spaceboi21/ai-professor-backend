@@ -295,6 +295,22 @@ export class ChaptersService {
             0,
           ],
         },
+        // Check for ppt content
+        hasPpt: {
+          $gt: [
+            {
+              $size: {
+                $filter: {
+                  input: '$bibliography',
+                  cond: {
+                    $eq: ['$$this.type', BibliographyTypeEnum.POWERPOINT],
+                  },
+                },
+              },
+            },
+            0,
+          ],
+        },
         // Check for PDF content
         hasPdf: {
           $gt: [
@@ -364,6 +380,7 @@ export class ChaptersService {
         created_at: 1,
         updated_at: 1,
         hasVideo: 1,
+        hasPpt: 1,
         hasPdf: 1,
         hasQuiz: 1,
         bibliography_count: 1,
@@ -505,6 +522,22 @@ export class ChaptersService {
             0,
           ],
         },
+        // Check for video content
+        hasPpt: {
+          $gt: [
+            {
+              $size: {
+                $filter: {
+                  input: '$bibliography',
+                  cond: {
+                    $eq: ['$$this.type', BibliographyTypeEnum.POWERPOINT],
+                  },
+                },
+              },
+            },
+            0,
+          ],
+        },
         // Check for PDF content
         hasPdf: {
           $gt: [
@@ -574,6 +607,7 @@ export class ChaptersService {
         created_at: 1,
         updated_at: 1,
         hasVideo: 1,
+        hasPpt: 1,
         hasPdf: 1,
         hasQuiz: 1,
         bibliography_count: 1,
