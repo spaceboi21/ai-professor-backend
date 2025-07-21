@@ -330,7 +330,7 @@ export class QuizService {
       question,
       type,
       options,
-      answer,
+      answer = [],
       explanation,
       sequence,
     } = createQuizDto;
@@ -342,14 +342,6 @@ export class QuizService {
     });
     if (!quizGroup) {
       throw new NotFoundException('Quiz group not found');
-    }
-
-    // Validate that all answers are in the options array
-    const invalidAnswers = answer.filter((ans) => !options.includes(ans));
-    if (invalidAnswers.length > 0) {
-      throw new BadRequestException(
-        `Invalid answers: ${invalidAnswers.join(', ')}. All answers must be from the options array.`,
-      );
     }
 
     // Generate sequence if not provided
