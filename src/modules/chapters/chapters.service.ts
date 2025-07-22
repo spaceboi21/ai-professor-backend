@@ -702,6 +702,73 @@ export class ChaptersService {
             as: 'progress',
           },
         });
+        pipeline.push({
+          $lookup: {
+            from: 'student_chapter_progress',
+            let: { chapterId: '$_id' },
+            pipeline: [
+              {
+                $match: {
+                  $expr: {
+                    $and: [
+                      { $eq: ['$chapter_id', '$$chapterId'] },
+                      { $eq: ['$student_id', new Types.ObjectId(user.id)] },
+                    ],
+                  },
+                },
+              },
+              {
+                $project: {
+                  status: 1,
+                  chapter_quiz_completed: 1,
+                },
+              },
+            ],
+            as: 'progress',
+          },
+        });
+
+        // Lookup quiz attempts
+        pipeline.push({
+          $lookup: {
+            from: 'student_quiz_attempts',
+            let: { chapterId: '$_id' },
+            pipeline: [
+              {
+                $match: {
+                  $expr: {
+                    $and: [
+                      { $eq: ['$chapter_id', '$$chapterId'] },
+                      { $eq: ['$student_id', new Types.ObjectId(user.id)] },
+                    ],
+                  },
+                },
+              },
+              {
+                $count: 'attempts',
+              },
+            ],
+            as: 'quiz_attempts',
+          },
+        });
+
+        // Add chapter_quiz_completed field
+        addFieldsStage.chapter_quiz_completed = {
+          $cond: {
+            if: { $gt: [{ $size: '$progress' }, 0] },
+            then: { $arrayElemAt: ['$progress.chapter_quiz_completed', 0] },
+            else: false,
+          },
+        };
+
+        // Add quiz_attempt_count field
+        addFieldsStage.quiz_attempt_count = {
+          $cond: {
+            if: { $gt: [{ $size: '$quiz_attempts' }, 0] },
+            then: { $arrayElemAt: ['$quiz_attempts.attempts', 0] },
+            else: 0,
+          },
+        };
 
         // Add status field for students
         addFieldsStage.status = {
@@ -743,6 +810,53 @@ export class ChaptersService {
 
       // Execute aggregation
       const chapters = await ChapterModel.aggregate(pipeline);
+
+      if (
+        user.role.name === RoleEnum.STUDENT &&
+        Array.isArray(chapters) &&
+        chapters.length > 0
+      ) {
+        for (let i = 0; i < chapters.length; i++) {
+          const chapter = chapters[i];
+          const progress = chapter.progress?.[0];
+
+          chapter.status = progress?.status || ProgressStatusEnum.NOT_STARTED;
+          chapter.chapter_quiz_completed =
+            progress?.chapter_quiz_completed || false;
+          chapter.quiz_attempt_count = chapter.quiz_attempt_count || 0;
+
+          // Add "needs_quiz_retake" flag
+          chapter.needs_quiz_retake =
+            chapter.status === ProgressStatusEnum.COMPLETED &&
+            chapter.chapter_quiz_completed === false &&
+            chapter.quiz_attempt_count > 0;
+
+          // Lock logic
+          if (i === 0) {
+            chapter.is_locked = false;
+            chapter.locked_reason = null;
+          } else {
+            const prev = chapters[i - 1];
+            const prevProgress = prev.progress?.[0];
+            const isPrevCompleted =
+              prevProgress?.status === ProgressStatusEnum.COMPLETED;
+            const isPrevQuizCompleted =
+              prevProgress?.chapter_quiz_completed === true;
+
+            chapter.is_locked = !(isPrevCompleted && isPrevQuizCompleted);
+
+            // Add locked reason
+            if (!isPrevCompleted) {
+              chapter.locked_reason = 'Complete the previous chapter first';
+            } else if (!isPrevQuizCompleted) {
+              chapter.locked_reason =
+                'Retake and pass the quiz to unlock this chapter';
+            } else {
+              chapter.locked_reason = null;
+            }
+          }
+        }
+      }
 
       if (chapters.length === 0) {
         throw new NotFoundException('Chapter not found');
