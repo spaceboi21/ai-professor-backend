@@ -387,6 +387,48 @@ export class ChaptersService {
           },
         });
 
+        // Lookup quiz attempts
+        pipeline.push({
+          $lookup: {
+            from: 'student_quiz_attempts',
+            let: { chapterId: '$_id' },
+            pipeline: [
+              {
+                $match: {
+                  $expr: {
+                    $and: [
+                      { $eq: ['$chapter_id', '$$chapterId'] },
+                      { $eq: ['$student_id', new Types.ObjectId(user.id)] },
+                    ],
+                  },
+                },
+              },
+              {
+                $count: 'attempts',
+              },
+            ],
+            as: 'quiz_attempts',
+          },
+        });
+
+        // Add chapter_quiz_completed field
+        addFieldsStage.chapter_quiz_completed = {
+          $cond: {
+            if: { $gt: [{ $size: '$progress' }, 0] },
+            then: { $arrayElemAt: ['$progress.chapter_quiz_completed', 0] },
+            else: false,
+          },
+        };
+
+        // Add quiz_attempt_count field
+        addFieldsStage.quiz_attempt_count = {
+          $cond: {
+            if: { $gt: [{ $size: '$quiz_attempts' }, 0] },
+            then: { $arrayElemAt: ['$quiz_attempts.attempts', 0] },
+            else: 0,
+          },
+        };
+
         // Add status field for students
         addFieldsStage.status = {
           $cond: {
@@ -451,14 +493,21 @@ export class ChaptersService {
           const chapter = chapters[i];
           const progress = chapter.progress?.[0];
 
-          // Add status and quiz completion fields to each chapter
           chapter.status = progress?.status || ProgressStatusEnum.NOT_STARTED;
           chapter.chapter_quiz_completed =
             progress?.chapter_quiz_completed || false;
+          chapter.quiz_attempt_count = chapter.quiz_attempt_count || 0;
+
+          // Add "needs_quiz_retake" flag
+          chapter.needs_quiz_retake =
+            chapter.status === ProgressStatusEnum.COMPLETED &&
+            chapter.chapter_quiz_completed === false &&
+            chapter.quiz_attempt_count > 0;
 
           // Lock logic
           if (i === 0) {
-            chapter.is_locked = false; // First chapter is always unlocked
+            chapter.is_locked = false;
+            chapter.locked_reason = null;
           } else {
             const prev = chapters[i - 1];
             const prevProgress = prev.progress?.[0];
@@ -468,6 +517,16 @@ export class ChaptersService {
               prevProgress?.chapter_quiz_completed === true;
 
             chapter.is_locked = !(isPrevCompleted && isPrevQuizCompleted);
+
+            // Add locked reason
+            if (!isPrevCompleted) {
+              chapter.locked_reason = 'Complete the previous chapter first';
+            } else if (!isPrevQuizCompleted) {
+              chapter.locked_reason =
+                'Retake and pass the quiz to unlock this chapter';
+            } else {
+              chapter.locked_reason = null;
+            }
           }
         }
       }
