@@ -48,6 +48,7 @@ import { StartModuleDto } from './dto/start-module.dto';
 import { StartChapterDto } from './dto/start-chapter.dto';
 import { StartQuizAttemptDto } from './dto/start-quiz-attempt.dto';
 import { SubmitQuizAnswersDto } from './dto/submit-quiz-answers.dto';
+import { MarkChapterCompleteDto } from './dto/mark-chapter-complete.dto';
 import {
   ProgressFilterDto,
   QuizAttemptFilterDto,
@@ -226,7 +227,7 @@ export class ProgressService {
       await this.validateChapterAccess(user.id, chapter, tenantConnection);
 
       // Start the module if not already started
-      await this.startModule({ module_id: chapter.module_id }, user);
+      await this.startModule({ module_id: new Types.ObjectId(chapter.module_id) }, user);
 
       // Check if chapter progress already exists
       let progress = await StudentChapterProgressModel.findOne({
@@ -246,7 +247,7 @@ export class ProgressService {
         // Create new progress record
         progress = new StudentChapterProgressModel({
           student_id: new Types.ObjectId(user.id),
-          module_id: chapter.module_id,
+          module_id: new Types.ObjectId(chapter.module_id),
           chapter_id: new Types.ObjectId(chapter_id),
           status: ProgressStatusEnum.IN_PROGRESS,
           started_at: new Date(),
@@ -280,6 +281,103 @@ export class ProgressService {
         throw error;
       }
       throw new BadRequestException('Failed to start chapter');
+    }
+  }
+
+  // ========== CHAPTER COMPLETION OPERATIONS ==========
+
+  async markChapterComplete(
+    markChapterCompleteDto: MarkChapterCompleteDto,
+    user: JWTUserPayload,
+  ) {
+    const { chapter_id } = markChapterCompleteDto;
+
+    this.logger.log(
+      `Student ${user.id} marking chapter ${chapter_id} as complete`,
+    );
+
+    // Validate user is a student
+    if (user.role.name !== RoleEnum.STUDENT) {
+      throw new ForbiddenException('Only students can mark chapters as complete');
+    }
+
+    // Get school and tenant connection
+    const school = await this.schoolModel.findById(user.school_id);
+    if (!school) {
+      throw new NotFoundException('School not found');
+    }
+
+    const tenantConnection =
+      await this.tenantConnectionService.getTenantConnection(school.db_name);
+    const StudentModel = tenantConnection.model(Student.name, StudentSchema);
+    const ChapterModel = tenantConnection.model(Chapter.name, ChapterSchema);
+    const StudentChapterProgressModel = tenantConnection.model(
+      StudentChapterProgress.name,
+      StudentChapterProgressSchema,
+    );
+
+    try {
+      // Validate student exists
+      const student = await StudentModel.findById(user.id);
+      if (!student) {
+        throw new NotFoundException('Student not found');
+      }
+
+      // Validate chapter exists
+      const chapter = await ChapterModel.findOne({
+        _id: new Types.ObjectId(chapter_id),
+        deleted_at: null,
+      });
+      if (!chapter) {
+        throw new NotFoundException('Chapter not found');
+      }
+
+      // Check if chapter progress exists
+      let chapterProgress = await StudentChapterProgressModel.findOne({
+        student_id: new Types.ObjectId(user.id),
+        chapter_id: new Types.ObjectId(chapter_id),
+      });
+
+      if (!chapterProgress) {
+        // Create new chapter progress if it doesn't exist
+        chapterProgress = new StudentChapterProgressModel({
+          student_id: new Types.ObjectId(user.id),
+          module_id: new Types.ObjectId(chapter.module_id),
+          chapter_id: new Types.ObjectId(chapter_id),
+          status: ProgressStatusEnum.IN_PROGRESS,
+          started_at: new Date(),
+          chapter_sequence: chapter.sequence,
+          last_accessed_at: new Date(),
+        });
+      }
+
+      // Mark chapter as complete (manual completion)
+      chapterProgress.status = ProgressStatusEnum.COMPLETED;
+      chapterProgress.completed_at = new Date();
+      chapterProgress.last_accessed_at = new Date();
+
+      await chapterProgress.save();
+
+      this.logger.log(
+        `Chapter ${chapter_id} marked as complete for student ${user.id}`,
+      );
+
+      return {
+        message: 'Chapter marked as complete successfully',
+        data: {
+          chapter_id: chapterProgress.chapter_id,
+          module_id: chapterProgress.module_id,
+          status: chapterProgress.status,
+          completed_at: chapterProgress.completed_at,
+          chapter_quiz_completed: chapterProgress.chapter_quiz_completed,
+        },
+      };
+    } catch (error) {
+      this.logger.error('Error marking chapter as complete:', error);
+      if (error instanceof NotFoundException || error instanceof ForbiddenException) {
+        throw error;
+      }
+      throw new BadRequestException('Failed to mark chapter as complete');
     }
   }
 
@@ -627,27 +725,44 @@ export class ProgressService {
         deleted_at: null,
       });
 
-      // Get completed chapters count
+      // Get completed chapters count (both manually completed and quiz completed)
       const completedChapters =
         await StudentChapterProgressModel.countDocuments({
           student_id: new Types.ObjectId(studentId),
           module_id: quizGroup.module_id,
+          status: ProgressStatusEnum.COMPLETED,
           chapter_quiz_completed: true,
         });
 
       if (completedChapters < totalChapters) {
         throw new ForbiddenException(
-          'You must complete all chapter quizzes before taking the module quiz',
+          'You must complete all chapters and their quizzes before taking the module quiz',
         );
       }
     }
 
-    // If this is a chapter-level quiz, check chapter access
+    // If this is a chapter-level quiz, check if chapter is manually completed
     if (quizGroup.type === QuizTypeEnum.CHAPTER && quizGroup.chapter_id) {
-      const ChapterModel = tenantConnection.model(Chapter.name, ChapterSchema);
-      const chapter = await ChapterModel.findById(quizGroup.chapter_id);
-      if (chapter) {
-        await this.validateChapterAccess(studentId, chapter, tenantConnection);
+      const StudentChapterProgressModel = tenantConnection.model(
+        StudentChapterProgress.name,
+        StudentChapterProgressSchema,
+      );
+
+      // Check if chapter is manually completed
+      const chapterProgress = await StudentChapterProgressModel.findOne({
+        student_id: new Types.ObjectId(studentId),
+        chapter_id: quizGroup.chapter_id,
+        status: ProgressStatusEnum.COMPLETED,
+      });
+
+      if (!chapterProgress) {
+        const ChapterModel = tenantConnection.model(Chapter.name, ChapterSchema);
+        const chapter = await ChapterModel.findById(quizGroup.chapter_id);
+        const chapterTitle = chapter?.title || 'this chapter';
+        
+        throw new ForbiddenException(
+          `You must mark "${chapterTitle}" as complete before taking the quiz`,
+        );
       }
     }
 
@@ -690,17 +805,16 @@ export class ProgressService {
       StudentChapterProgressSchema,
     );
 
-    // Update chapter progress
+    // Update chapter progress - only mark quiz as completed, don't change status
     await StudentChapterProgressModel.findOneAndUpdate(
       {
         student_id: attempt.student_id,
         chapter_id: attempt.chapter_id,
       },
       {
-        status: ProgressStatusEnum.COMPLETED,
-        completed_at: new Date(),
         chapter_quiz_completed: true,
         quiz_completed_at: attempt.completed_at,
+        last_accessed_at: new Date(),
       },
       { upsert: true },
     );

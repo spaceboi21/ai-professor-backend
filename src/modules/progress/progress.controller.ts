@@ -31,6 +31,7 @@ import { StartModuleDto } from './dto/start-module.dto';
 import { StartChapterDto } from './dto/start-chapter.dto';
 import { StartQuizAttemptDto } from './dto/start-quiz-attempt.dto';
 import { SubmitQuizAnswersDto } from './dto/submit-quiz-answers.dto';
+import { MarkChapterCompleteDto } from './dto/mark-chapter-complete.dto';
 import {
   ProgressFilterDto,
   QuizAttemptFilterDto,
@@ -112,6 +113,39 @@ export class ProgressController {
     @User() user: JWTUserPayload,
   ) {
     return this.progressService.startChapter(startChapterDto, user);
+  }
+
+  @Post('chapters/complete')
+  @Roles(RoleEnum.STUDENT)
+  @ApiOperation({ summary: 'Mark chapter as complete (Student)' })
+  @ApiBody({ type: MarkChapterCompleteDto })
+  @ApiResponse({
+    status: 200,
+    description: 'Chapter marked as complete successfully',
+    schema: {
+      example: {
+        message: 'Chapter marked as complete successfully',
+        data: {
+          chapter_id: '507f1f77bcf86cd799439011',
+          module_id: '507f1f77bcf86cd799439012',
+          status: 'COMPLETED',
+          completed_at: '2024-01-15T10:00:00.000Z',
+          chapter_quiz_completed: false,
+        },
+      },
+    },
+  })
+  @ApiResponse({ status: 400, description: 'Bad request' })
+  @ApiResponse({
+    status: 403,
+    description: 'Only students can mark chapters as complete',
+  })
+  @ApiResponse({ status: 404, description: 'Chapter not found' })
+  async markChapterComplete(
+    @Body() markChapterCompleteDto: MarkChapterCompleteDto,
+    @User() user: JWTUserPayload,
+  ) {
+    return this.progressService.markChapterComplete(markChapterCompleteDto, user);
   }
 
   @Post('quiz/start')
