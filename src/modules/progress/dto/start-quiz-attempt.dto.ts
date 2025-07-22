@@ -10,4 +10,4 @@ export class StartQuizAttemptDto {
     description: 'ID of the quiz group to start',
   })
   quiz_group_id: string | Types.ObjectId;
-} 
+}

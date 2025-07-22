@@ -14,13 +14,13 @@ class MigrationCLI {
   /**
    * Parse command line arguments
    */
-  private parseArguments(): { dbName?: string, type?: string, help?: boolean } {
+  private parseArguments(): { dbName?: string; type?: string; help?: boolean } {
     const args = process.argv.slice(2);
-    const parsed: { dbName?: string, type?: string, help?: boolean } = {};
+    const parsed: { dbName?: string; type?: string; help?: boolean } = {};
 
     for (let i = 0; i < args.length; i++) {
       const arg = args[i];
-      
+
       switch (arg) {
         case '--db-name':
           if (i + 1 < args.length) {
@@ -30,7 +30,7 @@ class MigrationCLI {
             throw new Error('--db-name requires a value');
           }
           break;
-        
+
         case '--type':
           if (i + 1 < args.length) {
             const type = args[i + 1];
@@ -43,12 +43,12 @@ class MigrationCLI {
             throw new Error('--type requires a value');
           }
           break;
-        
+
         case '--help':
         case '-h':
           parsed.help = true;
           break;
-        
+
         default:
           if (arg.startsWith('--')) {
             throw new Error(`Unknown argument: ${arg}`);
@@ -104,7 +104,7 @@ NOTES:
   /**
    * Validate arguments
    */
-  private validateArguments(args: { dbName?: string, type?: string }): void {
+  private validateArguments(args: { dbName?: string; type?: string }): void {
     const { dbName, type } = args;
 
     // If type is tenant, db-name is required
@@ -114,24 +114,30 @@ NOTES:
 
     // If type is all and we want to run tenant migrations, db-name is required
     if ((type === 'all' || !type) && !dbName) {
-      this.logger.warn('⚠️ No --db-name provided. Only central migrations will be run.');
+      this.logger.warn(
+        '⚠️ No --db-name provided. Only central migrations will be run.',
+      );
     }
 
     // Validate required environment variables
     const centralUri = process.env.MONGODB_URI || process.env.CENTRAL_DB_URI;
     if (!centralUri) {
-      throw new Error('MONGODB_URI or CENTRAL_DB_URI environment variable is required');
+      throw new Error(
+        'MONGODB_URI or CENTRAL_DB_URI environment variable is required',
+      );
     }
 
     if ((type === 'tenant' || dbName) && !process.env.MONGODB_BASE_URI) {
-      throw new Error('MONGODB_BASE_URI environment variable is required for tenant migrations');
+      throw new Error(
+        'MONGODB_BASE_URI environment variable is required for tenant migrations',
+      );
     }
   }
 
   /**
    * Format and display migration results
    */
-  private displayResults(results: { central: any[], tenant?: any[] }): void {
+  private displayResults(results: { central: any[]; tenant?: any[] }): void {
     let totalExecuted = 0;
     let totalFailed = 0;
 
@@ -141,17 +147,17 @@ NOTES:
     // Central results
     if (results.central.length > 0) {
       this.logger.log('\n🏛️ Central Database:');
-      results.central.forEach(result => {
+      results.central.forEach((result) => {
         const status = result.success ? '✅' : '❌';
         const time = `${result.execution_time_ms}ms`;
         this.logger.log(`  ${status} ${result.migration_name} (${time})`);
-        
+
         if (!result.success && result.error) {
           this.logger.error(`     Error: ${result.error}`);
         }
       });
-      
-      const centralFailed = results.central.filter(r => !r.success).length;
+
+      const centralFailed = results.central.filter((r) => !r.success).length;
       totalExecuted += results.central.length;
       totalFailed += centralFailed;
     }
@@ -159,17 +165,17 @@ NOTES:
     // Tenant results
     if (results.tenant && results.tenant.length > 0) {
       this.logger.log('\n🏢 Tenant Database:');
-      results.tenant.forEach(result => {
+      results.tenant.forEach((result) => {
         const status = result.success ? '✅' : '❌';
         const time = `${result.execution_time_ms}ms`;
         this.logger.log(`  ${status} ${result.migration_name} (${time})`);
-        
+
         if (!result.success && result.error) {
           this.logger.error(`     Error: ${result.error}`);
         }
       });
-      
-      const tenantFailed = results.tenant.filter(r => !r.success).length;
+
+      const tenantFailed = results.tenant.filter((r) => !r.success).length;
       totalExecuted += results.tenant.length;
       totalFailed += tenantFailed;
     }
@@ -179,13 +185,15 @@ NOTES:
     this.logger.log(`📈 Total: ${totalExecuted} migrations executed`);
     this.logger.log(`✅ Success: ${totalExecuted - totalFailed}`);
     this.logger.log(`❌ Failed: ${totalFailed}`);
-    
+
     if (totalExecuted === 0) {
       this.logger.log('🎉 No new migrations to run - all up to date!');
     } else if (totalFailed === 0) {
       this.logger.log('🎉 All migrations completed successfully!');
     } else {
-      this.logger.error('⚠️ Some migrations failed. Please check the errors above.');
+      this.logger.error(
+        '⚠️ Some migrations failed. Please check the errors above.',
+      );
     }
   }
 
@@ -214,7 +222,7 @@ NOTES:
       }
       this.logger.log('═'.repeat(50));
 
-      let results: { central: any[], tenant?: any[] };
+      let results: { central: any[]; tenant?: any[] };
 
       // Execute migrations based on type
       switch (type) {
@@ -226,7 +234,9 @@ NOTES:
 
         case 'tenant':
           if (!dbName) {
-            throw new Error('Tenant database name is required for tenant migrations');
+            throw new Error(
+              'Tenant database name is required for tenant migrations',
+            );
           }
           results = {
             central: [],
@@ -244,18 +254,24 @@ NOTES:
       this.displayResults(results);
 
       // Exit with appropriate code
-      const hasFailures = results.central.some(r => !r.success) || 
-                         (results.tenant && results.tenant.some(r => !r.success));
-      
-      process.exit(hasFailures ? 1 : 0);
+      const hasFailures =
+        results.central.some((r) => !r.success) ||
+        (results.tenant && results.tenant.some((r) => !r.success));
 
+      process.exit(hasFailures ? 1 : 0);
     } catch (error) {
-      this.logger.error('💥 Migration CLI Error:', error instanceof Error ? error.message : String(error));
-      
-      if (error instanceof Error && error.message.includes('Unknown argument')) {
+      this.logger.error(
+        '💥 Migration CLI Error:',
+        error instanceof Error ? error.message : String(error),
+      );
+
+      if (
+        error instanceof Error &&
+        error.message.includes('Unknown argument')
+      ) {
         this.logger.log('\nUse --help for usage information.');
       }
-      
+
       process.exit(1);
     }
   }
@@ -267,4 +283,4 @@ if (require.main === module) {
   cli.run();
 }
 
-export { MigrationCLI }; 
+export { MigrationCLI };

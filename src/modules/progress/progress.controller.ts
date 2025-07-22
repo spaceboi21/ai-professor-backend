@@ -427,19 +427,11 @@ export class ProgressController {
     },
   })
   @ApiResponse({
-    status: 400,
-    description: 'Bad request - missing required parameters',
-  })
-  @ApiResponse({
     status: 403,
-    description: 'Access denied - insufficient permissions',
+    description: 'Only students can view their dashboard',
   })
-  @ApiResponse({ status: 404, description: 'Student or school not found' })
-  async getStudentDashboard(
-    @User() user: JWTUserPayload,
-    @Query() queryDto: StudentDashboardDto,
-  ) {
-    return this.progressService.getStudentDashboard(user, queryDto);
+  async getStudentDashboard(@User() user: JWTUserPayload) {
+    return this.progressService.getStudentDashboard(user);
   }
 
   @Get('admin/dashboard')

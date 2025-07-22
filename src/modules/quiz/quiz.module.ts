@@ -3,7 +3,10 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { QuizService } from './quiz.service';
 import { QuizController } from './quiz.controller';
 import { User, UserSchema } from 'src/database/schemas/central/user.schema';
-import { School, SchoolSchema } from 'src/database/schemas/central/school.schema';
+import {
+  School,
+  SchoolSchema,
+} from 'src/database/schemas/central/school.schema';
 import { TenantConnectionService } from 'src/database/tenant-connection.service';
 
 @Module({
@@ -17,4 +20,4 @@ import { TenantConnectionService } from 'src/database/tenant-connection.service'
   providers: [QuizService, TenantConnectionService],
   exports: [QuizService],
 })
-export class QuizModule {} 
+export class QuizModule {}

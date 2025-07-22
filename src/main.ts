@@ -15,25 +15,28 @@ async function bootstrap() {
     const configService = app.get(ConfigService);
 
     // Parse multiple frontend origins from environment variable
-    const frontendOriginString = configService.get<string>('ALLOWED_CORS_URLS') || 'http://localhost:3000';
-    const frontendOrigins = frontendOriginString.split(',').map(origin => origin.trim());
+    const frontendOriginString =
+      configService.get<string>('ALLOWED_CORS_URLS') || 'http://localhost:3000';
+    const frontendOrigins = frontendOriginString
+      .split(',')
+      .map((origin) => origin.trim());
 
     // CORS configuration with multiple domains support
     app.enableCors({
       // origin: (origin, callback) => {
       //   // Allow requests with no origin (like mobile apps or curl requests)
       //   if (!origin) return callback(null, true);
-        
+
       //   // Check if the origin is in the allowed list
       //   if (frontendOrigins.includes(origin)) {
       //     return callback(null, true);
       //   }
-        
+
       //   // For development, allow localhost with any port
       //   if (process.env.NODE_ENV === 'development' && origin.startsWith('http://localhost')) {
       //     return callback(null, true);
       //   }
-        
+
       //   // Reject the request
       //   return callback(new Error('Not allowed by CORS'), false);
       // },

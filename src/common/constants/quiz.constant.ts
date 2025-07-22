@@ -1,4 +1,3 @@
-
 export enum QuizTypeEnum {
   MODULE = 'MODULE',
   CHAPTER = 'CHAPTER',

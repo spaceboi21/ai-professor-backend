@@ -1,5 +1,14 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsMongoId, IsNotEmpty, IsArray, ValidateNested, IsString, IsNumber, IsOptional, Min } from 'class-validator';
+import {
+  IsMongoId,
+  IsNotEmpty,
+  IsArray,
+  ValidateNested,
+  IsString,
+  IsNumber,
+  IsOptional,
+  Min,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 import { Types } from 'mongoose';
 
@@ -59,4 +68,4 @@ export class SubmitQuizAnswersDto {
     required: false,
   })
   total_time_taken_minutes?: number;
-} 
+}

@@ -4,9 +4,7 @@ import { User } from '../central/user.schema';
 import { Module } from './module.schema';
 import { Chapter } from './chapter.schema';
 import { DifficultyEnum } from 'src/common/constants/difficulty.constant';
-import {
-  QuizTypeEnum,
-} from 'src/common/constants/quiz.constant';
+import { QuizTypeEnum } from 'src/common/constants/quiz.constant';
 import { RoleEnum } from 'src/common/constants/roles.constant';
 
 @Schema({

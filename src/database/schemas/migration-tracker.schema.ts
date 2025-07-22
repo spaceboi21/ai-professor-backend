@@ -31,4 +31,5 @@ export class MigrationTracker extends Document {
   error_message?: string;
 }
 
-export const MigrationTrackerSchema = SchemaFactory.createForClass(MigrationTracker); 
+export const MigrationTrackerSchema =
+  SchemaFactory.createForClass(MigrationTracker);

@@ -35,7 +35,8 @@ export class ReorderBibliographyItemsDto {
   @IsMongoId({ message: 'School ID must be a valid MongoDB ObjectId' })
   @ApiProperty({
     example: '507f1f77bcf86cd799439011',
-    description: 'School ID (required for super admin, optional for other roles)',
+    description:
+      'School ID (required for super admin, optional for other roles)',
     required: false,
   })
   school_id?: string | Types.ObjectId;

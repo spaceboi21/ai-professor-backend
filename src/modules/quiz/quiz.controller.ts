@@ -15,7 +15,7 @@ import {
   ApiOperation,
   ApiParam,
   ApiResponse,
-  ApiTags
+  ApiTags,
 } from '@nestjs/swagger';
 import { Types } from 'mongoose';
 import { RoleEnum } from 'src/common/constants/roles.constant';

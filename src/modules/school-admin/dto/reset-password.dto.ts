@@ -6,9 +6,9 @@ export class ResetPasswordDto {
   @IsString({ message: 'Old password must be a string' })
   @Transform(({ value }) => value?.trim())
   @IsNotEmpty({ message: 'Old password is required' })
-  @ApiProperty({ 
+  @ApiProperty({
     example: 'OldPassword123!',
-    description: 'Current password for verification'
+    description: 'Current password for verification',
   })
   old_password: string;
 
@@ -27,4 +27,4 @@ export class ResetPasswordDto {
       'New password - must be at least 8 characters with uppercase, lowercase, number, and special character',
   })
   new_password: string;
-} 
+}
