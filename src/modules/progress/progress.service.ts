@@ -57,6 +57,7 @@ import {
   getPaginationOptions,
   createPaginationResult,
 } from 'src/common/utils/pagination.util';
+import { StudentDashboardDto } from './dto/student-dashboard.dto';
 
 @Injectable()
 export class ProgressService {
@@ -1068,18 +1069,82 @@ export class ProgressService {
 
   // ========== DASHBOARD METHODS ==========
 
-  async getStudentDashboard(user: JWTUserPayload) {
-    this.logger.log(`Getting dashboard data for student ${user.id}`);
+  async getStudentDashboard(
+    user: JWTUserPayload,
+    queryDto?: StudentDashboardDto,
+  ) {
+    this.logger.log(
+      `Getting dashboard data for user ${user.id} with role ${user.role.name}`,
+    );
 
-    // Validate user is a student
-    if (user.role.name !== RoleEnum.STUDENT) {
-      throw new ForbiddenException('Only students can view their dashboard');
+    let studentId: string;
+    let schoolId: string;
+    let school: any;
+
+    // Determine student ID and school ID based on user role
+    if (user.role.name === RoleEnum.STUDENT) {
+      // For students, use their own ID and school
+      studentId = user.id.toString();
+      if (!user.school_id) {
+        throw new BadRequestException('Student must have a school_id');
+      }
+      schoolId = user.school_id.toString();
+    } else if (user.role.name === RoleEnum.SUPER_ADMIN) {
+      // For super admin, both student_id and school_id are required in params
+      if (!queryDto?.student_id || !queryDto?.school_id) {
+        throw new BadRequestException(
+          'Both student_id and school_id are required for super admin access',
+        );
+      }
+      studentId = queryDto.student_id;
+      schoolId = queryDto.school_id;
+    } else if (
+      user.role.name === RoleEnum.SCHOOL_ADMIN ||
+      user.role.name === RoleEnum.PROFESSOR
+    ) {
+      // For school admin/professor, student_id is required in params
+      if (!queryDto?.student_id) {
+        throw new BadRequestException(
+          'student_id is required for admin/professor access',
+        );
+      }
+      studentId = queryDto.student_id;
+      if (!user.school_id) {
+        throw new BadRequestException('Admin/Professor must have a school_id');
+      }
+      schoolId = user.school_id.toString(); // Use their school_id
+    } else {
+      throw new ForbiddenException('Access denied - insufficient permissions');
     }
 
-    // Get school and tenant connection
-    const school = await this.schoolModel.findById(user.school_id);
+    // Validate school exists
+    school = await this.schoolModel.findById(new Types.ObjectId(schoolId));
     if (!school) {
       throw new NotFoundException('School not found');
+    }
+
+    // For school admin/professor, validate that the student belongs to their school
+    if (
+      user.role.name === RoleEnum.SCHOOL_ADMIN ||
+      user.role.name === RoleEnum.PROFESSOR
+    ) {
+      const tenantConnection =
+        await this.tenantConnectionService.getTenantConnection(school.db_name);
+      const StudentModel = tenantConnection.model(Student.name, StudentSchema);
+      console.log(studentId);
+      const student = await StudentModel.findById(
+        new Types.ObjectId(studentId),
+      );
+      if (!student) {
+        throw new NotFoundException('Student not found');
+      }
+
+      // Validate student belongs to the same school as the admin/professor
+      if (student.school_id.toString() !== user.school_id?.toString()) {
+        throw new ForbiddenException(
+          'Access denied - student does not belong to your school',
+        );
+      }
     }
 
     const tenantConnection =
@@ -1097,8 +1162,10 @@ export class ProgressService {
       StudentQuizAttemptSchema,
     );
 
+    const ModuleModel = tenantConnection.model(Module.name, ModuleSchema);
+
     try {
-      const studentId = new Types.ObjectId(user.id);
+      const studentObjectId = new Types.ObjectId(studentId);
 
       // Get overall statistics
       const [
@@ -1109,25 +1176,27 @@ export class ProgressService {
         passedQuizzes,
         recentActivity,
       ] = await Promise.all([
-        StudentModuleProgressModel.countDocuments({ student_id: studentId }),
         StudentModuleProgressModel.countDocuments({
-          student_id: studentId,
+          student_id: studentObjectId,
+        }),
+        StudentModuleProgressModel.countDocuments({
+          student_id: studentObjectId,
           status: ProgressStatusEnum.IN_PROGRESS,
         }),
         StudentModuleProgressModel.countDocuments({
-          student_id: studentId,
+          student_id: studentObjectId,
           status: ProgressStatusEnum.COMPLETED,
         }),
         StudentQuizAttemptModel.countDocuments({
-          student_id: studentId,
+          student_id: studentObjectId,
           status: AttemptStatusEnum.COMPLETED,
         }),
         StudentQuizAttemptModel.countDocuments({
-          student_id: studentId,
+          student_id: studentObjectId,
           status: AttemptStatusEnum.COMPLETED,
           is_passed: true,
         }),
-        StudentModuleProgressModel.find({ student_id: studentId })
+        StudentModuleProgressModel.find({ student_id: studentObjectId })
           .populate('module_id', 'title subject')
           .sort({ last_accessed_at: -1 })
           .limit(5)
@@ -1136,7 +1205,7 @@ export class ProgressService {
 
       // Calculate average progress
       const moduleProgresses = await StudentModuleProgressModel.find({
-        student_id: studentId,
+        student_id: studentObjectId,
       }).lean();
       const averageProgress =
         moduleProgresses.length > 0
