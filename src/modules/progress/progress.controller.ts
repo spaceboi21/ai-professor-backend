@@ -426,7 +426,10 @@ export class ProgressController {
       },
     },
   })
-  @ApiResponse({ status: 403, description: 'Only students can view their dashboard' })
+  @ApiResponse({
+    status: 403,
+    description: 'Only students can view their dashboard',
+  })
   async getStudentDashboard(@User() user: JWTUserPayload) {
     return this.progressService.getStudentDashboard(user);
   }
