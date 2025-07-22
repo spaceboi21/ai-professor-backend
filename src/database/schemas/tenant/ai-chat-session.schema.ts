@@ -8,6 +8,7 @@ import { RoleEnum } from 'src/common/constants/roles.constant';
     createdAt: 'created_at',
     updatedAt: 'updated_at',
   },
+  collection: 'ai_chat_session',
 })
 export class AIChatSession extends Document {
   declare _id: Types.ObjectId;

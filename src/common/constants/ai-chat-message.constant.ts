@@ -1,8 +1,8 @@
 export enum MessageSenderEnum {
-  STUDENT = 'student',
-  AI_PATIENT = 'ai_patient',
-  AI_SUPERVISOR = 'ai_supervisor',
-  AI_PROFESSOR = 'ai_professor',
+  STUDENT = 'STUDENT',
+  AI_PATIENT = 'AI_PATIENT',
+  AI_SUPERVISOR = 'AI_SUPERVISOR',
+  AI_PROFESSOR = 'AI_PROFESSOR',
 }
 
 export enum MessageTypeEnum {

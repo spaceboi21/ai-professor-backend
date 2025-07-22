@@ -1,7 +1,7 @@
 export enum FeedbackTypeEnum {
-  SUPERVISOR_ANALYSIS = 'supervisor_analysis',
-  STUDENT_RATING = 'student_rating',
-  PROFESSOR_FEEDBACK = 'professor_feedback',
+  SUPERVISOR_ANALYSIS = 'SUPERVISOR_ANALYSIS',
+  STUDENT_RATING = 'STUDENT_RATING',
+  PROFESSOR_FEEDBACK = 'PROFESSOR_FEEDBACK',
 }
 
 export enum RatingEnum {

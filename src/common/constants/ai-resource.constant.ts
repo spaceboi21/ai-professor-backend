@@ -1,18 +1,18 @@
 export enum ResourceTypeEnum {
-  ARTICLE = 'article',
-  VIDEO = 'video',
-  DOCUMENT = 'document',
-  LINK = 'link',
-  BOOK = 'book',
-  PRACTICE_QUESTION = 'practice_question',
-  QUIZ = 'quiz',
-  OTHER = 'other',
+  ARTICLE = 'ARTICLE',
+  VIDEO = 'VIDEO',
+  DOCUMENT = 'DOCUMENT',
+  LINK = 'LINK',
+  BOOK = 'BOOK',
+  PRACTICE_QUESTION = 'PRACTICE_QUESTION',
+  QUIZ = 'QUIZ',
+  OTHER = 'OTHER',
 }
 
 export enum ResourceCategoryEnum {
-  STUDY_MATERIAL = 'study_material',
-  PRACTICE_EXERCISE = 'practice_exercise',
-  REFERENCE = 'reference',
-  TUTORIAL = 'tutorial',
-  ASSESSMENT = 'assessment',
+  STUDY_MATERIAL = 'STUDY_MATERIAL',
+  PRACTICE_EXERCISE = 'PRACTICE_EXERCISE',
+  REFERENCE = 'REFERENCE',
+  TUTORIAL = 'TUTORIAL',
+  ASSESSMENT = 'ASSESSMENT',
 }

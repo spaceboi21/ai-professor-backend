@@ -43,6 +43,7 @@ import { CreateAIMessageDto } from './dto/create-ai-message.dto';
 import { CreateAIFeedbackDto } from './dto/create-ai-feedback.dto';
 import { CreateAIResourceDto } from './dto/create-ai-resource.dto';
 import { MessageSenderEnum } from 'src/common/constants/ai-chat-message.constant';
+import { PythonService } from './python.service';
 
 @Injectable()
 export class AIChatService {
@@ -54,6 +55,7 @@ export class AIChatService {
     @InjectModel(School.name)
     private readonly schoolModel: Model<School>,
     private readonly tenantConnectionService: TenantConnectionService,
+    private readonly pythonService: PythonService,
   ) {}
 
   // ========== SESSION OPERATIONS ==========
@@ -120,7 +122,13 @@ export class AIChatService {
       `AI session created with ID: ${session._id} by user: ${user.id}`,
     );
 
-    return session;
+    // Python API call to create a conversation with the AI
+    const response = await this.pythonService.startPatientSession(
+      sessionData.session_title,
+      sessionData.session_description,
+    );
+
+    return response;
   }
 
   async findAllAISessions(
