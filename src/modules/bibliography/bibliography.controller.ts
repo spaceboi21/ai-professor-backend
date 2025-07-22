@@ -221,7 +221,8 @@ export class BibliographyController {
     name: 'school_id',
     required: false,
     type: String,
-    description: 'School ID (required for super admin, optional for other roles)',
+    description:
+      'School ID (required for super admin, optional for other roles)',
     example: '507f1f77bcf86cd799439011',
   })
   @ApiResponse({

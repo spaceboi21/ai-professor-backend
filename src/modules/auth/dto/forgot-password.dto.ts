@@ -6,9 +6,9 @@ export class ForgotPasswordDto {
   @IsEmail({}, { message: 'Invalid email format' })
   @IsNotEmpty({ message: 'Email is required' })
   @Transform(({ value }) => value.toLowerCase())
-  @ApiProperty({ 
+  @ApiProperty({
     example: 'admin@school.edu',
-    description: 'Email address to send password reset link'
+    description: 'Email address to send password reset link',
   })
   email: string;
-} 
+}

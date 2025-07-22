@@ -2,7 +2,10 @@ import { Injectable, Logger } from '@nestjs/common';
 import * as mongoose from 'mongoose';
 import * as fs from 'fs';
 import * as path from 'path';
-import { MigrationTracker, MigrationTrackerSchema } from './schemas/migration-tracker.schema';
+import {
+  MigrationTracker,
+  MigrationTrackerSchema,
+} from './schemas/migration-tracker.schema';
 
 export interface MigrationFile {
   name: string;
@@ -27,12 +30,14 @@ export class MigrationService {
   private async getCentralConnection(): Promise<mongoose.Connection> {
     const mongoUri = process.env.MONGODB_URI || process.env.CENTRAL_DB_URI;
     if (!mongoUri) {
-      throw new Error('MONGODB_URI or CENTRAL_DB_URI is not defined in environment variables');
+      throw new Error(
+        'MONGODB_URI or CENTRAL_DB_URI is not defined in environment variables',
+      );
     }
 
     this.logger.log(`Connecting to central database: ${mongoUri}`);
     const connection = await mongoose.createConnection(mongoUri);
-    
+
     connection.on('connected', () => {
       this.logger.log('✅ Central database connected successfully');
     });
@@ -47,23 +52,30 @@ export class MigrationService {
   /**
    * Get tenant database connection
    */
-  private async getTenantConnection(dbName: string): Promise<mongoose.Connection> {
+  private async getTenantConnection(
+    dbName: string,
+  ): Promise<mongoose.Connection> {
     const baseUri = process.env.MONGODB_BASE_URI;
     if (!baseUri) {
-      throw new Error('MONGODB_BASE_URI is not defined in environment variables');
+      throw new Error(
+        'MONGODB_BASE_URI is not defined in environment variables',
+      );
     }
 
     const connectionUrl = `${baseUri}/${dbName}`;
     this.logger.log(`Connecting to tenant database: ${connectionUrl}`);
-    
+
     const connection = await mongoose.createConnection(connectionUrl);
-    
+
     connection.on('connected', () => {
       this.logger.log(`✅ Tenant database ${dbName} connected successfully`);
     });
 
     connection.on('error', (error) => {
-      this.logger.error(`❌ Tenant database ${dbName} connection error:`, error.message);
+      this.logger.error(
+        `❌ Tenant database ${dbName} connection error:`,
+        error.message,
+      );
     });
 
     return connection;
@@ -78,10 +90,14 @@ export class MigrationService {
       return [];
     }
 
-    const files = fs.readdirSync(migrationDir)
-      .filter(file => file.endsWith('.migration.ts') || file.endsWith('.migration.js'))
-      .filter(file => !file.startsWith('example'))
-      .map(file => {
+    const files = fs
+      .readdirSync(migrationDir)
+      .filter(
+        (file) =>
+          file.endsWith('.migration.ts') || file.endsWith('.migration.js'),
+      )
+      .filter((file) => !file.startsWith('example'))
+      .map((file) => {
         const filePath = path.join(migrationDir, file);
         const stats = fs.statSync(filePath);
         return {
@@ -102,10 +118,13 @@ export class MigrationService {
     connection: mongoose.Connection,
     migrationName: string,
     migrationType: 'central' | 'tenant',
-    tenantDbName?: string
+    tenantDbName?: string,
   ): Promise<boolean> {
-    const MigrationModel = connection.model('MigrationTracker', MigrationTrackerSchema);
-    
+    const MigrationModel = connection.model(
+      'MigrationTracker',
+      MigrationTrackerSchema,
+    );
+
     const query: any = {
       migration_name: migrationName,
       migration_type: migrationType,
@@ -130,10 +149,13 @@ export class MigrationService {
     executionTimeMs: number,
     success: boolean,
     errorMessage?: string,
-    tenantDbName?: string
+    tenantDbName?: string,
   ): Promise<void> {
-    const MigrationModel = connection.model('MigrationTracker', MigrationTrackerSchema);
-    
+    const MigrationModel = connection.model(
+      'MigrationTracker',
+      MigrationTrackerSchema,
+    );
+
     await MigrationModel.create({
       migration_name: migrationName,
       migration_type: migrationType,
@@ -151,18 +173,20 @@ export class MigrationService {
     migrationFile: MigrationFile,
     connection: mongoose.Connection,
     migrationType: 'central' | 'tenant',
-    tenantDbName?: string
+    tenantDbName?: string,
   ): Promise<MigrationResult> {
     const startTime = Date.now();
-    
+
     try {
       this.logger.log(`📦 Executing migration: ${migrationFile.name}`);
-      
+
       // Import the migration file
       const migrationModule = await import(migrationFile.path);
-      
+
       if (!migrationModule.up || typeof migrationModule.up !== 'function') {
-        throw new Error(`Migration file ${migrationFile.name} does not export an 'up' function`);
+        throw new Error(
+          `Migration file ${migrationFile.name} does not export an 'up' function`,
+        );
       }
 
       // Execute the migration
@@ -173,7 +197,7 @@ export class MigrationService {
       }
 
       const executionTime = Date.now() - startTime;
-      
+
       // Record successful migration
       await this.recordMigration(
         connection,
@@ -182,11 +206,13 @@ export class MigrationService {
         executionTime,
         true,
         undefined,
-        tenantDbName
+        tenantDbName,
       );
 
-      this.logger.log(`✅ Migration ${migrationFile.name} completed in ${executionTime}ms`);
-      
+      this.logger.log(
+        `✅ Migration ${migrationFile.name} completed in ${executionTime}ms`,
+      );
+
       return {
         success: true,
         migration_name: migrationFile.name,
@@ -194,8 +220,9 @@ export class MigrationService {
       };
     } catch (error) {
       const executionTime = Date.now() - startTime;
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+
       // Record failed migration
       await this.recordMigration(
         connection,
@@ -204,11 +231,13 @@ export class MigrationService {
         executionTime,
         false,
         errorMessage,
-        tenantDbName
+        tenantDbName,
       );
 
-      this.logger.error(`❌ Migration ${migrationFile.name} failed: ${errorMessage}`);
-      
+      this.logger.error(
+        `❌ Migration ${migrationFile.name} failed: ${errorMessage}`,
+      );
+
       return {
         success: false,
         migration_name: migrationFile.name,
@@ -223,37 +252,45 @@ export class MigrationService {
    */
   async runCentralMigrations(): Promise<MigrationResult[]> {
     this.logger.log('🚀 Starting central database migrations...');
-    
+
     const connection = await this.getCentralConnection();
-    const migrationDir = path.join(process.cwd(), 'src', 'database', 'migrations', 'central');
+    const migrationDir = path.join(
+      process.cwd(),
+      'src',
+      'database',
+      'migrations',
+      'central',
+    );
     const migrationFiles = this.getMigrationFiles(migrationDir);
-    
+
     this.logger.log(`Found ${migrationFiles.length} central migration files`);
-    
+
     const results: MigrationResult[] = [];
-    
+
     try {
       for (const migrationFile of migrationFiles) {
         // Check if migration has already been executed
         const isExecuted = await this.isMigrationExecuted(
           connection,
           migrationFile.name,
-          'central'
+          'central',
         );
-        
+
         if (isExecuted) {
-          this.logger.log(`⏭️ Skipping already executed migration: ${migrationFile.name}`);
+          this.logger.log(
+            `⏭️ Skipping already executed migration: ${migrationFile.name}`,
+          );
           continue;
         }
-        
+
         const result = await this.executeMigration(
           migrationFile,
           connection,
-          'central'
+          'central',
         );
-        
+
         results.push(result);
-        
+
         // Stop on first failure
         if (!result.success) {
           this.logger.error('🛑 Stopping migration due to failure');
@@ -263,8 +300,10 @@ export class MigrationService {
     } finally {
       await connection.close();
     }
-    
-    this.logger.log(`🏁 Central migrations completed. ${results.length} migrations processed.`);
+
+    this.logger.log(
+      `🏁 Central migrations completed. ${results.length} migrations processed.`,
+    );
     return results;
   }
 
@@ -272,16 +311,24 @@ export class MigrationService {
    * Run tenant database migrations
    */
   async runTenantMigrations(tenantDbName: string): Promise<MigrationResult[]> {
-    this.logger.log(`🚀 Starting tenant database migrations for: ${tenantDbName}`);
-    
+    this.logger.log(
+      `🚀 Starting tenant database migrations for: ${tenantDbName}`,
+    );
+
     const connection = await this.getTenantConnection(tenantDbName);
-    const migrationDir = path.join(process.cwd(), 'src', 'database', 'migrations', 'tenants');
+    const migrationDir = path.join(
+      process.cwd(),
+      'src',
+      'database',
+      'migrations',
+      'tenants',
+    );
     const migrationFiles = this.getMigrationFiles(migrationDir);
-    
+
     this.logger.log(`Found ${migrationFiles.length} tenant migration files`);
-    
+
     const results: MigrationResult[] = [];
-    
+
     try {
       for (const migrationFile of migrationFiles) {
         // Check if migration has already been executed
@@ -289,23 +336,25 @@ export class MigrationService {
           connection,
           migrationFile.name,
           'tenant',
-          tenantDbName
+          tenantDbName,
         );
-        
+
         if (isExecuted) {
-          this.logger.log(`⏭️ Skipping already executed migration: ${migrationFile.name}`);
+          this.logger.log(
+            `⏭️ Skipping already executed migration: ${migrationFile.name}`,
+          );
           continue;
         }
-        
+
         const result = await this.executeMigration(
           migrationFile,
           connection,
           'tenant',
-          tenantDbName
+          tenantDbName,
         );
-        
+
         results.push(result);
-        
+
         // Stop on first failure
         if (!result.success) {
           this.logger.error('🛑 Stopping migration due to failure');
@@ -315,34 +364,41 @@ export class MigrationService {
     } finally {
       await connection.close();
     }
-    
-    this.logger.log(`🏁 Tenant migrations for ${tenantDbName} completed. ${results.length} migrations processed.`);
+
+    this.logger.log(
+      `🏁 Tenant migrations for ${tenantDbName} completed. ${results.length} migrations processed.`,
+    );
     return results;
   }
 
   /**
    * Run all migrations (central + specific tenant)
    */
-  async runAllMigrations(tenantDbName?: string): Promise<{ central: MigrationResult[], tenant?: MigrationResult[] }> {
-    const results: { central: MigrationResult[], tenant?: MigrationResult[] } = {
-      central: [],
-    };
-    
+  async runAllMigrations(
+    tenantDbName?: string,
+  ): Promise<{ central: MigrationResult[]; tenant?: MigrationResult[] }> {
+    const results: { central: MigrationResult[]; tenant?: MigrationResult[] } =
+      {
+        central: [],
+      };
+
     // Run central migrations first
     results.central = await this.runCentralMigrations();
-    
+
     // Check if central migrations were successful
-    const centralFailures = results.central.filter(r => !r.success);
+    const centralFailures = results.central.filter((r) => !r.success);
     if (centralFailures.length > 0) {
-      this.logger.error('🛑 Skipping tenant migrations due to central migration failures');
+      this.logger.error(
+        '🛑 Skipping tenant migrations due to central migration failures',
+      );
       return results;
     }
-    
+
     // Run tenant migrations if db name is provided
     if (tenantDbName) {
       results.tenant = await this.runTenantMigrations(tenantDbName);
     }
-    
+
     return results;
   }
-} 
+}

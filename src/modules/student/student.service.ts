@@ -50,7 +50,8 @@ export class StudentService {
     createStudentDto: CreateStudentDto,
     adminUser: JWTUserPayload,
   ) {
-    const { first_name, last_name, email, school_id, status } = createStudentDto;
+    const { first_name, last_name, email, school_id, status } =
+      createStudentDto;
 
     this.logger.log(
       `Creating student with email: ${email} for school: ${school_id}`,
@@ -235,7 +236,10 @@ export class StudentService {
       if (!targetSchoolId) {
         throw new BadRequestException('School admin must have a school_id');
       }
-    } else if (user.role.name === RoleEnum.SUPER_ADMIN || user.role.name === RoleEnum.PROFESSOR) {
+    } else if (
+      user.role.name === RoleEnum.SUPER_ADMIN ||
+      user.role.name === RoleEnum.PROFESSOR
+    ) {
       // Super admin can specify school_id or use their default
       targetSchoolId = school_id?.toString() || (user.school_id as string);
       if (!targetSchoolId) {

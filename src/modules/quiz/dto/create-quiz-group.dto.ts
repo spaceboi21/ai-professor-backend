@@ -11,9 +11,7 @@ import {
 } from 'class-validator';
 import { Types } from 'mongoose';
 import { DifficultyEnum } from 'src/common/constants/difficulty.constant';
-import {
-  QuizTypeEnum,
-} from 'src/common/constants/quiz.constant';
+import { QuizTypeEnum } from 'src/common/constants/quiz.constant';
 
 export class CreateQuizGroupDto {
   @IsString({ message: 'Subject must be a string' })
@@ -91,4 +89,4 @@ export class CreateQuizGroupDto {
     required: false,
   })
   chapter_id?: string | Types.ObjectId;
-} 
+}

@@ -44,7 +44,8 @@ export class ProfessorService {
     createProfessorDto: CreateProfessorDto,
     adminUser: JWTUserPayload,
   ) {
-    const { first_name, last_name, email, school_id, status } = createProfessorDto;
+    const { first_name, last_name, email, school_id, status } =
+      createProfessorDto;
 
     this.logger.log(
       `Creating professor with email: ${email} for school: ${school_id}`,
@@ -447,11 +448,11 @@ export class ProfessorService {
     const deletedProfessor = await this.userModel
       .findByIdAndUpdate(
         new Types.ObjectId(id),
-        { 
+        {
           deleted_at: new Date(),
-          status: StatusEnum.INACTIVE // Also set status to inactive
+          status: StatusEnum.INACTIVE, // Also set status to inactive
         },
-        { new: true }
+        { new: true },
       )
       .populate('role', 'name');
 

@@ -31,7 +31,10 @@ import { StartModuleDto } from './dto/start-module.dto';
 import { StartChapterDto } from './dto/start-chapter.dto';
 import { StartQuizAttemptDto } from './dto/start-quiz-attempt.dto';
 import { SubmitQuizAnswersDto } from './dto/submit-quiz-answers.dto';
-import { ProgressFilterDto, QuizAttemptFilterDto } from './dto/progress-filter.dto';
+import {
+  ProgressFilterDto,
+  QuizAttemptFilterDto,
+} from './dto/progress-filter.dto';
 
 @ApiTags('Progress Tracking')
 @ApiBearerAuth()
@@ -98,7 +101,10 @@ export class ProgressController {
     },
   })
   @ApiResponse({ status: 400, description: 'Bad request' })
-  @ApiResponse({ status: 403, description: 'Access denied - previous chapter quiz not completed' })
+  @ApiResponse({
+    status: 403,
+    description: 'Access denied - previous chapter quiz not completed',
+  })
   @ApiResponse({ status: 404, description: 'Chapter not found' })
   async startChapter(
     @Body() startChapterDto: StartChapterDto,
@@ -129,7 +135,10 @@ export class ProgressController {
     },
   })
   @ApiResponse({ status: 400, description: 'Bad request' })
-  @ApiResponse({ status: 403, description: 'Access denied - prerequisites not met' })
+  @ApiResponse({
+    status: 403,
+    description: 'Access denied - prerequisites not met',
+  })
   @ApiResponse({ status: 404, description: 'Quiz group not found' })
   async startQuizAttempt(
     @Body() startQuizAttemptDto: StartQuizAttemptDto,
@@ -162,7 +171,10 @@ export class ProgressController {
     },
   })
   @ApiResponse({ status: 400, description: 'Bad request' })
-  @ApiResponse({ status: 403, description: 'Only students can submit quiz answers' })
+  @ApiResponse({
+    status: 403,
+    description: 'Only students can submit quiz answers',
+  })
   @ApiResponse({ status: 404, description: 'Quiz attempt not found' })
   async submitQuizAnswers(
     @Body() submitQuizAnswersDto: SubmitQuizAnswersDto,
@@ -222,13 +234,20 @@ export class ProgressController {
     status: 200,
     description: 'Module progress retrieved successfully',
   })
-  @ApiResponse({ status: 403, description: 'Only students can view their progress' })
+  @ApiResponse({
+    status: 403,
+    description: 'Only students can view their progress',
+  })
   async getStudentModuleProgress(
     @User() user: JWTUserPayload,
     @Query() paginationDto: PaginationDto,
     @Query() filterDto: ProgressFilterDto,
   ) {
-    return this.progressService.getStudentModuleProgress(user, paginationDto, filterDto);
+    return this.progressService.getStudentModuleProgress(
+      user,
+      paginationDto,
+      filterDto,
+    );
   }
 
   @Get('chapters')
@@ -273,13 +292,20 @@ export class ProgressController {
     status: 200,
     description: 'Chapter progress retrieved successfully',
   })
-  @ApiResponse({ status: 403, description: 'Only students can view their progress' })
+  @ApiResponse({
+    status: 403,
+    description: 'Only students can view their progress',
+  })
   async getStudentChapterProgress(
     @User() user: JWTUserPayload,
     @Query() paginationDto: PaginationDto,
     @Query() filterDto: ProgressFilterDto,
   ) {
-    return this.progressService.getStudentChapterProgress(user, paginationDto, filterDto);
+    return this.progressService.getStudentChapterProgress(
+      user,
+      paginationDto,
+      filterDto,
+    );
   }
 
   @Get('quiz-attempts')
@@ -324,13 +350,20 @@ export class ProgressController {
     status: 200,
     description: 'Quiz attempts retrieved successfully',
   })
-  @ApiResponse({ status: 403, description: 'Only students can view their quiz attempts' })
+  @ApiResponse({
+    status: 403,
+    description: 'Only students can view their quiz attempts',
+  })
   async getStudentQuizAttempts(
     @User() user: JWTUserPayload,
     @Query() paginationDto: PaginationDto,
     @Query() filterDto: QuizAttemptFilterDto,
   ) {
-    return this.progressService.getStudentQuizAttempts(user, paginationDto, filterDto);
+    return this.progressService.getStudentQuizAttempts(
+      user,
+      paginationDto,
+      filterDto,
+    );
   }
 
   // ========== DASHBOARD ENDPOINTS ==========
@@ -370,14 +403,19 @@ export class ProgressController {
       },
     },
   })
-  @ApiResponse({ status: 403, description: 'Only students can view their dashboard' })
+  @ApiResponse({
+    status: 403,
+    description: 'Only students can view their dashboard',
+  })
   async getStudentDashboard(@User() user: JWTUserPayload) {
     return this.progressService.getStudentDashboard(user);
   }
 
   @Get('admin/dashboard')
   @Roles(RoleEnum.SCHOOL_ADMIN, RoleEnum.PROFESSOR)
-  @ApiOperation({ summary: 'Get school admin dashboard overview (Admin/Professor)' })
+  @ApiOperation({
+    summary: 'Get school admin dashboard overview (Admin/Professor)',
+  })
   @ApiQuery({
     name: 'module_id',
     required: false,
@@ -424,12 +462,18 @@ export class ProgressController {
       },
     },
   })
-  @ApiResponse({ status: 403, description: 'Only school admins and professors can view school dashboard' })
+  @ApiResponse({
+    status: 403,
+    description: 'Only school admins and professors can view school dashboard',
+  })
   async getSchoolAdminDashboard(
     @User() user: JWTUserPayload,
     @Query('module_id', ParseObjectIdPipe) moduleId?: string | Types.ObjectId,
   ) {
-    return this.progressService.getSchoolAdminDashboard(user, moduleId?.toString());
+    return this.progressService.getSchoolAdminDashboard(
+      user,
+      moduleId?.toString(),
+    );
   }
 
   // ========== VALIDATION ENDPOINTS ==========
@@ -466,7 +510,8 @@ export class ProgressController {
         data: {
           can_access: false,
           chapter_id: '507f1f77bcf86cd799439011',
-          reason: 'You must complete the quiz for "Introduction to Psychology" before accessing this chapter',
+          reason:
+            'You must complete the quiz for "Introduction to Psychology" before accessing this chapter',
         },
       },
     },
@@ -526,11 +571,15 @@ export class ProgressController {
   })
   @ApiResponse({ status: 404, description: 'Quiz group not found' })
   async canAccessQuiz(
-    @Param('quiz_group_id', ParseObjectIdPipe) quizGroupId: string | Types.ObjectId,
+    @Param('quiz_group_id', ParseObjectIdPipe)
+    quizGroupId: string | Types.ObjectId,
     @User() user: JWTUserPayload,
   ) {
     try {
-      await this.progressService.startQuizAttempt({ quiz_group_id: quizGroupId }, user);
+      await this.progressService.startQuizAttempt(
+        { quiz_group_id: quizGroupId },
+        user,
+      );
       return {
         message: 'Quiz access validated',
         data: {
@@ -553,4 +602,4 @@ export class ProgressController {
       throw error;
     }
   }
-} 
+}

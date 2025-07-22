@@ -10,4 +10,4 @@ export class StartChapterDto {
     description: 'ID of the chapter to start',
   })
   chapter_id: string | Types.ObjectId;
-} 
+}

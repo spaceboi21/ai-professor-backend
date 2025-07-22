@@ -55,7 +55,9 @@ export class SchoolAdminController {
   // Reset password endpoint
   @Post('reset-password')
   @Roles(RoleEnum.SCHOOL_ADMIN, RoleEnum.PROFESSOR)
-  @ApiOperation({ summary: 'Reset password for authenticated school admin or professor' })
+  @ApiOperation({
+    summary: 'Reset password for authenticated school admin or professor',
+  })
   @ApiBody({ type: ResetPasswordDto })
   @ApiResponse({ status: 200, description: 'Password updated successfully' })
   @ApiResponse({ status: 404, description: 'User not found' })
@@ -64,6 +66,9 @@ export class SchoolAdminController {
     @Body() resetPasswordDto: ResetPasswordDto,
     @User() user: JWTUserPayload,
   ) {
-    return this.schoolAdminService.resetPassword(user.id.toString(), resetPasswordDto);
+    return this.schoolAdminService.resetPassword(
+      user.id.toString(),
+      resetPasswordDto,
+    );
   }
 }

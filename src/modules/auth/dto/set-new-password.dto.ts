@@ -4,9 +4,9 @@ import { IsNotEmpty, IsString, Matches } from 'class-validator';
 export class SetNewPasswordDto {
   @IsString({ message: 'Token must be a string' })
   @IsNotEmpty({ message: 'Token is required' })
-  @ApiProperty({ 
+  @ApiProperty({
     example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
-    description: 'Reset password token received via email'
+    description: 'Reset password token received via email',
   })
   token: string;
 
@@ -25,4 +25,4 @@ export class SetNewPasswordDto {
       'New password - must be at least 8 characters with uppercase, lowercase, number, and special character',
   })
   new_password: string;
-} 
+}

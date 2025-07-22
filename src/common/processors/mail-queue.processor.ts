@@ -28,7 +28,7 @@ export class MailQueueProcessor {
   @Process('send-credentials')
   async handleSendCredentials(job: Job<SendCredentialsJobData>): Promise<void> {
     const { email, name, password, role } = job.data;
-    
+
     this.logger.log(`Processing send-credentials job for: ${email}`);
 
     try {
@@ -43,7 +43,7 @@ export class MailQueueProcessor {
   @Process('send-welcome')
   async handleSendWelcome(job: Job<SendWelcomeJobData>): Promise<void> {
     const { email, name, role } = job.data;
-    
+
     this.logger.log(`Processing send-welcome job for: ${email}`);
 
     try {
