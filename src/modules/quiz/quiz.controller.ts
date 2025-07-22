@@ -344,10 +344,9 @@ export class QuizController {
   })
   findQuizGroupsByModule(
     @Param('moduleId', ParseObjectIdPipe) moduleId: Types.ObjectId,
-    @Query() filterDto: QuizGroupFilterDto,
     @User() user: JWTUserPayload,
   ) {
-    const updatedFilter = { ...filterDto, module_id: moduleId };
+    const updatedFilter = { module_id: moduleId };
     return this.quizService.findAllQuizGroups(user, updatedFilter);
   }
 
@@ -370,10 +369,9 @@ export class QuizController {
   })
   findQuizGroupsByChapter(
     @Param('chapterId', ParseObjectIdPipe) chapterId: Types.ObjectId,
-    @Query() filterDto: QuizGroupFilterDto,
     @User() user: JWTUserPayload,
   ) {
-    const updatedFilter = { ...filterDto, chapter_id: chapterId };
+    const updatedFilter = { chapter_id: chapterId };
     return this.quizService.findAllQuizGroups(user, updatedFilter);
   }
 }
