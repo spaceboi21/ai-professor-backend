@@ -16,7 +16,8 @@ export class CreateModuleDto {
   @IsMongoId({ message: 'School ID must be a valid MongoDB ObjectId' })
   @ApiProperty({
     example: '507f1f77bcf86cd799439011',
-    description: 'School ID (required for super admin, optional for other roles)',
+    description:
+      'School ID (required for super admin, optional for other roles)',
     required: false,
   })
   school_id?: string | Types.ObjectId;
@@ -54,14 +55,6 @@ export class CreateModuleDto {
     required: false,
   })
   category?: string;
-
-  @IsNumber({}, { message: 'Duration must be a number' })
-  @IsNotEmpty({ message: 'Duration is required' })
-  @ApiProperty({
-    example: 720,
-    description: 'Duration in minutes (e.g. 720 for 12 hours)',
-  })
-  duration: number;
 
   @IsEnum(DifficultyEnum, {
     message: 'Difficulty must be BEGINNER, INTERMEDIATE, or ADVANCED',

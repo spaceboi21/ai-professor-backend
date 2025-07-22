@@ -97,7 +97,6 @@ export class ModulesService {
       subject,
       description,
       category,
-      duration,
       difficulty,
       tags,
       thumbnail,
@@ -126,7 +125,7 @@ export class ModulesService {
         subject,
         description,
         category,
-        duration,
+        duration: 0, // Always start at 0, will be updated as chapters are added
         difficulty,
         tags: tags || [],
         thumbnail: thumbnail || '/uploads/default-module-thumbnail.jpg',
@@ -159,6 +158,25 @@ export class ModulesService {
       this.logger.error('Error creating module', error?.stack || error);
       throw new BadRequestException('Failed to create module');
     }
+  }
+
+  // Helper to recalculate and update module duration
+  async recalculateModuleDuration(
+    moduleId: Types.ObjectId,
+    tenantConnection: any,
+  ) {
+    const ChapterModel = tenantConnection.model(Chapter.name, ChapterSchema);
+    const ModuleModel = tenantConnection.model(Module.name, ModuleSchema);
+    const chapters = await ChapterModel.find({
+      module_id: moduleId,
+      deleted_at: null,
+    });
+    const totalDuration = chapters.reduce(
+      (sum, chapter) => sum + (chapter.duration || 0),
+      0,
+    );
+    await ModuleModel.findByIdAndUpdate(moduleId, { duration: totalDuration });
+    return totalDuration;
   }
 
   async findAllModules(

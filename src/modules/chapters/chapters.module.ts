@@ -8,6 +8,9 @@ import {
   SchoolSchema,
 } from 'src/database/schemas/central/school.schema';
 import { TenantConnectionService } from 'src/database/tenant-connection.service';
+import { ModulesModule } from '../modules/modules.module';
+import { ModulesService } from '../modules/modules.service';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
   imports: [
@@ -15,9 +18,11 @@ import { TenantConnectionService } from 'src/database/tenant-connection.service'
       { name: User.name, schema: UserSchema },
       { name: School.name, schema: SchoolSchema },
     ]),
+    ModulesModule,
+    NotificationsModule,
   ],
   controllers: [ChaptersController],
-  providers: [ChaptersService, TenantConnectionService],
+  providers: [ChaptersService, TenantConnectionService, ModulesService],
   exports: [ChaptersService],
 })
 export class ChaptersModule {}

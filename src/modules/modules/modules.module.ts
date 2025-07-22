@@ -9,6 +9,7 @@ import {
 } from 'src/database/schemas/central/school.schema';
 import { DatabaseModule } from 'src/database/database.module';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { NotificationsService } from '../notifications/notifications.service';
 
 @Module({
   imports: [
@@ -20,7 +21,7 @@ import { NotificationsModule } from '../notifications/notifications.module';
     NotificationsModule,
   ],
   controllers: [ModulesController],
-  providers: [ModulesService],
+  providers: [ModulesService, NotificationsService],
   exports: [ModulesService],
 })
 export class ModulesModule {}

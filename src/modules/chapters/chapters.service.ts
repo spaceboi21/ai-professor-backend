@@ -35,6 +35,11 @@ import {
   getPaginationOptions,
   createPaginationResult,
 } from 'src/common/utils/pagination.util';
+import { ModulesService } from '../modules/modules.service';
+import {
+  Bibliography,
+  BibliographySchema,
+} from 'src/database/schemas/tenant/bibliography.schema';
 
 @Injectable()
 export class ChaptersService {
@@ -46,6 +51,7 @@ export class ChaptersService {
     @InjectModel(School.name)
     private readonly schoolModel: Model<School>,
     private readonly tenantConnectionService: TenantConnectionService,
+    private readonly modulesService: ModulesService,
   ) {}
 
   /**
@@ -441,17 +447,28 @@ export class ChaptersService {
         Array.isArray(chapters) &&
         chapters.length > 0
       ) {
-        // First chapter always unlocked
-        chapters[0].is_locked = false;
+        for (let i = 0; i < chapters.length; i++) {
+          const chapter = chapters[i];
+          const progress = chapter.progress?.[0];
 
-        for (let i = 1; i < chapters.length; i++) {
-          const prev = chapters[i - 1];
-          const isPrevCompleted =
-            prev.progress?.[0]?.status === ProgressStatusEnum.COMPLETED;
-          const isPrevQuizCompleted =
-            prev.progress?.[0]?.chapter_quiz_completed === true;
+          // Add status and quiz completion fields to each chapter
+          chapter.status = progress?.status || ProgressStatusEnum.NOT_STARTED;
+          chapter.chapter_quiz_completed =
+            progress?.chapter_quiz_completed || false;
 
-          chapters[i].is_locked = !(isPrevCompleted && isPrevQuizCompleted);
+          // Lock logic
+          if (i === 0) {
+            chapter.is_locked = false; // First chapter is always unlocked
+          } else {
+            const prev = chapters[i - 1];
+            const prevProgress = prev.progress?.[0];
+            const isPrevCompleted =
+              prevProgress?.status === ProgressStatusEnum.COMPLETED;
+            const isPrevQuizCompleted =
+              prevProgress?.chapter_quiz_completed === true;
+
+            chapter.is_locked = !(isPrevCompleted && isPrevQuizCompleted);
+          }
         }
       }
 
@@ -976,5 +993,38 @@ export class ChaptersService {
       this.logger.error('Error getting next sequence', error?.stack || error);
       throw new BadRequestException('Failed to get next sequence');
     }
+  }
+
+  // Helper to recalculate and update chapter duration
+  async recalculateChapterDuration(
+    chapterId: Types.ObjectId,
+    tenantConnection: any,
+  ) {
+    const BibliographyModel = tenantConnection.model(
+      Bibliography.name,
+      BibliographySchema,
+    );
+    const ChapterModel = tenantConnection.model(Chapter.name, ChapterSchema);
+    const bibliographies = await BibliographyModel.find({
+      chapter_id: chapterId,
+      deleted_at: null,
+    });
+    const totalDuration = bibliographies.reduce(
+      (sum, b) => sum + (b.duration || 0),
+      0,
+    );
+    const chapter = await ChapterModel.findByIdAndUpdate(
+      chapterId,
+      { duration: totalDuration },
+      { new: true },
+    );
+    // After updating chapter duration, update parent module duration
+    if (chapter && chapter.module_id) {
+      await this.modulesService.recalculateModuleDuration(
+        chapter.module_id,
+        tenantConnection,
+      );
+    }
+    return totalDuration;
   }
 }

@@ -59,15 +59,6 @@ export class UpdateModuleDto {
   category?: string;
 
   @IsOptional()
-  @IsNumber({}, { message: 'Duration must be a number' })
-  @ApiProperty({
-    example: 720,
-    description: 'Duration in minutes (e.g. 720 for 12 hours)',
-    required: false,
-  })
-  duration?: number;
-
-  @IsOptional()
   @IsEnum(DifficultyEnum, {
     message: 'Difficulty must be BEGINNER, INTERMEDIATE, or ADVANCED',
   })

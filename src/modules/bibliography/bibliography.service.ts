@@ -37,6 +37,7 @@ import {
   getPaginationOptions,
   createPaginationResult,
 } from 'src/common/utils/pagination.util';
+import { ChaptersService } from '../chapters/chapters.service';
 
 @Injectable()
 export class BibliographyService {
@@ -48,6 +49,7 @@ export class BibliographyService {
     @InjectModel(School.name)
     private readonly schoolModel: Model<School>,
     private readonly tenantConnectionService: TenantConnectionService,
+    private readonly chaptersService: ChaptersService,
   ) {}
 
   /**
@@ -158,6 +160,12 @@ export class BibliographyService {
 
       this.logger.log(
         `Bibliography created in tenant DB: ${savedBibliography._id}`,
+      );
+
+      // After saving the bibliography, recalculate chapter duration
+      await this.chaptersService.recalculateChapterDuration(
+        new Types.ObjectId(chapter_id),
+        tenantConnection,
       );
 
       return {
@@ -500,6 +508,12 @@ export class BibliographyService {
 
       this.logger.log(`Bibliography updated: ${updatedBibliography._id}`);
 
+      // After updating the bibliography, recalculate chapter duration
+      await this.chaptersService.recalculateChapterDuration(
+        updatedBibliography.chapter_id,
+        tenantConnection,
+      );
+
       return {
         message: 'Bibliography updated successfully',
         data: {
@@ -582,6 +596,12 @@ export class BibliographyService {
       }
 
       this.logger.log(`Bibliography deleted: ${deletedBibliography._id}`);
+
+      // After deleting the bibliography, recalculate chapter duration
+      await this.chaptersService.recalculateChapterDuration(
+        deletedBibliography.chapter_id,
+        tenantConnection,
+      );
 
       return {
         message: 'Bibliography deleted successfully',

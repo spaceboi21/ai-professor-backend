@@ -31,6 +31,9 @@ export class Chapter extends Document {
   @Prop({ required: true, type: Number, min: 1 })
   sequence: number;
 
+  @Prop({ type: Number, default: 0 })
+  duration: number; // in minutes, auto-calculated from bibliographies
+
   @Prop({ type: Date, default: null })
   deleted_at: Date;
 

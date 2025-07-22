@@ -8,6 +8,7 @@ import {
   SchoolSchema,
 } from 'src/database/schemas/central/school.schema';
 import { TenantConnectionService } from 'src/database/tenant-connection.service';
+import { ChaptersModule } from '../chapters/chapters.module';
 
 @Module({
   imports: [
@@ -15,6 +16,7 @@ import { TenantConnectionService } from 'src/database/tenant-connection.service'
       { name: User.name, schema: UserSchema },
       { name: School.name, schema: SchoolSchema },
     ]),
+    ChaptersModule,
   ],
   controllers: [BibliographyController],
   providers: [BibliographyService, TenantConnectionService],
