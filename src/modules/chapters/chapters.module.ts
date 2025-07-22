@@ -11,7 +11,7 @@ import { TenantConnectionService } from 'src/database/tenant-connection.service'
 import { ModulesModule } from '../modules/modules.module';
 import { ModulesService } from '../modules/modules.service';
 import { NotificationsModule } from '../notifications/notifications.module';
-
+import { ProgressModule } from '../progress/progress.module';
 @Module({
   imports: [
     MongooseModule.forFeature([
@@ -20,6 +20,7 @@ import { NotificationsModule } from '../notifications/notifications.module';
     ]),
     ModulesModule,
     NotificationsModule,
+    ProgressModule,
   ],
   controllers: [ChaptersController],
   providers: [ChaptersService, TenantConnectionService, ModulesService],

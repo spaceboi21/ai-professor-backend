@@ -40,6 +40,7 @@ import {
   Bibliography,
   BibliographySchema,
 } from 'src/database/schemas/tenant/bibliography.schema';
+import { ProgressService } from '../progress/progress.service';
 
 @Injectable()
 export class ChaptersService {
@@ -52,6 +53,7 @@ export class ChaptersService {
     private readonly schoolModel: Model<School>,
     private readonly tenantConnectionService: TenantConnectionService,
     private readonly modulesService: ModulesService,
+    private readonly progressService: ProgressService,
   ) {}
 
   /**
@@ -568,6 +570,17 @@ export class ChaptersService {
     const tenantConnection =
       await this.tenantConnectionService.getTenantConnection(school.db_name);
     const ChapterModel = tenantConnection.model(Chapter.name, ChapterSchema);
+
+    const chapter = await ChapterModel.findById(id);
+
+    // // Check if student can access this chapter (validate sequence)
+    // if (user.role.name === RoleEnum.STUDENT) {
+    //   await this.progressService.validateChapterAccess(
+    //     user.id,
+    //     chapter,
+    //     tenantConnection,
+    //   );
+    // }
 
     try {
       // Build aggregation pipeline

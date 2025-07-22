@@ -145,7 +145,10 @@ export class ProgressController {
     @Body() markChapterCompleteDto: MarkChapterCompleteDto,
     @User() user: JWTUserPayload,
   ) {
-    return this.progressService.markChapterComplete(markChapterCompleteDto, user);
+    return this.progressService.markChapterComplete(
+      markChapterCompleteDto,
+      user,
+    );
   }
 
   @Post('quiz/start')

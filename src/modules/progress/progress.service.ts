@@ -227,7 +227,10 @@ export class ProgressService {
       await this.validateChapterAccess(user.id, chapter, tenantConnection);
 
       // Start the module if not already started
-      await this.startModule({ module_id: new Types.ObjectId(chapter.module_id) }, user);
+      await this.startModule(
+        { module_id: new Types.ObjectId(chapter.module_id) },
+        user,
+      );
 
       // Check if chapter progress already exists
       let progress = await StudentChapterProgressModel.findOne({
@@ -298,7 +301,9 @@ export class ProgressService {
 
     // Validate user is a student
     if (user.role.name !== RoleEnum.STUDENT) {
-      throw new ForbiddenException('Only students can mark chapters as complete');
+      throw new ForbiddenException(
+        'Only students can mark chapters as complete',
+      );
     }
 
     // Get school and tenant connection
@@ -374,7 +379,10 @@ export class ProgressService {
       };
     } catch (error) {
       this.logger.error('Error marking chapter as complete:', error);
-      if (error instanceof NotFoundException || error instanceof ForbiddenException) {
+      if (
+        error instanceof NotFoundException ||
+        error instanceof ForbiddenException
+      ) {
         throw error;
       }
       throw new BadRequestException('Failed to mark chapter as complete');
@@ -663,7 +671,7 @@ export class ProgressService {
 
   // ========== VALIDATION METHODS ==========
 
-  private async validateChapterAccess(
+  async validateChapterAccess(
     studentId: string | Types.ObjectId,
     chapter: any,
     tenantConnection: any,
@@ -699,7 +707,7 @@ export class ProgressService {
 
     if (!previousChapterProgress) {
       throw new ForbiddenException(
-        `You must complete the quiz for "${previousChapter.title}" before accessing this chapter`,
+        `The chapter is locked. Please complete the quiz for "${previousChapter.title}" to continue.`,
       );
     }
 
@@ -756,10 +764,13 @@ export class ProgressService {
       });
 
       if (!chapterProgress) {
-        const ChapterModel = tenantConnection.model(Chapter.name, ChapterSchema);
+        const ChapterModel = tenantConnection.model(
+          Chapter.name,
+          ChapterSchema,
+        );
         const chapter = await ChapterModel.findById(quizGroup.chapter_id);
         const chapterTitle = chapter?.title || 'this chapter';
-        
+
         throw new ForbiddenException(
           `You must mark "${chapterTitle}" as complete before taking the quiz`,
         );
