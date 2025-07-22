@@ -35,6 +35,7 @@ import {
   ProgressFilterDto,
   QuizAttemptFilterDto,
 } from './dto/progress-filter.dto';
+import { StudentDashboardDto } from './dto/student-dashboard.dto';
 
 @ApiTags('Progress Tracking')
 @ApiBearerAuth()
@@ -369,8 +370,30 @@ export class ProgressController {
   // ========== DASHBOARD ENDPOINTS ==========
 
   @Get('dashboard')
-  @Roles(RoleEnum.STUDENT)
-  @ApiOperation({ summary: 'Get student dashboard overview (Student)' })
+  @Roles(
+    RoleEnum.STUDENT,
+    RoleEnum.SCHOOL_ADMIN,
+    RoleEnum.PROFESSOR,
+    RoleEnum.SUPER_ADMIN,
+  )
+  @ApiOperation({
+    summary:
+      'Get student dashboard overview (Student/Admin/Professor/Super Admin)',
+  })
+  @ApiQuery({
+    name: 'student_id',
+    required: false,
+    type: String,
+    description: 'Student ID (required for admin/professor/super admin access)',
+    example: '507f1f77bcf86cd799439011',
+  })
+  @ApiQuery({
+    name: 'school_id',
+    required: false,
+    type: String,
+    description: 'School ID (required for super admin access)',
+    example: '507f1f77bcf86cd799439012',
+  })
   @ApiResponse({
     status: 200,
     description: 'Dashboard data retrieved successfully',
@@ -403,10 +426,7 @@ export class ProgressController {
       },
     },
   })
-  @ApiResponse({
-    status: 403,
-    description: 'Only students can view their dashboard',
-  })
+  @ApiResponse({ status: 403, description: 'Only students can view their dashboard' })
   async getStudentDashboard(@User() user: JWTUserPayload) {
     return this.progressService.getStudentDashboard(user);
   }
