@@ -568,14 +568,14 @@ export class ChaptersService {
 
     const chapter = await ChapterModel.findById(id);
 
-    // // Check if student can access this chapter (validate sequence)
-    // if (user.role.name === RoleEnum.STUDENT) {
-    //   await this.progressService.validateChapterAccess(
-    //     user.id,
-    //     chapter,
-    //     tenantConnection,
-    //   );
-    // }
+    // Check if student can access this chapter (validate sequence)
+    if (user.role.name === RoleEnum.STUDENT) {
+      await this.progressService.validateChapterAccess(
+        user.id,
+        chapter,
+        tenantConnection,
+      );
+    }
 
     try {
       // Build aggregation pipeline
