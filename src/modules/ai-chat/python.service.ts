@@ -93,7 +93,7 @@ export class PythonService {
    * Knowledge base Q&A
    * POST /chat/qa/ask
    */
-  async knowledgeBaseQA(
+  async quizVerificationByAI(
     question: string,
     module_title: string,
     module_description: string,
