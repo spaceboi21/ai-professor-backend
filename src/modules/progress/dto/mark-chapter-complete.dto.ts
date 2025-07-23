@@ -11,4 +11,4 @@ export class MarkChapterCompleteDto {
     description: 'Chapter ID to mark as complete',
   })
   chapter_id: string;
-} 
+}

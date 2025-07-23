@@ -30,5 +30,5 @@ export interface ProfessorResourcesResponseType {
   recommendations: string;
   total_found: number;
   knowledge_available: boolean;
-  keywords_used: string[]
+  keywords_used: string[];
 }

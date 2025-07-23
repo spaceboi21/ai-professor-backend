@@ -68,8 +68,6 @@ export class AIMessageResponseDto {
   })
   attachments: string[];
 
-
-
   @ApiProperty({
     description: 'Message metadata',
     example: { confidence_score: 0.95, processing_time: 1200 },
