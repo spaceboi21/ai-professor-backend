@@ -201,7 +201,7 @@ export class ProgressController {
           correct_answers: 17,
           total_questions: 20,
           is_passed: true,
-          time_taken_minutes: 25,
+          time_taken_seconds: 25,
           status: 'COMPLETED',
           completed_at: '2024-01-15T10:25:00.000Z',
         },

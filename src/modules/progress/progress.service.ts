@@ -527,7 +527,7 @@ export class ProgressService {
     submitQuizAnswersDto: SubmitQuizAnswersDto,
     user: JWTUserPayload,
   ) {
-    const { quiz_group_id, answers, total_time_taken_minutes } =
+    const { quiz_group_id, answers, total_time_taken_seconds } =
       submitQuizAnswersDto;
 
     this.logger.log(
@@ -629,7 +629,7 @@ export class ProgressService {
       attempt.score_percentage = scorePercentage;
       attempt.correct_answers = correctAnswers;
       attempt.total_questions = quizzes.length;
-      attempt.time_taken_minutes = total_time_taken_minutes || 0;
+      attempt.time_taken_seconds = total_time_taken_seconds || 0;
       attempt.is_passed = isPassed;
       attempt.answers = processedAnswers;
 
@@ -652,7 +652,7 @@ export class ProgressService {
           correct_answers: attempt.correct_answers,
           total_questions: attempt.total_questions,
           is_passed: attempt.is_passed,
-          time_taken_minutes: attempt.time_taken_minutes,
+          time_taken_seconds: attempt.time_taken_seconds,
           status: attempt.status,
           completed_at: attempt.completed_at,
         },

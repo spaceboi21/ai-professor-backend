@@ -62,7 +62,7 @@ export class StudentQuizAttempt extends Document {
   total_questions: number;
 
   @Prop({ type: Number, default: 0 })
-  time_taken_minutes: number;
+  time_taken_seconds: number;
 
   @Prop({ type: Boolean, default: false })
   is_passed: boolean;

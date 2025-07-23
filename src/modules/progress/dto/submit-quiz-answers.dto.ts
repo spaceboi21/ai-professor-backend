@@ -67,5 +67,5 @@ export class SubmitQuizAnswersDto {
     description: 'Total time taken for the quiz in minutes',
     required: false,
   })
-  total_time_taken_minutes?: number;
+  total_time_taken_seconds?: number;
 }
