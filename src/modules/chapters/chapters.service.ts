@@ -867,6 +867,39 @@ export class ChaptersService {
 
       const chapter = chapters[0];
 
+      let previous_chapter_id: string | null = null;
+      let next_chapter_id: string | null = null;
+
+      if (chapter?.module_id && typeof chapter.sequence === 'number') {
+        // Fetch previous chapter by sequence - 1
+        const previousChapter = await ChapterModel.findOne({
+          module_id: chapter.module_id,
+          sequence: chapter.sequence - 1,
+          deleted_at: null,
+        }).select('_id');
+
+        if (previousChapter) {
+          previous_chapter_id = previousChapter._id.toString();
+        }
+
+        // Fetch next chapter by sequence + 1 only if current quiz is completed
+        const isQuizDone =
+          chapter.status === ProgressStatusEnum.COMPLETED &&
+          chapter.chapter_quiz_completed === true;
+
+        if (isQuizDone) {
+          const nextChapter = await ChapterModel.findOne({
+            module_id: chapter.module_id,
+            sequence: chapter.sequence + 1,
+            deleted_at: null,
+          }).select('_id');
+
+          if (nextChapter) {
+            next_chapter_id = nextChapter._id.toString();
+          }
+        }
+      }
+
       // Attach user details to chapter
       const chapterWithUser = await attachUserDetailsToEntity(
         chapter,
@@ -875,7 +908,11 @@ export class ChaptersService {
 
       return {
         message: 'Chapter retrieved successfully',
-        data: chapterWithUser,
+        data: {
+          ...chapterWithUser,
+          previous_chapter_id,
+          next_chapter_id,
+        },
       };
     } catch (error) {
       this.logger.error('Error finding chapter', error?.stack || error);
