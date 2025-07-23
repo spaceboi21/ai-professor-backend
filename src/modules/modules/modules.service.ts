@@ -514,14 +514,71 @@ export class ModulesService {
     const ModuleModel = tenantConnection.model(Module.name, ModuleSchema);
 
     try {
-      const module = await ModuleModel.findOne({
-        _id: id,
-        deleted_at: null,
-      }).lean();
+      // Build aggregation pipeline for single module with progress
+      const pipeline: any[] = [
+        // Stage 1: Match the specific module
+        {
+          $match: {
+            _id: new Types.ObjectId(id.toString()),
+            deleted_at: null,
+          },
+        },
+      ];
 
-      if (!module) {
+      // Stage 2: Add progress information for students
+      if (user.role.name === RoleEnum.STUDENT) {
+        // Lookup student progress
+        pipeline.push({
+          $lookup: {
+            from: 'student_module_progress',
+            let: { moduleId: '$_id' },
+            pipeline: [
+              {
+                $match: {
+                  $expr: {
+                    $and: [
+                      { $eq: ['$module_id', '$$moduleId'] },
+                      { $eq: ['$student_id', new Types.ObjectId(user.id)] },
+                    ],
+                  },
+                },
+              },
+            ],
+            as: 'progress',
+          },
+        });
+
+        // Add progress field
+        pipeline.push({
+          $addFields: {
+            progress: {
+              $cond: {
+                if: { $gt: [{ $size: '$progress' }, 0] },
+                then: { $arrayElemAt: ['$progress', 0] },
+                else: {
+                  status: ProgressStatusEnum.NOT_STARTED,
+                  progress_percentage: 0,
+                  chapters_completed: 0,
+                  total_chapters: 0,
+                  module_quiz_completed: false,
+                  started_at: null,
+                  completed_at: null,
+                  last_accessed_at: null,
+                },
+              },
+            },
+          },
+        });
+      }
+
+      // Execute aggregation
+      const modules = await ModuleModel.aggregate(pipeline);
+
+      if (modules.length === 0) {
         throw new NotFoundException('Module not found');
       }
+
+      const module = modules[0];
 
       // Attach user details to module
       const moduleWithUser = await attachUserDetailsToEntity(

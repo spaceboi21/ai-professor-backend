@@ -178,10 +178,15 @@ export class QuizService {
       throw new NotFoundException('Quiz group not found');
     }
 
-    const quiz = await QuizModel.find({ quiz_group_id: quizGroups._id }).sort({
-      sequence: 1,
-      created_at: -1,
-    });
+    const quiz = await QuizModel.find({
+      quiz_group_id: quizGroups._id,
+      deleted_at: null,
+    })
+      .sort({
+        sequence: 1,
+        created_at: -1,
+      })
+      .lean();
 
     return { ...quizGroups, quiz };
   }

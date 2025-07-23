@@ -557,116 +557,107 @@ export class ProgressService {
       StudentQuizAttemptSchema,
     );
 
-    try {
-      // Find the in-progress attempt
-      const attempt = await StudentQuizAttemptModel.findOne({
-        student_id: new Types.ObjectId(user.id),
-        quiz_group_id: new Types.ObjectId(quiz_group_id),
-        status: AttemptStatusEnum.IN_PROGRESS,
-      });
+    // Find the in-progress attempt
+    const attempt = await StudentQuizAttemptModel.findOne({
+      student_id: new Types.ObjectId(user.id),
+      quiz_group_id: new Types.ObjectId(quiz_group_id),
+      status: AttemptStatusEnum.IN_PROGRESS,
+    });
 
-      if (!attempt) {
-        throw new NotFoundException('No in-progress quiz attempt found');
-      }
-
-      // Get quiz group details
-      const quizGroup = await QuizGroupModel.findById(quiz_group_id);
-      if (!quizGroup) {
-        throw new NotFoundException('Quiz group not found');
-      }
-
-      // Get all quizzes for this group with correct answers
-      const quizzes = await QuizModel.find({
-        quiz_group_id: new Types.ObjectId(quiz_group_id),
-        deleted_at: null,
-      }).lean();
-
-      // Calculate score
-      let correctAnswers = 0;
-      const processedAnswers: Array<{
-        quiz_id: Types.ObjectId;
-        selected_answers: string[];
-        is_correct: boolean;
-        time_spent_seconds: number;
-      }> = [];
-
-      for (const answer of answers) {
-        const quiz = quizzes.find(
-          (q) => q._id.toString() === answer.quiz_id.toString(),
-        );
-        if (!quiz) {
-          throw new BadRequestException(
-            `Quiz ${answer.quiz_id} not found in this group`,
-          );
-        }
-
-        // Check if answer is correct
-        const isCorrect = this.areAnswersEqual(
-          answer.selected_answers,
-          quiz.answer,
-        );
-        if (isCorrect) {
-          correctAnswers++;
-        }
-
-        processedAnswers.push({
-          quiz_id: new Types.ObjectId(answer.quiz_id),
-          selected_answers: answer.selected_answers,
-          is_correct: isCorrect,
-          time_spent_seconds: answer.time_spent_seconds || 0,
-        });
-      }
-
-      const scorePercentage =
-        quizzes.length > 0
-          ? Math.round((correctAnswers / quizzes.length) * 100)
-          : 0;
-      const isPassed = scorePercentage >= attempt.passing_threshold;
-
-      // Update attempt
-      attempt.status = AttemptStatusEnum.COMPLETED;
-      attempt.completed_at = new Date();
-      attempt.score_percentage = scorePercentage;
-      attempt.correct_answers = correctAnswers;
-      attempt.total_questions = quizzes.length;
-      attempt.time_taken_seconds = total_time_taken_seconds || 0;
-      attempt.is_passed = isPassed;
-      attempt.answers = processedAnswers;
-
-      await attempt.save();
-
-      // Update chapter/module progress if quiz is passed
-      if (isPassed) {
-        await this.updateProgressOnQuizCompletion(attempt, tenantConnection);
-      }
-
-      this.logger.log(
-        `Quiz attempt completed for student ${user.id}, score: ${scorePercentage}%`,
-      );
-
-      return {
-        message: 'Quiz answers submitted successfully',
-        data: {
-          attempt_id: attempt._id,
-          score_percentage: attempt.score_percentage,
-          correct_answers: attempt.correct_answers,
-          total_questions: attempt.total_questions,
-          is_passed: attempt.is_passed,
-          time_taken_seconds: attempt.time_taken_seconds,
-          status: attempt.status,
-          completed_at: attempt.completed_at,
-        },
-      };
-    } catch (error) {
-      this.logger.error('Error submitting quiz answers', error?.stack || error);
-      if (
-        error instanceof NotFoundException ||
-        error instanceof ForbiddenException
-      ) {
-        throw error;
-      }
-      throw new BadRequestException('Failed to submit quiz answers');
+    if (!attempt) {
+      throw new NotFoundException('No in-progress quiz attempt found');
     }
+
+    // Get quiz group details
+    const quizGroup = await QuizGroupModel.findById(
+      new Types.ObjectId(quiz_group_id),
+    );
+    if (!quizGroup) {
+      throw new NotFoundException('Quiz group not found');
+    }
+
+    // Get all quizzes for this group with correct answers
+    const quizzes = await QuizModel.find({
+      quiz_group_id: new Types.ObjectId(quiz_group_id),
+      deleted_at: null,
+    }).lean();
+
+    // Calculate score
+    let correctAnswers = 0;
+    const processedAnswers: Array<{
+      quiz_id: Types.ObjectId;
+      selected_answers: string[];
+      is_correct: boolean;
+      time_spent_seconds: number;
+    }> = [];
+
+    for (const answer of answers) {
+      const quiz = quizzes.find(
+        (q) => q._id.toString() === answer.quiz_id.toString(),
+      );
+      if (!quiz) {
+        throw new BadRequestException(
+          `Quiz ${answer.quiz_id} not found in this group`,
+        );
+      }
+
+      // Check if answer is correct
+      const isCorrect = this.areAnswersEqual(
+        answer.selected_answers,
+        quiz.answer,
+      );
+      if (isCorrect) {
+        correctAnswers++;
+      }
+
+      processedAnswers.push({
+        quiz_id: new Types.ObjectId(answer.quiz_id),
+        selected_answers: answer.selected_answers,
+        is_correct: isCorrect,
+        time_spent_seconds: answer.time_spent_seconds || 0,
+      });
+    }
+
+    const scorePercentage =
+      quizzes.length > 0
+        ? Math.round((correctAnswers / quizzes.length) * 100)
+        : 0;
+    const isPassed = scorePercentage >= attempt.passing_threshold;
+
+    // Update attempt
+    attempt.status = AttemptStatusEnum.COMPLETED;
+    attempt.completed_at = new Date();
+    attempt.score_percentage = scorePercentage;
+    attempt.correct_answers = correctAnswers;
+    attempt.total_questions = quizzes.length;
+    attempt.time_taken_seconds = total_time_taken_seconds || 0;
+    attempt.is_passed = isPassed;
+    attempt.answers = processedAnswers;
+
+    await attempt.save();
+
+    // Update chapter/module progress if quiz is passed
+    if (isPassed) {
+      await this.updateProgressOnQuizCompletion(attempt, tenantConnection);
+    }
+
+    this.logger.log(
+      `Quiz attempt completed for student ${user.id}, score: ${scorePercentage}%`,
+    );
+
+    return {
+      message: 'Quiz answers submitted successfully',
+      data: {
+        attempt_id: attempt._id,
+        score_percentage: attempt.score_percentage,
+        correct_answers: attempt.correct_answers,
+        total_questions: attempt.total_questions,
+        is_passed: attempt.is_passed,
+        time_taken_seconds: attempt.time_taken_seconds,
+        status: attempt.status,
+        completed_at: attempt.completed_at,
+      },
+    };
   }
 
   // ========== VALIDATION METHODS ==========
