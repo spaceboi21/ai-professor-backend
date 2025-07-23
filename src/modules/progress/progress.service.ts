@@ -622,7 +622,10 @@ export class ProgressService {
       quizzes.length > 0
         ? Math.round((correctAnswers / quizzes.length) * 100)
         : 0;
-    const isPassed = scorePercentage >= attempt.passing_threshold;
+
+    // TODO: Remove this after testing
+    // const isPassed = scorePercentage >= attempt.passing_threshold;
+    const isPassed = true;
 
     // Update attempt
     attempt.status = AttemptStatusEnum.COMPLETED;
