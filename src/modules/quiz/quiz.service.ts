@@ -33,6 +33,8 @@ import { CreateQuizDto } from './dto/create-quiz.dto';
 import { QuizFilterDto, QuizGroupFilterDto } from './dto/quiz-filter.dto';
 import { UpdateQuizGroupDto } from './dto/update-quiz-group.dto';
 import { UpdateQuizDto } from './dto/update-quiz.dto';
+import { ProgressService } from '../progress/progress.service';
+import { RoleEnum } from 'src/common/constants/roles.constant';
 
 @Injectable()
 export class QuizService {
@@ -44,6 +46,7 @@ export class QuizService {
     @InjectModel(School.name)
     private readonly schoolModel: Model<School>,
     private readonly tenantConnectionService: TenantConnectionService,
+    private readonly progressService: ProgressService,
   ) {}
 
   // ========== QUIZ GROUP OPERATIONS ==========
@@ -176,6 +179,27 @@ export class QuizService {
 
     if (!quizGroups?._id) {
       throw new NotFoundException('Quiz group not found');
+    }
+
+    // // Check if student can access this quiz (validate sequence)
+    if (user.role.name === RoleEnum.STUDENT) {
+      // Validate quiz group exists
+      const quizGroup = await QuizGroupModel.findOne({
+        _id: quizGroups?._id,
+        deleted_at: null,
+      });
+      if (!quizGroup) {
+        throw new NotFoundException('Quiz group not found');
+      }
+
+      // Validate access to this quiz (chapter-based validation)
+      if (quizGroup.chapter_id) {
+        await this.progressService.validateQuizAccess(
+          user.id,
+          quizGroup,
+          connection,
+        );
+      }
     }
 
     const quiz = await QuizModel.find({

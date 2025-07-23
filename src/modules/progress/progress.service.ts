@@ -705,7 +705,7 @@ export class ProgressService {
     return true;
   }
 
-  private async validateQuizAccess(
+  async validateQuizAccess(
     studentId: string | Types.ObjectId,
     quizGroup: any,
     tenantConnection: any,
