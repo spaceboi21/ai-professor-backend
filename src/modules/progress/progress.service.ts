@@ -809,6 +809,7 @@ export class ProgressService {
       StudentChapterProgress.name,
       StudentChapterProgressSchema,
     );
+    console.log('attempt', attempt);
 
     // Update chapter progress - only mark quiz as completed, don't change status
     await StudentChapterProgressModel.findOneAndUpdate(

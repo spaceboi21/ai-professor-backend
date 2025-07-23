@@ -465,6 +465,8 @@ export class ChaptersService {
       // Add status field only for students
       if (user.role.name === RoleEnum.STUDENT) {
         projectFields.status = 1;
+        projectFields.chapter_quiz_completed = 1;
+        projectFields.quiz_attempt_count = 1;
       }
 
       pipeline.push({ $project: projectFields });
@@ -493,10 +495,6 @@ export class ChaptersService {
       ) {
         for (let i = 0; i < chapters.length; i++) {
           const chapter = chapters[i];
-          const progress = chapter.progress?.[0];
-
-          chapter.chapter_quiz_completed =
-            progress?.chapter_quiz_completed || false;
           chapter.quiz_attempt_count = chapter.quiz_attempt_count || 0;
 
           // Add "needs_quiz_retake" flag
@@ -511,11 +509,9 @@ export class ChaptersService {
             chapter.locked_reason = null;
           } else {
             const prev = chapters[i - 1];
-            const prevProgress = prev.progress?.[0];
             const isPrevCompleted =
-              prevProgress?.status === ProgressStatusEnum.COMPLETED;
-            const isPrevQuizCompleted =
-              prevProgress?.chapter_quiz_completed === true;
+              prev.status === ProgressStatusEnum.COMPLETED;
+            const isPrevQuizCompleted = prev.chapter_quiz_completed === true;
 
             chapter.is_locked = !(isPrevCompleted && isPrevQuizCompleted);
 
@@ -816,13 +812,14 @@ export class ChaptersService {
       // Add status field only for students
       if (user.role.name === RoleEnum.STUDENT) {
         projectFields.status = 1;
+        projectFields.chapter_quiz_completed = 1;
+        projectFields.quiz_attempt_count = 1;
       }
 
       pipeline.push({ $project: projectFields });
 
       // Execute aggregation
       const chapters = await ChapterModel.aggregate(pipeline);
-
       if (
         user.role.name === RoleEnum.STUDENT &&
         Array.isArray(chapters) &&
@@ -830,10 +827,7 @@ export class ChaptersService {
       ) {
         for (let i = 0; i < chapters.length; i++) {
           const chapter = chapters[i];
-          const progress = chapter.progress?.[0];
 
-          chapter.chapter_quiz_completed =
-            progress?.chapter_quiz_completed || false;
           chapter.quiz_attempt_count = chapter.quiz_attempt_count || 0;
 
           // Add "needs_quiz_retake" flag
@@ -848,11 +842,9 @@ export class ChaptersService {
             chapter.locked_reason = null;
           } else {
             const prev = chapters[i - 1];
-            const prevProgress = prev.progress?.[0];
             const isPrevCompleted =
-              prevProgress?.status === ProgressStatusEnum.COMPLETED;
-            const isPrevQuizCompleted =
-              prevProgress?.chapter_quiz_completed === true;
+              prev.status === ProgressStatusEnum.COMPLETED;
+            const isPrevQuizCompleted = prev.chapter_quiz_completed === true;
 
             chapter.is_locked = !(isPrevCompleted && isPrevQuizCompleted);
 
