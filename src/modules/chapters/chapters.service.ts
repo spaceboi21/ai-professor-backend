@@ -1032,20 +1032,58 @@ export class ChaptersService {
     const ChapterModel = tenantConnection.model(Chapter.name, ChapterSchema);
 
     try {
-      const deletedChapter = await ChapterModel.findOneAndUpdate(
-        { _id: id, deleted_at: null },
-        { deleted_at: new Date() },
-        { new: true },
-      );
+      // Use a transaction to ensure atomic updates
+      const session = await tenantConnection.startSession();
 
-      if (!deletedChapter) {
-        throw new NotFoundException('Chapter not found');
+      try {
+        await session.withTransaction(async () => {
+          const chapterToDelete = await ChapterModel.findOne({
+            _id: id,
+            deleted_at: null,
+          }).session(session);
+
+          if (!chapterToDelete) {
+            throw new NotFoundException('Chapter not found');
+          }
+
+          const deletedSequence = chapterToDelete.sequence;
+          const module_id = chapterToDelete.module_id;
+
+          // ✅ Step 1: Soft delete and move sequence to -1 (avoid conflict)
+          const deletedChapter = await ChapterModel.findOneAndUpdate(
+            { _id: id, deleted_at: null },
+            {
+              deleted_at: new Date(),
+              sequence: -1, // ✅ Temporary number outside the normal sequence range
+            },
+            { new: true, session },
+          );
+
+          if (!deletedChapter) {
+            throw new NotFoundException('Chapter not found');
+          }
+
+          // ✅ Step 2: Reorder others by decrementing sequence
+          await ChapterModel.updateMany(
+            {
+              module_id,
+              sequence: { $gt: deletedSequence },
+              deleted_at: null,
+            },
+            {
+              $inc: { sequence: -1 },
+              updated_at: new Date(),
+            },
+          ).session(session);
+        });
+
+        return {
+          message: 'Chapter deleted successfully',
+          data: { id },
+        };
+      } finally {
+        await session.endSession();
       }
-
-      return {
-        message: 'Chapter deleted successfully',
-        data: { id: deletedChapter._id },
-      };
     } catch (error) {
       this.logger.error('Error removing chapter', error?.stack || error);
       if (error instanceof NotFoundException) {

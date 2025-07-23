@@ -570,44 +570,64 @@ export class BibliographyService {
       BibliographySchema,
     );
 
+    const session = await tenantConnection.startSession();
+
     try {
-      // Check if bibliography exists
-      const bibliography = await BibliographyModel.findOne({
-        _id: id,
-        deleted_at: null,
-      });
-      if (!bibliography) {
-        throw new NotFoundException('Bibliography not found');
-      }
+      await session.withTransaction(async () => {
+        // Step 1: Find the bibliography
+        const bibliography = await BibliographyModel.findOne({
+          _id: id,
+          deleted_at: null,
+        }).session(session);
 
-      // Soft delete bibliography
-      const deletedBibliography = await BibliographyModel.findByIdAndUpdate(
-        id,
-        {
-          $set: {
-            deleted_at: new Date(),
+        if (!bibliography) {
+          throw new NotFoundException('Bibliography not found');
+        }
+
+        // Optional: If `sequence` exists and you need to reorder, extract it here
+        const sequence = bibliography.sequence;
+        const chapter_id = bibliography.chapter_id;
+
+        // Step 2: Soft delete and move sequence to -1 to avoid duplication
+        const deletedBibliography = await BibliographyModel.findByIdAndUpdate(
+          id,
+          {
+            $set: {
+              deleted_at: new Date(),
+              sequence: -1, // Ensure no conflict with other bibliographies
+            },
           },
-        },
-        { new: true },
-      );
+          { new: true, session },
+        );
 
-      if (!deletedBibliography) {
-        throw new NotFoundException('Bibliography not found');
-      }
+        if (!deletedBibliography) {
+          throw new NotFoundException('Bibliography not found during update');
+        }
 
-      this.logger.log(`Bibliography deleted: ${deletedBibliography._id}`);
+        // Optional Step 3: If reordering is required (like for chapters)
+        // await BibliographyModel.updateMany(
+        //   {
+        //     chapter_id,
+        //     sequence: { $gt: sequence },
+        //     deleted_at: null,
+        //   },
+        //   {
+        //     $inc: { sequence: -1 },
+        //     updated_at: new Date(),
+        //   },
+        // ).session(session);
 
-      // After deleting the bibliography, recalculate chapter duration
-      await this.chaptersService.recalculateChapterDuration(
-        deletedBibliography.chapter_id,
-        tenantConnection,
-      );
+        // Step 4: Recalculate chapter duration
+        await this.chaptersService.recalculateChapterDuration(
+          bibliography.chapter_id,
+          tenantConnection,
+        );
+      });
 
       return {
         message: 'Bibliography deleted successfully',
         data: {
-          id: deletedBibliography._id,
-          deleted_at: deletedBibliography.deleted_at,
+          id,
         },
       };
     } catch (error) {
@@ -616,6 +636,8 @@ export class BibliographyService {
       }
       this.logger.error('Error deleting bibliography', error?.stack || error);
       throw new BadRequestException('Failed to delete bibliography');
+    } finally {
+      await session.endSession();
     }
   }
 
