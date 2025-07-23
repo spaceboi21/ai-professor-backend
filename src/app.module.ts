@@ -30,6 +30,7 @@ import { NotificationsModule } from './modules/notifications/notifications.modul
 import { ProgressModule } from './modules/progress/progress.module';
 import { ServeStaticModule } from '@nestjs/serve-static';
 import { join } from 'path';
+import { AIChatModule } from './modules/ai-chat/ai-chat.module';
 
 @Module({
   imports: [
@@ -120,6 +121,7 @@ import { join } from 'path';
     QuizModule,
     NotificationsModule,
     ProgressModule,
+    AIChatModule,
   ],
   controllers: [AppController],
   providers: [AppService, JwtStrategy],
