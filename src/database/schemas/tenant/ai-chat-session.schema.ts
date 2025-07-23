@@ -56,6 +56,9 @@ export class AIChatSession extends Document {
   @Prop({ type: Object, default: null })
   session_metadata: Record<string, any>;
 
+  @Prop({ type: String, default: null })
+  scenario: string;
+
   @Prop({ type: Date, default: null })
   deleted_at: Date;
 

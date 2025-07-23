@@ -123,6 +123,7 @@ export class AIChatService {
       started_at: new Date(),
       session_title: `AI Practice Session - ${moduleExists.title}`,
       session_description: `AI practice session for ${moduleExists.title}`,
+      scenario: "",
     };
 
     // Start database transaction
@@ -130,6 +131,19 @@ export class AIChatService {
 
     try {
       const response = await dbSession.withTransaction(async () => {
+        const scenario = await this.pythonService.generatePatientScenario(
+          moduleExists.title,
+          moduleExists.description,
+        );
+
+        if (!scenario?.scenario) {
+          throw new InternalServerErrorException(
+            'Failed to generate patient scenario',
+          );
+        }
+
+        sessionData.scenario = scenario.scenario;
+
         // Create AI session within transaction
         const aiSession = new AISessionModel(sessionData);
         await aiSession.save({ session: dbSession });
@@ -142,6 +156,7 @@ export class AIChatService {
         let response = await this.pythonService.startPatientSession(
           sessionData.session_title,
           sessionData.session_description,
+          sessionData.scenario,
         );
 
         // Create AI chat message within transaction
@@ -358,6 +373,7 @@ export class AIChatService {
       conversation_history,
       session.session_title,
       session.session_description,
+      session.scenario,
     );
 
     await AIMessageModel.create({

@@ -15,20 +15,11 @@ export class PythonService {
    * Start a new AI patient session
    * POST /chat/patient/start
    */
-  async startPatientSession(module_title: string, module_description: string) {
-    const scenario = `You are a patient presenting with symptoms related to ${module_title}. 
-    
-    Module Context: ${module_description}
-
-    Your role is to:
-    - Present realistic symptoms based on the module's medical condition
-    - Respond naturally to medical student questions
-    - Provide relevant patient history when asked
-    - Maintain consistency in your symptoms and responses
-    - Act as a cooperative but realistic patient
-
-    Please begin the consultation by presenting your symptoms to the medical student.`;
-
+  async startPatientSession(
+    module_title: string,
+    module_description: string,
+    scenario: string,
+  ) {
     return this._post('/chat/patient/start', {
       scenario,
       module_title,
@@ -45,20 +36,8 @@ export class PythonService {
     conversation_history: ConversationHistoryType[],
     module_title: string,
     module_description: string,
+    scenario: string,
   ) {
-    const scenario = `You are a patient presenting with symptoms related to ${module_title}. 
-    
-    Module Context: ${module_description}
-
-    Your role is to:
-    - Present realistic symptoms based on the module's medical condition
-    - Respond naturally to medical student questions
-    - Provide relevant patient history when asked
-    - Maintain consistency in your symptoms and responses
-    - Act as a cooperative but realistic patient
-
-    Continue the consultation by responding to the medical student's questions.`;
-
     const patient_context = {
       module_title,
       module_description,
@@ -144,18 +123,8 @@ export class PythonService {
     module_title: string,
     module_description: string,
     conversation_history: ConversationHistoryType[],
+    scenario: string,
   ) {
-    const scenario = `You are a patient presenting with symptoms related to ${module_title}. 
-    
-    Module Context: ${module_description}
-    
-    Your role is to:
-    - Present realistic symptoms based on the module's medical condition
-    - Respond naturally to medical student questions
-    - Provide relevant patient history when asked
-    - Maintain consistency in your symptoms and responses
-    - Act as a cooperative but realistic patient`;
-
     const patient_context = {
       module_title,
       module_description,
@@ -164,6 +133,16 @@ export class PythonService {
     return this._post('/chat/workflow/complete-session', {
       patient_context,
       conversation_history,
+    });
+  }
+
+  async generatePatientScenario(
+    module_title: string,
+    module_description: string,
+  ) {
+    return this._post('/chat/patient/generate-scenario', {
+      module_title,
+      module_description,
     });
   }
 
