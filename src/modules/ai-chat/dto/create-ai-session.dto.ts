@@ -1,4 +1,4 @@
-import { IsMongoId, IsOptional, IsString } from 'class-validator';
+import { IsMongoId } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class CreateAISessionDto {
@@ -9,24 +9,4 @@ export class CreateAISessionDto {
   })
   @IsMongoId()
   module_id: string;
-
-  @ApiProperty({
-    description: 'Optional title for the AI session',
-    example: 'Cardiology Practice Session',
-    required: false,
-    type: String,
-  })
-  @IsOptional()
-  @IsString()
-  session_title?: string;
-
-  @ApiProperty({
-    description: 'Optional description for the AI session',
-    example: 'AI practice session for cardiology module',
-    required: false,
-    type: String,
-  })
-  @IsOptional()
-  @IsString()
-  session_description?: string;
 }

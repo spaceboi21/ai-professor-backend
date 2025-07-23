@@ -1,7 +1,6 @@
 import {
   Body,
   Controller,
-  Delete,
   Get,
   Param,
   Post,
@@ -27,7 +26,6 @@ import { CreateAIMessageDto } from './dto/create-ai-message.dto';
 import { CreateAIFeedbackDto } from './dto/create-ai-feedback.dto';
 import { CreateAIResourceDto } from './dto/create-ai-resource.dto';
 import { AISessionFilterDto } from './dto/ai-session-filter.dto';
-import { UpdateAISessionDto } from './dto/update-ai-session.dto';
 import { AISessionResponseDto } from './dto/ai-session-response.dto';
 import { AIMessageResponseDto } from './dto/ai-message-response.dto';
 import { AIFeedbackResponseDto } from './dto/ai-feedback-response.dto';
@@ -54,7 +52,7 @@ export class AIChatController {
   @ApiOperation({
     summary: 'Create a new AI chat session',
     description:
-      'Creates a new AI practice session for a student with a specific module',
+      'Creates a new AI practice session for a student with a specific module. Session title and description are automatically generated from the module information.',
   })
   @ApiBody({ type: CreateAISessionDto })
   @ApiResponse({
@@ -145,71 +143,13 @@ export class AIChatController {
     );
   }
 
-  @Get('sessions/:id')
-  @Roles(RoleEnum.STUDENT, RoleEnum.PROFESSOR, RoleEnum.SCHOOL_ADMIN)
-  @ApiOperation({
-    summary: 'Get an AI chat session by ID',
-    description: 'Retrieve a specific AI chat session with its details',
-  })
-  @ApiParam({
-    name: 'id',
-    description: 'AI session ID',
-    example: '507f1f77bcf86cd799439011',
-    type: 'string',
-    format: 'mongoId',
-  })
-  @ApiResponse({
-    status: 200,
-    description: 'AI session retrieved successfully',
-    type: AISessionResponseDto,
-  })
-  @ApiResponse({
-    status: 404,
-    description: 'AI session not found',
-  })
-  async findAISessionById(
-    @Param('id', ParseObjectIdPipe) id: Types.ObjectId,
-    @User() user: JWTUserPayload,
-  ) {
-    return this.aiChatService.findAISessionById(id, user);
-  }
 
-  @Put('sessions/:id')
-  @Roles(RoleEnum.STUDENT, RoleEnum.PROFESSOR, RoleEnum.SCHOOL_ADMIN)
-  @ApiOperation({
-    summary: 'Update an AI chat session',
-    description: 'Update session details like status, title, or description',
-  })
-  @ApiParam({
-    name: 'id',
-    description: 'AI session ID',
-    example: '507f1f77bcf86cd799439011',
-    type: 'string',
-    format: 'mongoId',
-  })
-  @ApiBody({ type: UpdateAISessionDto })
-  @ApiResponse({
-    status: 200,
-    description: 'AI session updated successfully',
-    type: AISessionResponseDto,
-  })
-  @ApiResponse({
-    status: 404,
-    description: 'AI session not found',
-  })
-  async updateAISession(
-    @Param('id', ParseObjectIdPipe) id: Types.ObjectId,
-    @Body() updateAISessionDto: UpdateAISessionDto,
-    @User() user: JWTUserPayload,
-  ) {
-    return this.aiChatService.updateAISession(id, updateAISessionDto, user);
-  }
 
-  @Post('sessions/:id/complete')
+  @Put('sessions/:id/complete')
   @Roles(RoleEnum.STUDENT, RoleEnum.PROFESSOR, RoleEnum.SCHOOL_ADMIN)
   @ApiOperation({
     summary: 'Complete an AI chat session',
-    description: 'Mark an AI session as completed and end the conversation',
+    description: 'Mark an AI session as completed and set the ended_at timestamp automatically',
   })
   @ApiParam({
     name: 'id',
@@ -227,6 +167,10 @@ export class AIChatController {
     status: 404,
     description: 'AI session not found',
   })
+  @ApiResponse({
+    status: 400,
+    description: 'Session is already completed or cannot be completed',
+  })
   async completeAISession(
     @Param('id', ParseObjectIdPipe) id: Types.ObjectId,
     @User() user: JWTUserPayload,
@@ -234,40 +178,9 @@ export class AIChatController {
     return this.aiChatService.completeAISession(id, user);
   }
 
-  @Delete('sessions/:id')
-  @Roles(RoleEnum.STUDENT, RoleEnum.PROFESSOR, RoleEnum.SCHOOL_ADMIN)
-  @ApiOperation({
-    summary: 'Delete an AI chat session',
-    description:
-      'Soft delete an AI chat session (marks as deleted but preserves data)',
-  })
-  @ApiParam({
-    name: 'id',
-    description: 'AI session ID',
-    example: '507f1f77bcf86cd799439011',
-    type: 'string',
-    format: 'mongoId',
-  })
-  @ApiResponse({
-    status: 200,
-    description: 'AI session deleted successfully',
-    schema: {
-      type: 'object',
-      properties: {
-        message: { type: 'string', example: 'AI session deleted successfully' },
-      },
-    },
-  })
-  @ApiResponse({
-    status: 404,
-    description: 'AI session not found',
-  })
-  async removeAISession(
-    @Param('id', ParseObjectIdPipe) id: Types.ObjectId,
-    @User() user: JWTUserPayload,
-  ) {
-    return this.aiChatService.removeAISession(id, user);
-  }
+
+
+
 
   // ========== MESSAGE ENDPOINTS ==========
 
@@ -447,32 +360,5 @@ export class AIChatController {
     return this.aiChatService.findResourcesBySessionId(sessionId, user);
   }
 
-  @Post('resources/:id/access')
-  @Roles(RoleEnum.STUDENT, RoleEnum.PROFESSOR, RoleEnum.SCHOOL_ADMIN)
-  @ApiOperation({
-    summary: 'Mark resource as accessed',
-    description: 'Mark a study resource as accessed and track usage',
-  })
-  @ApiParam({
-    name: 'id',
-    description: 'AI resource ID',
-    example: '507f1f77bcf86cd799439011',
-    type: 'string',
-    format: 'mongoId',
-  })
-  @ApiResponse({
-    status: 200,
-    description: 'Resource marked as accessed successfully',
-    type: AIResourceResponseDto,
-  })
-  @ApiResponse({
-    status: 404,
-    description: 'AI resource not found',
-  })
-  async markResourceAsAccessed(
-    @Param('id', ParseObjectIdPipe) id: Types.ObjectId,
-    @User() user: JWTUserPayload,
-  ) {
-    return this.aiChatService.markResourceAsAccessed(id, user);
-  }
+
 }

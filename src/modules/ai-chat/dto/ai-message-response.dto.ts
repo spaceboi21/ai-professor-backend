@@ -68,11 +68,7 @@ export class AIMessageResponseDto {
   })
   attachments: string[];
 
-  @ApiProperty({
-    description: 'Message sequence number',
-    example: 1,
-  })
-  sequence: number;
+
 
   @ApiProperty({
     description: 'Message metadata',

@@ -30,12 +30,6 @@ export class AIChatMessage extends Document {
   @Prop({ type: Types.ObjectId, ref: 'Student', required: true, index: true })
   student_id: Types.ObjectId;
 
-  @Prop({ type: Types.ObjectId, ref: 'User', required: true, index: true })
-  created_by: Types.ObjectId;
-
-  @Prop({ required: true, enum: RoleEnum })
-  created_by_role: RoleEnum;
-
   @Prop({ required: true, enum: MessageSenderEnum })
   sender: MessageSenderEnum;
 
@@ -52,14 +46,10 @@ export class AIChatMessage extends Document {
   @Prop({ type: [String], default: [] })
   attachments: string[];
 
-  @Prop({ type: Number, default: 0 })
-  sequence: number;
+
 
   @Prop({ type: Object, default: null })
   message_metadata: Record<string, any>;
-
-  @Prop({ type: Boolean, default: false })
-  is_system_message: boolean;
 
   @Prop({ type: Boolean, default: false })
   is_error: boolean;
@@ -69,6 +59,9 @@ export class AIChatMessage extends Document {
 
   @Prop({ type: Date, default: null })
   deleted_at: Date;
+
+  @Prop({ type: Boolean, default: false })
+  conversation_started: boolean;
 
   readonly created_at?: Date;
   readonly updated_at?: Date;

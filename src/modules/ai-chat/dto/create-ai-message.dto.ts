@@ -30,14 +30,6 @@ export class CreateAIMessageDto {
   module_id: string;
 
   @ApiProperty({
-    description: 'Message sender (student or AI agent)',
-    enum: MessageSenderEnum,
-    example: MessageSenderEnum.STUDENT,
-  })
-  @IsEnum(MessageSenderEnum)
-  sender: MessageSenderEnum;
-
-  @ApiProperty({
     description: 'Type of message',
     enum: MessageTypeEnum,
     example: MessageTypeEnum.TEXT,
@@ -53,25 +45,4 @@ export class CreateAIMessageDto {
   })
   @IsString()
   content: string;
-
-  @ApiProperty({
-    description: 'Optional file attachments',
-    example: ['https://example.com/file1.pdf'],
-    required: false,
-    type: [String],
-  })
-  @IsOptional()
-  @IsArray()
-  @IsString({ each: true })
-  attachments?: string[];
-
-  @ApiProperty({
-    description: 'Optional message sequence number',
-    example: 1,
-    required: false,
-    type: Number,
-  })
-  @IsOptional()
-  @IsNumber()
-  sequence?: number;
 }

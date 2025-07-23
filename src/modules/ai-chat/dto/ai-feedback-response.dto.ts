@@ -1,8 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
-import {
-  FeedbackTypeEnum,
-  RatingEnum,
-} from 'src/common/constants/ai-chat-feedback.constant';
+import { FeedbackTypeEnum } from 'src/common/constants/ai-chat-feedback.constant';
+import { RatingObjectType } from 'src/common/types/ai-chat-module.type';
 
 export class AIFeedbackResponseDto {
   @ApiProperty({
@@ -63,29 +61,39 @@ export class AIFeedbackResponseDto {
 
   @ApiProperty({
     description: 'Numerical rating (1-5)',
-    enum: RatingEnum,
-    example: RatingEnum.GOOD,
-    required: false,
+    example: {
+      overall_score: 7,
+      communication_score: 8,
+      clinical_score: 6,
+      professionalism_score: 9,
+    },
   })
-  rating?: RatingEnum;
+  rating: RatingObjectType;
 
   @ApiProperty({
     description: 'Keywords extracted from the session',
     example: ['diagnosis', 'symptoms', 'treatment'],
     type: [String],
   })
-  keywords: string[];
+  keywords_for_learning: string[];
 
   @ApiProperty({
-    description: 'Mistakes identified in the session',
+    description: 'Suggestions for improvement',
     example: ['Incorrect diagnosis', 'Missing vital signs'],
     type: [String],
   })
-  mistakes: string[];
+  suggestions: string[];
 
   @ApiProperty({
-    description: 'Student strengths identified',
+    description: 'Missed opportunities',
     example: ['Good communication', 'Professional demeanor'],
+    type: [String],
+  })
+  missed_opportunities: string[];
+
+  @ApiProperty({
+    description: 'Strengths',
+    example: ['Clinical reasoning', 'Differential diagnosis'],
     type: [String],
   })
   strengths: string[];
@@ -96,39 +104,6 @@ export class AIFeedbackResponseDto {
     type: [String],
   })
   areas_for_improvement: string[];
-
-  @ApiProperty({
-    description: 'Additional analysis data',
-    example: { confidence_score: 0.85, time_spent: 1200 },
-    required: false,
-  })
-  analysis_data?: Record<string, any>;
-
-  @ApiProperty({
-    description: 'Feedback metadata',
-    example: { analysis_version: '1.0', model_used: 'gpt-4' },
-    required: false,
-  })
-  feedback_metadata?: Record<string, any>;
-
-  @ApiProperty({
-    description: 'Whether feedback has been processed',
-    example: true,
-  })
-  is_processed: boolean;
-
-  @ApiProperty({
-    description: 'Processing date',
-    example: '2024-01-15T11:30:00.000Z',
-    required: false,
-  })
-  processed_at?: Date;
-
-  @ApiProperty({
-    description: 'Creation date',
-    example: '2024-01-15T11:25:00.000Z',
-  })
-  created_at: Date;
 
   @ApiProperty({
     description: 'Last update date',

@@ -184,13 +184,8 @@ export class PythonService {
       );
 
       this.logger.log(`Python API call successful: ${path}`);
-      return response.data;
+      return response?.data;
     } catch (error) {
-      this.logger.error(
-        `Python API call failed: ${url}`,
-        error?.response?.data || error?.message || error,
-      );
-
       // Re-throw with more context
       const errorMessage =
         error?.response?.data?.message || error?.message || 'Unknown error';

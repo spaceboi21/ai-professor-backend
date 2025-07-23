@@ -1,11 +1,12 @@
 import {
   BadRequestException,
   Injectable,
+  InternalServerErrorException,
   Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model, Types } from 'mongoose';
+import { Connection, Model, Types } from 'mongoose';
 import { JWTUserPayload } from 'src/common/types/jwr-user.type';
 import { createPaginationResult } from 'src/common/utils/pagination.util';
 import { School } from 'src/database/schemas/central/school.schema';
@@ -36,14 +37,22 @@ import {
 } from 'src/database/schemas/tenant/student.schema';
 import { TenantConnectionService } from 'src/database/tenant-connection.service';
 import { CreateAISessionDto } from './dto/create-ai-session.dto';
-import { UpdateAISessionDto } from './dto/update-ai-session.dto';
 import { AISessionStatusEnum } from 'src/common/constants/ai-chat-session.constant';
 import { AISessionFilterDto } from './dto/ai-session-filter.dto';
 import { CreateAIMessageDto } from './dto/create-ai-message.dto';
 import { CreateAIFeedbackDto } from './dto/create-ai-feedback.dto';
 import { CreateAIResourceDto } from './dto/create-ai-resource.dto';
-import { MessageSenderEnum } from 'src/common/constants/ai-chat-message.constant';
+import {
+  MessageSenderEnum,
+  MessageTypeEnum,
+} from 'src/common/constants/ai-chat-message.constant';
 import { PythonService } from './python.service';
+import {
+  ConversationHistoryType,
+  ProfessorResourcesResponseType,
+  SupervisorAnalysisResponseType,
+} from 'src/common/types/ai-chat-module.type';
+import { FeedbackTypeEnum } from 'src/common/constants/ai-chat-feedback.constant';
 
 @Injectable()
 export class AIChatService {
@@ -78,10 +87,13 @@ export class AIChatService {
       AIChatSessionSchema,
     );
     const ModuleModel = connection.model(Module.name, ModuleSchema);
+    const AIChatMessageModel = connection.model(
+      AIChatMessage.name,
+      AIChatMessageSchema,
+    );
     const StudentModel = connection.model(Student.name, StudentSchema);
 
-    const { module_id, session_title, session_description } =
-      createAISessionDto;
+    const { module_id } = createAISessionDto;
     const student_id = user.id; // Extract student ID from JWT token
 
     // Validate that the module exists
@@ -109,26 +121,55 @@ export class AIChatService {
       created_by_role: user.role.name,
       status: AISessionStatusEnum.ACTIVE,
       started_at: new Date(),
-      session_title:
-        session_title || `AI Practice Session - ${moduleExists.title}`,
-      session_description:
-        session_description || `AI practice session for ${moduleExists.title}`,
+      session_title: `AI Practice Session - ${moduleExists.title}`,
+      session_description: `AI practice session for ${moduleExists.title}`,
     };
 
-    const session = new AISessionModel(sessionData);
-    await session.save();
+    // Start database transaction
+    const dbSession = await connection.startSession();
 
-    this.logger.log(
-      `AI session created with ID: ${session._id} by user: ${user.id}`,
-    );
+    try {
+      const response = await dbSession.withTransaction(async () => {
+        // Create AI session within transaction
+        const aiSession = new AISessionModel(sessionData);
+        await aiSession.save({ session: dbSession });
 
-    // Python API call to create a conversation with the AI
-    const response = await this.pythonService.startPatientSession(
-      sessionData.session_title,
-      sessionData.session_description,
-    );
+        this.logger.log(
+          `AI session created with ID: ${aiSession._id} by user: ${user.id}`,
+        );
 
-    return response;
+        // Python API call to create a conversation with the AI
+        let response = await this.pythonService.startPatientSession(
+          sessionData.session_title,
+          sessionData.session_description,
+        );
+
+        // Create AI chat message within transaction
+        const message = await AIChatMessageModel.create(
+          [
+            {
+              session_id: new Types.ObjectId(aiSession._id),
+              module_id: new Types.ObjectId(module_id),
+              student_id: new Types.ObjectId(student_id),
+              sender: MessageSenderEnum.AI_PATIENT,
+              message_type: MessageTypeEnum.TEXT,
+              content: response.message,
+              conversation_started: true,
+              message_metadata: response?.metadata || null,
+            },
+          ],
+          { session: dbSession },
+        );
+        return message[0];
+      });
+
+      // Return the response from the transaction
+      return response;
+    } catch (error) {
+      throw new InternalServerErrorException(error?.message || error);
+    } finally {
+      await dbSession.endSession();
+    }
   }
 
   async findAllAISessions(
@@ -180,92 +221,7 @@ export class AIChatService {
     return createPaginationResult(sessions, total, paginationOptions);
   }
 
-  async findAISessionById(id: string | Types.ObjectId, user: JWTUserPayload) {
-    // Validate school exists
-    const school = await this.schoolModel.findById(user.school_id);
-    if (!school) {
-      throw new NotFoundException('School not found');
-    }
-
-    const connection = await this.tenantConnectionService.getTenantConnection(
-      school.db_name,
-    );
-    const AISessionModel = connection.model(
-      AIChatSession.name,
-      AIChatSessionSchema,
-    );
-    // Register related models for populate
-    connection.model(Module.name, ModuleSchema);
-    connection.model(Student.name, StudentSchema);
-
-    const session = await AISessionModel.findOne({
-      _id: id,
-      deleted_at: null,
-    })
-      .populate('module_id', 'title subject description')
-      .populate('student_id', 'first_name last_name email')
-      .exec();
-
-    if (!session) {
-      throw new NotFoundException('AI session not found');
-    }
-
-    return session;
-  }
-
-  async updateAISession(
-    id: string | Types.ObjectId,
-    updateAISessionDto: UpdateAISessionDto,
-    user: JWTUserPayload,
-  ) {
-    // Validate school exists
-    const school = await this.schoolModel.findById(user.school_id);
-    if (!school) {
-      throw new NotFoundException('School not found');
-    }
-
-    const connection = await this.tenantConnectionService.getTenantConnection(
-      school.db_name,
-    );
-    const AISessionModel = connection.model(
-      AIChatSession.name,
-      AIChatSessionSchema,
-    );
-
-    const session = await AISessionModel.findOne({
-      _id: id,
-      deleted_at: null,
-    });
-
-    if (!session) {
-      throw new NotFoundException('AI session not found');
-    }
-
-    // If status is being updated to completed, set ended_at
-    if (
-      updateAISessionDto.status === AISessionStatusEnum.COMPLETED &&
-      !session.ended_at
-    ) {
-      updateAISessionDto.ended_at = new Date();
-    }
-
-    Object.assign(session, updateAISessionDto);
-    await session.save();
-
-    this.logger.log(`AI session updated with ID: ${id} by user: ${user.id}`);
-
-    return session;
-  }
-
   async completeAISession(id: string | Types.ObjectId, user: JWTUserPayload) {
-    return this.updateAISession(
-      id,
-      { status: AISessionStatusEnum.COMPLETED },
-      user,
-    );
-  }
-
-  async removeAISession(id: string | Types.ObjectId, user: JWTUserPayload) {
     // Validate school exists
     const school = await this.schoolModel.findById(user.school_id);
     if (!school) {
@@ -280,6 +236,7 @@ export class AIChatService {
       AIChatSessionSchema,
     );
 
+    // Find the session and validate it exists
     const session = await AISessionModel.findOne({
       _id: id,
       deleted_at: null,
@@ -289,13 +246,28 @@ export class AIChatService {
       throw new NotFoundException('AI session not found');
     }
 
-    await AISessionModel.updateOne({ _id: id }, { deleted_at: new Date() });
+    // Check if session is already completed
+    if (session.status === AISessionStatusEnum.COMPLETED) {
+      throw new BadRequestException('Session is already completed');
+    }
 
-    this.logger.log(
-      `AI session soft deleted with ID: ${id} by user: ${user.id}`,
-    );
+    // Check if session is cancelled
+    if (session.status === AISessionStatusEnum.CANCELLED) {
+      throw new BadRequestException('Cannot complete a cancelled session');
+    }
 
-    return { message: 'AI session deleted successfully' };
+    // Update session to completed status with ended_at timestamp
+    const updateData = {
+      status: AISessionStatusEnum.COMPLETED,
+      ended_at: new Date(),
+      updated_at: new Date(),
+    };
+
+    await AISessionModel.findByIdAndUpdate(new Types.ObjectId(id), updateData);
+
+    this.logger.log(`AI session completed with ID: ${id} by user: ${user.id}`);
+
+    return { message: 'AI session completed successfully' };
   }
 
   // ========== MESSAGE OPERATIONS ==========
@@ -322,15 +294,7 @@ export class AIChatService {
       AIChatSessionSchema,
     );
 
-    const {
-      session_id,
-      module_id,
-      sender,
-      message_type,
-      content,
-      attachments,
-      sequence,
-    } = createAIMessageDto;
+    const { session_id, module_id, message_type, content } = createAIMessageDto;
     const student_id = user.id; // Extract student ID from JWT token
 
     // Validate that the session exists and is active
@@ -346,36 +310,68 @@ export class AIChatService {
       throw new BadRequestException('Cannot add messages to inactive session');
     }
 
-    // Generate sequence if not provided
-    let finalSequence = sequence;
-    if (!finalSequence) {
-      finalSequence = await this.getNextMessageSequence(session_id, user);
-    }
-
     const messageData = {
       session_id: new Types.ObjectId(session_id),
       module_id: new Types.ObjectId(module_id),
       student_id: new Types.ObjectId(student_id),
-      created_by: new Types.ObjectId(user.id),
-      created_by_role: user.role.name,
-      sender,
+      sender: MessageSenderEnum.STUDENT,
       message_type,
       content,
-      attachments: attachments || [],
-      sequence: finalSequence,
     };
 
     const message = new AIMessageModel(messageData);
     await message.save();
 
     // Update session message counts
-    await this.updateSessionMessageCounts(session_id, user);
+    await this.updateSessionMessageCounts(
+      session_id,
+      AIMessageModel,
+      AISessionModel,
+    );
 
     this.logger.log(
       `AI message created with ID: ${message._id} by user: ${user.id}`,
     );
 
-    return message;
+    const conversation_history: ConversationHistoryType[] =
+      await AIMessageModel.aggregate([
+        {
+          $match: {
+            session_id,
+            deleted_at: null,
+          },
+        },
+        {
+          $sort: { created_at: 1 },
+        },
+        {
+          $project: {
+            role: '$sender',
+            content: '$content',
+            timestamp: '$created_at',
+          },
+        },
+      ]);
+
+    const response = await this.pythonService.patientChat(
+      messageData.content,
+      conversation_history,
+      session.session_title,
+      session.session_description,
+    );
+
+    await AIMessageModel.create({
+      session_id: new Types.ObjectId(session_id),
+      module_id: new Types.ObjectId(module_id),
+      student_id: new Types.ObjectId(student_id),
+      sender: MessageSenderEnum.AI_PATIENT,
+      message_type: MessageTypeEnum.TEXT,
+      content: response?.message,
+      conversation_started: false,
+      message_metadata: null,
+    });
+
+    return response;
   }
 
   async findMessagesBySessionId(
@@ -400,7 +396,7 @@ export class AIChatService {
       session_id,
       deleted_at: null,
     })
-      .sort({ sequence: 1, created_at: 1 })
+      .sort({ created_at: 1 })
       .exec();
 
     return messages;
@@ -429,46 +425,65 @@ export class AIChatService {
       AIChatSession.name,
       AIChatSessionSchema,
     );
+    const AIChatMessageModel = connection.model(
+      AIChatMessage.name,
+      AIChatMessageSchema,
+    );
 
-    const {
-      session_id,
-      module_id,
-      feedback_type,
-      title,
-      content,
-      rating,
-      keywords,
-      mistakes,
-      strengths,
-      areas_for_improvement,
-      analysis_data,
-    } = createAIFeedbackDto;
+    const { session_id } = createAIFeedbackDto;
     const student_id = user.id; // Extract student ID from JWT token
 
     // Validate that the session exists
     const session = await AISessionModel.findOne({
       _id: session_id,
+      status: AISessionStatusEnum.COMPLETED,
+      student_id: new Types.ObjectId(student_id),
       deleted_at: null,
-    });
+    }).lean();
     if (!session) {
-      throw new NotFoundException('AI session not found');
+      throw new NotFoundException('AI session not found or not completed');
     }
+
+    const conversation_history: ConversationHistoryType[] =
+      await AIChatMessageModel.aggregate([
+        {
+          $match: {
+            session_id: new Types.ObjectId(session_id),
+            deleted_at: null,
+          },
+        },
+        {
+          $sort: { created_at: 1 },
+        },
+        {
+          $project: {
+            role: '$sender',
+            content: '$content',
+            timestamp: '$created_at',
+            _id: 0,
+          },
+        },
+      ]);
+
+    const supervisorAnalysisResponse: SupervisorAnalysisResponseType =
+      await this.pythonService.supervisorAnalyze(conversation_history);
 
     const feedbackData = {
       session_id: new Types.ObjectId(session_id),
-      module_id: new Types.ObjectId(module_id),
+      module_id: new Types.ObjectId(session.module_id),
       student_id: new Types.ObjectId(student_id),
-      created_by: new Types.ObjectId(user.id),
-      created_by_role: user.role.name,
-      feedback_type,
-      title,
-      content,
-      rating,
-      keywords: keywords || [],
-      mistakes: mistakes || [],
-      strengths: strengths || [],
-      areas_for_improvement: areas_for_improvement || [],
-      analysis_data: analysis_data || {},
+      feedback_type: FeedbackTypeEnum.SUPERVISOR_ANALYSIS,
+      rating: {
+        overall_score: supervisorAnalysisResponse.overall_score,
+        communication_score: supervisorAnalysisResponse.communication_score,
+        clinical_score: supervisorAnalysisResponse.clinical_score,
+        professionalism_score: supervisorAnalysisResponse.professionalism_score,
+      },
+      keywords_for_learning: supervisorAnalysisResponse.keywords_for_learning,
+      suggestions: supervisorAnalysisResponse.suggestions,
+      missed_opportunities: supervisorAnalysisResponse.missed_opportunities,
+      areas_for_improvement: supervisorAnalysisResponse.areas_for_improvement,
+      strengths: supervisorAnalysisResponse.strengths,
     };
 
     const feedback = new AIFeedbackModel(feedbackData);
@@ -500,7 +515,7 @@ export class AIChatService {
     );
 
     const feedback = await AIFeedbackModel.find({
-      session_id,
+      session_id: new Types.ObjectId(session_id),
       deleted_at: null,
     })
       .sort({ created_at: -1 })
@@ -530,53 +545,50 @@ export class AIChatService {
       AIChatSessionSchema,
     );
 
-    const {
-      session_id,
-      module_id,
-      title,
-      description,
-      resource_type,
-      category,
-      url,
-      tags,
-      keywords,
-      related_mistakes,
-      duration_minutes,
-      author,
-      source,
-      difficulty_level,
-      is_recommended,
-    } = createAIResourceDto;
+    const { session_id } = createAIResourceDto;
     const student_id = user.id; // Extract student ID from JWT token
 
     // Validate that the session exists
     const session = await AISessionModel.findOne({
-      _id: session_id,
+      _id: new Types.ObjectId(session_id),
       deleted_at: null,
     });
     if (!session) {
       throw new NotFoundException('AI session not found');
     }
 
+    const supervisorAnalysisFeedback = await this.findFeedbackBySessionId(
+      session_id,
+      user,
+    );
+
+    if (supervisorAnalysisFeedback.length === 0) {
+      throw new NotFoundException(`Supervisor's feedback not found`);
+    }
+
+    const professorResources: ProfessorResourcesResponseType =
+      await this.pythonService.professorResources(
+        session.session_title,
+        {
+          areas_for_improvement:
+            supervisorAnalysisFeedback[0].areas_for_improvement,
+          overall_score: supervisorAnalysisFeedback[0].rating.overall_score,
+          strengths: supervisorAnalysisFeedback[0].strengths,
+        },
+        supervisorAnalysisFeedback[0].keywords_for_learning,
+      );
+
     const resourceData = {
       session_id: new Types.ObjectId(session_id),
-      module_id: new Types.ObjectId(module_id),
+      module_id: new Types.ObjectId(session.module_id),
       student_id: new Types.ObjectId(student_id),
-      created_by: new Types.ObjectId(user.id),
-      created_by_role: user.role.name,
-      title,
-      description,
-      resource_type,
-      category,
-      url,
-      tags: tags || [],
-      keywords: keywords || [],
-      related_mistakes: related_mistakes || [],
-      duration_minutes: duration_minutes || 0,
-      author: author || null,
-      source: source || null,
-      difficulty_level: difficulty_level || 0,
-      is_recommended: is_recommended || false,
+      resources: professorResources.resources,
+      recommendations: professorResources.recommendations,
+      total_found: professorResources.total_found,
+      knowledge_available: professorResources.knowledge_available,
+      supervisor_feedback_id: new Types.ObjectId(
+        supervisorAnalysisFeedback[0]._id,
+      ),
     };
 
     const resource = new AIResourceModel(resourceData);
@@ -614,49 +626,9 @@ export class AIChatService {
     return resources;
   }
 
-  async markResourceAsAccessed(
-    resource_id: string | Types.ObjectId,
-    user: JWTUserPayload,
-  ) {
-    // Validate school exists
-    const school = await this.schoolModel.findById(user.school_id);
-    if (!school) {
-      throw new NotFoundException('School not found');
-    }
-
-    const connection = await this.tenantConnectionService.getTenantConnection(
-      school.db_name,
-    );
-    const AIResourceModel = connection.model(AIResource.name, AIResourceSchema);
-
-    const resource = await AIResourceModel.findOne({
-      _id: resource_id,
-      deleted_at: null,
-    });
-
-    if (!resource) {
-      throw new NotFoundException('AI resource not found');
-    }
-
-    resource.is_accessed = true;
-    resource.accessed_at = new Date();
-    resource.access_count += 1;
-    await resource.save();
-
-    this.logger.log(
-      `AI resource marked as accessed with ID: ${resource_id} by user: ${user.id}`,
-    );
-
-    return resource;
-  }
-
   // ========== HELPER METHODS ==========
 
-  private async getNextMessageSequence(
-    session_id: string | Types.ObjectId,
-    user: JWTUserPayload,
-  ): Promise<number> {
-    // Validate school exists
+  private async validateSchoolAndGetConnection(user: JWTUserPayload) {
     const school = await this.schoolModel.findById(user.school_id);
     if (!school) {
       throw new NotFoundException('School not found');
@@ -665,43 +637,15 @@ export class AIChatService {
     const connection = await this.tenantConnectionService.getTenantConnection(
       school.db_name,
     );
-    const AIMessageModel = connection.model(
-      AIChatMessage.name,
-      AIChatMessageSchema,
-    );
 
-    const lastMessage = await AIMessageModel.findOne({
-      session_id,
-      deleted_at: null,
-    })
-      .sort({ sequence: -1 })
-      .exec();
-
-    return lastMessage ? lastMessage.sequence + 1 : 1;
+    return { school, connection };
   }
 
   private async updateSessionMessageCounts(
     session_id: string | Types.ObjectId,
-    user: JWTUserPayload,
+    AIMessageModel: Model<AIChatMessage>,
+    AISessionModel: Model<AIChatSession>,
   ) {
-    // Validate school exists
-    const school = await this.schoolModel.findById(user.school_id);
-    if (!school) {
-      throw new NotFoundException('School not found');
-    }
-
-    const connection = await this.tenantConnectionService.getTenantConnection(
-      school.db_name,
-    );
-    const AIMessageModel = connection.model(
-      AIChatMessage.name,
-      AIChatMessageSchema,
-    );
-    const AISessionModel = connection.model(
-      AIChatSession.name,
-      AIChatSessionSchema,
-    );
-
     const [totalMessages, studentMessages, aiMessages] = await Promise.all([
       AIMessageModel.countDocuments({ session_id, deleted_at: null }),
       AIMessageModel.countDocuments({
