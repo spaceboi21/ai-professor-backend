@@ -123,7 +123,7 @@ export class AIChatService {
       started_at: new Date(),
       session_title: `AI Practice Session - ${moduleExists.title}`,
       session_description: `AI practice session for ${moduleExists.title}`,
-      scenario: "",
+      scenario: '',
     };
 
     // Start database transaction

@@ -3,4 +3,3 @@ export enum FeedbackTypeEnum {
   STUDENT_RATING = 'STUDENT_RATING',
   PROFESSOR_FEEDBACK = 'PROFESSOR_FEEDBACK',
 }
-

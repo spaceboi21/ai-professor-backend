@@ -46,8 +46,6 @@ export class AIChatMessage extends Document {
   @Prop({ type: [String], default: [] })
   attachments: string[];
 
-
-
   @Prop({ type: Object, default: null })
   message_metadata: Record<string, any>;
 

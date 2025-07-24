@@ -21,6 +21,7 @@ export interface SupervisorAnalysisResponseType {
   missed_opportunities: string[];
   areas_for_improvement: string[];
   strengths: string[];
+  skill_gaps: string[];
 }
 
 export interface ProfessorResourcesResponseType {
@@ -29,5 +30,5 @@ export interface ProfessorResourcesResponseType {
   recommendations: string;
   total_found: number;
   knowledge_available: boolean;
-  keywords_used: string[]
+  keywords_used: string[];
 }

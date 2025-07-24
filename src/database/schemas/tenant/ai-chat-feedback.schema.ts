@@ -48,6 +48,9 @@ export class AIChatFeedback extends Document {
   @Prop({ type: [String], default: [] })
   strengths: string[];
 
+  @Prop({ type: [String], default: [] })
+  skill_gaps: string[];
+
   @Prop({ type: Date, default: null })
   deleted_at: Date;
 

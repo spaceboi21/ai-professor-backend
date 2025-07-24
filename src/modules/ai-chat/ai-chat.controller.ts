@@ -143,13 +143,12 @@ export class AIChatController {
     );
   }
 
-
-
   @Put('sessions/:id/complete')
   @Roles(RoleEnum.STUDENT, RoleEnum.PROFESSOR, RoleEnum.SCHOOL_ADMIN)
   @ApiOperation({
     summary: 'Complete an AI chat session',
-    description: 'Mark an AI session as completed and set the ended_at timestamp automatically',
+    description:
+      'Mark an AI session as completed and set the ended_at timestamp automatically',
   })
   @ApiParam({
     name: 'id',
@@ -177,10 +176,6 @@ export class AIChatController {
   ) {
     return this.aiChatService.completeAISession(id, user);
   }
-
-
-
-
 
   // ========== MESSAGE ENDPOINTS ==========
 
@@ -359,6 +354,4 @@ export class AIChatController {
   ) {
     return this.aiChatService.findResourcesBySessionId(sessionId, user);
   }
-
-
 }
