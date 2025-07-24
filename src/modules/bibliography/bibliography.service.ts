@@ -604,7 +604,7 @@ export class BibliographyService {
           throw new NotFoundException('Bibliography not found during update');
         }
 
-        // Optional Step 3: If reordering is required (like for chapters)
+        // Optional Step 3: after deleting a bibliography, we need to decrement the sequence of the other bibliographies in the same chapter
         await BibliographyModel.updateMany(
           {
             chapter_id,
