@@ -1,0 +1,3603 @@
+{
+  "info": {
+    "name": "AI Professor API",
+    "description": "API collection for AI Professor backend",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "GET /api",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api",
+              "protocol": "http",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Health check endpoint",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/health",
+              "protocol": "http",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "health"
+              ]
+            },
+            "description": ""
+          }
+        }
+      ]
+    },
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Super Admin Login",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "description": "JSON content type"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/super-admin/login",
+              "protocol": "http",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "super-admin",
+                "login"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "School Admin or Professor Login",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "description": "JSON content type"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/school-admin/login",
+              "protocol": "http",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "school-admin",
+                "login"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Student Login",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "description": "JSON content type"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/student/login",
+              "protocol": "http",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "student",
+                "login"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Get current user info",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "description": "JWT Bearer token"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/me",
+              "protocol": "http",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "me"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Request password reset for school admin or professor or student",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "description": "JSON content type"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/forgot-password",
+              "protocol": "http",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "forgot-password"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Set new password using reset token",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "description": "JSON content type"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/set-new-password",
+              "protocol": "http",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "set-new-password"
+              ]
+            },
+            "description": ""
+          }
+        }
+      ]
+    },
+    {
+      "name": "Queue",
+      "item": [
+        {
+          "name": "Get mail queue statistics",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "description": "JWT Bearer token"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/queue/mail/stats",
+              "protocol": "http",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "queue",
+                "mail",
+                "stats"
+              ]
+            },
+            "description": ""
+          }
+        }
+      ]
+    },
+    {
+      "name": "Student",
+      "item": [
+        {
+          "name": "Create a new student",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "description": "JWT Bearer token"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "description": "JSON content type"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/students",
+              "protocol": "http",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "students"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Get all students",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "description": "JWT Bearer token"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/students",
+              "protocol": "http",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "students"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "",
+                  "description": "Page number (starts from 1)"
+                },
+                {
+                  "key": "limit",
+                  "value": "",
+                  "description": "Number of items per page"
+                },
+                {
+                  "key": "search",
+                  "value": "",
+                  "description": ""
+                },
+                {
+                  "key": "status",
+                  "value": "",
+                  "description": ""
+                },
+                {
+                  "key": "school_id",
+                  "value": "",
+                  "description": "School ID (required for SUPER_ADMIN, optional for SCHOOL_ADMIN)"
+                },
+                {
+                  "key": "sortBy",
+                  "value": "",
+                  "description": "Field to sort by (name = first_name + last_name)"
+                },
+                {
+                  "key": "sortOrder",
+                  "value": "",
+                  "description": "Sort order (asc or desc)"
+                }
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Bulk create students from CSV file",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "description": "JWT Bearer token"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "description": "JSON content type"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/students/bulk",
+              "protocol": "http",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "students",
+                "bulk"
+              ],
+              "query": [
+                {
+                  "key": "school_id",
+                  "value": "",
+                  "description": "School ID (required for SUPER_ADMIN, ignored for SCHOOL_ADMIN who use their own school)"
+                }
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Get student by ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "description": "JWT Bearer token"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/students/{id}",
+              "protocol": "http",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "students",
+                "{id}"
+              ],
+              "query": [
+                {
+                  "key": "school_id",
+                  "value": "",
+                  "description": "School ID (required for SUPER_ADMIN, optional for SCHOOL_ADMIN)"
+                }
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Update student details (including status)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "description": "JWT Bearer token"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "description": "JSON content type"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/students/{id}",
+              "protocol": "http",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "students",
+                "{id}"
+              ],
+              "query": [
+                {
+                  "key": "school_id",
+                  "value": "",
+                  "description": "School ID (required for SUPER_ADMIN, optional for SCHOOL_ADMIN)"
+                }
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Delete student (soft delete)",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "description": "JWT Bearer token"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/students/{id}",
+              "protocol": "http",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "students",
+                "{id}"
+              ],
+              "query": [
+                {
+                  "key": "school_id",
+                  "value": "",
+                  "description": "School ID (required for SUPER_ADMIN, optional for SCHOOL_ADMIN)"
+                }
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Update student status",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "description": "JWT Bearer token"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "description": "JSON content type"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/students/{id}/status",
+              "protocol": "http",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "students",
+                "{id}",
+                "status"
+              ],
+              "query": [
+                {
+                  "key": "school_id",
+                  "value": "",
+                  "description": "School ID (required for SUPER_ADMIN, optional for SCHOOL_ADMIN)"
+                }
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Reset password for authenticated student",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "description": "JWT Bearer token"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "description": "JSON content type"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/students/reset-password",
+              "protocol": "http",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "students",
+                "reset-password"
+              ]
+            },
+            "description": ""
+          }
+        }
+      ]
+    },
+    {
+      "name": "Upload",
+      "item": [
+        {
+          "name": "Generate a secure presigned upload URL for profile pictures",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "description": "JWT Bearer token"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "description": "JSON content type"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/upload/profile-url",
+              "protocol": "http",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "upload",
+                "profile-url"
+              ]
+            },
+            "description": "Returns a temporary upload URL that expires in 5 minutes. File size limit: 5MB."
+          }
+        },
+        {
+          "name": "Generate a secure presigned upload URL for bibliography files (PDF/Video/PowerPoint)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "description": "JWT Bearer token"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "description": "JSON content type"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/upload/bibliography-url",
+              "protocol": "http",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "upload",
+                "bibliography-url"
+              ]
+            },
+            "description": "Returns a temporary upload URL that expires in 10 minutes. File size limit: 100MB. Supports PDF, video files (MP4, AVI, MOV, WMV, FLV, WebM), and PowerPoint files (PPT, PPTX)."
+          }
+        },
+        {
+          "name": "Generate a secure presigned upload URL for thumbnail images",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "description": "JWT Bearer token"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "description": "JSON content type"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/upload/thumbnail-url",
+              "protocol": "http",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "upload",
+                "thumbnail-url"
+              ]
+            },
+            "description": "Returns a temporary upload URL that expires in 5 minutes. File size limit: 5MB."
+          }
+        },
+        {
+          "name": "Validate an uploaded file",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "description": "JWT Bearer token"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/upload/validate-file",
+              "protocol": "http",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "upload",
+                "validate-file"
+              ],
+              "query": [
+                {
+                  "key": "fileUrl",
+                  "value": "",
+                  "description": "The file URL to validate"
+                }
+              ]
+            },
+            "description": "Verify that an uploaded file exists and is valid"
+          }
+        },
+        {
+          "name": "Upload file via PUT with raw binary body",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "description": "JWT Bearer token"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "description": "JSON content type"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/upload/bibliography",
+              "protocol": "http",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "upload",
+                "bibliography"
+              ],
+              "query": [
+                {
+                  "key": "filename",
+                  "value": "",
+                  "description": ""
+                }
+              ]
+            },
+            "description": "Send raw file buffer (e.g., PDF, MP4, PPT, PPTX) in the request body with the appropriate Content-Type header. Must use Postman, curl, or frontend — Swagger UI doesn't support raw binary upload."
+          }
+        },
+        {
+          "name": "Upload file via PUT with raw binary body",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "description": "JWT Bearer token"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "description": "JSON content type"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/upload/profile",
+              "protocol": "http",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "upload",
+                "profile"
+              ],
+              "query": [
+                {
+                  "key": "filename",
+                  "value": "",
+                  "description": ""
+                }
+              ]
+            },
+            "description": "Send raw file buffer (e.g., PDF, MP4, JPEG) in the request body with the appropriate Content-Type header. Must use Postman, curl, or frontend — Swagger UI doesn't support raw binary upload."
+          }
+        },
+        {
+          "name": "Upload thumbnail via PUT with raw binary body",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "description": "JWT Bearer token"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "description": "JSON content type"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/upload/thumbnail",
+              "protocol": "http",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "upload",
+                "thumbnail"
+              ],
+              "query": [
+                {
+                  "key": "filename",
+                  "value": "",
+                  "description": ""
+                }
+              ]
+            },
+            "description": "Send raw image buffer (JPEG, PNG, WebP) in the request body with the appropriate Content-Type header. Must use Postman, curl, or frontend — Swagger UI doesn't support raw binary upload."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Modules",
+      "item": [
+        {
+          "name": "Create a new module",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "description": "JWT Bearer token"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "description": "JSON content type"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/modules",
+              "protocol": "http",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "modules"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Get all modules with filtering and sorting",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "description": "JWT Bearer token"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/modules",
+              "protocol": "http",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "modules"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "",
+                  "description": "Page number (default: 1)"
+                },
+                {
+                  "key": "limit",
+                  "value": "",
+                  "description": "Number of items per page (default: 10, max: 100)"
+                },
+                {
+                  "key": "text",
+                  "value": "",
+                  "description": "Search text in title and description (case-insensitive)"
+                },
+                {
+                  "key": "difficulty",
+                  "value": "",
+                  "description": "Filter by difficulty level"
+                },
+                {
+                  "key": "published",
+                  "value": "",
+                  "description": "Filter by published status (only available for non-student users)"
+                },
+                {
+                  "key": "progress_status",
+                  "value": "",
+                  "description": "Filter by progress status (only available for students). Use ALL to show all modules regardless of progress status."
+                },
+                {
+                  "key": "sortBy",
+                  "value": "",
+                  "description": "Sort by field. progress_status is only available for students (ASC: IN_PROGRESS → NOT_STARTED → COMPLETED, DESC: COMPLETED → NOT_STARTED → IN_PROGRESS)"
+                },
+                {
+                  "key": "sortOrder",
+                  "value": "",
+                  "description": "Sort order"
+                }
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Toggle module visibility (publish/unpublish)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "description": "JWT Bearer token"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "description": "JSON content type"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/modules/toggle-visibility",
+              "protocol": "http",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "modules",
+                "toggle-visibility"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Assign professors to a module",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "description": "JWT Bearer token"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "description": "JSON content type"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/modules/assign-professors",
+              "protocol": "http",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "modules",
+                "assign-professors"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Unassign a professor from a module",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "description": "JWT Bearer token"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "description": "JSON content type"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/modules/unassign-professor",
+              "protocol": "http",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "modules",
+                "unassign-professor"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Get all professors assigned to a module",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "description": "JWT Bearer token"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/modules/{id}/assignments",
+              "protocol": "http",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "modules",
+                "{id}",
+                "assignments"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Get assignment audit logs for admin accountability",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "description": "JWT Bearer token"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/modules/assignments/audit-logs",
+              "protocol": "http",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "modules",
+                "assignments",
+                "audit-logs"
+              ],
+              "query": [
+                {
+                  "key": "module_id",
+                  "value": "",
+                  "description": "Filter by module ID"
+                },
+                {
+                  "key": "professor_id",
+                  "value": "",
+                  "description": "Filter by professor ID"
+                },
+                {
+                  "key": "page",
+                  "value": "",
+                  "description": "Page number (starts from 1)"
+                },
+                {
+                  "key": "limit",
+                  "value": "",
+                  "description": "Number of items per page"
+                }
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Get a module by id",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "description": "JWT Bearer token"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/modules/{id}",
+              "protocol": "http",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "modules",
+                "{id}"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Update a module",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "description": "JWT Bearer token"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "description": "JSON content type"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/modules/{id}",
+              "protocol": "http",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "modules",
+                "{id}"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Delete a module",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "description": "JWT Bearer token"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/modules/{id}",
+              "protocol": "http",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "modules",
+                "{id}"
+              ],
+              "query": [
+                {
+                  "key": "school_id",
+                  "value": "",
+                  "description": "School ID (required for super admin, optional for other roles)"
+                }
+              ]
+            },
+            "description": ""
+          }
+        }
+      ]
+    },
+    {
+      "name": "Notifications",
+      "item": [
+        {
+          "name": "Get user notifications (Student or Professor)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "description": "JWT Bearer token"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/notifications",
+              "protocol": "http",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "notifications"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "",
+                  "description": "Page number (default: 1)"
+                },
+                {
+                  "key": "limit",
+                  "value": "",
+                  "description": "Number of items per page (default: 10, max: 100)"
+                }
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Get unread notifications count (Student or Professor)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "description": "JWT Bearer token"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/notifications/unread-count",
+              "protocol": "http",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "notifications",
+                "unread-count"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Mark a notification as read (Student or Professor)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "description": "JWT Bearer token"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "description": "JSON content type"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/notifications/{id}/read",
+              "protocol": "http",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "notifications",
+                "{id}",
+                "read"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Mark all notifications as read (Student or Professor)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "description": "JWT Bearer token"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "description": "JSON content type"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/notifications/mark-all-read",
+              "protocol": "http",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "notifications",
+                "mark-all-read"
+              ]
+            },
+            "description": ""
+          }
+        }
+      ]
+    },
+    {
+      "name": "Chapters",
+      "item": [
+        {
+          "name": "Create a new chapter",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "description": "JWT Bearer token"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "description": "JSON content type"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/chapters",
+              "protocol": "http",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "chapters"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Get all chapters or chapters by module",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "description": "JWT Bearer token"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/chapters",
+              "protocol": "http",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "chapters"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "",
+                  "description": "Page number (default: 1)"
+                },
+                {
+                  "key": "limit",
+                  "value": "",
+                  "description": "Number of items per page (default: 10, max: 100)"
+                },
+                {
+                  "key": "module_id",
+                  "value": "",
+                  "description": "Optional filter by module ID"
+                }
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Get a chapter by ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "description": "JWT Bearer token"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/chapters/{id}",
+              "protocol": "http",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "chapters",
+                "{id}"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Update a chapter",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "description": "JWT Bearer token"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "description": "JSON content type"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/chapters/{id}",
+              "protocol": "http",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "chapters",
+                "{id}"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Delete a chapter",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "description": "JWT Bearer token"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/chapters/{id}",
+              "protocol": "http",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "chapters",
+                "{id}"
+              ],
+              "query": [
+                {
+                  "key": "school_id",
+                  "value": "",
+                  "description": "School ID (required for super admin, optional for other roles)"
+                }
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Reorder chapters",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "description": "JWT Bearer token"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "description": "JSON content type"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/chapters/reorder",
+              "protocol": "http",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "chapters",
+                "reorder"
+              ]
+            },
+            "description": ""
+          }
+        }
+      ]
+    },
+    {
+      "name": "Progress Tracking",
+      "item": [
+        {
+          "name": "Start a module (Student)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "description": "JWT Bearer token"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "description": "JSON content type"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/progress/modules/start",
+              "protocol": "http",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "progress",
+                "modules",
+                "start"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Start a chapter (Student)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "description": "JWT Bearer token"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "description": "JSON content type"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/progress/chapters/start",
+              "protocol": "http",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "progress",
+                "chapters",
+                "start"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Mark chapter as complete (Student)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "description": "JWT Bearer token"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "description": "JSON content type"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/progress/chapters/complete",
+              "protocol": "http",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "progress",
+                "chapters",
+                "complete"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Start a quiz attempt (Student)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "description": "JWT Bearer token"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "description": "JSON content type"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/progress/quiz/start",
+              "protocol": "http",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "progress",
+                "quiz",
+                "start"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Submit quiz answers (Student)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "description": "JWT Bearer token"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "description": "JSON content type"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/progress/quiz/submit",
+              "protocol": "http",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "progress",
+                "quiz",
+                "submit"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Get student module progress (Student)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "description": "JWT Bearer token"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/progress/modules",
+              "protocol": "http",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "progress",
+                "modules"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "",
+                  "description": "Page number (default: 1)"
+                },
+                {
+                  "key": "limit",
+                  "value": "",
+                  "description": "Number of items per page (default: 10, max: 100)"
+                },
+                {
+                  "key": "module_id",
+                  "value": "",
+                  "description": "Filter by module ID"
+                },
+                {
+                  "key": "chapter_id",
+                  "value": "",
+                  "description": "Filter by chapter ID"
+                },
+                {
+                  "key": "status",
+                  "value": "",
+                  "description": "Filter by progress status"
+                },
+                {
+                  "key": "from_date",
+                  "value": "",
+                  "description": "Filter from date (YYYY-MM-DD)"
+                },
+                {
+                  "key": "to_date",
+                  "value": "",
+                  "description": "Filter to date (YYYY-MM-DD)"
+                }
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Get student chapter progress (Student)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "description": "JWT Bearer token"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/progress/chapters",
+              "protocol": "http",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "progress",
+                "chapters"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "",
+                  "description": "Page number (default: 1)"
+                },
+                {
+                  "key": "limit",
+                  "value": "",
+                  "description": "Number of items per page (default: 10, max: 100)"
+                },
+                {
+                  "key": "module_id",
+                  "value": "",
+                  "description": "Filter by module ID"
+                },
+                {
+                  "key": "chapter_id",
+                  "value": "",
+                  "description": "Filter by chapter ID"
+                },
+                {
+                  "key": "status",
+                  "value": "",
+                  "description": "Filter by progress status"
+                },
+                {
+                  "key": "from_date",
+                  "value": "",
+                  "description": "Filter progress from this date (YYYY-MM-DD)"
+                },
+                {
+                  "key": "to_date",
+                  "value": "",
+                  "description": "Filter progress until this date (YYYY-MM-DD)"
+                }
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Get student quiz attempts (Student)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "description": "JWT Bearer token"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/progress/quiz-attempts",
+              "protocol": "http",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "progress",
+                "quiz-attempts"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "",
+                  "description": "Page number (default: 1)"
+                },
+                {
+                  "key": "limit",
+                  "value": "",
+                  "description": "Number of items per page (default: 10, max: 100)"
+                },
+                {
+                  "key": "quiz_group_id",
+                  "value": "",
+                  "description": "Filter by quiz group ID"
+                },
+                {
+                  "key": "module_id",
+                  "value": "",
+                  "description": "Filter by module ID"
+                },
+                {
+                  "key": "chapter_id",
+                  "value": "",
+                  "description": "Filter by chapter ID"
+                },
+                {
+                  "key": "status",
+                  "value": "",
+                  "description": "Filter by attempt status"
+                },
+                {
+                  "key": "from_date",
+                  "value": "",
+                  "description": "Filter attempts from this date (YYYY-MM-DD)"
+                },
+                {
+                  "key": "to_date",
+                  "value": "",
+                  "description": "Filter attempts until this date (YYYY-MM-DD)"
+                }
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Get student dashboard overview (Student/Admin/Professor/Super Admin)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "description": "JWT Bearer token"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/progress/dashboard",
+              "protocol": "http",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "progress",
+                "dashboard"
+              ],
+              "query": [
+                {
+                  "key": "school_id",
+                  "value": "",
+                  "description": "School ID (required for super admin access)"
+                },
+                {
+                  "key": "student_id",
+                  "value": "",
+                  "description": "Student ID (required for admin/professor/super admin access)"
+                }
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Get school admin dashboard overview (Admin/Professor)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "description": "JWT Bearer token"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/progress/admin/dashboard",
+              "protocol": "http",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "progress",
+                "admin",
+                "dashboard"
+              ],
+              "query": [
+                {
+                  "key": "module_id",
+                  "value": "",
+                  "description": "Filter by specific module ID"
+                }
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Check if student can access a chapter (Student)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "description": "JWT Bearer token"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/progress/chapters/{chapter_id}/can-access",
+              "protocol": "http",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "progress",
+                "chapters",
+                "{chapter_id}",
+                "can-access"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Check if student can access a quiz (Student)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "description": "JWT Bearer token"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/progress/quiz/{quiz_group_id}/can-access",
+              "protocol": "http",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "progress",
+                "quiz",
+                "{quiz_group_id}",
+                "can-access"
+              ]
+            },
+            "description": ""
+          }
+        }
+      ]
+    },
+    {
+      "name": "Users",
+      "item": [
+        {
+          "name": "Get all users (Super Admin only)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "description": "JWT Bearer token"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/users",
+              "protocol": "http",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "users"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "",
+                  "description": "Page number (starts from 1)"
+                },
+                {
+                  "key": "limit",
+                  "value": "",
+                  "description": "Number of items per page"
+                },
+                {
+                  "key": "search",
+                  "value": "",
+                  "description": ""
+                },
+                {
+                  "key": "role",
+                  "value": "",
+                  "description": ""
+                },
+                {
+                  "key": "status",
+                  "value": "",
+                  "description": ""
+                }
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Get user by ID (Super Admin only)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "description": "JWT Bearer token"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/users/{id}",
+              "protocol": "http",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "users",
+                "{id}"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Update user status (Super Admin only)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "description": "JWT Bearer token"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "description": "JSON content type"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/users/{id}/status",
+              "protocol": "http",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "users",
+                "{id}",
+                "status"
+              ]
+            },
+            "description": ""
+          }
+        }
+      ]
+    },
+    {
+      "name": "Schools",
+      "item": [
+        {
+          "name": "Get all schools (Super Admin only)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "description": "JWT Bearer token"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/schools",
+              "protocol": "http",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "schools"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "",
+                  "description": "Page number (starts from 1)"
+                },
+                {
+                  "key": "limit",
+                  "value": "",
+                  "description": "Number of items per page"
+                },
+                {
+                  "key": "search",
+                  "value": "",
+                  "description": ""
+                },
+                {
+                  "key": "status",
+                  "value": "",
+                  "description": ""
+                }
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Get school by ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "description": "JWT Bearer token"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/schools/{id}",
+              "protocol": "http",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "schools",
+                "{id}"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Update school details",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "description": "JWT Bearer token"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "description": "JSON content type"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/schools/{id}",
+              "protocol": "http",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "schools",
+                "{id}"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Update school status (Super Admin only)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "description": "JWT Bearer token"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "description": "JSON content type"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/schools/{id}/status",
+              "protocol": "http",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "schools",
+                "{id}",
+                "status"
+              ]
+            },
+            "description": ""
+          }
+        }
+      ]
+    },
+    {
+      "name": "Professor",
+      "item": [
+        {
+          "name": "Create a new professor",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "description": "JWT Bearer token"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "description": "JSON content type"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/professor",
+              "protocol": "http",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "professor"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Get all professors (School Admin only)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "description": "JWT Bearer token"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/professor",
+              "protocol": "http",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "professor"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "",
+                  "description": "Page number (starts from 1)"
+                },
+                {
+                  "key": "limit",
+                  "value": "",
+                  "description": "Number of items per page"
+                },
+                {
+                  "key": "search",
+                  "value": "",
+                  "description": ""
+                },
+                {
+                  "key": "status",
+                  "value": "",
+                  "description": ""
+                },
+                {
+                  "key": "sortBy",
+                  "value": "",
+                  "description": "Field to sort by (name = first_name + last_name)"
+                },
+                {
+                  "key": "sortOrder",
+                  "value": "",
+                  "description": "Sort order (asc or desc)"
+                }
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Update professor details",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "description": "JWT Bearer token"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "description": "JSON content type"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/professor/{id}",
+              "protocol": "http",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "professor",
+                "{id}"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Get professor by ID (School Admin only)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "description": "JWT Bearer token"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/professor/{id}",
+              "protocol": "http",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "professor",
+                "{id}"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Soft delete a professor",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "description": "JWT Bearer token"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/professor/{id}",
+              "protocol": "http",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "professor",
+                "{id}"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Update professor password",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "description": "JWT Bearer token"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "description": "JSON content type"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/professor/password/{id}",
+              "protocol": "http",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "professor",
+                "password",
+                "{id}"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Get professor assignments (School Admin and Professor)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "description": "JWT Bearer token"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/professor/{id}/assignments",
+              "protocol": "http",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "professor",
+                "{id}",
+                "assignments"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "",
+                  "description": "Page number (starts from 1)"
+                },
+                {
+                  "key": "limit",
+                  "value": "",
+                  "description": "Number of items per page"
+                }
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Check professor access to a specific module",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "description": "JWT Bearer token"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/professor/{id}/module-access/{moduleId}",
+              "protocol": "http",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "professor",
+                "{id}",
+                "module-access",
+                "{moduleId}"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Update professor status (School Admin only)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "description": "JWT Bearer token"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "description": "JSON content type"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/professor/{id}/status",
+              "protocol": "http",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "professor",
+                "{id}",
+                "status"
+              ]
+            },
+            "description": ""
+          }
+        }
+      ]
+    },
+    {
+      "name": "School Admin",
+      "item": [
+        {
+          "name": "Create a new school and school admin",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "description": "JWT Bearer token"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "description": "JSON content type"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/school-admin",
+              "protocol": "http",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "school-admin"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Get school admin dashboard information",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "description": "JWT Bearer token"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/school-admin/dashboard",
+              "protocol": "http",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "school-admin",
+                "dashboard"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Reset password for authenticated school admin or professor",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "description": "JWT Bearer token"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "description": "JSON content type"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/school-admin/reset-password",
+              "protocol": "http",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "school-admin",
+                "reset-password"
+              ]
+            },
+            "description": ""
+          }
+        }
+      ]
+    },
+    {
+      "name": "Bibliography",
+      "item": [
+        {
+          "name": "Create a new bibliography item",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "description": "JWT Bearer token"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "description": "JSON content type"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/bibliography",
+              "protocol": "http",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "bibliography"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Get all bibliography items with filtering and sorting",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "description": "JWT Bearer token"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/bibliography",
+              "protocol": "http",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "bibliography"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "",
+                  "description": "Page number (default: 1)"
+                },
+                {
+                  "key": "limit",
+                  "value": "",
+                  "description": "Number of items per page (default: 10, max: 100)"
+                },
+                {
+                  "key": "module_id",
+                  "value": "",
+                  "description": "Optional filter by module ID"
+                },
+                {
+                  "key": "chapter_id",
+                  "value": "",
+                  "description": "Optional filter by chapter ID"
+                },
+                {
+                  "key": "text",
+                  "value": "",
+                  "description": "Search text in title and description"
+                },
+                {
+                  "key": "type",
+                  "value": "",
+                  "description": "Filter by bibliography type"
+                },
+                {
+                  "key": "sortBy",
+                  "value": "",
+                  "description": "Sort by field"
+                },
+                {
+                  "key": "sortOrder",
+                  "value": "",
+                  "description": "Sort order"
+                }
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Get bibliography by ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "description": "JWT Bearer token"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/bibliography/{id}",
+              "protocol": "http",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "bibliography",
+                "{id}"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Update bibliography by ID",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "description": "JWT Bearer token"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "description": "JSON content type"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/bibliography/{id}",
+              "protocol": "http",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "bibliography",
+                "{id}"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Delete bibliography by ID (soft delete)",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "description": "JWT Bearer token"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/bibliography/{id}",
+              "protocol": "http",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "bibliography",
+                "{id}"
+              ],
+              "query": [
+                {
+                  "key": "school_id",
+                  "value": "",
+                  "description": "School ID (required for super admin, optional for other roles)"
+                }
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Reorder bibliography items",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "description": "JWT Bearer token"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "description": "JSON content type"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/bibliography/reorder",
+              "protocol": "http",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "bibliography",
+                "reorder"
+              ]
+            },
+            "description": ""
+          }
+        }
+      ]
+    },
+    {
+      "name": "Quiz",
+      "item": [
+        {
+          "name": "Create a new quiz group",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "description": "JWT Bearer token"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "description": "JSON content type"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/quiz/groups",
+              "protocol": "http",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "quiz",
+                "groups"
+              ]
+            },
+            "description": "Creates a new quiz group for a module or chapter"
+          }
+        },
+        {
+          "name": "Get all quiz groups",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "description": "JWT Bearer token"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/quiz/groups",
+              "protocol": "http",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "quiz",
+                "groups"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "",
+                  "description": "Page number (starts from 1)"
+                },
+                {
+                  "key": "limit",
+                  "value": "",
+                  "description": "Number of items per page"
+                },
+                {
+                  "key": "category",
+                  "value": "",
+                  "description": "Filter by quiz category"
+                },
+                {
+                  "key": "difficulty",
+                  "value": "",
+                  "description": "Filter by difficulty level"
+                },
+                {
+                  "key": "type",
+                  "value": "",
+                  "description": "Filter by quiz type"
+                },
+                {
+                  "key": "module_id",
+                  "value": "",
+                  "description": "Filter by module ID"
+                },
+                {
+                  "key": "chapter_id",
+                  "value": "",
+                  "description": "Filter by chapter ID"
+                }
+              ]
+            },
+            "description": "Retrieve paginated list of quiz groups with optional filters"
+          }
+        },
+        {
+          "name": "Get a quiz group by ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "description": "JWT Bearer token"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/quiz/groups/{id}",
+              "protocol": "http",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "quiz",
+                "groups",
+                "{id}"
+              ]
+            },
+            "description": "Retrieve a specific quiz group with its details"
+          }
+        },
+        {
+          "name": "Update a quiz group",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "description": "JWT Bearer token"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "description": "JSON content type"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/quiz/groups/{id}",
+              "protocol": "http",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "quiz",
+                "groups",
+                "{id}"
+              ]
+            },
+            "description": "Update an existing quiz group"
+          }
+        },
+        {
+          "name": "Delete a quiz group",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "description": "JWT Bearer token"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/quiz/groups/{id}",
+              "protocol": "http",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "quiz",
+                "groups",
+                "{id}"
+              ]
+            },
+            "description": "Soft delete a quiz group and all its associated quizzes"
+          }
+        },
+        {
+          "name": "Create a new quiz question",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "description": "JWT Bearer token"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "description": "JSON content type"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/quiz/questions",
+              "protocol": "http",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "quiz",
+                "questions"
+              ]
+            },
+            "description": "Creates a new quiz question within a quiz group"
+          }
+        },
+        {
+          "name": "Get all quiz questions",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "description": "JWT Bearer token"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/quiz/questions",
+              "protocol": "http",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "quiz",
+                "questions"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "",
+                  "description": "Page number (starts from 1)"
+                },
+                {
+                  "key": "limit",
+                  "value": "",
+                  "description": "Number of items per page"
+                },
+                {
+                  "key": "quiz_group_id",
+                  "value": "",
+                  "description": "Filter by quiz group ID"
+                },
+                {
+                  "key": "type",
+                  "value": "",
+                  "description": "Filter by question type"
+                },
+                {
+                  "key": "module_id",
+                  "value": "",
+                  "description": "Filter by module ID"
+                },
+                {
+                  "key": "chapter_id",
+                  "value": "",
+                  "description": "Filter by chapter ID"
+                }
+              ]
+            },
+            "description": "Retrieve paginated list of quiz questions with optional filters"
+          }
+        },
+        {
+          "name": "Get a quiz question by ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "description": "JWT Bearer token"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/quiz/questions/{id}",
+              "protocol": "http",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "quiz",
+                "questions",
+                "{id}"
+              ]
+            },
+            "description": "Retrieve a specific quiz question with its details"
+          }
+        },
+        {
+          "name": "Update a quiz question",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "description": "JWT Bearer token"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "description": "JSON content type"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/quiz/questions/{id}",
+              "protocol": "http",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "quiz",
+                "questions",
+                "{id}"
+              ]
+            },
+            "description": "Update an existing quiz question"
+          }
+        },
+        {
+          "name": "Delete a quiz question",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "description": "JWT Bearer token"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/quiz/questions/{id}",
+              "protocol": "http",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "quiz",
+                "questions",
+                "{id}"
+              ]
+            },
+            "description": "Soft delete a quiz question"
+          }
+        },
+        {
+          "name": "Get all questions for a specific quiz group",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "description": "JWT Bearer token"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/quiz/groups/{groupId}/questions",
+              "protocol": "http",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "quiz",
+                "groups",
+                "{groupId}",
+                "questions"
+              ]
+            },
+            "description": "Retrieve all quiz questions belonging to a specific quiz group"
+          }
+        },
+        {
+          "name": "Get all quiz groups for a specific module",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "description": "JWT Bearer token"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/quiz/modules/{moduleId}/groups",
+              "protocol": "http",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "quiz",
+                "modules",
+                "{moduleId}",
+                "groups"
+              ]
+            },
+            "description": "Retrieve all quiz groups belonging to a specific module"
+          }
+        },
+        {
+          "name": "Get all quiz groups for a specific chapter",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "description": "JWT Bearer token"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/quiz/chapters/{chapterId}/groups",
+              "protocol": "http",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "quiz",
+                "chapters",
+                "{chapterId}",
+                "groups"
+              ]
+            },
+            "description": "Retrieve all quiz groups belonging to a specific chapter"
+          }
+        }
+      ]
+    },
+    {
+      "name": "AI Chat",
+      "item": [
+        {
+          "name": "Create a new AI chat session",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "description": "JWT Bearer token"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "description": "JSON content type"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/ai-chat/sessions",
+              "protocol": "http",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "ai-chat",
+                "sessions"
+              ]
+            },
+            "description": "Creates a new AI practice session for a student with a specific module. Session title and description are automatically generated from the module information."
+          }
+        },
+        {
+          "name": "Get all AI chat sessions",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "description": "JWT Bearer token"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/ai-chat/sessions",
+              "protocol": "http",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "ai-chat",
+                "sessions"
+              ],
+              "query": [
+                {
+                  "key": "module_id",
+                  "value": "",
+                  "description": "Filter by module ID"
+                },
+                {
+                  "key": "status",
+                  "value": "",
+                  "description": "Filter by session status"
+                },
+                {
+                  "key": "limit",
+                  "value": "",
+                  "description": "Number of items per page (default: 10, max: 100)"
+                },
+                {
+                  "key": "page",
+                  "value": "",
+                  "description": "Page number (default: 1)"
+                }
+              ]
+            },
+            "description": "Retrieve paginated list of AI chat sessions with optional filters. Sessions are automatically filtered by the authenticated user."
+          }
+        },
+        {
+          "name": "Complete an AI chat session",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "description": "JWT Bearer token"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "description": "JSON content type"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/ai-chat/sessions/{id}/complete",
+              "protocol": "http",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "ai-chat",
+                "sessions",
+                "{id}",
+                "complete"
+              ]
+            },
+            "description": "Mark an AI session as completed and set the ended_at timestamp automatically"
+          }
+        },
+        {
+          "name": "Create a new AI chat message",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "description": "JWT Bearer token"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "description": "JSON content type"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/ai-chat/messages",
+              "protocol": "http",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "ai-chat",
+                "messages"
+              ]
+            },
+            "description": "Add a new message to an AI chat session (student or AI response)"
+          }
+        },
+        {
+          "name": "Get messages by session ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "description": "JWT Bearer token"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/ai-chat/sessions/{sessionId}/messages",
+              "protocol": "http",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "ai-chat",
+                "sessions",
+                "{sessionId}",
+                "messages"
+              ]
+            },
+            "description": "Retrieve all messages for a specific AI chat session"
+          }
+        },
+        {
+          "name": "Create AI chat feedback",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "description": "JWT Bearer token"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "description": "JSON content type"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/ai-chat/feedback",
+              "protocol": "http",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "ai-chat",
+                "feedback"
+              ]
+            },
+            "description": "Add feedback, analysis, or ratings for an AI chat session"
+          }
+        },
+        {
+          "name": "Get feedback by session ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "description": "JWT Bearer token"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/ai-chat/sessions/{sessionId}/feedback",
+              "protocol": "http",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "ai-chat",
+                "sessions",
+                "{sessionId}",
+                "feedback"
+              ]
+            },
+            "description": "Retrieve all feedback and analysis for a specific AI chat session"
+          }
+        },
+        {
+          "name": "Create AI resource",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "description": "JWT Bearer token"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "description": "JSON content type"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/ai-chat/resources",
+              "protocol": "http",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "ai-chat",
+                "resources"
+              ]
+            },
+            "description": "Add study materials, resources, or learning content for an AI session"
+          }
+        },
+        {
+          "name": "Get resources by session ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "description": "JWT Bearer token"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/ai-chat/sessions/{sessionId}/resources",
+              "protocol": "http",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "ai-chat",
+                "sessions",
+                "{sessionId}",
+                "resources"
+              ]
+            },
+            "description": "Retrieve all study materials and resources for a specific AI chat session"
+          }
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:5000"
+    },
+    {
+      "key": "token",
+      "value": "your-jwt-token-here"
+    }
+  ]
+}

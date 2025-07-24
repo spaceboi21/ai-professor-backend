@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { ModulesService } from './modules.service';
 import { ModulesController } from './modules.controller';
+import { ModuleAssignmentService } from './module-assignment.service';
 import { User, UserSchema } from 'src/database/schemas/central/user.schema';
 import {
   School,
@@ -21,7 +22,7 @@ import { NotificationsService } from '../notifications/notifications.service';
     NotificationsModule,
   ],
   controllers: [ModulesController],
-  providers: [ModulesService, NotificationsService],
-  exports: [ModulesService],
+  providers: [ModulesService, ModuleAssignmentService, NotificationsService],
+  exports: [ModulesService, ModuleAssignmentService],
 })
 export class ModulesModule {}

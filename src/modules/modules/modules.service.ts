@@ -51,6 +51,11 @@ import {
   MODULE_CONSTANTS,
 } from 'src/common/constants/module.constant';
 import { NotificationsService } from '../notifications/notifications.service';
+import { ModuleAssignmentService } from './module-assignment.service';
+import {
+  ModuleProfessorAssignment,
+  ModuleProfessorAssignmentSchema,
+} from 'src/database/schemas/tenant/module-professor-assignment.schema';
 
 @Injectable()
 export class ModulesService {
@@ -63,6 +68,7 @@ export class ModulesService {
     private readonly schoolModel: Model<School>,
     private readonly tenantConnectionService: TenantConnectionService,
     private readonly notificationsService: NotificationsService,
+    private readonly moduleAssignmentService: ModuleAssignmentService,
   ) {}
 
   /**
@@ -214,6 +220,45 @@ export class ModulesService {
       if (user.role.name === RoleEnum.STUDENT) {
         pipeline.push({
           $match: { published: true },
+        });
+      }
+
+      // Professors can only see modules they are assigned to
+      if (user.role.name === RoleEnum.PROFESSOR) {
+        // Get professor's assigned modules
+        const AssignmentModel = tenantConnection.model(
+          ModuleProfessorAssignment.name,
+          ModuleProfessorAssignmentSchema,
+        );
+
+        const assignments = await AssignmentModel.find({
+          professor_id: new Types.ObjectId(user.id),
+          is_active: true,
+        }).lean();
+
+        const assignedModuleIds = assignments.map((a) => a.module_id);
+
+        if (assignedModuleIds.length === 0) {
+          // Professor has no assigned modules, return empty result
+          return {
+            message: 'Modules retrieved successfully',
+            data: [],
+            pagination_data: {
+              page: paginationOptions.page,
+              limit: paginationOptions.limit,
+              total: 0,
+              totalPages: 0,
+              hasNext: false,
+              hasPrev: false,
+            },
+          };
+        }
+
+        // Filter to only assigned modules
+        pipeline.push({
+          $match: {
+            _id: { $in: assignedModuleIds },
+          },
         });
       }
 
@@ -580,6 +625,20 @@ export class ModulesService {
 
       const module = modules[0];
 
+      // Check professor access if user is a professor
+      if (user.role.name === RoleEnum.PROFESSOR) {
+        const accessCheck =
+          await this.moduleAssignmentService.checkProfessorModuleAccess(
+            new Types.ObjectId(user.id),
+            new Types.ObjectId(id.toString()),
+            user,
+          );
+
+        if (!accessCheck.has_access) {
+          throw new NotFoundException('Module not found or access denied');
+        }
+      }
+
       // Attach user details to module
       const moduleWithUser = await attachUserDetailsToEntity(
         module,
@@ -623,6 +682,20 @@ export class ModulesService {
     const ModuleModel = tenantConnection.model(Module.name, ModuleSchema);
 
     try {
+      // Check professor access if user is a professor
+      if (user.role.name === RoleEnum.PROFESSOR) {
+        const accessCheck =
+          await this.moduleAssignmentService.checkProfessorModuleAccess(
+            new Types.ObjectId(user.id),
+            id,
+            user,
+          );
+
+        if (!accessCheck.has_access) {
+          throw new NotFoundException('Module not found or access denied');
+        }
+      }
+
       const updatedModule = await ModuleModel.findOneAndUpdate(
         { _id: id, deleted_at: null },
         { ...moduleUpdateData, updated_at: new Date() },
@@ -674,6 +747,20 @@ export class ModulesService {
     const ModuleModel = tenantConnection.model(Module.name, ModuleSchema);
 
     try {
+      // Check professor access if user is a professor
+      if (user.role.name === RoleEnum.PROFESSOR) {
+        const accessCheck =
+          await this.moduleAssignmentService.checkProfessorModuleAccess(
+            new Types.ObjectId(user.id),
+            id,
+            user,
+          );
+
+        if (!accessCheck.has_access) {
+          throw new NotFoundException('Module not found or access denied');
+        }
+      }
+
       const deletedModule = await ModuleModel.findOneAndUpdate(
         { _id: id, deleted_at: null },
         { deleted_at: new Date() },
@@ -733,6 +820,20 @@ export class ModulesService {
 
       if (!module) {
         throw new NotFoundException('Module not found');
+      }
+
+      // Check professor access if user is a professor
+      if (user.role.name === RoleEnum.PROFESSOR) {
+        const accessCheck =
+          await this.moduleAssignmentService.checkProfessorModuleAccess(
+            new Types.ObjectId(user.id),
+            new Types.ObjectId(module_id),
+            user,
+          );
+
+        if (!accessCheck.has_access) {
+          throw new NotFoundException('Module not found or access denied');
+        }
       }
 
       if (action === ModuleVisibilityActionEnum.PUBLISH) {

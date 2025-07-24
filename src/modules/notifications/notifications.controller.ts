@@ -24,6 +24,7 @@ import { RoleGuard } from 'src/common/guards/roles.guard';
 import { JWTUserPayload } from 'src/common/types/jwr-user.type';
 import { NotificationsService } from './notifications.service';
 import { PaginationDto } from 'src/common/dto/pagination.dto';
+import { RecipientTypeEnum } from 'src/database/schemas/tenant/notification.schema';
 
 @ApiTags('Notifications')
 @ApiBearerAuth()
@@ -33,8 +34,8 @@ export class NotificationsController {
   constructor(private readonly notificationsService: NotificationsService) {}
 
   @Get()
-  @Roles(RoleEnum.STUDENT)
-  @ApiOperation({ summary: 'Get student notifications' })
+  @Roles(RoleEnum.STUDENT, RoleEnum.PROFESSOR)
+  @ApiOperation({ summary: 'Get user notifications (Student or Professor)' })
   @ApiQuery({
     name: 'page',
     required: false,
@@ -57,26 +58,41 @@ export class NotificationsController {
     @User() user: JWTUserPayload,
     @Query() paginationDto?: PaginationDto,
   ) {
-    return this.notificationsService.getStudentNotifications(
+    const recipientType =
+      user.role.name === RoleEnum.STUDENT
+        ? RecipientTypeEnum.STUDENT
+        : RecipientTypeEnum.PROFESSOR;
+
+    return this.notificationsService.getNotifications(
       user,
+      recipientType,
       paginationDto,
     );
   }
 
   @Get('unread-count')
-  @Roles(RoleEnum.STUDENT)
-  @ApiOperation({ summary: 'Get unread notifications count' })
+  @Roles(RoleEnum.STUDENT, RoleEnum.PROFESSOR)
+  @ApiOperation({
+    summary: 'Get unread notifications count (Student or Professor)',
+  })
   @ApiResponse({
     status: 200,
     description: 'Unread count retrieved successfully',
   })
   async getUnreadCount(@User() user: JWTUserPayload) {
-    return this.notificationsService.getUnreadCount(user);
+    const recipientType =
+      user.role.name === RoleEnum.STUDENT
+        ? RecipientTypeEnum.STUDENT
+        : RecipientTypeEnum.PROFESSOR;
+
+    return this.notificationsService.getUnreadCount(user, recipientType);
   }
 
   @Patch(':id/read')
-  @Roles(RoleEnum.STUDENT)
-  @ApiOperation({ summary: 'Mark a notification as read' })
+  @Roles(RoleEnum.STUDENT, RoleEnum.PROFESSOR)
+  @ApiOperation({
+    summary: 'Mark a notification as read (Student or Professor)',
+  })
   @ApiParam({
     name: 'id',
     type: String,
@@ -89,14 +105,33 @@ export class NotificationsController {
     @Param('id', ParseObjectIdPipe) id: Types.ObjectId,
     @User() user: JWTUserPayload,
   ) {
-    return this.notificationsService.markNotificationAsRead(id, user);
+    const recipientType =
+      user.role.name === RoleEnum.STUDENT
+        ? RecipientTypeEnum.STUDENT
+        : RecipientTypeEnum.PROFESSOR;
+
+    return this.notificationsService.markNotificationAsRead(
+      id,
+      user,
+      recipientType,
+    );
   }
 
   @Patch('mark-all-read')
-  @Roles(RoleEnum.STUDENT)
-  @ApiOperation({ summary: 'Mark all notifications as read' })
+  @Roles(RoleEnum.STUDENT, RoleEnum.PROFESSOR)
+  @ApiOperation({
+    summary: 'Mark all notifications as read (Student or Professor)',
+  })
   @ApiResponse({ status: 200, description: 'All notifications marked as read' })
   async markAllNotificationsAsRead(@User() user: JWTUserPayload) {
-    return this.notificationsService.markAllNotificationsAsRead(user);
+    const recipientType =
+      user.role.name === RoleEnum.STUDENT
+        ? RecipientTypeEnum.STUDENT
+        : RecipientTypeEnum.PROFESSOR;
+
+    return this.notificationsService.markAllNotificationsAsRead(
+      user,
+      recipientType,
+    );
   }
 }

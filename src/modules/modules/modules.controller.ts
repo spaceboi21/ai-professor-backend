@@ -30,7 +30,12 @@ import { CreateModuleDto } from './dto/create-module.dto';
 import { UpdateModuleDto } from './dto/update-module.dto';
 import { ModuleFilterDto } from './dto/module-filter.dto';
 import { ToggleModuleVisibilityDto } from './dto/toggle-module-visibility.dto';
+import {
+  AssignProfessorDto,
+  UnassignProfessorDto,
+} from './dto/assign-professor.dto';
 import { ModulesService } from './modules.service';
+import { ModuleAssignmentService } from './module-assignment.service';
 import { PaginationDto } from 'src/common/dto/pagination.dto';
 import { DifficultyEnum } from 'src/common/constants/difficulty.constant';
 
@@ -39,7 +44,10 @@ import { DifficultyEnum } from 'src/common/constants/difficulty.constant';
 @Controller('modules')
 @UseGuards(JwtAuthGuard, RoleGuard)
 export class ModulesController {
-  constructor(private readonly modulesService: ModulesService) {}
+  constructor(
+    private readonly modulesService: ModulesService,
+    private readonly moduleAssignmentService: ModuleAssignmentService,
+  ) {}
 
   @Post()
   @Roles(RoleEnum.SUPER_ADMIN, RoleEnum.SCHOOL_ADMIN, RoleEnum.PROFESSOR)
@@ -73,6 +81,208 @@ export class ModulesController {
     @User() user: JWTUserPayload,
   ) {
     return this.modulesService.toggleModuleVisibility(publishModuleDto, user);
+  }
+
+  @Post('assign-professors')
+  @Roles(RoleEnum.SUPER_ADMIN, RoleEnum.SCHOOL_ADMIN)
+  @ApiOperation({ summary: 'Assign professors to a module' })
+  @ApiBody({ type: AssignProfessorDto })
+  @ApiResponse({ status: 200, description: 'Professors assigned successfully' })
+  @ApiResponse({ status: 404, description: 'Module or professor not found' })
+  async assignProfessorsToModule(
+    @Body() assignDto: AssignProfessorDto,
+    @User() user: JWTUserPayload,
+  ): Promise<any> {
+    return this.moduleAssignmentService.assignProfessorsToModule(
+      assignDto,
+      user,
+    );
+  }
+
+  @Post('unassign-professor')
+  @Roles(RoleEnum.SUPER_ADMIN, RoleEnum.SCHOOL_ADMIN)
+  @ApiOperation({ summary: 'Unassign a professor from a module' })
+  @ApiBody({ type: UnassignProfessorDto })
+  @ApiResponse({
+    status: 200,
+    description: 'Professor unassigned successfully',
+  })
+  @ApiResponse({ status: 404, description: 'Module or professor not found' })
+  async unassignProfessorFromModule(
+    @Body() unassignDto: UnassignProfessorDto,
+    @User() user: JWTUserPayload,
+  ) {
+    return this.moduleAssignmentService.unassignProfessorFromModule(
+      unassignDto,
+      user,
+    );
+  }
+
+  @Get(':id/assignments')
+  @Roles(RoleEnum.SUPER_ADMIN, RoleEnum.SCHOOL_ADMIN)
+  @ApiOperation({ summary: 'Get all professors assigned to a module' })
+  @ApiParam({
+    name: 'id',
+    type: String,
+    description: 'Module ID',
+    example: '507f1f77bcf86cd799439011',
+  })
+  @ApiQuery({
+    name: 'school_id',
+    required: false,
+    type: String,
+    description:
+      'School ID (required for super admin, optional for other roles)',
+    example: '507f1f77bcf86cd799439011',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Module assignments retrieved successfully',
+  })
+  @ApiResponse({ status: 404, description: 'Module not found' })
+  async getModuleAssignments(
+    @Param('id', ParseObjectIdPipe) id: Types.ObjectId,
+    @User() user: JWTUserPayload,
+    @Query('school_id') school_id?: string,
+  ) {
+    return this.moduleAssignmentService.getModuleAssignments(
+      id,
+      user,
+      school_id,
+    );
+  }
+
+  @Get('assignments/audit-logs')
+  @Roles(RoleEnum.SUPER_ADMIN, RoleEnum.SCHOOL_ADMIN)
+  @ApiOperation({
+    summary: 'Get assignment audit logs for admin accountability',
+  })
+  @ApiQuery({
+    name: 'module_id',
+    required: false,
+    type: String,
+    description: 'Filter by module ID',
+    example: '507f1f77bcf86cd799439011',
+  })
+  @ApiQuery({
+    name: 'professor_id',
+    required: false,
+    type: String,
+    description: 'Filter by professor ID',
+    example: '507f1f77bcf86cd799439011',
+  })
+  @ApiQuery({
+    name: 'school_id',
+    required: false,
+    type: String,
+    description:
+      'School ID (required for super admin, optional for other roles)',
+    example: '507f1f77bcf86cd799439011',
+  })
+  @ApiQuery({ name: 'page', required: false, type: Number })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  @ApiResponse({
+    status: 200,
+    description: 'Audit logs retrieved successfully',
+  })
+  async getAssignmentAuditLogs(
+    @User() user: JWTUserPayload,
+    @Query('module_id') moduleId?: string,
+    @Query('professor_id') professorId?: string,
+    @Query() paginationDto?: PaginationDto,
+    @Query('school_id') school_id?: string,
+  ) {
+    const moduleObjectId = moduleId ? new Types.ObjectId(moduleId) : undefined;
+    const professorObjectId = professorId
+      ? new Types.ObjectId(professorId)
+      : undefined;
+
+    return this.moduleAssignmentService.getAssignmentAuditLogs(
+      user,
+      moduleObjectId,
+      professorObjectId,
+      paginationDto,
+      school_id,
+    );
+  }
+
+  @Get('assignments/professor/:professorId')
+  @Roles(RoleEnum.SUPER_ADMIN, RoleEnum.SCHOOL_ADMIN)
+  @ApiOperation({ summary: 'Get all modules assigned to a professor' })
+  @ApiParam({
+    name: 'professorId',
+    type: String,
+    description: 'Professor ID',
+    example: '507f1f77bcf86cd799439011',
+  })
+  @ApiQuery({
+    name: 'school_id',
+    required: false,
+    type: String,
+    description:
+      'School ID (required for super admin, optional for other roles)',
+    example: '507f1f77bcf86cd799439011',
+  })
+  @ApiQuery({ name: 'page', required: false, type: Number })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  @ApiResponse({
+    status: 200,
+    description: 'Professor assignments retrieved successfully',
+  })
+  @ApiResponse({ status: 404, description: 'Professor not found' })
+  async getProfessorAssignments(
+    @Param('professorId', ParseObjectIdPipe) professorId: Types.ObjectId,
+    @User() user: JWTUserPayload,
+    @Query() paginationDto?: PaginationDto,
+    @Query('school_id') school_id?: string,
+  ) {
+    return this.moduleAssignmentService.getProfessorAssignments(
+      professorId,
+      user,
+      paginationDto,
+      school_id,
+    );
+  }
+
+  @Get('assignments/check-access/:professorId/:moduleId')
+  @Roles(RoleEnum.SUPER_ADMIN, RoleEnum.SCHOOL_ADMIN)
+  @ApiOperation({ summary: 'Check if a professor has access to a module' })
+  @ApiParam({
+    name: 'professorId',
+    type: String,
+    description: 'Professor ID',
+    example: '507f1f77bcf86cd799439011',
+  })
+  @ApiParam({
+    name: 'moduleId',
+    type: String,
+    description: 'Module ID',
+    example: '507f1f77bcf86cd799439011',
+  })
+  @ApiQuery({
+    name: 'school_id',
+    required: false,
+    type: String,
+    description:
+      'School ID (required for super admin, optional for other roles)',
+    example: '507f1f77bcf86cd799439011',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Access check completed successfully',
+  })
+  async checkProfessorModuleAccess(
+    @Param('professorId', ParseObjectIdPipe) professorId: Types.ObjectId,
+    @Param('moduleId', ParseObjectIdPipe) moduleId: Types.ObjectId,
+    @User() user: JWTUserPayload,
+    @Query('school_id') school_id?: string,
+  ) {
+    return this.moduleAssignmentService.checkProfessorModuleAccess(
+      professorId,
+      moduleId,
+      user,
+      school_id,
+    );
   }
 
   @Get()

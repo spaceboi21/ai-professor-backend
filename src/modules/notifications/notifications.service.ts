@@ -15,6 +15,7 @@ import {
 import {
   Notification,
   NotificationSchema,
+  RecipientTypeEnum,
 } from 'src/database/schemas/tenant/notification.schema';
 import {
   NotificationTypeEnum,
@@ -41,19 +42,68 @@ export class NotificationsService {
   ) {}
 
   async createNotification(
-    studentId: Types.ObjectId,
+    recipientId: Types.ObjectId,
+    recipientType: RecipientTypeEnum,
     title: string,
     message: string,
     type: NotificationTypeEnum,
     metadata: Record<string, any> = {},
+    schoolId?: Types.ObjectId,
   ) {
-    this.logger.log(`Creating notification for student: ${studentId}`);
-
-    // For individual notifications, we need to get the student's school
-    // This method should be used with proper student context
-    throw new BadRequestException(
-      'Individual notification creation requires student context',
+    this.logger.log(
+      `Creating notification for ${recipientType}: ${recipientId}`,
     );
+
+    if (!schoolId) {
+      throw new BadRequestException(
+        'School ID is required for notification creation',
+      );
+    }
+
+    // Validate school exists
+    const school = await this.schoolModel.findById(schoolId);
+    if (!school) {
+      throw new NotFoundException('School not found');
+    }
+
+    // Get tenant connection for the school
+    const tenantConnection =
+      await this.tenantConnectionService.getTenantConnection(school.db_name);
+    const NotificationModel = tenantConnection.model(
+      Notification.name,
+      NotificationSchema,
+    );
+
+    try {
+      const notification = new NotificationModel({
+        recipient_type: recipientType,
+        recipient_id: recipientId,
+        title,
+        message,
+        type,
+        metadata,
+        status: NotificationStatusEnum.UNREAD,
+        created_at: new Date(),
+        updated_at: new Date(),
+      });
+
+      await notification.save();
+
+      this.logger.log(
+        `Notification created successfully for ${recipientType}: ${recipientId}`,
+      );
+
+      return {
+        message: 'Notification created successfully',
+        data: notification,
+      };
+    } catch (error) {
+      this.logger.error(
+        `Error creating notification for ${recipientType} ${recipientId}:`,
+        error?.stack || error,
+      );
+      throw new BadRequestException('Failed to create notification');
+    }
   }
 
   async createModulePublishedNotification(
@@ -114,7 +164,8 @@ export class NotificationsService {
 
       // Prepare bulk notification documents
       const notificationDocuments = students.map((student) => ({
-        student_id: new Types.ObjectId(student._id),
+        recipient_type: RecipientTypeEnum.STUDENT,
+        recipient_id: new Types.ObjectId(student._id),
         title,
         message,
         type: NotificationTypeEnum.MODULE_PUBLISHED,
@@ -207,7 +258,8 @@ export class NotificationsService {
 
       // Prepare bulk notification documents
       const notificationDocuments = students.map((student) => ({
-        student_id: student._id,
+        recipient_type: RecipientTypeEnum.STUDENT,
+        recipient_id: student._id,
         title,
         message,
         type: NotificationTypeEnum.MODULE_UNPUBLISHED,
@@ -242,11 +294,12 @@ export class NotificationsService {
     }
   }
 
-  async getStudentNotifications(
+  async getNotifications(
     user: JWTUserPayload,
+    recipientType: RecipientTypeEnum,
     paginationDto?: PaginationDto,
   ) {
-    this.logger.log(`Getting notifications for student: ${user.id}`);
+    this.logger.log(`Getting notifications for ${recipientType}: ${user.id}`);
 
     // Validate school exists
     const school = await this.schoolModel.findById(user.school_id);
@@ -266,7 +319,8 @@ export class NotificationsService {
       const paginationOptions = getPaginationOptions(paginationDto || {});
 
       const query = {
-        student_id: new Types.ObjectId(user.id),
+        recipient_type: recipientType,
+        recipient_id: new Types.ObjectId(user.id),
         deleted_at: null,
       };
 
@@ -301,6 +355,7 @@ export class NotificationsService {
   async markNotificationAsRead(
     notificationId: Types.ObjectId,
     user: JWTUserPayload,
+    recipientType: RecipientTypeEnum,
   ) {
     this.logger.log(`Marking notification as read: ${notificationId}`);
 
@@ -322,7 +377,8 @@ export class NotificationsService {
       const notification = await NotificationModel.findOneAndUpdate(
         {
           _id: notificationId,
-          student_id: new Types.ObjectId(user.id),
+          recipient_type: recipientType,
+          recipient_id: new Types.ObjectId(user.id),
           deleted_at: null,
         },
         {
@@ -352,9 +408,12 @@ export class NotificationsService {
     }
   }
 
-  async markAllNotificationsAsRead(user: JWTUserPayload) {
+  async markAllNotificationsAsRead(
+    user: JWTUserPayload,
+    recipientType: RecipientTypeEnum,
+  ) {
     this.logger.log(
-      `Marking all notifications as read for student: ${user.id}`,
+      `Marking all notifications as read for ${recipientType}: ${user.id}`,
     );
 
     // Validate school exists
@@ -374,7 +433,8 @@ export class NotificationsService {
     try {
       const result = await NotificationModel.updateMany(
         {
-          student_id: new Types.ObjectId(user.id),
+          recipient_type: recipientType,
+          recipient_id: new Types.ObjectId(user.id),
           status: NotificationStatusEnum.UNREAD,
           deleted_at: null,
         },
@@ -399,8 +459,8 @@ export class NotificationsService {
     }
   }
 
-  async getUnreadCount(user: JWTUserPayload) {
-    this.logger.log(`Getting unread count for student: ${user.id}`);
+  async getUnreadCount(user: JWTUserPayload, recipientType: RecipientTypeEnum) {
+    this.logger.log(`Getting unread count for ${recipientType}: ${user.id}`);
 
     // Validate school exists
     const school = await this.schoolModel.findById(user.school_id);
@@ -418,7 +478,8 @@ export class NotificationsService {
 
     try {
       const count = await NotificationModel.countDocuments({
-        student_id: new Types.ObjectId(user.id),
+        recipient_type: recipientType,
+        recipient_id: new Types.ObjectId(user.id),
         status: NotificationStatusEnum.UNREAD,
         deleted_at: null,
       });

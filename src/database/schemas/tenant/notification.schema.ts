@@ -1,10 +1,15 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, Types } from 'mongoose';
-import { Student } from './student.schema';
+
 import {
   NotificationTypeEnum,
   NotificationStatusEnum,
 } from 'src/common/constants/notification.constant';
+
+export enum RecipientTypeEnum {
+  STUDENT = 'STUDENT',
+  PROFESSOR = 'PROFESSOR',
+}
 
 @Schema({
   collection: 'notifications',
@@ -17,23 +22,31 @@ export class Notification extends Document {
   declare _id: Types.ObjectId;
 
   @Prop({
-    type: Types.ObjectId,
-    ref: Student.name,
+    type: String,
+    enum: RecipientTypeEnum,
     required: true,
     index: true,
   })
-  student_id: Types.ObjectId;
+  recipient_type: RecipientTypeEnum;
 
-  @Prop({ required: true })
+  @Prop({
+    type: Types.ObjectId,
+    required: true,
+    index: true,
+  })
+  recipient_id: Types.ObjectId;
+
+  @Prop({ type: String, required: true })
   title: string;
 
-  @Prop({ required: true })
+  @Prop({ type: String, required: true })
   message: string;
 
-  @Prop({ required: true, enum: NotificationTypeEnum })
+  @Prop({ type: String, required: true, enum: NotificationTypeEnum })
   type: NotificationTypeEnum;
 
   @Prop({
+    type: String,
     enum: NotificationStatusEnum,
     default: NotificationStatusEnum.UNREAD,
   })
@@ -55,6 +68,10 @@ export class Notification extends Document {
 export const NotificationSchema = SchemaFactory.createForClass(Notification);
 
 // Create indexes for better query performance
-NotificationSchema.index({ student_id: 1, status: 1 });
-NotificationSchema.index({ student_id: 1, created_at: -1 });
+NotificationSchema.index({ recipient_type: 1, recipient_id: 1, status: 1 });
+NotificationSchema.index({
+  recipient_type: 1,
+  recipient_id: 1,
+  created_at: -1,
+});
 NotificationSchema.index({ type: 1 });

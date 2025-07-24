@@ -25,6 +25,7 @@ import {
 } from './dto/update-professor.dto';
 import { StatusEnum } from 'src/common/constants/status.constant';
 import { PaginationDto } from 'src/common/dto/pagination.dto';
+import { ModuleAssignmentService } from '../modules/module-assignment.service';
 
 @Injectable()
 export class ProfessorService {
@@ -38,6 +39,7 @@ export class ProfessorService {
     private readonly globalStudentModel: Model<GlobalStudent>,
     private readonly bcryptUtil: BcryptUtil,
     private readonly mailService: MailService,
+    private readonly moduleAssignmentService: ModuleAssignmentService,
   ) {}
 
   async createProfessor(
@@ -476,5 +478,29 @@ export class ProfessorService {
         role: deletedProfessor.role,
       },
     };
+  }
+
+  async getProfessorAssignments(
+    professorId: Types.ObjectId,
+    user: JWTUserPayload,
+    paginationDto?: PaginationDto,
+  ) {
+    return this.moduleAssignmentService.getProfessorAssignments(
+      professorId,
+      user,
+      paginationDto,
+    );
+  }
+
+  async checkProfessorModuleAccess(
+    professorId: Types.ObjectId,
+    moduleId: Types.ObjectId,
+    user: JWTUserPayload,
+  ) {
+    return this.moduleAssignmentService.checkProfessorModuleAccess(
+      professorId,
+      moduleId,
+      user,
+    );
   }
 }

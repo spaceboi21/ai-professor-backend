@@ -18,6 +18,7 @@ import {
 import { UtilsModule } from 'src/common/utils';
 import { DatabaseModule } from 'src/database/database.module';
 import { MailModule } from 'src/mail/mail.module';
+import { ModulesModule } from '../modules/modules.module';
 
 @Module({
   imports: [
@@ -28,6 +29,7 @@ import { MailModule } from 'src/mail/mail.module';
     ]),
     UtilsModule,
     MailModule,
+    ModulesModule,
   ],
   controllers: [ProfessorController],
   providers: [ProfessorService],

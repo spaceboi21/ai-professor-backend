@@ -1,0 +1,6594 @@
+{
+  "openapi": "3.0.0",
+  "paths": {
+    "/api": {
+      "get": {
+        "operationId": "AppController_getHello",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": ["Health"]
+      }
+    },
+    "/api/health": {
+      "get": {
+        "operationId": "AppController_getHealth",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "API is healthy"
+          }
+        },
+        "summary": "Health check endpoint",
+        "tags": ["Health"]
+      }
+    },
+    "/api/auth/super-admin/login": {
+      "post": {
+        "operationId": "AuthController_superAdminLogin",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginSuperAdminDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Login successful"
+          },
+          "400": {
+            "description": "Invalid email or password"
+          }
+        },
+        "summary": "Super Admin Login",
+        "tags": ["Auth"]
+      }
+    },
+    "/api/auth/school-admin/login": {
+      "post": {
+        "operationId": "AuthController_loginSchoolAdmin",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginSchoolAdminDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Login successful"
+          },
+          "400": {
+            "description": "Invalid email or password"
+          }
+        },
+        "summary": "School Admin or Professor Login",
+        "tags": ["Auth"]
+      }
+    },
+    "/api/auth/student/login": {
+      "post": {
+        "operationId": "AuthController_loginStudent",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginStudentDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Login successful"
+          },
+          "400": {
+            "description": "Invalid email or password"
+          }
+        },
+        "summary": "Student Login",
+        "tags": ["Auth"]
+      }
+    },
+    "/api/auth/me": {
+      "get": {
+        "operationId": "AuthController_getMe",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "User info"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get current user info",
+        "tags": ["Auth"]
+      }
+    },
+    "/api/auth/forgot-password": {
+      "post": {
+        "operationId": "AuthController_forgotPassword",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ForgotPasswordDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Password reset link sent successfully"
+          },
+          "400": {
+            "description": "Account is deactivated"
+          },
+          "404": {
+            "description": "User not found with this email"
+          }
+        },
+        "summary": "Request password reset for school admin or professor or student",
+        "tags": ["Auth"]
+      }
+    },
+    "/api/auth/set-new-password": {
+      "post": {
+        "operationId": "AuthController_setNewPassword",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetNewPasswordDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Password updated successfully"
+          },
+          "400": {
+            "description": "Invalid or expired token"
+          },
+          "404": {
+            "description": "User not found"
+          }
+        },
+        "summary": "Set new password using reset token",
+        "tags": ["Auth"]
+      }
+    },
+    "/api/queue/mail/stats": {
+      "get": {
+        "operationId": "QueueController_getMailQueueStats",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Mail queue statistics retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "waiting": {
+                      "type": "number"
+                    },
+                    "active": {
+                      "type": "number"
+                    },
+                    "completed": {
+                      "type": "number"
+                    },
+                    "failed": {
+                      "type": "number"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get mail queue statistics",
+        "tags": ["Queue"]
+      }
+    },
+    "/api/students": {
+      "post": {
+        "operationId": "StudentController_createStudent",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateStudentDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Student created successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudentResponseDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Email already exists"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Create a new student",
+        "tags": ["Student"]
+      },
+      "get": {
+        "operationId": "StudentController_getAllStudents",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "Page number (starts from 1)",
+            "schema": {
+              "default": 1,
+              "example": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "Number of items per page",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 10,
+              "example": 10,
+              "type": "number"
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": ["ACTIVE", "INACTIVE"],
+              "type": "string"
+            }
+          },
+          {
+            "name": "school_id",
+            "required": false,
+            "in": "query",
+            "description": "School ID (required for SUPER_ADMIN, optional for SCHOOL_ADMIN)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sortBy",
+            "required": false,
+            "in": "query",
+            "description": "Field to sort by (name = first_name + last_name)",
+            "schema": {
+              "enum": ["name", "email", "created_at", "updated_at"],
+              "type": "string"
+            }
+          },
+          {
+            "name": "sortOrder",
+            "required": false,
+            "in": "query",
+            "description": "Sort order (asc or desc)",
+            "schema": {
+              "enum": ["asc", "desc"],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Students retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudentListResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get all students",
+        "tags": ["Student"]
+      }
+    },
+    "/api/students/bulk": {
+      "post": {
+        "operationId": "StudentController_bulkCreateStudents",
+        "parameters": [
+          {
+            "name": "school_id",
+            "required": false,
+            "in": "query",
+            "description": "School ID (required for SUPER_ADMIN, ignored for SCHOOL_ADMIN who use their own school)",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": "CSV file containing student data (first_name, last_name, email). School ID is determined by user role and parameters."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Bulk student creation completed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BulkCreateStudentResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid CSV format or data"
+          },
+          "409": {
+            "description": "Some emails already exist"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Bulk create students from CSV file",
+        "tags": ["Student"]
+      }
+    },
+    "/api/students/{id}": {
+      "get": {
+        "operationId": "StudentController_getStudentById",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Student ID",
+            "schema": {
+              "example": "507f1f77bcf86cd799439011",
+              "type": "string"
+            }
+          },
+          {
+            "name": "school_id",
+            "required": false,
+            "in": "query",
+            "description": "School ID (required for SUPER_ADMIN, optional for SCHOOL_ADMIN)",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Student retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudentResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Student not found"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get student by ID",
+        "tags": ["Student"]
+      },
+      "patch": {
+        "operationId": "StudentController_updateStudent",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Student ID",
+            "schema": {
+              "example": "507f1f77bcf86cd799439011",
+              "type": "string"
+            }
+          },
+          {
+            "name": "school_id",
+            "required": false,
+            "in": "query",
+            "description": "School ID (required for SUPER_ADMIN, optional for SCHOOL_ADMIN)",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateStudentDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Student updated successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudentResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Student not found"
+          },
+          "409": {
+            "description": "Email already exists"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Update student details (including status)",
+        "tags": ["Student"]
+      },
+      "delete": {
+        "operationId": "StudentController_deleteStudent",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Student ID",
+            "schema": {
+              "example": "507f1f77bcf86cd799439011",
+              "type": "string"
+            }
+          },
+          {
+            "name": "school_id",
+            "required": false,
+            "in": "query",
+            "description": "School ID (required for SUPER_ADMIN, optional for SCHOOL_ADMIN)",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Student deleted successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudentResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Student not found"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Delete student (soft delete)",
+        "tags": ["Student"]
+      }
+    },
+    "/api/students/{id}/status": {
+      "patch": {
+        "operationId": "StudentController_updateStudentStatus",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Student ID",
+            "schema": {
+              "example": "507f1f77bcf86cd799439011",
+              "type": "string"
+            }
+          },
+          {
+            "name": "school_id",
+            "required": false,
+            "in": "query",
+            "description": "School ID (required for SUPER_ADMIN, optional for SCHOOL_ADMIN)",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateStatusDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Student status updated successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudentResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Student not found"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Update student status",
+        "tags": ["Student"]
+      }
+    },
+    "/api/students/reset-password": {
+      "post": {
+        "operationId": "StudentController_resetPassword",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResetStudentPasswordDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Password updated successfully"
+          },
+          "400": {
+            "description": "Invalid old password"
+          },
+          "404": {
+            "description": "Student not found"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Reset password for authenticated student",
+        "tags": ["Student"]
+      }
+    },
+    "/api/upload/profile-url": {
+      "post": {
+        "description": "Returns a temporary upload URL that expires in 5 minutes. File size limit: 5MB.",
+        "operationId": "UploadController_getProfileUploadUrl",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GetFileUploadUrl"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Upload URL generated successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "uploadUrl": {
+                      "type": "string",
+                      "description": "Presigned upload URL"
+                    },
+                    "fileUrl": {
+                      "type": "string",
+                      "description": "Final file URL after upload"
+                    },
+                    "expiresIn": {
+                      "type": "number",
+                      "description": "URL expiry time in seconds"
+                    },
+                    "maxSize": {
+                      "type": "number",
+                      "description": "Maximum file size in bytes"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid file type or missing parameters"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Generate a secure presigned upload URL for profile pictures",
+        "tags": ["Upload"]
+      }
+    },
+    "/api/upload/bibliography-url": {
+      "post": {
+        "description": "Returns a temporary upload URL that expires in 10 minutes. File size limit: 100MB. Supports PDF, video files (MP4, AVI, MOV, WMV, FLV, WebM), and PowerPoint files (PPT, PPTX).",
+        "operationId": "UploadController_getBibliographyUploadUrl",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GetBibliographyUploadUrl"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Upload URL generated successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "uploadUrl": {
+                      "type": "string",
+                      "description": "Presigned upload URL"
+                    },
+                    "fileUrl": {
+                      "type": "string",
+                      "description": "Final file URL after upload"
+                    },
+                    "expiresIn": {
+                      "type": "number",
+                      "description": "URL expiry time in seconds"
+                    },
+                    "maxSize": {
+                      "type": "number",
+                      "description": "Maximum file size in bytes"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid file type or missing parameters"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Generate a secure presigned upload URL for bibliography files (PDF/Video/PowerPoint)",
+        "tags": ["Upload"]
+      }
+    },
+    "/api/upload/thumbnail-url": {
+      "post": {
+        "description": "Returns a temporary upload URL that expires in 5 minutes. File size limit: 5MB.",
+        "operationId": "UploadController_getThumbnailUploadUrl",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GetThumbnailUploadUrl"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Upload URL generated successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "uploadUrl": {
+                      "type": "string",
+                      "description": "Presigned upload URL"
+                    },
+                    "fileUrl": {
+                      "type": "string",
+                      "description": "Final file URL after upload"
+                    },
+                    "expiresIn": {
+                      "type": "number",
+                      "description": "URL expiry time in seconds"
+                    },
+                    "maxSize": {
+                      "type": "number",
+                      "description": "Maximum file size in bytes"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid file type or missing parameters"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Generate a secure presigned upload URL for thumbnail images",
+        "tags": ["Upload"]
+      }
+    },
+    "/api/upload/validate-file": {
+      "get": {
+        "description": "Verify that an uploaded file exists and is valid",
+        "operationId": "UploadController_validateUploadedFile",
+        "parameters": [
+          {
+            "name": "fileUrl",
+            "required": true,
+            "in": "query",
+            "description": "The file URL to validate",
+            "schema": {
+              "example": "https://bucket.s3.amazonaws.com/profile-pics/123-uuid-filename.jpg",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "File is valid"
+          },
+          "404": {
+            "description": "File not found or invalid"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Validate an uploaded file",
+        "tags": ["Upload"]
+      }
+    },
+    "/api/upload/bibliography": {
+      "put": {
+        "description": "Send raw file buffer (e.g., PDF, MP4, PPT, PPTX) in the request body with the appropriate Content-Type header. Must use Postman, curl, or frontend — Swagger UI doesn't support raw binary upload.",
+        "operationId": "UploadController_uploadBibliographyFileBuffer",
+        "parameters": [
+          {
+            "name": "filename",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "File uploaded successfully"
+          },
+          "400": {
+            "description": "Invalid file"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Upload file via PUT with raw binary body",
+        "tags": ["Upload"]
+      }
+    },
+    "/api/upload/profile": {
+      "put": {
+        "description": "Send raw file buffer (e.g., PDF, MP4, JPEG) in the request body with the appropriate Content-Type header. Must use Postman, curl, or frontend — Swagger UI doesn't support raw binary upload.",
+        "operationId": "UploadController_uploadProfilePicture",
+        "parameters": [
+          {
+            "name": "filename",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "File uploaded successfully"
+          },
+          "400": {
+            "description": "Invalid file"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Upload file via PUT with raw binary body",
+        "tags": ["Upload"]
+      }
+    },
+    "/api/upload/thumbnail": {
+      "put": {
+        "description": "Send raw image buffer (JPEG, PNG, WebP) in the request body with the appropriate Content-Type header. Must use Postman, curl, or frontend — Swagger UI doesn't support raw binary upload.",
+        "operationId": "UploadController_uploadThumbnail",
+        "parameters": [
+          {
+            "name": "filename",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Thumbnail uploaded successfully"
+          },
+          "400": {
+            "description": "Invalid file"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Upload thumbnail via PUT with raw binary body",
+        "tags": ["Upload"]
+      }
+    },
+    "/api/modules": {
+      "post": {
+        "operationId": "ModulesController_createModule",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateModuleDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Module created successfully"
+          },
+          "400": {
+            "description": "Bad request"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Create a new module",
+        "tags": ["Modules"]
+      },
+      "get": {
+        "operationId": "ModulesController_findAllModules",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "Page number (default: 1)",
+            "schema": {
+              "default": 1,
+              "example": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "Number of items per page (default: 10, max: 100)",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 10,
+              "example": 10,
+              "type": "number"
+            }
+          },
+          {
+            "name": "text",
+            "required": false,
+            "in": "query",
+            "description": "Search text in title and description (case-insensitive)",
+            "schema": {
+              "example": "psychology",
+              "type": "string"
+            }
+          },
+          {
+            "name": "difficulty",
+            "required": false,
+            "in": "query",
+            "description": "Filter by difficulty level",
+            "schema": {
+              "enum": ["BEGINNER", "INTERMEDIATE", "ADVANCED"],
+              "type": "string"
+            }
+          },
+          {
+            "name": "published",
+            "required": false,
+            "in": "query",
+            "description": "Filter by published status (only available for non-student users)",
+            "schema": {
+              "example": true,
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "progress_status",
+            "required": false,
+            "in": "query",
+            "description": "Filter by progress status (only available for students). Use ALL to show all modules regardless of progress status.",
+            "schema": {
+              "example": "IN_PROGRESS",
+              "type": "string",
+              "enum": ["NOT_STARTED", "IN_PROGRESS", "COMPLETED", "ALL"]
+            }
+          },
+          {
+            "name": "sortBy",
+            "required": false,
+            "in": "query",
+            "description": "Sort by field. progress_status is only available for students (ASC: IN_PROGRESS → NOT_STARTED → COMPLETED, DESC: COMPLETED → NOT_STARTED → IN_PROGRESS)",
+            "schema": {
+              "enum": [
+                "title",
+                "difficulty",
+                "duration",
+                "created_at",
+                "progress_status"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "sortOrder",
+            "required": false,
+            "in": "query",
+            "description": "Sort order",
+            "schema": {
+              "enum": ["asc", "desc"],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Modules retrieved successfully"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get all modules with filtering and sorting",
+        "tags": ["Modules"]
+      }
+    },
+    "/api/modules/toggle-visibility": {
+      "post": {
+        "operationId": "ModulesController_toggleModuleVisibility",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ToggleModuleVisibilityDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Module visibility toggled successfully"
+          },
+          "400": {
+            "description": "Bad request - Module must have at least one chapter and one quiz group to be published"
+          },
+          "404": {
+            "description": "Module not found"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Toggle module visibility (publish/unpublish)",
+        "tags": ["Modules"]
+      }
+    },
+    "/api/modules/assign-professors": {
+      "post": {
+        "operationId": "ModulesController_assignProfessorsToModule",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssignProfessorDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Professors assigned successfully"
+          },
+          "404": {
+            "description": "Module or professor not found"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Assign professors to a module",
+        "tags": ["Modules"]
+      }
+    },
+    "/api/modules/unassign-professor": {
+      "post": {
+        "operationId": "ModulesController_unassignProfessorFromModule",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UnassignProfessorDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Professor unassigned successfully"
+          },
+          "404": {
+            "description": "Module or professor not found"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Unassign a professor from a module",
+        "tags": ["Modules"]
+      }
+    },
+    "/api/modules/{id}/assignments": {
+      "get": {
+        "operationId": "ModulesController_getModuleAssignments",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Module ID",
+            "schema": {
+              "example": "507f1f77bcf86cd799439011",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Module assignments retrieved successfully"
+          },
+          "404": {
+            "description": "Module not found"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get all professors assigned to a module",
+        "tags": ["Modules"]
+      }
+    },
+    "/api/modules/assignments/audit-logs": {
+      "get": {
+        "operationId": "ModulesController_getAssignmentAuditLogs",
+        "parameters": [
+          {
+            "name": "module_id",
+            "required": false,
+            "in": "query",
+            "description": "Filter by module ID",
+            "schema": {
+              "example": "507f1f77bcf86cd799439011",
+              "type": "string"
+            }
+          },
+          {
+            "name": "professor_id",
+            "required": false,
+            "in": "query",
+            "description": "Filter by professor ID",
+            "schema": {
+              "example": "507f1f77bcf86cd799439011",
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "Page number (starts from 1)",
+            "schema": {
+              "default": 1,
+              "example": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "Number of items per page",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 10,
+              "example": 10,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Audit logs retrieved successfully"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get assignment audit logs for admin accountability",
+        "tags": ["Modules"]
+      }
+    },
+    "/api/modules/{id}": {
+      "get": {
+        "operationId": "ModulesController_findModuleById",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Module ID",
+            "schema": {
+              "example": "507f1f77bcf86cd799439011",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Module retrieved successfully"
+          },
+          "404": {
+            "description": "Module not found"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get a module by id",
+        "tags": ["Modules"]
+      },
+      "patch": {
+        "operationId": "ModulesController_updateModule",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Module ID",
+            "schema": {
+              "example": "507f1f77bcf86cd799439011",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateModuleDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Module updated successfully"
+          },
+          "404": {
+            "description": "Module not found"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Update a module",
+        "tags": ["Modules"]
+      },
+      "delete": {
+        "operationId": "ModulesController_removeModule",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Module ID",
+            "schema": {
+              "example": "507f1f77bcf86cd799439011",
+              "type": "string"
+            }
+          },
+          {
+            "name": "school_id",
+            "required": false,
+            "in": "query",
+            "description": "School ID (required for super admin, optional for other roles)",
+            "schema": {
+              "example": "507f1f77bcf86cd799439011",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Module deleted successfully"
+          },
+          "404": {
+            "description": "Module not found"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Delete a module",
+        "tags": ["Modules"]
+      }
+    },
+    "/api/notifications": {
+      "get": {
+        "operationId": "NotificationsController_getNotifications",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "Page number (default: 1)",
+            "schema": {
+              "default": 1,
+              "example": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "Number of items per page (default: 10, max: 100)",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 10,
+              "example": 10,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Notifications retrieved successfully"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get user notifications (Student or Professor)",
+        "tags": ["Notifications"]
+      }
+    },
+    "/api/notifications/unread-count": {
+      "get": {
+        "operationId": "NotificationsController_getUnreadCount",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Unread count retrieved successfully"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get unread notifications count (Student or Professor)",
+        "tags": ["Notifications"]
+      }
+    },
+    "/api/notifications/{id}/read": {
+      "patch": {
+        "operationId": "NotificationsController_markNotificationAsRead",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Notification ID",
+            "schema": {
+              "example": "507f1f77bcf86cd799439011",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Notification marked as read"
+          },
+          "404": {
+            "description": "Notification not found"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Mark a notification as read (Student or Professor)",
+        "tags": ["Notifications"]
+      }
+    },
+    "/api/notifications/mark-all-read": {
+      "patch": {
+        "operationId": "NotificationsController_markAllNotificationsAsRead",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "All notifications marked as read"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Mark all notifications as read (Student or Professor)",
+        "tags": ["Notifications"]
+      }
+    },
+    "/api/chapters": {
+      "post": {
+        "operationId": "ChaptersController_createChapter",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateChapterDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Chapter created successfully"
+          },
+          "400": {
+            "description": "Bad request"
+          },
+          "404": {
+            "description": "Module not found"
+          },
+          "409": {
+            "description": "Sequence conflict or duplicate chapter title"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Create a new chapter",
+        "tags": ["Chapters"]
+      },
+      "get": {
+        "operationId": "ChaptersController_findAllChapters",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "Page number (default: 1)",
+            "schema": {
+              "default": 1,
+              "example": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "Number of items per page (default: 10, max: 100)",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 10,
+              "example": 10,
+              "type": "number"
+            }
+          },
+          {
+            "name": "module_id",
+            "required": false,
+            "in": "query",
+            "description": "Optional filter by module ID",
+            "schema": {
+              "example": "507f1f77bcf86cd799439011",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Chapters retrieved successfully"
+          },
+          "400": {
+            "description": "Bad request"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get all chapters or chapters by module",
+        "tags": ["Chapters"]
+      }
+    },
+    "/api/chapters/{id}": {
+      "get": {
+        "operationId": "ChaptersController_findChapterById",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Chapter ID",
+            "schema": {
+              "example": "507f1f77bcf86cd799439011",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Chapter retrieved successfully"
+          },
+          "404": {
+            "description": "Chapter not found"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get a chapter by ID",
+        "tags": ["Chapters"]
+      },
+      "patch": {
+        "operationId": "ChaptersController_updateChapter",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Chapter ID",
+            "schema": {
+              "example": "507f1f77bcf86cd799439011",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateChapterDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Chapter updated successfully"
+          },
+          "404": {
+            "description": "Chapter not found"
+          },
+          "409": {
+            "description": "Sequence conflict or duplicate chapter title"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Update a chapter",
+        "tags": ["Chapters"]
+      },
+      "delete": {
+        "operationId": "ChaptersController_removeChapter",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Chapter ID",
+            "schema": {
+              "example": "507f1f77bcf86cd799439011",
+              "type": "string"
+            }
+          },
+          {
+            "name": "school_id",
+            "required": false,
+            "in": "query",
+            "description": "School ID (required for super admin, optional for other roles)",
+            "schema": {
+              "example": "507f1f77bcf86cd799439011",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Chapter deleted successfully"
+          },
+          "404": {
+            "description": "Chapter not found"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Delete a chapter",
+        "tags": ["Chapters"]
+      }
+    },
+    "/api/chapters/reorder": {
+      "post": {
+        "operationId": "ChaptersController_reorderChapters",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReorderChaptersDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Chapters reordered successfully"
+          },
+          "400": {
+            "description": "Bad request"
+          },
+          "404": {
+            "description": "One or more chapters not found"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Reorder chapters",
+        "tags": ["Chapters"]
+      }
+    },
+    "/api/progress/modules/start": {
+      "post": {
+        "operationId": "ProgressController_startModule",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StartModuleDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Module started successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": {
+                    "message": "Module started successfully",
+                    "data": {
+                      "progress_id": "507f1f77bcf86cd799439011",
+                      "module_id": "507f1f77bcf86cd799439012",
+                      "status": "IN_PROGRESS",
+                      "progress_percentage": 0,
+                      "chapters_completed": 0,
+                      "total_chapters": 5,
+                      "started_at": "2024-01-15T10:00:00.000Z"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request"
+          },
+          "403": {
+            "description": "Only students can start modules"
+          },
+          "404": {
+            "description": "Module not found"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Start a module (Student)",
+        "tags": ["Progress Tracking"]
+      }
+    },
+    "/api/progress/chapters/start": {
+      "post": {
+        "operationId": "ProgressController_startChapter",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StartChapterDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Chapter started successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": {
+                    "message": "Chapter started successfully",
+                    "data": {
+                      "progress_id": "507f1f77bcf86cd799439011",
+                      "chapter_id": "507f1f77bcf86cd799439012",
+                      "module_id": "507f1f77bcf86cd799439013",
+                      "status": "IN_PROGRESS",
+                      "chapter_sequence": 1,
+                      "started_at": "2024-01-15T10:00:00.000Z"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request"
+          },
+          "403": {
+            "description": "Access denied - previous chapter quiz not completed"
+          },
+          "404": {
+            "description": "Chapter not found"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Start a chapter (Student)",
+        "tags": ["Progress Tracking"]
+      }
+    },
+    "/api/progress/chapters/complete": {
+      "post": {
+        "operationId": "ProgressController_markChapterComplete",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MarkChapterCompleteDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Chapter marked as complete successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": {
+                    "message": "Chapter marked as complete successfully",
+                    "data": {
+                      "chapter_id": "507f1f77bcf86cd799439011",
+                      "module_id": "507f1f77bcf86cd799439012",
+                      "status": "COMPLETED",
+                      "completed_at": "2024-01-15T10:00:00.000Z",
+                      "chapter_quiz_completed": false
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request"
+          },
+          "403": {
+            "description": "Only students can mark chapters as complete"
+          },
+          "404": {
+            "description": "Chapter not found"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Mark chapter as complete (Student)",
+        "tags": ["Progress Tracking"]
+      }
+    },
+    "/api/progress/quiz/start": {
+      "post": {
+        "operationId": "ProgressController_startQuizAttempt",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StartQuizAttemptDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Quiz attempt started successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": {
+                    "message": "Quiz attempt started successfully",
+                    "data": {
+                      "attempt_id": "507f1f77bcf86cd799439011",
+                      "quiz_group_id": "507f1f77bcf86cd799439012",
+                      "status": "IN_PROGRESS",
+                      "started_at": "2024-01-15T10:00:00.000Z",
+                      "total_questions": 10,
+                      "attempt_number": 1
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request"
+          },
+          "403": {
+            "description": "Access denied - prerequisites not met"
+          },
+          "404": {
+            "description": "Quiz group not found"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Start a quiz attempt (Student)",
+        "tags": ["Progress Tracking"]
+      }
+    },
+    "/api/progress/quiz/submit": {
+      "post": {
+        "operationId": "ProgressController_submitQuizAnswers",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SubmitQuizAnswersDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Quiz answers submitted successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": {
+                    "message": "Quiz answers submitted successfully",
+                    "data": {
+                      "attempt_id": "507f1f77bcf86cd799439011",
+                      "score_percentage": 85,
+                      "correct_answers": 17,
+                      "total_questions": 20,
+                      "is_passed": true,
+                      "time_taken_seconds": 25,
+                      "status": "COMPLETED",
+                      "completed_at": "2024-01-15T10:25:00.000Z"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request"
+          },
+          "403": {
+            "description": "Only students can submit quiz answers"
+          },
+          "404": {
+            "description": "Quiz attempt not found"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Submit quiz answers (Student)",
+        "tags": ["Progress Tracking"]
+      }
+    },
+    "/api/progress/modules": {
+      "get": {
+        "operationId": "ProgressController_getStudentModuleProgress",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "Page number (default: 1)",
+            "schema": {
+              "default": 1,
+              "example": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "Number of items per page (default: 10, max: 100)",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 10,
+              "example": 10,
+              "type": "number"
+            }
+          },
+          {
+            "name": "module_id",
+            "required": false,
+            "in": "query",
+            "description": "Filter by module ID",
+            "schema": {
+              "example": "507f1f77bcf86cd799439011",
+              "type": "string"
+            }
+          },
+          {
+            "name": "chapter_id",
+            "required": false,
+            "in": "query",
+            "description": "Filter by chapter ID",
+            "schema": {
+              "$ref": "#/components/schemas/Object"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "description": "Filter by progress status",
+            "schema": {
+              "enum": ["NOT_STARTED", "IN_PROGRESS", "COMPLETED"],
+              "type": "string"
+            }
+          },
+          {
+            "name": "from_date",
+            "required": false,
+            "in": "query",
+            "description": "Filter from date (YYYY-MM-DD)",
+            "schema": {
+              "example": "2024-01-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "to_date",
+            "required": false,
+            "in": "query",
+            "description": "Filter to date (YYYY-MM-DD)",
+            "schema": {
+              "example": "2024-12-31",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Module progress retrieved successfully"
+          },
+          "403": {
+            "description": "Only students can view their progress"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get student module progress (Student)",
+        "tags": ["Progress Tracking"]
+      }
+    },
+    "/api/progress/chapters": {
+      "get": {
+        "operationId": "ProgressController_getStudentChapterProgress",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "Page number (default: 1)",
+            "schema": {
+              "default": 1,
+              "example": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "Number of items per page (default: 10, max: 100)",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 10,
+              "example": 10,
+              "type": "number"
+            }
+          },
+          {
+            "name": "module_id",
+            "required": false,
+            "in": "query",
+            "description": "Filter by module ID",
+            "schema": {
+              "example": "507f1f77bcf86cd799439011",
+              "type": "string"
+            }
+          },
+          {
+            "name": "chapter_id",
+            "required": false,
+            "in": "query",
+            "description": "Filter by chapter ID",
+            "schema": {
+              "example": "507f1f77bcf86cd799439012",
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "description": "Filter by progress status",
+            "schema": {
+              "enum": ["NOT_STARTED", "IN_PROGRESS", "COMPLETED"],
+              "type": "string"
+            }
+          },
+          {
+            "name": "from_date",
+            "required": false,
+            "in": "query",
+            "description": "Filter progress from this date (YYYY-MM-DD)",
+            "schema": {
+              "example": "2024-01-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "to_date",
+            "required": false,
+            "in": "query",
+            "description": "Filter progress until this date (YYYY-MM-DD)",
+            "schema": {
+              "example": "2024-12-31",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Chapter progress retrieved successfully"
+          },
+          "403": {
+            "description": "Only students can view their progress"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get student chapter progress (Student)",
+        "tags": ["Progress Tracking"]
+      }
+    },
+    "/api/progress/quiz-attempts": {
+      "get": {
+        "operationId": "ProgressController_getStudentQuizAttempts",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "Page number (default: 1)",
+            "schema": {
+              "default": 1,
+              "example": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "Number of items per page (default: 10, max: 100)",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 10,
+              "example": 10,
+              "type": "number"
+            }
+          },
+          {
+            "name": "quiz_group_id",
+            "required": false,
+            "in": "query",
+            "description": "Filter by quiz group ID",
+            "schema": {
+              "example": "507f1f77bcf86cd799439011",
+              "type": "string"
+            }
+          },
+          {
+            "name": "module_id",
+            "required": false,
+            "in": "query",
+            "description": "Filter by module ID",
+            "schema": {
+              "example": "507f1f77bcf86cd799439012",
+              "type": "string"
+            }
+          },
+          {
+            "name": "chapter_id",
+            "required": false,
+            "in": "query",
+            "description": "Filter by chapter ID",
+            "schema": {
+              "$ref": "#/components/schemas/Object"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "description": "Filter by attempt status",
+            "schema": {
+              "enum": ["IN_PROGRESS", "COMPLETED", "TIMEOUT", "ABANDONED"],
+              "type": "string"
+            }
+          },
+          {
+            "name": "from_date",
+            "required": false,
+            "in": "query",
+            "description": "Filter attempts from this date (YYYY-MM-DD)",
+            "schema": {
+              "example": "2024-01-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "to_date",
+            "required": false,
+            "in": "query",
+            "description": "Filter attempts until this date (YYYY-MM-DD)",
+            "schema": {
+              "example": "2024-12-31",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Quiz attempts retrieved successfully"
+          },
+          "403": {
+            "description": "Only students can view their quiz attempts"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get student quiz attempts (Student)",
+        "tags": ["Progress Tracking"]
+      }
+    },
+    "/api/progress/dashboard": {
+      "get": {
+        "operationId": "ProgressController_getStudentDashboard",
+        "parameters": [
+          {
+            "name": "school_id",
+            "required": false,
+            "in": "query",
+            "description": "School ID (required for super admin access)",
+            "schema": {
+              "example": "507f1f77bcf86cd799439012",
+              "type": "string"
+            }
+          },
+          {
+            "name": "student_id",
+            "required": false,
+            "in": "query",
+            "description": "Student ID (required for admin/professor/super admin access)",
+            "schema": {
+              "example": "507f1f77bcf86cd799439011",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Dashboard data retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": {
+                    "message": "Dashboard data retrieved successfully",
+                    "data": {
+                      "overview": {
+                        "total_modules": 5,
+                        "in_progress_modules": 2,
+                        "completed_modules": 2,
+                        "total_quiz_attempts": 15,
+                        "passed_quizzes": 12,
+                        "average_progress": 75
+                      },
+                      "recent_activity": [
+                        {
+                          "_id": "507f1f77bcf86cd799439011",
+                          "module_id": {
+                            "_id": "507f1f77bcf86cd799439012",
+                            "title": "Child Development Psychology",
+                            "subject": "Psychology"
+                          },
+                          "progress_percentage": 85,
+                          "status": "IN_PROGRESS",
+                          "last_accessed_at": "2024-01-15T10:00:00.000Z"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only students can view their dashboard"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get student dashboard overview (Student/Admin/Professor/Super Admin)",
+        "tags": ["Progress Tracking"]
+      }
+    },
+    "/api/progress/admin/dashboard": {
+      "get": {
+        "operationId": "ProgressController_getSchoolAdminDashboard",
+        "parameters": [
+          {
+            "name": "module_id",
+            "required": false,
+            "in": "query",
+            "description": "Filter by specific module ID",
+            "schema": {
+              "example": "507f1f77bcf86cd799439011",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Admin dashboard data retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": {
+                    "message": "Admin dashboard data retrieved successfully",
+                    "data": {
+                      "overview": {
+                        "total_students": 150,
+                        "active_students": 125,
+                        "not_started": 25,
+                        "in_progress": 75,
+                        "completed": 50,
+                        "average_progress": 65
+                      },
+                      "student_progress": [
+                        {
+                          "_id": "507f1f77bcf86cd799439011",
+                          "student_id": {
+                            "_id": "507f1f77bcf86cd799439012",
+                            "first_name": "John",
+                            "last_name": "Doe",
+                            "email": "john.doe@example.com"
+                          },
+                          "module_id": {
+                            "_id": "507f1f77bcf86cd799439013",
+                            "title": "Child Development Psychology",
+                            "subject": "Psychology"
+                          },
+                          "progress_percentage": 75,
+                          "status": "IN_PROGRESS",
+                          "last_accessed_at": "2024-01-15T10:00:00.000Z"
+                        }
+                      ],
+                      "recent_quiz_attempts": []
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only school admins and professors can view school dashboard"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get school admin dashboard overview (Admin/Professor)",
+        "tags": ["Progress Tracking"]
+      }
+    },
+    "/api/progress/chapters/{chapter_id}/can-access": {
+      "get": {
+        "operationId": "ProgressController_canAccessChapter",
+        "parameters": [
+          {
+            "name": "chapter_id",
+            "required": true,
+            "in": "path",
+            "description": "Chapter ID to check access for",
+            "schema": {
+              "example": "507f1f77bcf86cd799439011",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Chapter access check completed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": {
+                    "message": "Chapter access validated",
+                    "data": {
+                      "can_access": true,
+                      "chapter_id": "507f1f77bcf86cd799439011",
+                      "reason": null
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Chapter not found"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Check if student can access a chapter (Student)",
+        "tags": ["Progress Tracking"]
+      }
+    },
+    "/api/progress/quiz/{quiz_group_id}/can-access": {
+      "get": {
+        "operationId": "ProgressController_canAccessQuiz",
+        "parameters": [
+          {
+            "name": "quiz_group_id",
+            "required": true,
+            "in": "path",
+            "description": "Quiz group ID to check access for",
+            "schema": {
+              "example": "507f1f77bcf86cd799439011",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Quiz access check completed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": {
+                    "message": "Quiz access validated",
+                    "data": {
+                      "can_access": true,
+                      "quiz_group_id": "507f1f77bcf86cd799439011",
+                      "reason": null
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Quiz group not found"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Check if student can access a quiz (Student)",
+        "tags": ["Progress Tracking"]
+      }
+    },
+    "/api/users": {
+      "get": {
+        "operationId": "UsersController_getAllUsers",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "Page number (starts from 1)",
+            "schema": {
+              "default": 1,
+              "example": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "Number of items per page",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 10,
+              "example": 10,
+              "type": "number"
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "role",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Users retrieved successfully"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get all users (Super Admin only)",
+        "tags": ["Users"]
+      }
+    },
+    "/api/users/{id}": {
+      "get": {
+        "operationId": "UsersController_getUserById",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "User ID",
+            "schema": {
+              "example": "507f1f77bcf86cd799439011",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "User retrieved successfully"
+          },
+          "404": {
+            "description": "User not found"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get user by ID (Super Admin only)",
+        "tags": ["Users"]
+      }
+    },
+    "/api/users/{id}/status": {
+      "patch": {
+        "operationId": "UsersController_updateUserStatus",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "User ID",
+            "schema": {
+              "example": "507f1f77bcf86cd799439011",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateStatusDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "User status updated successfully"
+          },
+          "404": {
+            "description": "User not found"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Update user status (Super Admin only)",
+        "tags": ["Users"]
+      }
+    },
+    "/api/schools": {
+      "get": {
+        "operationId": "SchoolsController_getAllSchools",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "Page number (starts from 1)",
+            "schema": {
+              "default": 1,
+              "example": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "Number of items per page",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 10,
+              "example": 10,
+              "type": "number"
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Schools retrieved successfully"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get all schools (Super Admin only)",
+        "tags": ["Schools"]
+      }
+    },
+    "/api/schools/{id}": {
+      "get": {
+        "operationId": "SchoolsController_getSchoolById",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "School ID",
+            "schema": {
+              "example": "507f1f77bcf86cd799439011",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "School retrieved successfully"
+          },
+          "404": {
+            "description": "School not found"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get school by ID",
+        "tags": ["Schools"]
+      },
+      "patch": {
+        "operationId": "SchoolsController_updateSchoolDetails",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "School ID",
+            "schema": {
+              "example": "507f1f77bcf86cd799439011",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateSchoolDetailsDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "School details updated successfully"
+          },
+          "404": {
+            "description": "School not found"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Update school details",
+        "tags": ["Schools"]
+      }
+    },
+    "/api/schools/{id}/status": {
+      "patch": {
+        "operationId": "SchoolsController_updateSchoolStatus",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "School ID",
+            "schema": {
+              "example": "507f1f77bcf86cd799439011",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateStatusDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "School status updated successfully"
+          },
+          "404": {
+            "description": "School not found"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Update school status (Super Admin only)",
+        "tags": ["Schools"]
+      }
+    },
+    "/api/professor": {
+      "post": {
+        "operationId": "ProfessorController_createProfessor",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateProfessorDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Professor created successfully"
+          },
+          "409": {
+            "description": "Email already exists"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Create a new professor",
+        "tags": ["Professor"]
+      },
+      "get": {
+        "operationId": "ProfessorController_getAllProfessors",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "Page number (starts from 1)",
+            "schema": {
+              "default": 1,
+              "example": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "Number of items per page",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 10,
+              "example": 10,
+              "type": "number"
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sortBy",
+            "required": false,
+            "in": "query",
+            "description": "Field to sort by (name = first_name + last_name)",
+            "schema": {
+              "enum": ["name", "email", "created_at", "updated_at"],
+              "type": "string"
+            }
+          },
+          {
+            "name": "sortOrder",
+            "required": false,
+            "in": "query",
+            "description": "Sort order (asc or desc)",
+            "schema": {
+              "enum": ["asc", "desc"],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Professors retrieved successfully"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get all professors (School Admin only)",
+        "tags": ["Professor"]
+      }
+    },
+    "/api/professor/{id}": {
+      "patch": {
+        "operationId": "ProfessorController_updateProfessor",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Professor ID",
+            "schema": {
+              "example": "507f1f77bcf86cd799439011",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateProfessorDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Professor updated successfully"
+          },
+          "404": {
+            "description": "Professor not found"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Update professor details",
+        "tags": ["Professor"]
+      },
+      "get": {
+        "operationId": "ProfessorController_getProfessorById",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Professor ID",
+            "schema": {
+              "example": "507f1f77bcf86cd799439011",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Professor retrieved successfully"
+          },
+          "404": {
+            "description": "Professor not found"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get professor by ID (School Admin only)",
+        "tags": ["Professor"]
+      },
+      "delete": {
+        "operationId": "ProfessorController_deleteProfessor",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Professor ID",
+            "schema": {
+              "example": "507f1f77bcf86cd799439011",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Professor deleted successfully"
+          },
+          "404": {
+            "description": "Professor not found"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Soft delete a professor",
+        "tags": ["Professor"]
+      }
+    },
+    "/api/professor/password/{id}": {
+      "patch": {
+        "operationId": "ProfessorController_updateProfessorPassword",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Professor ID",
+            "schema": {
+              "example": "507f1f77bcf86cd799439011",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateProfessorPasswordDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Password updated successfully"
+          },
+          "404": {
+            "description": "Professor not found"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Update professor password",
+        "tags": ["Professor"]
+      }
+    },
+    "/api/professor/{id}/assignments": {
+      "get": {
+        "operationId": "ProfessorController_getProfessorAssignments",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Professor ID",
+            "schema": {
+              "example": "507f1f77bcf86cd799439011",
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "Page number (starts from 1)",
+            "schema": {
+              "default": 1,
+              "example": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "Number of items per page",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 10,
+              "example": 10,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Professor assignments retrieved successfully"
+          },
+          "404": {
+            "description": "Professor not found"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get professor assignments (School Admin and Professor)",
+        "tags": ["Professor"]
+      }
+    },
+    "/api/professor/{id}/module-access/{moduleId}": {
+      "get": {
+        "operationId": "ProfessorController_checkProfessorModuleAccess",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Professor ID",
+            "schema": {
+              "example": "507f1f77bcf86cd799439011",
+              "type": "string"
+            }
+          },
+          {
+            "name": "moduleId",
+            "required": true,
+            "in": "path",
+            "description": "Module ID",
+            "schema": {
+              "example": "507f1f77bcf86cd799439011",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Module access check completed"
+          },
+          "404": {
+            "description": "Professor or module not found"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Check professor access to a specific module",
+        "tags": ["Professor"]
+      }
+    },
+    "/api/professor/{id}/status": {
+      "patch": {
+        "operationId": "ProfessorController_updateProfessorStatus",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Professor ID",
+            "schema": {
+              "example": "507f1f77bcf86cd799439011",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateStatusDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Professor status updated successfully"
+          },
+          "404": {
+            "description": "Professor not found"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Update professor status (School Admin only)",
+        "tags": ["Professor"]
+      }
+    },
+    "/api/school-admin": {
+      "post": {
+        "operationId": "SchoolAdminController_createSchoolAdmin",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateSchoolAdminDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "School and Admin user created successfully"
+          },
+          "409": {
+            "description": "Email or school already exists"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Create a new school and school admin",
+        "tags": ["School Admin"]
+      }
+    },
+    "/api/school-admin/dashboard": {
+      "get": {
+        "operationId": "SchoolAdminController_getDashboard",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Dashboard information retrieved successfully"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get school admin dashboard information",
+        "tags": ["School Admin"]
+      }
+    },
+    "/api/school-admin/reset-password": {
+      "post": {
+        "operationId": "SchoolAdminController_resetPassword",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResetPasswordDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Password updated successfully"
+          },
+          "400": {
+            "description": "Invalid old password"
+          },
+          "404": {
+            "description": "User not found"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Reset password for authenticated school admin or professor",
+        "tags": ["School Admin"]
+      }
+    },
+    "/api/bibliography": {
+      "post": {
+        "operationId": "BibliographyController_createBibliography",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateBibliographyDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Bibliography created successfully"
+          },
+          "400": {
+            "description": "Bad request"
+          },
+          "404": {
+            "description": "Module or Chapter not found"
+          },
+          "409": {
+            "description": "Sequence conflict"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Create a new bibliography item",
+        "tags": ["Bibliography"]
+      },
+      "get": {
+        "operationId": "BibliographyController_findAllBibliography",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "Page number (default: 1)",
+            "schema": {
+              "default": 1,
+              "example": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "Number of items per page (default: 10, max: 100)",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 10,
+              "example": 10,
+              "type": "number"
+            }
+          },
+          {
+            "name": "module_id",
+            "required": false,
+            "in": "query",
+            "description": "Optional filter by module ID",
+            "schema": {
+              "example": "507f1f77bcf86cd799439011",
+              "type": "string"
+            }
+          },
+          {
+            "name": "chapter_id",
+            "required": false,
+            "in": "query",
+            "description": "Optional filter by chapter ID",
+            "schema": {
+              "example": "507f1f77bcf86cd799439012",
+              "type": "string"
+            }
+          },
+          {
+            "name": "text",
+            "required": false,
+            "in": "query",
+            "description": "Search text in title and description",
+            "schema": {
+              "example": "psychology",
+              "type": "string"
+            }
+          },
+          {
+            "name": "type",
+            "required": false,
+            "in": "query",
+            "description": "Filter by bibliography type",
+            "schema": {
+              "enum": ["PDF", "VIDEO", "SLIDE", "CASE_STUDY", "IMAGE", "LINK"],
+              "type": "string"
+            }
+          },
+          {
+            "name": "sortBy",
+            "required": false,
+            "in": "query",
+            "description": "Sort by field",
+            "schema": {
+              "enum": ["title", "type", "duration", "sequence", "created_at"],
+              "type": "string"
+            }
+          },
+          {
+            "name": "sortOrder",
+            "required": false,
+            "in": "query",
+            "description": "Sort order",
+            "schema": {
+              "enum": ["asc", "desc"],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Bibliography retrieved successfully"
+          },
+          "400": {
+            "description": "Bad request"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get all bibliography items with filtering and sorting",
+        "tags": ["Bibliography"]
+      }
+    },
+    "/api/bibliography/{id}": {
+      "get": {
+        "operationId": "BibliographyController_findBibliographyById",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Bibliography ID",
+            "schema": {
+              "example": "507f1f77bcf86cd799439013"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Bibliography retrieved successfully"
+          },
+          "400": {
+            "description": "Bad request"
+          },
+          "404": {
+            "description": "Bibliography not found"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get bibliography by ID",
+        "tags": ["Bibliography"]
+      },
+      "patch": {
+        "operationId": "BibliographyController_updateBibliography",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Bibliography ID",
+            "schema": {
+              "example": "507f1f77bcf86cd799439013"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateBibliographyDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Bibliography updated successfully"
+          },
+          "400": {
+            "description": "Bad request"
+          },
+          "404": {
+            "description": "Bibliography not found"
+          },
+          "409": {
+            "description": "Sequence conflict"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Update bibliography by ID",
+        "tags": ["Bibliography"]
+      },
+      "delete": {
+        "operationId": "BibliographyController_deleteBibliography",
+        "parameters": [
+          {
+            "name": "school_id",
+            "required": false,
+            "in": "query",
+            "description": "School ID (required for super admin, optional for other roles)",
+            "schema": {
+              "example": "507f1f77bcf86cd799439011",
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Bibliography ID",
+            "schema": {
+              "example": "507f1f77bcf86cd799439013"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Bibliography deleted successfully"
+          },
+          "400": {
+            "description": "Bad request"
+          },
+          "404": {
+            "description": "Bibliography not found"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Delete bibliography by ID (soft delete)",
+        "tags": ["Bibliography"]
+      }
+    },
+    "/api/bibliography/reorder": {
+      "post": {
+        "operationId": "BibliographyController_reorderBibliography",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReorderBibliographyItemsDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Bibliography items reordered successfully"
+          },
+          "400": {
+            "description": "Bad request"
+          },
+          "404": {
+            "description": "One or more bibliography items not found"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Reorder bibliography items",
+        "tags": ["Bibliography"]
+      }
+    },
+    "/api/quiz/groups": {
+      "post": {
+        "description": "Creates a new quiz group for a module or chapter",
+        "operationId": "QuizController_createQuizGroup",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateQuizGroupDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Quiz group created successfully"
+          },
+          "400": {
+            "description": "Invalid input data"
+          },
+          "404": {
+            "description": "Module or chapter not found"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Create a new quiz group",
+        "tags": ["Quiz"]
+      },
+      "get": {
+        "description": "Retrieve paginated list of quiz groups with optional filters",
+        "operationId": "QuizController_findAllQuizGroups",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "Page number (starts from 1)",
+            "schema": {
+              "default": 1,
+              "example": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "Number of items per page",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 10,
+              "example": 10,
+              "type": "number"
+            }
+          },
+          {
+            "name": "category",
+            "required": false,
+            "in": "query",
+            "description": "Filter by quiz category",
+            "schema": {
+              "example": "COMMUNICATION",
+              "type": "string"
+            }
+          },
+          {
+            "name": "difficulty",
+            "required": false,
+            "in": "query",
+            "description": "Filter by difficulty level",
+            "schema": {
+              "example": "INTERMEDIATE",
+              "type": "string",
+              "enum": ["BEGINNER", "INTERMEDIATE", "ADVANCED"]
+            }
+          },
+          {
+            "name": "type",
+            "required": false,
+            "in": "query",
+            "description": "Filter by quiz type",
+            "schema": {
+              "example": "MODULE",
+              "type": "string",
+              "enum": ["MODULE", "CHAPTER"]
+            }
+          },
+          {
+            "name": "module_id",
+            "required": false,
+            "in": "query",
+            "description": "Filter by module ID",
+            "schema": {
+              "$ref": "#/components/schemas/Object"
+            }
+          },
+          {
+            "name": "chapter_id",
+            "required": false,
+            "in": "query",
+            "description": "Filter by chapter ID",
+            "schema": {
+              "$ref": "#/components/schemas/Object"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Quiz groups retrieved successfully"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get all quiz groups",
+        "tags": ["Quiz"]
+      }
+    },
+    "/api/quiz/groups/{id}": {
+      "get": {
+        "description": "Retrieve a specific quiz group with its details",
+        "operationId": "QuizController_findQuizGroupById",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Quiz group ID",
+            "schema": {
+              "format": "mongoId",
+              "example": "507f1f77bcf86cd799439011",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Quiz group retrieved successfully"
+          },
+          "404": {
+            "description": "Quiz group not found"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get a quiz group by ID",
+        "tags": ["Quiz"]
+      },
+      "patch": {
+        "description": "Update an existing quiz group",
+        "operationId": "QuizController_updateQuizGroup",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Quiz group ID",
+            "schema": {
+              "format": "mongoId",
+              "example": "507f1f77bcf86cd799439011",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateQuizGroupDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Quiz group updated successfully"
+          },
+          "404": {
+            "description": "Quiz group not found"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Update a quiz group",
+        "tags": ["Quiz"]
+      },
+      "delete": {
+        "description": "Soft delete a quiz group and all its associated quizzes",
+        "operationId": "QuizController_removeQuizGroup",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Quiz group ID",
+            "schema": {
+              "format": "mongoId",
+              "example": "507f1f77bcf86cd799439011",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Quiz group deleted successfully"
+          },
+          "404": {
+            "description": "Quiz group not found"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Delete a quiz group",
+        "tags": ["Quiz"]
+      }
+    },
+    "/api/quiz/questions": {
+      "post": {
+        "description": "Creates a new quiz question within a quiz group",
+        "operationId": "QuizController_createQuiz",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateQuizDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Quiz question created successfully"
+          },
+          "400": {
+            "description": "Invalid input data or answers not in options"
+          },
+          "404": {
+            "description": "Quiz group not found"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Create a new quiz question",
+        "tags": ["Quiz"]
+      },
+      "get": {
+        "description": "Retrieve paginated list of quiz questions with optional filters",
+        "operationId": "QuizController_findAllQuizzes",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "Page number (starts from 1)",
+            "schema": {
+              "default": 1,
+              "example": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "Number of items per page",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 10,
+              "example": 10,
+              "type": "number"
+            }
+          },
+          {
+            "name": "quiz_group_id",
+            "required": false,
+            "in": "query",
+            "description": "Filter by quiz group ID",
+            "schema": {
+              "$ref": "#/components/schemas/Object"
+            }
+          },
+          {
+            "name": "type",
+            "required": false,
+            "in": "query",
+            "description": "Filter by question type",
+            "schema": {
+              "example": "SINGLE_SELECT",
+              "type": "string",
+              "enum": ["MULTI_SELECT", "SINGLE_SELECT", "SCENARIO_BASED"]
+            }
+          },
+          {
+            "name": "module_id",
+            "required": false,
+            "in": "query",
+            "description": "Filter by module ID",
+            "schema": {
+              "$ref": "#/components/schemas/Object"
+            }
+          },
+          {
+            "name": "chapter_id",
+            "required": false,
+            "in": "query",
+            "description": "Filter by chapter ID",
+            "schema": {
+              "$ref": "#/components/schemas/Object"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Quiz questions retrieved successfully"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get all quiz questions",
+        "tags": ["Quiz"]
+      }
+    },
+    "/api/quiz/questions/{id}": {
+      "get": {
+        "description": "Retrieve a specific quiz question with its details",
+        "operationId": "QuizController_findQuizById",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Quiz question ID",
+            "schema": {
+              "format": "mongoId",
+              "example": "507f1f77bcf86cd799439011",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Quiz question retrieved successfully"
+          },
+          "404": {
+            "description": "Quiz question not found"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get a quiz question by ID",
+        "tags": ["Quiz"]
+      },
+      "patch": {
+        "description": "Update an existing quiz question",
+        "operationId": "QuizController_updateQuiz",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Quiz question ID",
+            "schema": {
+              "format": "mongoId",
+              "example": "507f1f77bcf86cd799439011",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateQuizDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Quiz question updated successfully"
+          },
+          "404": {
+            "description": "Quiz question not found"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Update a quiz question",
+        "tags": ["Quiz"]
+      },
+      "delete": {
+        "description": "Soft delete a quiz question",
+        "operationId": "QuizController_removeQuiz",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Quiz question ID",
+            "schema": {
+              "format": "mongoId",
+              "example": "507f1f77bcf86cd799439011",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Quiz question deleted successfully"
+          },
+          "404": {
+            "description": "Quiz question not found"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Delete a quiz question",
+        "tags": ["Quiz"]
+      }
+    },
+    "/api/quiz/groups/{groupId}/questions": {
+      "get": {
+        "description": "Retrieve all quiz questions belonging to a specific quiz group",
+        "operationId": "QuizController_findQuizzesByGroup",
+        "parameters": [
+          {
+            "name": "groupId",
+            "required": true,
+            "in": "path",
+            "description": "Quiz group ID",
+            "schema": {
+              "format": "mongoId",
+              "example": "507f1f77bcf86cd799439011",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Quiz questions retrieved successfully"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get all questions for a specific quiz group",
+        "tags": ["Quiz"]
+      }
+    },
+    "/api/quiz/modules/{moduleId}/groups": {
+      "get": {
+        "description": "Retrieve all quiz groups belonging to a specific module",
+        "operationId": "QuizController_findQuizGroupsByModule",
+        "parameters": [
+          {
+            "name": "moduleId",
+            "required": true,
+            "in": "path",
+            "description": "Module ID",
+            "schema": {
+              "format": "mongoId",
+              "example": "507f1f77bcf86cd799439011",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Quiz groups retrieved successfully"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get all quiz groups for a specific module",
+        "tags": ["Quiz"]
+      }
+    },
+    "/api/quiz/chapters/{chapterId}/groups": {
+      "get": {
+        "description": "Retrieve all quiz groups belonging to a specific chapter",
+        "operationId": "QuizController_findQuizGroupsByChapter",
+        "parameters": [
+          {
+            "name": "chapterId",
+            "required": true,
+            "in": "path",
+            "description": "Chapter ID",
+            "schema": {
+              "format": "mongoId",
+              "example": "507f1f77bcf86cd799439011",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Quiz groups retrieved successfully"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get all quiz groups for a specific chapter",
+        "tags": ["Quiz"]
+      }
+    },
+    "/api/ai-chat/sessions": {
+      "post": {
+        "description": "Creates a new AI practice session for a student with a specific module. Session title and description are automatically generated from the module information.",
+        "operationId": "AIChatController_createAISession",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateAISessionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "AI session created successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AISessionResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input data"
+          },
+          "404": {
+            "description": "Module or student not found"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Create a new AI chat session",
+        "tags": ["AI Chat"]
+      },
+      "get": {
+        "description": "Retrieve paginated list of AI chat sessions with optional filters. Sessions are automatically filtered by the authenticated user.",
+        "operationId": "AIChatController_findAllAISessions",
+        "parameters": [
+          {
+            "name": "module_id",
+            "required": false,
+            "in": "query",
+            "description": "Filter by module ID",
+            "schema": {
+              "example": "507f1f77bcf86cd799439011",
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "description": "Filter by session status",
+            "schema": {
+              "enum": ["ACTIVE", "COMPLETED", "PAUSED", "CANCELLED"],
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "Number of items per page (default: 10, max: 100)",
+            "schema": {
+              "example": 10,
+              "type": "number"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "Page number (default: 1)",
+            "schema": {
+              "example": 1,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "AI sessions retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/AISessionResponseDto"
+                      }
+                    },
+                    "total": {
+                      "type": "number",
+                      "example": 25
+                    },
+                    "page": {
+                      "type": "number",
+                      "example": 1
+                    },
+                    "limit": {
+                      "type": "number",
+                      "example": 10
+                    },
+                    "totalPages": {
+                      "type": "number",
+                      "example": 3
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get all AI chat sessions",
+        "tags": ["AI Chat"]
+      }
+    },
+    "/api/ai-chat/sessions/{id}/complete": {
+      "put": {
+        "description": "Mark an AI session as completed and set the ended_at timestamp automatically",
+        "operationId": "AIChatController_completeAISession",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "AI session ID",
+            "schema": {
+              "format": "mongoId",
+              "example": "507f1f77bcf86cd799439011",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "AI session completed successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AISessionResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Session is already completed or cannot be completed"
+          },
+          "404": {
+            "description": "AI session not found"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Complete an AI chat session",
+        "tags": ["AI Chat"]
+      }
+    },
+    "/api/ai-chat/messages": {
+      "post": {
+        "description": "Add a new message to an AI chat session (student or AI response)",
+        "operationId": "AIChatController_createAIMessage",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateAIMessageDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "AI message created successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AIMessageResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input data or session not active"
+          },
+          "404": {
+            "description": "AI session not found"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Create a new AI chat message",
+        "tags": ["AI Chat"]
+      }
+    },
+    "/api/ai-chat/sessions/{sessionId}/messages": {
+      "get": {
+        "description": "Retrieve all messages for a specific AI chat session",
+        "operationId": "AIChatController_findMessagesBySessionId",
+        "parameters": [
+          {
+            "name": "sessionId",
+            "required": true,
+            "in": "path",
+            "description": "AI session ID",
+            "schema": {
+              "format": "mongoId",
+              "example": "507f1f77bcf86cd799439011",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Messages retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AIMessageResponseDto"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "AI session not found"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get messages by session ID",
+        "tags": ["AI Chat"]
+      }
+    },
+    "/api/ai-chat/feedback": {
+      "post": {
+        "description": "Add feedback, analysis, or ratings for an AI chat session",
+        "operationId": "AIChatController_createAIFeedback",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateAIFeedbackDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "AI feedback created successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AIFeedbackResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input data"
+          },
+          "404": {
+            "description": "AI session not found"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Create AI chat feedback",
+        "tags": ["AI Chat"]
+      }
+    },
+    "/api/ai-chat/sessions/{sessionId}/feedback": {
+      "get": {
+        "description": "Retrieve all feedback and analysis for a specific AI chat session",
+        "operationId": "AIChatController_findFeedbackBySessionId",
+        "parameters": [
+          {
+            "name": "sessionId",
+            "required": true,
+            "in": "path",
+            "description": "AI session ID",
+            "schema": {
+              "format": "mongoId",
+              "example": "507f1f77bcf86cd799439011",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Feedback retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AIFeedbackResponseDto"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "AI session not found"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get feedback by session ID",
+        "tags": ["AI Chat"]
+      }
+    },
+    "/api/ai-chat/resources": {
+      "post": {
+        "description": "Add study materials, resources, or learning content for an AI session",
+        "operationId": "AIChatController_createAIResource",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateAIResourceDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "AI resource created successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AIResourceResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input data"
+          },
+          "404": {
+            "description": "AI session not found"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Create AI resource",
+        "tags": ["AI Chat"]
+      }
+    },
+    "/api/ai-chat/sessions/{sessionId}/resources": {
+      "get": {
+        "description": "Retrieve all study materials and resources for a specific AI chat session",
+        "operationId": "AIChatController_findResourcesBySessionId",
+        "parameters": [
+          {
+            "name": "sessionId",
+            "required": true,
+            "in": "path",
+            "description": "AI session ID",
+            "schema": {
+              "format": "mongoId",
+              "example": "507f1f77bcf86cd799439011",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Resources retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AIResourceResponseDto"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "AI session not found"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get resources by session ID",
+        "tags": ["AI Chat"]
+      }
+    }
+  },
+  "info": {
+    "title": "AI Professor API",
+    "description": "API documentation for AI Professor backend",
+    "version": "1.0",
+    "contact": {}
+  },
+  "tags": [],
+  "servers": [],
+  "components": {
+    "securitySchemes": {
+      "bearer": {
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "type": "http"
+      }
+    },
+    "schemas": {
+      "LoginSuperAdminDto": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "example": "superadmin.aiprofessor@yopmail.com"
+          },
+          "password": {
+            "type": "string",
+            "example": "superAdmin@123"
+          },
+          "rememberMe": {
+            "type": "boolean",
+            "example": false,
+            "description": "If true, token will be valid for 30 days, otherwise 1 day"
+          }
+        },
+        "required": ["email", "password"]
+      },
+      "LoginSchoolAdminDto": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "example": "techtic.anirudh@gmail.com"
+          },
+          "password": {
+            "type": "string",
+            "example": "|Co(>#n(-5si"
+          },
+          "rememberMe": {
+            "type": "boolean",
+            "example": false,
+            "description": "If true, token will be valid for 30 days, otherwise 1 day"
+          }
+        },
+        "required": ["email", "password"]
+      },
+      "LoginStudentDto": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "example": "shubh@yopmail.com"
+          },
+          "password": {
+            "type": "string",
+            "example": "+[I0{pYI72j@"
+          },
+          "rememberMe": {
+            "type": "boolean",
+            "example": false,
+            "description": "If true, token will be valid for 30 days, otherwise 1 day"
+          }
+        },
+        "required": ["email", "password"]
+      },
+      "ForgotPasswordDto": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "example": "admin@school.edu",
+            "description": "Email address to send password reset link"
+          }
+        },
+        "required": ["email"]
+      },
+      "SetNewPasswordDto": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string",
+            "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+            "description": "Reset password token received via email"
+          },
+          "new_password": {
+            "type": "string",
+            "example": "NewPassword123!",
+            "description": "New password - must be at least 8 characters with uppercase, lowercase, number, and special character"
+          }
+        },
+        "required": ["token", "new_password"]
+      },
+      "CreateStudentDto": {
+        "type": "object",
+        "properties": {
+          "first_name": {
+            "type": "string",
+            "example": "Alice"
+          },
+          "last_name": {
+            "type": "string",
+            "example": "Smith"
+          },
+          "email": {
+            "type": "string",
+            "example": "alice.smith@student.com"
+          },
+          "school_id": {
+            "type": "string",
+            "example": "60d21b4667d0d8992e610c85"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["ACTIVE", "INACTIVE"],
+            "example": "ACTIVE",
+            "description": "Student status (ACTIVE or INACTIVE)"
+          }
+        },
+        "required": ["first_name", "email", "school_id"]
+      },
+      "ObjectId": {
+        "type": "object",
+        "properties": {}
+      },
+      "StudentResponseDto": {
+        "type": "object",
+        "properties": {
+          "_id": {
+            "example": "507f1f77bcf86cd799439011",
+            "description": "Student ID",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ObjectId"
+              }
+            ]
+          },
+          "first_name": {
+            "type": "string",
+            "example": "Alice",
+            "description": "First name of the student"
+          },
+          "last_name": {
+            "type": "string",
+            "example": "Smith",
+            "description": "Last name of the student"
+          },
+          "email": {
+            "type": "string",
+            "example": "alice.smith@student.com",
+            "description": "Email address of the student"
+          },
+          "school_id": {
+            "example": "60d21b4667d0d8992e610c85",
+            "description": "School ID",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ObjectId"
+              }
+            ]
+          },
+          "student_code": {
+            "type": "string",
+            "example": "STU001",
+            "description": "Student code"
+          },
+          "profile_pic": {
+            "type": "string",
+            "example": "https://example.com/profile.jpg",
+            "description": "Profile picture URL"
+          },
+          "created_by": {
+            "example": "507f1f77bcf86cd799439011",
+            "description": "ID of the user who created this student",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ObjectId"
+              }
+            ]
+          },
+          "created_by_role": {
+            "type": "string",
+            "enum": ["SUPER_ADMIN", "SCHOOL_ADMIN", "PROFESSOR", "STUDENT"],
+            "example": "SCHOOL_ADMIN",
+            "description": "Role of the user who created this student"
+          },
+          "role": {
+            "example": "507f1f77bcf86cd799439011",
+            "description": "Role ID",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ObjectId"
+              }
+            ]
+          },
+          "last_logged_in": {
+            "format": "date-time",
+            "type": "string",
+            "example": "2024-01-15T10:30:00.000Z",
+            "description": "Last login timestamp"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["ACTIVE", "INACTIVE"],
+            "example": "ACTIVE",
+            "description": "Student status"
+          },
+          "is_csv_upload": {
+            "type": "boolean",
+            "example": false,
+            "description": "Whether the student was created via CSV bulk upload"
+          },
+          "created_at": {
+            "format": "date-time",
+            "type": "string",
+            "example": "2024-01-15T10:30:00.000Z",
+            "description": "Creation timestamp"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "type": "string",
+            "example": "2024-01-15T10:30:00.000Z",
+            "description": "Last update timestamp"
+          }
+        },
+        "required": [
+          "_id",
+          "first_name",
+          "last_name",
+          "email",
+          "school_id",
+          "student_code",
+          "created_by",
+          "created_by_role",
+          "role",
+          "status",
+          "is_csv_upload",
+          "created_at",
+          "updated_at"
+        ]
+      },
+      "BulkCreateStudentResponseDto": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string",
+            "example": "Bulk student creation completed",
+            "description": "Success message"
+          },
+          "data": {
+            "type": "object",
+            "description": "Bulk creation results",
+            "properties": {
+              "success": {
+                "type": "array",
+                "items": {
+                  "type": "object"
+                },
+                "description": "Successfully created students"
+              },
+              "failed": {
+                "type": "array",
+                "items": {
+                  "type": "object"
+                },
+                "description": "Failed student creations"
+              },
+              "total": {
+                "type": "number",
+                "description": "Total number of students processed"
+              },
+              "successCount": {
+                "type": "number",
+                "description": "Number of successfully created students"
+              },
+              "failedCount": {
+                "type": "number",
+                "description": "Number of failed student creations"
+              }
+            }
+          }
+        },
+        "required": ["message", "data"]
+      },
+      "StudentListResponseDto": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "description": "List of students",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StudentResponseDto"
+            }
+          },
+          "total": {
+            "type": "number",
+            "example": 100,
+            "description": "Total number of students"
+          },
+          "page": {
+            "type": "number",
+            "example": 10,
+            "description": "Current page number"
+          },
+          "limit": {
+            "type": "number",
+            "example": 10,
+            "description": "Number of items per page"
+          },
+          "totalPages": {
+            "type": "number",
+            "example": 10,
+            "description": "Total number of pages"
+          }
+        },
+        "required": ["data", "total", "page", "limit", "totalPages"]
+      },
+      "UpdateStudentDto": {
+        "type": "object",
+        "properties": {
+          "first_name": {
+            "type": "string",
+            "example": "Alice"
+          },
+          "last_name": {
+            "type": "string",
+            "example": "Smith"
+          },
+          "email": {
+            "type": "string",
+            "example": "alice.smith@student.com"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["ACTIVE", "INACTIVE"],
+            "example": "ACTIVE",
+            "description": "Student status (ACTIVE, INACTIVE)"
+          }
+        }
+      },
+      "UpdateStatusDto": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "Status of the entity",
+            "enum": ["ACTIVE", "INACTIVE"],
+            "example": "ACTIVE"
+          }
+        },
+        "required": ["status"]
+      },
+      "ResetStudentPasswordDto": {
+        "type": "object",
+        "properties": {
+          "old_password": {
+            "type": "string",
+            "example": "OldPassword123!",
+            "description": "Current password for verification"
+          },
+          "new_password": {
+            "type": "string",
+            "example": "NewPassword123!",
+            "description": "New password - must be at least 8 characters with uppercase, lowercase, number, and special character"
+          }
+        },
+        "required": ["old_password", "new_password"]
+      },
+      "GetFileUploadUrl": {
+        "type": "object",
+        "properties": {
+          "fileName": {
+            "type": "string",
+            "example": "profile_pic.jpg",
+            "description": "Original filename (alphanumeric, dots, hyphens, underscores only)"
+          },
+          "mimeType": {
+            "type": "string",
+            "example": "image/jpeg",
+            "description": "MIME type - must be image/jpeg, image/png, or image/webp"
+          }
+        },
+        "required": ["fileName", "mimeType"]
+      },
+      "GetBibliographyUploadUrl": {
+        "type": "object",
+        "properties": {
+          "fileName": {
+            "type": "string",
+            "example": "introduction-to-psychology.pdf",
+            "description": "Original filename (alphanumeric, dots, hyphens, underscores only)"
+          },
+          "mimeType": {
+            "type": "string",
+            "example": "application/pdf",
+            "description": "MIME type - must be application/pdf for PDFs, video/* for videos, or application/vnd.ms-powerpoint/application/vnd.openxmlformats-officedocument.presentationml.presentation for PowerPoint files"
+          },
+          "fileType": {
+            "type": "string",
+            "enum": ["PDF", "VIDEO", "POWERPOINT"],
+            "example": "PDF",
+            "description": "Type of bibliography file (PDF or VIDEO or POWERPOINT)"
+          }
+        },
+        "required": ["fileName", "mimeType", "fileType"]
+      },
+      "GetThumbnailUploadUrl": {
+        "type": "object",
+        "properties": {
+          "fileName": {
+            "type": "string",
+            "description": "Name of the file to upload",
+            "example": "thumbnail.jpg"
+          },
+          "mimeType": {
+            "type": "string",
+            "description": "MIME type of the file",
+            "example": "image/jpeg",
+            "enum": ["image/jpeg", "image/jpg", "image/png", "image/webp"]
+          }
+        },
+        "required": ["fileName", "mimeType"]
+      },
+      "CreateModuleDto": {
+        "type": "object",
+        "properties": {
+          "school_id": {
+            "type": "object",
+            "example": "507f1f77bcf86cd799439011",
+            "description": "School ID (required for super admin, optional for other roles)"
+          },
+          "title": {
+            "type": "string",
+            "example": "Child and Adolescent Development Psychology",
+            "description": "Title of the module"
+          },
+          "subject": {
+            "type": "string",
+            "example": "Child Development",
+            "description": "Subject of the module"
+          },
+          "description": {
+            "type": "string",
+            "example": "This module covers the fundamental principles of child and adolescent development psychology, including cognitive, social, and emotional development stages.",
+            "description": "Overview/intro shown in UI"
+          },
+          "category": {
+            "type": "string",
+            "example": "Psychology",
+            "description": "Category of the module"
+          },
+          "difficulty": {
+            "type": "string",
+            "example": "INTERMEDIATE",
+            "enum": ["BEGINNER", "INTERMEDIATE", "ADVANCED"],
+            "description": "Difficulty level of the module"
+          },
+          "tags": {
+            "example": [
+              "psychology",
+              "child-development",
+              "cognitive-development"
+            ],
+            "description": "Array of tags for better searching and filtering",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "thumbnail": {
+            "type": "string",
+            "example": "/images/module-thumbnails/child-development.jpg",
+            "description": "Thumbnail image path for the module"
+          }
+        },
+        "required": ["title", "subject", "description", "difficulty"]
+      },
+      "ToggleModuleVisibilityDto": {
+        "type": "object",
+        "properties": {
+          "school_id": {
+            "type": "object",
+            "example": "507f1f77bcf86cd799439011",
+            "description": "School ID (required for super admin, optional for other roles)"
+          },
+          "module_id": {
+            "type": "object",
+            "example": "507f1f77bcf86cd799439011",
+            "description": "ID of the module to toggle visibility"
+          },
+          "action": {
+            "type": "string",
+            "enum": ["PUBLISH", "UNPUBLISH"],
+            "example": "PUBLISH",
+            "description": "Action to perform: PUBLISH or UNPUBLISH"
+          }
+        },
+        "required": ["module_id", "action"]
+      },
+      "ProfessorAssignmentDto": {
+        "type": "object",
+        "properties": {
+          "professor_id": {
+            "type": "object",
+            "example": "507f1f77bcf86cd799439011",
+            "description": "Professor ID"
+          }
+        },
+        "required": ["professor_id"]
+      },
+      "AssignProfessorDto": {
+        "type": "object",
+        "properties": {
+          "module_id": {
+            "type": "object",
+            "example": "507f1f77bcf86cd799439011",
+            "description": "Module ID"
+          },
+          "assignments": {
+            "description": "Array of professor assignments",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProfessorAssignmentDto"
+            }
+          }
+        },
+        "required": ["module_id", "assignments"]
+      },
+      "UnassignProfessorDto": {
+        "type": "object",
+        "properties": {
+          "module_id": {
+            "type": "object",
+            "example": "507f1f77bcf86cd799439011",
+            "description": "Module ID"
+          },
+          "professor_id": {
+            "type": "object",
+            "example": "507f1f77bcf86cd799439011",
+            "description": "Professor ID"
+          }
+        },
+        "required": ["module_id", "professor_id"]
+      },
+      "UpdateModuleDto": {
+        "type": "object",
+        "properties": {
+          "school_id": {
+            "type": "object",
+            "example": "507f1f77bcf86cd799439011",
+            "description": "School ID (required for super admin, optional for other roles)"
+          },
+          "title": {
+            "type": "string",
+            "example": "Child and Adolescent Development Psychology",
+            "description": "Title of the module"
+          },
+          "subject": {
+            "type": "string",
+            "example": "Child Development",
+            "description": "Subject of the module"
+          },
+          "description": {
+            "type": "string",
+            "example": "This module covers the fundamental principles of child and adolescent development psychology, including cognitive, social, and emotional development stages.",
+            "description": "Overview/intro shown in UI"
+          },
+          "category": {
+            "type": "string",
+            "example": "Psychology",
+            "description": "Category of the module"
+          },
+          "difficulty": {
+            "type": "string",
+            "example": "INTERMEDIATE",
+            "enum": ["BEGINNER", "INTERMEDIATE", "ADVANCED"],
+            "description": "Difficulty level of the module"
+          },
+          "tags": {
+            "example": [
+              "psychology",
+              "child-development",
+              "cognitive-development"
+            ],
+            "description": "Array of tags for better searching and filtering",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "thumbnail": {
+            "type": "string",
+            "example": "/images/module-thumbnails/child-development.jpg",
+            "description": "Thumbnail image path for the module"
+          }
+        }
+      },
+      "CreateChapterDto": {
+        "type": "object",
+        "properties": {
+          "school_id": {
+            "type": "object",
+            "example": "507f1f77bcf86cd799439011",
+            "description": "School ID (required for super admin, optional for other roles)"
+          },
+          "module_id": {
+            "type": "object",
+            "example": "507f1f77bcf86cd799439011",
+            "description": "ID of the parent module"
+          },
+          "title": {
+            "type": "string",
+            "example": "Cognitive Development",
+            "description": "Chapter title"
+          },
+          "description": {
+            "type": "string",
+            "example": "This chapter explores Jean Piaget's theory of cognitive development and its stages.",
+            "description": "Overview/introduction text for the chapter"
+          }
+        },
+        "required": ["module_id", "title"]
+      },
+      "UpdateChapterDto": {
+        "type": "object",
+        "properties": {
+          "school_id": {
+            "type": "object",
+            "example": "507f1f77bcf86cd799439011",
+            "description": "School ID (required for super admin, optional for other roles)"
+          },
+          "module_id": {
+            "type": "object",
+            "example": "507f1f77bcf86cd799439011",
+            "description": "ID of the parent module"
+          },
+          "title": {
+            "type": "string",
+            "example": "Cognitive Development",
+            "description": "Chapter title"
+          },
+          "description": {
+            "type": "string",
+            "example": "This chapter explores Jean Piaget's theory of cognitive development and its stages.",
+            "description": "Overview/introduction text for the chapter"
+          }
+        }
+      },
+      "ReorderChapterDto": {
+        "type": "object",
+        "properties": {
+          "chapter_id": {
+            "type": "object",
+            "example": "507f1f77bcf86cd799439011",
+            "description": "ID of the chapter to reorder"
+          },
+          "new_sequence": {
+            "type": "number",
+            "example": 3,
+            "description": "New sequence number for the chapter"
+          }
+        },
+        "required": ["chapter_id", "new_sequence"]
+      },
+      "ReorderChaptersDto": {
+        "type": "object",
+        "properties": {
+          "school_id": {
+            "type": "object",
+            "example": "507f1f77bcf86cd799439011",
+            "description": "School ID (required for super admin, optional for other roles)"
+          },
+          "chapters": {
+            "description": "Array of chapters with their new sequence numbers",
+            "example": [
+              {
+                "chapter_id": "507f1f77bcf86cd799439011",
+                "new_sequence": 1
+              },
+              {
+                "chapter_id": "507f1f77bcf86cd799439012",
+                "new_sequence": 2
+              }
+            ],
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReorderChapterDto"
+            }
+          }
+        },
+        "required": ["chapters"]
+      },
+      "StartModuleDto": {
+        "type": "object",
+        "properties": {
+          "module_id": {
+            "type": "object",
+            "example": "507f1f77bcf86cd799439011",
+            "description": "ID of the module to start"
+          }
+        },
+        "required": ["module_id"]
+      },
+      "StartChapterDto": {
+        "type": "object",
+        "properties": {
+          "chapter_id": {
+            "type": "object",
+            "example": "507f1f77bcf86cd799439011",
+            "description": "ID of the chapter to start"
+          }
+        },
+        "required": ["chapter_id"]
+      },
+      "MarkChapterCompleteDto": {
+        "type": "object",
+        "properties": {
+          "chapter_id": {
+            "type": "string",
+            "example": "507f1f77bcf86cd799439011",
+            "description": "Chapter ID to mark as complete"
+          }
+        },
+        "required": ["chapter_id"]
+      },
+      "StartQuizAttemptDto": {
+        "type": "object",
+        "properties": {
+          "quiz_group_id": {
+            "type": "object",
+            "example": "507f1f77bcf86cd799439011",
+            "description": "ID of the quiz group to start"
+          }
+        },
+        "required": ["quiz_group_id"]
+      },
+      "QuizAnswerDto": {
+        "type": "object",
+        "properties": {
+          "quiz_id": {
+            "type": "object",
+            "example": "507f1f77bcf86cd799439011",
+            "description": "ID of the quiz question"
+          },
+          "selected_answers": {
+            "example": ["Option A", "Option B"],
+            "description": "Array of selected answers",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "time_spent_seconds": {
+            "type": "number",
+            "example": 30,
+            "description": "Time spent on this question in seconds"
+          }
+        },
+        "required": ["quiz_id", "selected_answers"]
+      },
+      "SubmitQuizAnswersDto": {
+        "type": "object",
+        "properties": {
+          "quiz_group_id": {
+            "type": "object",
+            "example": "507f1f77bcf86cd799439011",
+            "description": "ID of the quiz group"
+          },
+          "answers": {
+            "description": "Array of quiz answers",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/QuizAnswerDto"
+            }
+          },
+          "total_time_taken_seconds": {
+            "type": "number",
+            "example": 300,
+            "description": "Total time taken for the quiz in minutes"
+          }
+        },
+        "required": ["quiz_group_id", "answers"]
+      },
+      "Object": {
+        "type": "object",
+        "properties": {}
+      },
+      "UpdateSchoolDetailsDto": {
+        "type": "object",
+        "properties": {
+          "school_name": {
+            "type": "string",
+            "example": "Springfield High"
+          },
+          "address": {
+            "type": "string",
+            "example": "742 Evergreen Terrace, Springfield"
+          },
+          "school_website_url": {
+            "type": "string",
+            "example": "https://springfieldhigh.edu"
+          },
+          "phone": {
+            "type": "number",
+            "example": 1234567890
+          },
+          "country_code": {
+            "type": "number",
+            "example": 91
+          },
+          "timezone": {
+            "type": "string",
+            "example": "Asia/Kolkata"
+          },
+          "language": {
+            "type": "string",
+            "example": "en"
+          },
+          "logo": {
+            "type": "string",
+            "example": "/logo.png"
+          }
+        }
+      },
+      "CreateProfessorDto": {
+        "type": "object",
+        "properties": {
+          "first_name": {
+            "type": "string",
+            "example": "John",
+            "description": "First name of the professor"
+          },
+          "last_name": {
+            "type": "string",
+            "example": "Doe",
+            "description": "Last name of the professor"
+          },
+          "email": {
+            "type": "string",
+            "example": "john.doe@example.com",
+            "description": "Email address"
+          },
+          "school_id": {
+            "type": "string",
+            "example": "60d21b4667d0d8992e610c85",
+            "description": "School ID (MongoDB ObjectId)"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["ACTIVE", "INACTIVE"],
+            "example": "ACTIVE",
+            "description": "Professor status (ACTIVE or INACTIVE)"
+          }
+        },
+        "required": ["first_name", "email", "school_id"]
+      },
+      "UpdateProfessorDto": {
+        "type": "object",
+        "properties": {
+          "phone": {
+            "type": "number",
+            "example": 1234567890
+          },
+          "country_code": {
+            "type": "number",
+            "example": 1
+          },
+          "first_name": {
+            "type": "string",
+            "example": "John"
+          },
+          "last_name": {
+            "type": "string",
+            "example": "Doe"
+          },
+          "profile_pic": {
+            "type": "string",
+            "example": "https://bucket.s3.amazonaws.com/profile-pics/123-uuid-filename.jpg",
+            "description": "Profile picture URL from authorized upload"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["ACTIVE", "INACTIVE"],
+            "example": "ACTIVE",
+            "description": "Professor status (ACTIVE or INACTIVE)"
+          }
+        }
+      },
+      "UpdateProfessorPasswordDto": {
+        "type": "object",
+        "properties": {
+          "old_password": {
+            "type": "string",
+            "example": "OldPassword123!"
+          },
+          "new_password": {
+            "type": "string",
+            "example": "NewPassword123!",
+            "description": "Password must be at least 8 characters with uppercase, lowercase, number, and special character"
+          }
+        },
+        "required": ["old_password", "new_password"]
+      },
+      "CreateSchoolAdminDto": {
+        "type": "object",
+        "properties": {
+          "school_name": {
+            "type": "string",
+            "example": "Springfield High"
+          },
+          "school_email": {
+            "type": "string",
+            "example": "contact@springfieldhigh.edu"
+          },
+          "school_website_url": {
+            "type": "string",
+            "example": "https://springfieldhigh.edu"
+          },
+          "user_email": {
+            "type": "string",
+            "example": "admin@springfieldhigh.edu"
+          },
+          "user_first_name": {
+            "type": "string",
+            "example": "Bob"
+          },
+          "user_last_name": {
+            "type": "string",
+            "example": "Johnson"
+          }
+        },
+        "required": [
+          "school_name",
+          "school_email",
+          "school_website_url",
+          "user_email",
+          "user_first_name",
+          "user_last_name"
+        ]
+      },
+      "ResetPasswordDto": {
+        "type": "object",
+        "properties": {
+          "old_password": {
+            "type": "string",
+            "example": "OldPassword123!",
+            "description": "Current password for verification"
+          },
+          "new_password": {
+            "type": "string",
+            "example": "NewPassword123!",
+            "description": "New password - must be at least 8 characters with uppercase, lowercase, number, and special character"
+          }
+        },
+        "required": ["old_password", "new_password"]
+      },
+      "CreateBibliographyDto": {
+        "type": "object",
+        "properties": {
+          "school_id": {
+            "type": "object",
+            "example": "507f1f77bcf86cd799439011",
+            "description": "School ID (required for super admin, optional for other roles)"
+          },
+          "module_id": {
+            "type": "object",
+            "example": "507f1f77bcf86cd799439011",
+            "description": "ID of the parent module"
+          },
+          "chapter_id": {
+            "type": "object",
+            "example": "507f1f77bcf86cd799439012",
+            "description": "ID of the parent chapter"
+          },
+          "title": {
+            "type": "string",
+            "example": "Introduction to Psychology",
+            "description": "Bibliography title"
+          },
+          "description": {
+            "type": "string",
+            "example": "Comprehensive introduction to psychological concepts and theories.",
+            "description": "Description of the bibliography item"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "PDF",
+              "VIDEO",
+              "SLIDE",
+              "CASE_STUDY",
+              "IMAGE",
+              "LINK",
+              "POWERPOINT"
+            ],
+            "example": "PDF",
+            "description": "Type of bibliography item"
+          },
+          "mime_type": {
+            "type": "string",
+            "example": "application/pdf",
+            "description": "MIME type of the file"
+          },
+          "path": {
+            "type": "string",
+            "example": "/uploads/bibliography/intro-psychology.pdf",
+            "description": "File path or URL"
+          },
+          "pages": {
+            "type": "number",
+            "example": 25,
+            "description": "Number of pages (for documents)"
+          },
+          "duration": {
+            "type": "number",
+            "example": 45,
+            "description": "Duration in minutes"
+          }
+        },
+        "required": [
+          "module_id",
+          "chapter_id",
+          "title",
+          "type",
+          "mime_type",
+          "path",
+          "duration"
+        ]
+      },
+      "UpdateBibliographyDto": {
+        "type": "object",
+        "properties": {
+          "school_id": {
+            "type": "object",
+            "example": "507f1f77bcf86cd799439011",
+            "description": "School ID (required for super admin, optional for other roles)"
+          },
+          "module_id": {
+            "type": "object",
+            "example": "507f1f77bcf86cd799439011",
+            "description": "ID of the parent module"
+          },
+          "chapter_id": {
+            "type": "object",
+            "example": "507f1f77bcf86cd799439012",
+            "description": "ID of the parent chapter"
+          },
+          "title": {
+            "type": "string",
+            "example": "Introduction to Psychology",
+            "description": "Bibliography title"
+          },
+          "description": {
+            "type": "string",
+            "example": "Comprehensive introduction to psychological concepts and theories.",
+            "description": "Description of the bibliography item"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "PDF",
+              "VIDEO",
+              "SLIDE",
+              "CASE_STUDY",
+              "IMAGE",
+              "LINK",
+              "POWERPOINT"
+            ],
+            "example": "PDF",
+            "description": "Type of bibliography item"
+          },
+          "mime_type": {
+            "type": "string",
+            "example": "application/pdf",
+            "description": "MIME type of the file"
+          },
+          "path": {
+            "type": "string",
+            "example": "/uploads/bibliography/intro-psychology.pdf",
+            "description": "File path or URL"
+          },
+          "pages": {
+            "type": "number",
+            "example": 25,
+            "description": "Number of pages (for documents)"
+          },
+          "duration": {
+            "type": "number",
+            "example": 45,
+            "description": "Duration in minutes"
+          }
+        }
+      },
+      "ReorderBibliographyDto": {
+        "type": "object",
+        "properties": {
+          "bibliography_id": {
+            "type": "object",
+            "example": "507f1f77bcf86cd799439011",
+            "description": "ID of the bibliography item to reorder"
+          },
+          "new_sequence": {
+            "type": "number",
+            "example": 3,
+            "description": "New sequence number for the bibliography item"
+          }
+        },
+        "required": ["bibliography_id", "new_sequence"]
+      },
+      "ReorderBibliographyItemsDto": {
+        "type": "object",
+        "properties": {
+          "school_id": {
+            "type": "object",
+            "example": "507f1f77bcf86cd799439011",
+            "description": "School ID (required for super admin, optional for other roles)"
+          },
+          "bibliography_items": {
+            "description": "Array of bibliography items with their new sequence numbers",
+            "example": [
+              {
+                "bibliography_id": "507f1f77bcf86cd799439011",
+                "new_sequence": 1
+              },
+              {
+                "bibliography_id": "507f1f77bcf86cd799439012",
+                "new_sequence": 2
+              }
+            ],
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReorderBibliographyDto"
+            }
+          }
+        },
+        "required": ["bibliography_items"]
+      },
+      "CreateQuizGroupDto": {
+        "type": "object",
+        "properties": {
+          "subject": {
+            "type": "string",
+            "example": "Communication Skills Assessment",
+            "description": "Subject of the quiz group"
+          },
+          "description": {
+            "type": "string",
+            "example": "This quiz group assesses communication skills in various scenarios",
+            "description": "Description of the quiz group"
+          },
+          "difficulty": {
+            "type": "string",
+            "example": "INTERMEDIATE",
+            "enum": ["BEGINNER", "INTERMEDIATE", "ADVANCED"],
+            "description": "Difficulty level of the quiz group"
+          },
+          "time_left": {
+            "type": "number",
+            "example": 30,
+            "description": "Time allowed for the quiz in minutes"
+          },
+          "category": {
+            "type": "string",
+            "example": "COMMUNICATION",
+            "description": "Category of the quiz group"
+          },
+          "type": {
+            "type": "string",
+            "example": "MODULE",
+            "enum": ["MODULE", "CHAPTER"],
+            "description": "Type of quiz - whether it belongs to a module or chapter"
+          },
+          "module_id": {
+            "type": "object",
+            "example": "507f1f77bcf86cd799439011",
+            "description": "ID of the parent module (required when type is MODULE)"
+          },
+          "chapter_id": {
+            "type": "object",
+            "example": "507f1f77bcf86cd799439012",
+            "description": "ID of the parent chapter (required when type is CHAPTER)"
+          }
+        },
+        "required": [
+          "subject",
+          "description",
+          "difficulty",
+          "time_left",
+          "category",
+          "type"
+        ]
+      },
+      "UpdateQuizGroupDto": {
+        "type": "object",
+        "properties": {
+          "subject": {
+            "type": "string",
+            "example": "Communication Skills Assessment",
+            "description": "Subject of the quiz group"
+          },
+          "description": {
+            "type": "string",
+            "example": "This quiz group assesses communication skills in various scenarios",
+            "description": "Description of the quiz group"
+          },
+          "difficulty": {
+            "type": "string",
+            "example": "INTERMEDIATE",
+            "enum": ["BEGINNER", "INTERMEDIATE", "ADVANCED"],
+            "description": "Difficulty level of the quiz group"
+          },
+          "time_left": {
+            "type": "number",
+            "example": 30,
+            "description": "Time allowed for the quiz in minutes"
+          },
+          "category": {
+            "type": "string",
+            "example": "COMMUNICATION",
+            "description": "Category of the quiz group"
+          },
+          "type": {
+            "type": "string",
+            "example": "MODULE",
+            "enum": ["MODULE", "CHAPTER"],
+            "description": "Type of quiz - whether it belongs to a module or chapter"
+          },
+          "module_id": {
+            "type": "object",
+            "example": "507f1f77bcf86cd799439011",
+            "description": "ID of the parent module (required when type is MODULE)"
+          },
+          "chapter_id": {
+            "type": "object",
+            "example": "507f1f77bcf86cd799439012",
+            "description": "ID of the parent chapter (required when type is CHAPTER)"
+          }
+        }
+      },
+      "CreateQuizDto": {
+        "type": "object",
+        "properties": {
+          "quiz_group_id": {
+            "type": "object",
+            "example": "507f1f77bcf86cd799439011",
+            "description": "ID of the quiz group this question belongs to"
+          },
+          "question": {
+            "type": "string",
+            "example": "What is the most effective way to establish rapport with a client?",
+            "description": "The question text"
+          },
+          "type": {
+            "type": "string",
+            "example": "SINGLE_SELECT",
+            "enum": ["MULTI_SELECT", "SINGLE_SELECT", "SCENARIO_BASED"],
+            "description": "Type of the quiz question"
+          },
+          "options": {
+            "example": [
+              "Listen actively and show empathy",
+              "Maintain professional distance",
+              "Focus on giving advice immediately",
+              "Ask leading questions"
+            ],
+            "description": "Array of all available options for the question",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "answer": {
+            "example": ["Listen actively and show empathy"],
+            "description": "Array of correct options (must be from the options array)",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "explanation": {
+            "type": "string",
+            "example": "Active listening and empathy are fundamental to building trust and rapport with clients.",
+            "description": "Optional explanation for the correct answer"
+          },
+          "sequence": {
+            "type": "number",
+            "example": 1,
+            "description": "Order of the question in the quiz group (auto-generated if not provided)"
+          },
+          "module_id": {
+            "type": "object",
+            "example": "507f1f77bcf86cd799439011",
+            "description": "ID of the parent module (optional for direct reference)"
+          },
+          "chapter_id": {
+            "type": "object",
+            "example": "507f1f77bcf86cd799439012",
+            "description": "ID of the parent chapter (optional for direct reference)"
+          }
+        },
+        "required": ["quiz_group_id", "question", "type", "options"]
+      },
+      "UpdateQuizDto": {
+        "type": "object",
+        "properties": {
+          "quiz_group_id": {
+            "type": "object",
+            "example": "507f1f77bcf86cd799439011",
+            "description": "ID of the quiz group this question belongs to"
+          },
+          "question": {
+            "type": "string",
+            "example": "What is the most effective way to establish rapport with a client?",
+            "description": "The question text"
+          },
+          "type": {
+            "type": "string",
+            "example": "SINGLE_SELECT",
+            "enum": ["MULTI_SELECT", "SINGLE_SELECT", "SCENARIO_BASED"],
+            "description": "Type of the quiz question"
+          },
+          "options": {
+            "example": [
+              "Listen actively and show empathy",
+              "Maintain professional distance",
+              "Focus on giving advice immediately",
+              "Ask leading questions"
+            ],
+            "description": "Array of all available options for the question",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "answer": {
+            "example": ["Listen actively and show empathy"],
+            "description": "Array of correct options (must be from the options array)",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "explanation": {
+            "type": "string",
+            "example": "Active listening and empathy are fundamental to building trust and rapport with clients.",
+            "description": "Optional explanation for the correct answer"
+          },
+          "sequence": {
+            "type": "number",
+            "example": 1,
+            "description": "Order of the question in the quiz group (auto-generated if not provided)"
+          },
+          "module_id": {
+            "type": "object",
+            "example": "507f1f77bcf86cd799439011",
+            "description": "ID of the parent module (optional for direct reference)"
+          },
+          "chapter_id": {
+            "type": "object",
+            "example": "507f1f77bcf86cd799439012",
+            "description": "ID of the parent chapter (optional for direct reference)"
+          }
+        }
+      },
+      "CreateAISessionDto": {
+        "type": "object",
+        "properties": {
+          "module_id": {
+            "type": "string",
+            "description": "Module ID for the AI session",
+            "example": "507f1f77bcf86cd799439011"
+          }
+        },
+        "required": ["module_id"]
+      },
+      "AISessionResponseDto": {
+        "type": "object",
+        "properties": {
+          "_id": {
+            "type": "string",
+            "description": "AI session ID",
+            "example": "507f1f77bcf86cd799439011"
+          },
+          "module_id": {
+            "type": "string",
+            "description": "Module ID",
+            "example": "507f1f77bcf86cd799439011"
+          },
+          "student_id": {
+            "type": "string",
+            "description": "Student ID (automatically set from JWT token)",
+            "example": "507f1f77bcf86cd799439011"
+          },
+          "created_by": {
+            "type": "string",
+            "description": "Created by user ID",
+            "example": "507f1f77bcf86cd799439011"
+          },
+          "created_by_role": {
+            "type": "string",
+            "description": "Created by role",
+            "example": "student"
+          },
+          "status": {
+            "type": "string",
+            "description": "Session status",
+            "enum": ["ACTIVE", "COMPLETED", "PAUSED", "CANCELLED"],
+            "example": "ACTIVE"
+          },
+          "started_at": {
+            "format": "date-time",
+            "type": "string",
+            "description": "Session start date",
+            "example": "2024-01-15T10:00:00.000Z"
+          },
+          "ended_at": {
+            "format": "date-time",
+            "type": "string",
+            "description": "Session end date",
+            "example": "2024-01-15T11:30:00.000Z"
+          },
+          "total_messages": {
+            "type": "number",
+            "description": "Total number of messages",
+            "example": 25
+          },
+          "student_messages": {
+            "type": "number",
+            "description": "Number of student messages",
+            "example": 12
+          },
+          "ai_messages": {
+            "type": "number",
+            "description": "Number of AI messages",
+            "example": 13
+          },
+          "session_title": {
+            "type": "string",
+            "description": "Session title",
+            "example": "Cardiology Practice Session"
+          },
+          "session_description": {
+            "type": "string",
+            "description": "Session description",
+            "example": "AI practice session for cardiology module"
+          },
+          "session_metadata": {
+            "type": "object",
+            "description": "Session metadata",
+            "example": {
+              "module_title": "Cardiology Basics",
+              "student_name": "John Doe"
+            }
+          },
+          "created_at": {
+            "format": "date-time",
+            "type": "string",
+            "description": "Creation date",
+            "example": "2024-01-15T10:00:00.000Z"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "type": "string",
+            "description": "Last update date",
+            "example": "2024-01-15T11:30:00.000Z"
+          }
+        },
+        "required": [
+          "_id",
+          "module_id",
+          "student_id",
+          "created_by",
+          "created_by_role",
+          "status",
+          "started_at",
+          "total_messages",
+          "student_messages",
+          "ai_messages",
+          "session_title",
+          "session_description",
+          "created_at",
+          "updated_at"
+        ]
+      },
+      "CreateAIMessageDto": {
+        "type": "object",
+        "properties": {
+          "session_id": {
+            "type": "string",
+            "description": "AI session ID",
+            "example": "507f1f77bcf86cd799439011"
+          },
+          "module_id": {
+            "type": "string",
+            "description": "Module ID",
+            "example": "507f1f77bcf86cd799439011"
+          },
+          "message_type": {
+            "type": "string",
+            "description": "Type of message",
+            "enum": ["text", "image", "file", "system"],
+            "example": "text",
+            "default": "text"
+          },
+          "content": {
+            "type": "string",
+            "description": "Message content",
+            "example": "Hello, I am a medical student here to practice"
+          }
+        },
+        "required": ["session_id", "module_id", "message_type", "content"]
+      },
+      "AIMessageResponseDto": {
+        "type": "object",
+        "properties": {
+          "_id": {
+            "type": "string",
+            "description": "Message ID",
+            "example": "507f1f77bcf86cd799439011"
+          },
+          "session_id": {
+            "type": "string",
+            "description": "AI session ID",
+            "example": "507f1f77bcf86cd799439011"
+          },
+          "module_id": {
+            "type": "string",
+            "description": "Module ID",
+            "example": "507f1f77bcf86cd799439011"
+          },
+          "student_id": {
+            "type": "string",
+            "description": "Student ID (automatically set from JWT token)",
+            "example": "507f1f77bcf86cd799439011"
+          },
+          "created_by": {
+            "type": "string",
+            "description": "Created by user ID",
+            "example": "507f1f77bcf86cd799439011"
+          },
+          "created_by_role": {
+            "type": "string",
+            "description": "Created by role",
+            "example": "student"
+          },
+          "sender": {
+            "type": "string",
+            "description": "Message sender",
+            "enum": ["STUDENT", "AI_PATIENT", "AI_SUPERVISOR", "AI_PROFESSOR"],
+            "example": "STUDENT"
+          },
+          "message_type": {
+            "type": "string",
+            "description": "Message type",
+            "enum": ["text", "image", "file", "system"],
+            "example": "text"
+          },
+          "content": {
+            "type": "string",
+            "description": "Message content",
+            "example": "Hello, I am a medical student here to practice"
+          },
+          "attachments": {
+            "description": "File attachments",
+            "example": ["https://example.com/file1.pdf"],
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "message_metadata": {
+            "type": "object",
+            "description": "Message metadata",
+            "example": {
+              "confidence_score": 0.95,
+              "processing_time": 1200
+            }
+          },
+          "is_system_message": {
+            "type": "boolean",
+            "description": "Whether this is a system message",
+            "example": false
+          },
+          "is_error": {
+            "type": "boolean",
+            "description": "Whether this message has an error",
+            "example": false
+          },
+          "error_message": {
+            "type": "string",
+            "description": "Error message if any",
+            "example": "Failed to process message"
+          },
+          "created_at": {
+            "format": "date-time",
+            "type": "string",
+            "description": "Creation date",
+            "example": "2024-01-15T10:05:00.000Z"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "type": "string",
+            "description": "Last update date",
+            "example": "2024-01-15T10:05:00.000Z"
+          }
+        },
+        "required": [
+          "_id",
+          "session_id",
+          "module_id",
+          "student_id",
+          "created_by",
+          "created_by_role",
+          "sender",
+          "message_type",
+          "content",
+          "attachments",
+          "is_system_message",
+          "is_error",
+          "created_at",
+          "updated_at"
+        ]
+      },
+      "CreateAIFeedbackDto": {
+        "type": "object",
+        "properties": {
+          "session_id": {
+            "type": "string",
+            "description": "AI session ID",
+            "example": "507f1f77bcf86cd799439011"
+          }
+        },
+        "required": ["session_id"]
+      },
+      "AIFeedbackResponseDto": {
+        "type": "object",
+        "properties": {
+          "_id": {
+            "type": "string",
+            "description": "Feedback ID",
+            "example": "507f1f77bcf86cd799439011"
+          },
+          "session_id": {
+            "type": "string",
+            "description": "AI session ID",
+            "example": "507f1f77bcf86cd799439011"
+          },
+          "module_id": {
+            "type": "string",
+            "description": "Module ID",
+            "example": "507f1f77bcf86cd799439011"
+          },
+          "student_id": {
+            "type": "string",
+            "description": "Student ID (automatically set from JWT token)",
+            "example": "507f1f77bcf86cd799439011"
+          },
+          "created_by": {
+            "type": "string",
+            "description": "Created by user ID",
+            "example": "507f1f77bcf86cd799439011"
+          },
+          "created_by_role": {
+            "type": "string",
+            "description": "Created by role",
+            "example": "student"
+          },
+          "feedback_type": {
+            "type": "string",
+            "description": "Type of feedback",
+            "enum": [
+              "SUPERVISOR_ANALYSIS",
+              "STUDENT_RATING",
+              "PROFESSOR_FEEDBACK"
+            ],
+            "example": "SUPERVISOR_ANALYSIS"
+          },
+          "title": {
+            "type": "string",
+            "description": "Feedback title",
+            "example": "Session Analysis Report"
+          },
+          "content": {
+            "type": "string",
+            "description": "Detailed feedback content",
+            "example": "The student demonstrated good communication skills but needs improvement in clinical reasoning..."
+          },
+          "rating": {
+            "type": "object",
+            "description": "Numerical rating (1-5)",
+            "example": {
+              "overall_score": 7,
+              "communication_score": 8,
+              "clinical_score": 6,
+              "professionalism_score": 9
+            }
+          },
+          "keywords_for_learning": {
+            "description": "Keywords extracted from the session",
+            "example": ["diagnosis", "symptoms", "treatment"],
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "suggestions": {
+            "description": "Suggestions for improvement",
+            "example": ["Incorrect diagnosis", "Missing vital signs"],
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "missed_opportunities": {
+            "description": "Missed opportunities",
+            "example": ["Good communication", "Professional demeanor"],
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "strengths": {
+            "description": "Strengths",
+            "example": ["Clinical reasoning", "Differential diagnosis"],
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "areas_for_improvement": {
+            "description": "Areas for improvement",
+            "example": ["Clinical reasoning", "Differential diagnosis"],
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "updated_at": {
+            "format": "date-time",
+            "type": "string",
+            "description": "Last update date",
+            "example": "2024-01-15T11:30:00.000Z"
+          }
+        },
+        "required": [
+          "_id",
+          "session_id",
+          "module_id",
+          "student_id",
+          "created_by",
+          "created_by_role",
+          "feedback_type",
+          "title",
+          "content",
+          "rating",
+          "keywords_for_learning",
+          "suggestions",
+          "missed_opportunities",
+          "strengths",
+          "areas_for_improvement",
+          "updated_at"
+        ]
+      },
+      "CreateAIResourceDto": {
+        "type": "object",
+        "properties": {
+          "session_id": {
+            "type": "string",
+            "description": "AI session ID",
+            "example": "507f1f77bcf86cd799439011"
+          }
+        },
+        "required": ["session_id"]
+      },
+      "AIResourceResponseDto": {
+        "type": "object",
+        "properties": {
+          "_id": {
+            "type": "string",
+            "description": "Resource ID",
+            "example": "507f1f77bcf86cd799439011"
+          },
+          "session_id": {
+            "type": "string",
+            "description": "AI session ID",
+            "example": "507f1f77bcf86cd799439011"
+          },
+          "module_id": {
+            "type": "string",
+            "description": "Module ID",
+            "example": "507f1f77bcf86cd799439011"
+          },
+          "student_id": {
+            "type": "string",
+            "description": "Student ID (automatically set from JWT token)",
+            "example": "507f1f77bcf86cd799439011"
+          },
+          "created_by": {
+            "type": "string",
+            "description": "Created by user ID",
+            "example": "507f1f77bcf86cd799439011"
+          },
+          "created_by_role": {
+            "type": "string",
+            "description": "Created by role",
+            "example": "student"
+          },
+          "title": {
+            "type": "string",
+            "description": "Resource title",
+            "example": "Cardiology Diagnosis Guidelines"
+          },
+          "description": {
+            "type": "string",
+            "description": "Resource description",
+            "example": "Comprehensive guide to cardiology diagnosis and treatment protocols"
+          },
+          "resource_type": {
+            "type": "string",
+            "description": "Type of resource",
+            "enum": [
+              "ARTICLE",
+              "VIDEO",
+              "DOCUMENT",
+              "LINK",
+              "BOOK",
+              "PRACTICE_QUESTION",
+              "QUIZ",
+              "OTHER"
+            ],
+            "example": "ARTICLE"
+          },
+          "category": {
+            "type": "string",
+            "description": "Resource category",
+            "enum": [
+              "STUDY_MATERIAL",
+              "PRACTICE_EXERCISE",
+              "REFERENCE",
+              "TUTORIAL",
+              "ASSESSMENT"
+            ],
+            "example": "STUDY_MATERIAL"
+          },
+          "url": {
+            "type": "string",
+            "description": "Resource URL or link",
+            "example": "https://example.com/cardiology-guidelines"
+          },
+          "tags": {
+            "description": "Resource tags",
+            "example": ["cardiology", "diagnosis", "guidelines"],
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "keywords": {
+            "description": "Keywords related to the resource",
+            "example": ["cardiology", "diagnosis", "treatment"],
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "related_mistakes": {
+            "description": "Mistakes this resource addresses",
+            "example": ["Incorrect diagnosis", "Missing vital signs"],
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "duration_minutes": {
+            "type": "number",
+            "description": "Duration in minutes",
+            "example": 30
+          },
+          "author": {
+            "type": "string",
+            "description": "Resource author",
+            "example": "Dr. John Smith"
+          },
+          "source": {
+            "type": "string",
+            "description": "Resource source",
+            "example": "American Medical Association"
+          },
+          "difficulty_level": {
+            "type": "number",
+            "description": "Difficulty level (1-5)",
+            "example": 3
+          },
+          "is_recommended": {
+            "type": "boolean",
+            "description": "Whether this is a recommended resource",
+            "example": true
+          },
+          "is_accessed": {
+            "type": "boolean",
+            "description": "Whether this resource has been accessed",
+            "example": false
+          },
+          "accessed_at": {
+            "format": "date-time",
+            "type": "string",
+            "description": "Access date",
+            "example": "2024-01-15T12:00:00.000Z"
+          },
+          "access_count": {
+            "type": "number",
+            "description": "Number of times accessed",
+            "example": 0
+          },
+          "resource_metadata": {
+            "type": "object",
+            "description": "Resource metadata",
+            "example": {
+              "source_type": "academic",
+              "language": "en"
+            }
+          },
+          "created_at": {
+            "format": "date-time",
+            "type": "string",
+            "description": "Creation date",
+            "example": "2024-01-15T11:35:00.000Z"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "type": "string",
+            "description": "Last update date",
+            "example": "2024-01-15T11:35:00.000Z"
+          }
+        },
+        "required": [
+          "_id",
+          "session_id",
+          "module_id",
+          "student_id",
+          "created_by",
+          "created_by_role",
+          "title",
+          "description",
+          "resource_type",
+          "category",
+          "url",
+          "tags",
+          "keywords",
+          "related_mistakes",
+          "duration_minutes",
+          "difficulty_level",
+          "is_recommended",
+          "is_accessed",
+          "access_count",
+          "created_at",
+          "updated_at"
+        ]
+      }
+    }
+  }
+}

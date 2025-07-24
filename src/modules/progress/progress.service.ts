@@ -320,6 +320,10 @@ export class ProgressService {
       StudentChapterProgress.name,
       StudentChapterProgressSchema,
     );
+    const QuizGroupModel = tenantConnection.model(
+      QuizGroup.name,
+      QuizGroupSchema,
+    );
 
     try {
       // Validate student exists
@@ -336,6 +340,12 @@ export class ProgressService {
       if (!chapter) {
         throw new NotFoundException('Chapter not found');
       }
+
+      // Check if chapter has any quiz groups
+      const hasQuiz = await QuizGroupModel.exists({
+        chapter_id: new Types.ObjectId(chapter_id),
+        deleted_at: null,
+      });
 
       // Check if chapter progress exists
       let chapterProgress = await StudentChapterProgressModel.findOne({
@@ -360,6 +370,12 @@ export class ProgressService {
       chapterProgress.status = ProgressStatusEnum.COMPLETED;
       chapterProgress.completed_at = new Date();
       chapterProgress.last_accessed_at = new Date();
+
+      // If chapter doesn't have a quiz, mark quiz as completed automatically
+      if (!hasQuiz) {
+        chapterProgress.chapter_quiz_completed = true;
+        chapterProgress.quiz_completed_at = new Date();
+      }
 
       await chapterProgress.save();
 

@@ -158,6 +158,64 @@ export class ProfessorController {
     return this.professorService.getProfessorById(id, user);
   }
 
+  @Get(':id/assignments')
+  @Roles(RoleEnum.SCHOOL_ADMIN, RoleEnum.PROFESSOR)
+  @ApiOperation({
+    summary: 'Get professor assignments (School Admin and Professor)',
+  })
+  @ApiParam({
+    name: 'id',
+    type: String,
+    description: 'Professor ID',
+    example: '507f1f77bcf86cd799439011',
+  })
+  @ApiQuery({ name: 'page', required: false, type: Number })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  @ApiResponse({
+    status: 200,
+    description: 'Professor assignments retrieved successfully',
+  })
+  @ApiResponse({ status: 404, description: 'Professor not found' })
+  async getProfessorAssignments(
+    @Param('id', ParseObjectIdPipe) id: Types.ObjectId,
+    @User() user: JWTUserPayload,
+    @Query() paginationDto?: PaginationDto,
+  ) {
+    return this.professorService.getProfessorAssignments(
+      id,
+      user,
+      paginationDto,
+    );
+  }
+
+  @Get(':id/module-access/:moduleId')
+  @Roles(RoleEnum.SCHOOL_ADMIN, RoleEnum.PROFESSOR)
+  @ApiOperation({ summary: 'Check professor access to a specific module' })
+  @ApiParam({
+    name: 'id',
+    type: String,
+    description: 'Professor ID',
+    example: '507f1f77bcf86cd799439011',
+  })
+  @ApiParam({
+    name: 'moduleId',
+    type: String,
+    description: 'Module ID',
+    example: '507f1f77bcf86cd799439011',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Module access check completed',
+  })
+  @ApiResponse({ status: 404, description: 'Professor or module not found' })
+  async checkProfessorModuleAccess(
+    @Param('id', ParseObjectIdPipe) id: Types.ObjectId,
+    @Param('moduleId', ParseObjectIdPipe) moduleId: Types.ObjectId,
+    @User() user: JWTUserPayload,
+  ) {
+    return this.professorService.checkProfessorModuleAccess(id, moduleId, user);
+  }
+
   @Patch(':id/status')
   @Roles(RoleEnum.SCHOOL_ADMIN)
   @ApiOperation({ summary: 'Update professor status (School Admin only)' })
