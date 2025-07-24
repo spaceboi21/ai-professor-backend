@@ -373,10 +373,12 @@ export class ProgressService {
       chapterProgress.completed_at = new Date();
       chapterProgress.last_accessed_at = new Date();
 
-      // If chapter doesn't have a quiz, mark quiz as completed automatically
+      // Auto-complete quiz if chapter has no quiz groups
+      // This ensures chapters without quizzes are considered fully completed
       if (!hasQuiz) {
         chapterProgress.chapter_quiz_completed = true;
         chapterProgress.quiz_completed_at = new Date();
+        chapterProgress.quiz_auto_completed = true;
       }
 
       await chapterProgress.save();

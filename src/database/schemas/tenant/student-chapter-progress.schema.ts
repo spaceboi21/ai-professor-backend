@@ -53,6 +53,9 @@ export class StudentChapterProgress extends Document {
   @Prop({ type: Date })
   quiz_completed_at: Date;
 
+  @Prop({ type: Boolean, default: false })
+  quiz_auto_completed: boolean;
+
   @Prop({ type: Number })
   chapter_sequence: number;
 

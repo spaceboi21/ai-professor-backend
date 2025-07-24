@@ -56,6 +56,7 @@ import {
   ModuleProfessorAssignment,
   ModuleProfessorAssignmentSchema,
 } from 'src/database/schemas/tenant/module-professor-assignment.schema';
+import { QuizTypeEnum } from 'src/common/constants/quiz.constant';
 
 @Injectable()
 export class ModulesService {
@@ -857,6 +858,7 @@ export class ModulesService {
         // Check if module has at least one quiz group
         const quizGroups = await QuizGroupModel.find({
           module_id: new Types.ObjectId(module_id),
+          type: QuizTypeEnum.MODULE,
           deleted_at: null,
         }).lean();
 
