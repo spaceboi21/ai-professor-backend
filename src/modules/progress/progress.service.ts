@@ -704,6 +704,7 @@ export class ProgressService {
         status: attempt.status,
         completed_at: attempt.completed_at,
         ai_verification: aiVerificationResult ? 'completed' : 'failed',
+        ai_verification_report: aiVerificationResult,
       },
     };
   }
