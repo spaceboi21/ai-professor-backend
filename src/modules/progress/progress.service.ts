@@ -383,6 +383,14 @@ export class ProgressService {
 
       await chapterProgress.save();
 
+      // Recalculate module progress to prevent progress from getting stuck
+      // This is especially important when quiz is auto-completed
+      await this.recalculateModuleProgress(
+        new Types.ObjectId(user.id),
+        new Types.ObjectId(chapter.module_id),
+        tenantConnection,
+      );
+
       this.logger.log(
         `Chapter ${chapter_id} marked as complete for student ${user.id}`,
       );
@@ -865,7 +873,6 @@ export class ProgressService {
       StudentChapterProgress.name,
       StudentChapterProgressSchema,
     );
-    console.log('attempt', attempt);
 
     // Update chapter progress - only mark quiz as completed, don't change status
     await StudentChapterProgressModel.findOneAndUpdate(
