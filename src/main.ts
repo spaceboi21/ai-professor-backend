@@ -57,7 +57,7 @@ async function bootstrap() {
 
     // Serve static assets from the uploads directory
     if (process.env.NODE_ENV !== 'production') {
-      app.useStaticAssets(join(__dirname, '..', 'uploads'), {
+      app.useStaticAssets(join(__dirname, '..', '..', 'uploads'), {
         prefix: '/uploads/',
       });
     }

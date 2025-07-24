@@ -341,7 +341,7 @@ export class UploadController {
     try {
       // Use the improved file processing method
       const { buffer, size } = await this.uploadService.processFileBuffer(
-        req,
+        req as any,
         filePath,
         (this.configService.get<number>('MAXIMUM_BIBLIOGRAPHY_FILE_SIZE') ??
           100) *
@@ -421,7 +421,7 @@ export class UploadController {
     try {
       // Use the improved file processing method
       const { buffer, size } = await this.uploadService.processFileBuffer(
-        req,
+        req as any,
         filePath,
         (this.configService.get<number>('MAXIMUM_FILE_SIZE') ?? 5) *
           1024 *
@@ -500,7 +500,7 @@ export class UploadController {
     try {
       // Use the improved file processing method
       const { buffer, size } = await this.uploadService.processFileBuffer(
-        req,
+        req as any,
         filePath,
         (this.configService.get<number>('MAXIMUM_FILE_SIZE') ?? 5) *
           1024 *
