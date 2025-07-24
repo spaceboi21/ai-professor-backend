@@ -186,6 +186,7 @@ export class QuizService {
       // Validate quiz group exists
       const quizGroup = await QuizGroupModel.findOne({
         _id: quizGroups?._id,
+        type: filterDto?.module_id ? QuizTypeEnum.MODULE : QuizTypeEnum.CHAPTER,
         deleted_at: null,
       });
       if (!quizGroup) {
