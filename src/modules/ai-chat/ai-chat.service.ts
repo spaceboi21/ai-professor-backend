@@ -123,7 +123,7 @@ export class AIChatService {
       started_at: new Date(),
       session_title: `AI Practice Session - ${moduleExists.title}`,
       session_description: `AI practice session for ${moduleExists.title}`,
-      scenario: '',
+      scenario: "",
     };
 
     // Start database transaction
@@ -500,6 +500,7 @@ export class AIChatService {
       missed_opportunities: supervisorAnalysisResponse.missed_opportunities,
       areas_for_improvement: supervisorAnalysisResponse.areas_for_improvement,
       strengths: supervisorAnalysisResponse.strengths,
+      skill_gaps: supervisorAnalysisResponse.skill_gaps,
     };
 
     const feedback = new AIFeedbackModel(feedbackData);
