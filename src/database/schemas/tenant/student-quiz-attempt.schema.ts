@@ -79,7 +79,6 @@ export class StudentQuizAttempt extends Document {
       {
         quiz_id: { type: Types.ObjectId, ref: Quiz.name, required: true },
         selected_answers: [String],
-        is_correct: Boolean,
         time_spent_seconds: Number,
       },
     ],
@@ -88,7 +87,6 @@ export class StudentQuizAttempt extends Document {
   answers: Array<{
     quiz_id: Types.ObjectId;
     selected_answers: string[];
-    is_correct: boolean;
     time_spent_seconds: number;
   }>;
 

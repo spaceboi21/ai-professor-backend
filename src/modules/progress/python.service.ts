@@ -2,20 +2,7 @@ import { HttpService } from '@nestjs/axios';
 import { Injectable, Logger } from '@nestjs/common';
 import { firstValueFrom } from 'rxjs';
 import { QuizQuestionTypeEnum } from 'src/common/constants/quiz.constant';
-
-interface QuizQuestion {
-  question: string;
-  type: QuizQuestionTypeEnum;
-  options?: string[];
-  correct_answer?: string;
-}
-
-interface QuizVerificationRequest {
-  module_title: string;
-  module_description: string;
-  questions: QuizQuestion[];
-  max_results?: number;
-}
+import { QuizQuestion } from 'src/common/types/quiz.type';
 
 @Injectable()
 export class PythonService {
@@ -35,52 +22,25 @@ export class PythonService {
     questions: QuizQuestion[],
     max_results: number = 1,
   ) {
-    const module_context = `Module: ${module_title}
-    Description: ${module_description}
+    const module_context = `Questions to verify:
+${questions
+  .map(
+    (q, index) =>
+      `${index + 1}. ${q.question}\n  Type: ${q.question_type}${
+        q.options && q.options.length > 0
+          ? `\n  Options: ${q.options.join(', ')}`
+          : ''
+      }\n  user_answer: ${q.user_answer ?? ''}`,
+  )
+  .join('\n\n')}`;
 
-    Questions to verify:
-    ${questions
-      .map((q, index) => {
-        const questionText =
-          index === 0
-            ? `${index + 1}. ${q.question}`
-            : `    ${index + 1}. ${q.question}`;
-        const typeText = `      Type: ${q.type}`;
-        const optionsText =
-          q.options && q.options.length > 0
-            ? `      Options: ${q.options.join(', ')}`
-            : '';
-        const correctAnswerText = q.correct_answer
-          ? `      Correct Answer: ${q.correct_answer}`
-          : '';
-
-        return [questionText, typeText, optionsText, correctAnswerText]
-          .filter((text) => text)
-          .join('\n');
-      })
-      .join('\n\n')}
-
-    Please verify each question for accuracy, relevance to the module content, and appropriateness for medical education. Provide feedback on question quality, difficulty level, and suggest improvements if needed.`;
-
-    // module_context Module: Find High Blood Pressure Tools and Resources
-    // Description: Find High Blood Pressure Tools and Resources
-
-    // Questions to verify:
-    // 1. blood Pressure q1
-    //   Type: SINGLE_SELECT
-    //   Options: A Group, AB Group, A+ Group, A-
-
-    // 2. blood Pressure q2
-    //   Type: SINGLE_SELECT
-    //   Options: A Group, AB Group, A+ Group, A-
-
-    // Please verify each question for accuracy, relevance to the module content, and appropriateness for medical education. Provide feedback on question quality, difficulty level, and suggest improvements if needed.
-
-    return this._post('/chat/qa/ask', {
+    console.log('module_context', JSON.stringify(module_context));
+    console.log('questions', questions);
+    return this._post('/chat/qa/validate-quiz', {
       module_title,
       module_description,
-      questions,
       module_context,
+      questions,
       max_results,
     });
   }

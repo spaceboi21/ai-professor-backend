@@ -60,6 +60,10 @@ import {
 } from 'src/common/utils/pagination.util';
 import { StudentDashboardDto } from './dto/student-dashboard.dto';
 import { PythonService } from './python.service';
+import {
+  QuizQuestion,
+  QuizVerificationResponse,
+} from 'src/common/types/quiz.type';
 
 @Injectable()
 export class ProgressService {
@@ -618,15 +622,27 @@ export class ProgressService {
     }).lean();
 
     // Prepare questions for AI verification
-    const questionsForAI = quizzes.map((quiz) => ({
-      question: quiz.question,
-      type: quiz.type,
-      options: quiz.options || [],
-      correct_answer: quiz.answer ? quiz.answer.join(', ') : undefined,
-    }));
+    const questionsForAI: QuizQuestion[] = [];
+    answers.map((answer) => {
+      const quiz = quizzes.find(
+        (q) => q._id.toString() === answer.quiz_id.toString(),
+      );
+
+      if (quiz) {
+        questionsForAI.push({
+          question: quiz?.question || '',
+          question_type: quiz?.type,
+          options: quiz?.options || [],
+          user_answer:
+            answer.selected_answers && answer.selected_answers.length > 0
+              ? answer.selected_answers.join(', ')
+              : '',
+        });
+      }
+    });
 
     // Verify quiz questions using Python AI service
-    let aiVerificationResult;
+    let aiVerificationResult: QuizVerificationResponse | null = null;
     try {
       aiVerificationResult = await this.pythonService.quizVerificationByAI(
         module.title,
@@ -640,60 +656,25 @@ export class ProgressService {
       aiVerificationResult = null;
     }
 
-    // Calculate score using manual verification
-    let correctAnswers = 0;
-    const processedAnswers: Array<{
-      quiz_id: Types.ObjectId;
-      selected_answers: string[];
-      is_correct: boolean;
-      time_spent_seconds: number;
-    }> = [];
-
-    for (const answer of answers) {
-      const quiz = quizzes.find(
-        (q) => q._id.toString() === answer.quiz_id.toString(),
-      );
-      if (!quiz) {
-        throw new BadRequestException(
-          `Quiz ${answer.quiz_id} not found in this group`,
-        );
-      }
-
-      // Check if answer is correct
-      const isCorrect = this.areAnswersEqual(
-        answer.selected_answers,
-        quiz.answer,
-      );
-      if (isCorrect) {
-        correctAnswers++;
-      }
-
-      processedAnswers.push({
-        quiz_id: new Types.ObjectId(answer.quiz_id),
-        selected_answers: answer.selected_answers,
-        is_correct: isCorrect,
-        time_spent_seconds: answer.time_spent_seconds || 0,
-      });
-    }
-
-    const scorePercentage =
-      quizzes.length > 0
-        ? Math.round((correctAnswers / quizzes.length) * 100)
-        : 0;
-
     // TODO: Remove this after testing
-    // const isPassed = scorePercentage >= attempt.passing_threshold;
-    const isPassed = true;
+    const isPassed =
+      (aiVerificationResult?.score_percentage || 0) >=
+      attempt.passing_threshold;
+    // const isPassed = true;
 
     // Update attempt
     attempt.status = AttemptStatusEnum.COMPLETED;
     attempt.completed_at = new Date();
-    attempt.score_percentage = scorePercentage;
-    attempt.correct_answers = correctAnswers;
+    attempt.score_percentage = aiVerificationResult?.score_percentage || 0;
+    attempt.correct_answers = aiVerificationResult?.correct_answers || 0;
     attempt.total_questions = quizzes.length;
     attempt.time_taken_seconds = total_time_taken_seconds || 0;
     attempt.is_passed = isPassed;
-    attempt.answers = processedAnswers;
+    attempt.answers = answers?.map((answer) => ({
+      quiz_id: new Types.ObjectId(answer.quiz_id),
+      selected_answers: answer.selected_answers,
+      time_spent_seconds: answer?.time_spent_seconds || 0,
+    }));
 
     // Store AI verification result if available
     if (aiVerificationResult) {
@@ -708,7 +689,7 @@ export class ProgressService {
     }
 
     this.logger.log(
-      `Quiz attempt completed for student ${user.id}, score: ${scorePercentage}%`,
+      `Quiz attempt completed for student ${user.id}, score: ${aiVerificationResult?.score_percentage || 0}%`,
     );
 
     return {
