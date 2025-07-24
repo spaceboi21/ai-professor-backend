@@ -92,6 +92,10 @@ export class StudentQuizAttempt extends Document {
     time_spent_seconds: number;
   }>;
 
+  // Store AI verification result from Python service
+  @Prop({ type: Object, default: null })
+  ai_verification_result: any;
+
   readonly created_at?: Date;
   readonly updated_at?: Date;
 }

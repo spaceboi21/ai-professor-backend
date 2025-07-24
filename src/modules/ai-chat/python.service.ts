@@ -90,32 +90,6 @@ export class PythonService {
   }
 
   /**
-   * Knowledge base Q&A
-   * POST /chat/qa/ask
-   */
-  async quizVerificationByAI(
-    question: string,
-    module_title: string,
-    module_description: string,
-    options?: string[],
-    max_results: number = 1,
-  ) {
-    const module_context = `Module: ${module_title}
-    Description: ${module_description}
-
-    Question: ${question}
-    ${options && options.length > 0 ? `Available Options: ${options.join(', ')}` : ''}
-
-    Please provide an accurate answer based on the module content and medical knowledge. If multiple options are provided, select the most appropriate one and explain your reasoning.`;
-
-    return this._post('/chat/qa/ask', {
-      question,
-      module_context,
-      max_results,
-    });
-  }
-
-  /**
    * Complete session workflow (analyze and recommend in one step)
    * POST /chat/workflow/complete-session
    */
