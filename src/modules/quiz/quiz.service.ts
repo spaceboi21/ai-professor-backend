@@ -170,9 +170,11 @@ export class QuizService {
     }
     if (filterDto?.module_id) {
       filter.module_id = new Types.ObjectId(filterDto.module_id);
+      filter.type = QuizTypeEnum.MODULE;
     }
     if (filterDto?.chapter_id) {
       filter.chapter_id = new Types.ObjectId(filterDto.chapter_id);
+      filter.type = QuizTypeEnum.CHAPTER;
     }
 
     const quizGroups = await QuizGroupModel.findOne(filter).lean();
@@ -185,10 +187,11 @@ export class QuizService {
     if (user.role.name === RoleEnum.STUDENT) {
       // Validate quiz group exists
       const quizGroup = await QuizGroupModel.findOne({
-        _id: quizGroups?._id,
-        type: filterDto?.module_id ? QuizTypeEnum.MODULE : QuizTypeEnum.CHAPTER,
+        _id: new Types.ObjectId(quizGroups?._id),
+
         deleted_at: null,
       });
+
       if (!quizGroup) {
         throw new NotFoundException('Quiz group not found');
       }
