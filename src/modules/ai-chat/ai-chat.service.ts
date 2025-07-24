@@ -123,7 +123,7 @@ export class AIChatService {
       started_at: new Date(),
       session_title: `AI Practice Session - ${moduleExists.title}`,
       session_description: `AI practice session for ${moduleExists.title}`,
-      scenario: "",
+      scenario: '',
     };
 
     // Start database transaction
@@ -223,13 +223,101 @@ export class AIChatService {
     }
 
     const [sessions, total] = await Promise.all([
-      AISessionModel.find(filter)
-        .sort({ created_at: -1 })
-        .populate('module_id', 'title subject description')
-        .populate('student_id', 'first_name last_name email')
-        .skip(paginationOptions?.skip || 0)
-        .limit(paginationOptions?.limit || 10)
-        .exec(),
+      AISessionModel.aggregate([
+        { $match: filter },
+        {
+          $lookup: {
+            from: 'modules',
+            localField: 'module_id',
+            foreignField: '_id',
+            as: 'module',
+            pipeline: [
+              { $project: { _id: 1, title: 1, subject: 1, description: 1 } },
+            ],
+          },
+        },
+        { $unwind: { path: '$module', preserveNullAndEmptyArrays: true } },
+        {
+          $lookup: {
+            from: 'students',
+            localField: 'student_id',
+            foreignField: '_id',
+            as: 'student',
+            pipeline: [
+              { $project: { _id: 1, first_name: 1, last_name: 1, email: 1 } },
+            ],
+          },
+        },
+        {
+          $lookup: {
+            from: 'ai_chat_message',
+            localField: '_id',
+            foreignField: 'session_id',
+            pipeline: [
+              {
+                $group: {
+                  _id: null,
+                  total_messages: { $sum: 1 },
+                  student_messages: {
+                    $sum: {
+                      $cond: [
+                        { $eq: ['$sender', MessageSenderEnum.STUDENT] },
+                        1,
+                        0,
+                      ],
+                    },
+                  },
+                  ai_messages: {
+                    $sum: {
+                      $cond: [
+                        { $eq: ['$sender', MessageSenderEnum.AI_PATIENT] },
+                        1,
+                        0,
+                      ],
+                    },
+                  },
+                },
+              },
+              {
+                $project: {
+                  _id: 0,
+                  total_messages: 1,
+                  student_messages: 1,
+                  ai_messages: 1,
+                },
+              },
+            ],
+            as: 'message_counts',
+          },
+        },
+        {
+          $addFields: {
+            total_messages: {
+              $ifNull: [
+                { $arrayElemAt: ['$message_counts.total_messages', 0] },
+                0,
+              ],
+            },
+            student_messages: {
+              $ifNull: [
+                { $arrayElemAt: ['$message_counts.student_messages', 0] },
+                0,
+              ],
+            },
+            ai_messages: {
+              $ifNull: [
+                { $arrayElemAt: ['$message_counts.ai_messages', 0] },
+                0,
+              ],
+            },
+          },
+        },
+        { $project: { message_counts: 0 } },
+        { $unwind: { path: '$student', preserveNullAndEmptyArrays: true } },
+        { $sort: { status: 1, created_at: -1 } },
+        { $skip: Number(paginationOptions?.skip || 0) },
+        { $limit: Number(paginationOptions?.limit || 10) },
+      ]),
       AISessionModel.countDocuments(filter),
     ]);
 
@@ -407,6 +495,15 @@ export class AIChatService {
       AIChatMessage.name,
       AIChatMessageSchema,
     );
+    const AIChatFeedbackModel = connection.model(
+      AIChatFeedback.name,
+      AIChatFeedbackSchema,
+    );
+    const AIResourceModel = connection.model(AIResource.name, AIResourceSchema);
+    const AISessionModel = connection.model(
+      AIChatSession.name,
+      AIChatSessionSchema,
+    );
 
     const messages = await AIMessageModel.find({
       session_id,
@@ -415,7 +512,22 @@ export class AIChatService {
       .sort({ created_at: 1 })
       .exec();
 
-    return messages;
+    const supervisor_feedback = await AIChatFeedbackModel.find({
+      session_id,
+      deleted_at: null,
+    });
+
+    const professor_resources = await AIResourceModel.find({
+      session_id,
+      deleted_at: null,
+    });
+
+    const sessionDetails = await AISessionModel.findOne({
+      _id: session_id,
+      deleted_at: null,
+    });
+
+    return { messages, supervisor_feedback, professor_resources, sessionDetails };
   }
 
   // ========== FEEDBACK OPERATIONS ==========

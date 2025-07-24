@@ -59,6 +59,7 @@ import {
   createPaginationResult,
 } from 'src/common/utils/pagination.util';
 import { StudentDashboardDto } from './dto/student-dashboard.dto';
+import { PythonService } from './python.service';
 
 @Injectable()
 export class ProgressService {
@@ -70,6 +71,7 @@ export class ProgressService {
     @InjectModel(School.name)
     private readonly schoolModel: Model<School>,
     private readonly tenantConnectionService: TenantConnectionService,
+    private readonly pythonService: PythonService,
   ) {}
 
   // ========== MODULE PROGRESS OPERATIONS ==========
@@ -556,6 +558,7 @@ export class ProgressService {
       StudentQuizAttempt.name,
       StudentQuizAttemptSchema,
     );
+    const ModuleModel = tenantConnection.model(Module.name, ModuleSchema);
 
     // Find the in-progress attempt
     const attempt = await StudentQuizAttemptModel.findOne({
@@ -576,13 +579,42 @@ export class ProgressService {
       throw new NotFoundException('Quiz group not found');
     }
 
+    // Get module details for AI verification
+    const module = await ModuleModel.findById(quizGroup.module_id);
+    if (!module) {
+      throw new NotFoundException('Module not found');
+    }
+
     // Get all quizzes for this group with correct answers
     const quizzes = await QuizModel.find({
       quiz_group_id: new Types.ObjectId(quiz_group_id),
       deleted_at: null,
     }).lean();
 
-    // Calculate score
+    // Prepare questions for AI verification
+    const questionsForAI = quizzes.map((quiz) => ({
+      question: quiz.question,
+      type: quiz.type,
+      options: quiz.options || [],
+      correct_answer: quiz.answer ? quiz.answer.join(', ') : undefined,
+    }));
+
+    // Verify quiz questions using Python AI service
+    let aiVerificationResult;
+    try {
+      aiVerificationResult = await this.pythonService.quizVerificationByAI(
+        module.title,
+        module.description,
+        questionsForAI,
+      );
+      this.logger.log('AI verification completed successfully');
+    } catch (error) {
+      this.logger.error('AI verification failed:', error.message);
+      // Continue with manual verification if AI fails
+      aiVerificationResult = null;
+    }
+
+    // Calculate score using manual verification
     let correctAnswers = 0;
     const processedAnswers: Array<{
       quiz_id: Types.ObjectId;
@@ -637,6 +669,11 @@ export class ProgressService {
     attempt.is_passed = isPassed;
     attempt.answers = processedAnswers;
 
+    // Store AI verification result if available
+    if (aiVerificationResult) {
+      attempt.ai_verification_result = aiVerificationResult;
+    }
+
     await attempt.save();
 
     // Update chapter/module progress if quiz is passed
@@ -659,6 +696,7 @@ export class ProgressService {
         time_taken_seconds: attempt.time_taken_seconds,
         status: attempt.status,
         completed_at: attempt.completed_at,
+        ai_verification: aiVerificationResult ? 'completed' : 'failed',
       },
     };
   }

@@ -8,6 +8,8 @@ import {
   SchoolSchema,
 } from 'src/database/schemas/central/school.schema';
 import { TenantConnectionService } from 'src/database/tenant-connection.service';
+import { PythonService } from './python.service';
+import { HttpModule } from '@nestjs/axios';
 
 @Module({
   imports: [
@@ -15,9 +17,10 @@ import { TenantConnectionService } from 'src/database/tenant-connection.service'
       { name: User.name, schema: UserSchema },
       { name: School.name, schema: SchoolSchema },
     ]),
+    HttpModule,
   ],
   controllers: [ProgressController],
-  providers: [ProgressService, TenantConnectionService],
+  providers: [ProgressService, TenantConnectionService, PythonService],
   exports: [ProgressService],
 })
 export class ProgressModule {}
