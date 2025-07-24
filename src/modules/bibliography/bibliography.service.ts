@@ -605,17 +605,17 @@ export class BibliographyService {
         }
 
         // Optional Step 3: If reordering is required (like for chapters)
-        // await BibliographyModel.updateMany(
-        //   {
-        //     chapter_id,
-        //     sequence: { $gt: sequence },
-        //     deleted_at: null,
-        //   },
-        //   {
-        //     $inc: { sequence: -1 },
-        //     updated_at: new Date(),
-        //   },
-        // ).session(session);
+        await BibliographyModel.updateMany(
+          {
+            chapter_id,
+            sequence: { $gt: sequence },
+            deleted_at: null,
+          },
+          {
+            $inc: { sequence: -1 },
+            updated_at: new Date(),
+          },
+        ).session(session);
 
         // Step 4: Recalculate chapter duration
         await this.chaptersService.recalculateChapterDuration(
