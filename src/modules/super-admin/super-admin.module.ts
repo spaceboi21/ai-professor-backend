@@ -7,6 +7,7 @@ import {
   School,
   SchoolSchema,
 } from 'src/database/schemas/central/school.schema';
+import { ActivityLogModule } from '../activity-log/activity-log.module';
 
 @Module({
   imports: [
@@ -14,6 +15,7 @@ import {
       { name: User.name, schema: UserSchema },
       { name: School.name, schema: SchoolSchema },
     ]),
+    ActivityLogModule,
   ],
   controllers: [SuperAdminController],
   providers: [SuperAdminService],

@@ -1,0 +1,578 @@
+import {
+  Injectable,
+  Logger,
+  BadRequestException,
+  UnauthorizedException,
+} from '@nestjs/common';
+import { InjectModel } from '@nestjs/mongoose';
+import { Model, Types } from 'mongoose';
+import {
+  ActivityLog,
+  ActivityLogSchema,
+} from 'src/database/schemas/central/activity-log.schema';
+import { User } from 'src/database/schemas/central/user.schema';
+import { School } from 'src/database/schemas/central/school.schema';
+import {
+  ActivityTypeEnum,
+  ActivityCategoryEnum,
+  ActivityLevelEnum,
+  ACTIVITY_CATEGORY_MAPPING,
+  ACTIVITY_LEVEL_MAPPING,
+} from 'src/common/constants/activity.constant';
+import { RoleEnum } from 'src/common/constants/roles.constant';
+import { JWTUserPayload } from 'src/common/types/jwr-user.type';
+import {
+  getPaginationOptions,
+  createPaginationResult,
+} from 'src/common/utils/pagination.util';
+import { PaginationDto } from 'src/common/dto/pagination.dto';
+
+export interface CreateActivityLogDto {
+  activity_type: ActivityTypeEnum;
+  description: string;
+  performed_by: Types.ObjectId;
+  performed_by_role: RoleEnum;
+  school_id?: Types.ObjectId;
+  school_name?: string;
+  target_user_id?: Types.ObjectId;
+  target_user_email?: string;
+  target_user_role?: RoleEnum;
+  module_id?: string;
+  module_name?: string;
+  chapter_id?: string;
+  chapter_name?: string;
+  metadata?: Record<string, any>;
+  ip_address?: string;
+  user_agent?: string;
+  session_id?: string;
+  is_success?: boolean;
+  error_message?: string;
+  execution_time_ms?: number;
+  endpoint?: string;
+  http_method?: string;
+  http_status_code?: number;
+  status?: 'SUCCESS' | 'WARNING' | 'ERROR' | 'INFO';
+}
+
+export interface ActivityLogFilterDto extends PaginationDto {
+  activity_type?: ActivityTypeEnum;
+  category?: ActivityCategoryEnum;
+  level?: ActivityLevelEnum;
+  performed_by_role?: RoleEnum;
+  school_id?: string;
+  target_user_id?: string;
+  module_id?: string;
+  chapter_id?: string;
+  is_success?: boolean;
+  status?: 'SUCCESS' | 'WARNING' | 'ERROR' | 'INFO';
+  start_date?: string;
+  end_date?: string;
+  search?: string;
+}
+
+interface PopulatedUser {
+  _id: Types.ObjectId;
+  first_name: string;
+  last_name: string;
+  email: string;
+}
+
+interface PopulatedSchool {
+  _id: Types.ObjectId;
+  name: string;
+}
+
+@Injectable()
+export class ActivityLogService {
+  private readonly logger = new Logger(ActivityLogService.name);
+
+  constructor(
+    @InjectModel(ActivityLog.name)
+    private readonly activityLogModel: Model<ActivityLog>,
+    @InjectModel(User.name)
+    private readonly userModel: Model<User>,
+    @InjectModel(School.name)
+    private readonly schoolModel: Model<School>,
+  ) {}
+
+  async createActivityLog(
+    createActivityLogDto: CreateActivityLogDto,
+  ): Promise<ActivityLog> {
+    try {
+      const { activity_type, ...rest } = createActivityLogDto;
+
+      const category = ACTIVITY_CATEGORY_MAPPING[activity_type];
+      const level = ACTIVITY_LEVEL_MAPPING[activity_type];
+
+      const activityLog = new this.activityLogModel({
+        activity_type,
+        category,
+        level,
+        ...rest,
+      });
+
+      const savedLog = await activityLog.save();
+      this.logger.log(
+        `Activity logged: ${activity_type} by ${createActivityLogDto.performed_by}`,
+      );
+
+      return savedLog;
+    } catch (error) {
+      // Log the error but don't throw - this prevents breaking the main application
+      this.logger.error('Error creating activity log (non-critical):', {
+        error: error.message,
+        activityType: createActivityLogDto.activity_type,
+        performedBy: createActivityLogDto.performed_by,
+        endpoint: createActivityLogDto.endpoint,
+      });
+
+      // Return a mock log object to prevent downstream errors
+      return {
+        _id: 'error-log-id',
+        activity_type: createActivityLogDto.activity_type,
+        category: ACTIVITY_CATEGORY_MAPPING[createActivityLogDto.activity_type],
+        level: ACTIVITY_LEVEL_MAPPING[createActivityLogDto.activity_type],
+        description: createActivityLogDto.description,
+        performed_by: createActivityLogDto.performed_by,
+        performed_by_role: createActivityLogDto.performed_by_role,
+        is_success: false,
+        status: 'ERROR',
+        created_at: new Date(),
+        updated_at: new Date(),
+      } as any;
+    }
+  }
+
+  async getActivityLogs(
+    currentUser: JWTUserPayload,
+    filterDto: ActivityLogFilterDto,
+  ) {
+    try {
+      this.logger.log(
+        `Getting activity logs for user: ${currentUser.id} with role: ${currentUser.role.name}`,
+      );
+
+      const options = getPaginationOptions(filterDto);
+      const query: any = {};
+
+      // Apply role-based access control
+      await this.applyAccessControl(query, currentUser);
+
+      // Apply filters
+      if (filterDto.activity_type) {
+        query.activity_type = filterDto.activity_type;
+      }
+
+      if (filterDto.category) {
+        query.category = filterDto.category;
+      }
+
+      if (filterDto.level) {
+        query.level = filterDto.level;
+      }
+
+      if (filterDto.performed_by_role) {
+        query.performed_by_role = filterDto.performed_by_role;
+      }
+
+      if (filterDto.school_id) {
+        query.school_id = new Types.ObjectId(filterDto.school_id);
+      }
+
+      if (filterDto.target_user_id) {
+        query.target_user_id = new Types.ObjectId(filterDto.target_user_id);
+      }
+
+      if (filterDto.module_id) {
+        query.module_id = filterDto.module_id;
+      }
+
+      if (filterDto.chapter_id) {
+        query.chapter_id = filterDto.chapter_id;
+      }
+
+      if (filterDto.is_success !== undefined) {
+        query.is_success = filterDto.is_success;
+      }
+
+      if (filterDto.status) {
+        query.status = filterDto.status;
+      }
+
+      // Date range filter
+      if (filterDto.start_date || filterDto.end_date) {
+        query.created_at = {};
+        if (filterDto.start_date) {
+          query.created_at.$gte = new Date(filterDto.start_date);
+        }
+        if (filterDto.end_date) {
+          query.created_at.$lte = new Date(filterDto.end_date);
+        }
+      }
+
+      // Text search
+      if (filterDto.search) {
+        query.$or = [
+          { description: { $regex: filterDto.search, $options: 'i' } },
+          { school_name: { $regex: filterDto.search, $options: 'i' } },
+          { target_user_email: { $regex: filterDto.search, $options: 'i' } },
+          { module_name: { $regex: filterDto.search, $options: 'i' } },
+          { chapter_name: { $regex: filterDto.search, $options: 'i' } },
+        ];
+      }
+
+      // Get logs with user and school population
+      const logs = await this.activityLogModel
+        .find(query)
+        .populate('performed_by', 'first_name last_name email')
+        .populate('school_id', 'name')
+        .populate('target_user_id', 'first_name last_name email')
+        .sort({ created_at: -1 })
+        .skip(options.skip)
+        .limit(options.limit)
+        .lean();
+
+      const total = await this.activityLogModel.countDocuments(query);
+
+      // Transform the data for better readability
+      const transformedLogs = logs.map((log) => {
+        const performedBy = log.performed_by as any;
+        const school = log.school_id as any;
+        const targetUser = log.target_user_id as any;
+
+        return {
+          id: log._id,
+          timestamp: log.created_at,
+          activity_type: log.activity_type,
+          category: log.category,
+          level: log.level,
+          description: log.description,
+          performed_by:
+            performedBy && performedBy.first_name
+              ? {
+                  id: performedBy._id,
+                  name: `${performedBy.first_name} ${performedBy.last_name}`.trim(),
+                  email: performedBy.email,
+                  role: log.performed_by_role,
+                }
+              : null,
+          school:
+            school && school.name
+              ? {
+                  id: school._id,
+                  name: school.name,
+                }
+              : null,
+          target_user:
+            targetUser && targetUser.first_name
+              ? {
+                  id: targetUser._id,
+                  name: `${targetUser.first_name} ${targetUser.last_name}`.trim(),
+                  email: targetUser.email,
+                  role: log.target_user_role,
+                }
+              : null,
+          module: log.module_id
+            ? {
+                id: log.module_id,
+                name: log.module_name,
+              }
+            : null,
+          chapter: log.chapter_id
+            ? {
+                id: log.chapter_id,
+                name: log.chapter_name,
+              }
+            : null,
+          metadata: log.metadata,
+          ip_address: log.ip_address,
+          user_agent: log.user_agent,
+          is_success: log.is_success,
+          error_message: log.error_message,
+          execution_time_ms: log.execution_time_ms,
+          endpoint: log.endpoint,
+          http_method: log.http_method,
+          http_status_code: log.http_status_code,
+          status: log.status,
+        };
+      });
+
+      return createPaginationResult(transformedLogs, total, options);
+    } catch (error) {
+      this.logger.error('Error getting activity logs (non-critical):', {
+        error: error.message,
+        userId: currentUser.id,
+        userRole: currentUser.role.name,
+      });
+
+      // Return empty result instead of throwing
+      return createPaginationResult([], 0, getPaginationOptions(filterDto));
+    }
+  }
+
+  private isPopulatedUser(user: any): user is PopulatedUser {
+    return user && typeof user === 'object' && 'first_name' in user;
+  }
+
+  private isPopulatedSchool(school: any): school is PopulatedSchool {
+    return school && typeof school === 'object' && 'name' in school;
+  }
+
+  private async applyAccessControl(
+    query: any,
+    currentUser: JWTUserPayload,
+  ): Promise<void> {
+    switch (currentUser.role.name) {
+      case RoleEnum.SUPER_ADMIN:
+        // Super admin can see all logs - no restrictions
+        break;
+
+      case RoleEnum.SCHOOL_ADMIN:
+        // School admin can only see logs from their school
+        if (!currentUser.school_id) {
+          throw new UnauthorizedException(
+            'School admin must belong to a school',
+          );
+        }
+        query.school_id = new Types.ObjectId(currentUser.school_id);
+        break;
+
+      case RoleEnum.PROFESSOR:
+        // Professor can see logs from their school and their own activities
+        if (!currentUser.school_id) {
+          throw new UnauthorizedException('Professor must belong to a school');
+        }
+        query.$or = [
+          { school_id: new Types.ObjectId(currentUser.school_id) },
+          { performed_by: new Types.ObjectId(currentUser.id) },
+        ];
+        break;
+
+      case RoleEnum.STUDENT:
+        // Students can only see their own activities
+        query.performed_by = new Types.ObjectId(currentUser.id);
+        break;
+
+      default:
+        throw new UnauthorizedException('Invalid user role');
+    }
+  }
+
+  async getActivityLogById(
+    logId: string,
+    currentUser: JWTUserPayload,
+  ): Promise<any> {
+    const log = await this.activityLogModel
+      .findById(logId)
+      .populate('performed_by', 'first_name last_name email')
+      .populate('school_id', 'name')
+      .populate('target_user_id', 'first_name last_name email')
+      .lean();
+
+    if (!log) {
+      throw new BadRequestException('Activity log not found');
+    }
+
+    // Check access control
+    const query: any = { _id: new Types.ObjectId(logId) };
+    await this.applyAccessControl(query, currentUser);
+
+    const hasAccess = await this.activityLogModel.exists(query);
+    if (!hasAccess) {
+      throw new UnauthorizedException('Access denied to this activity log');
+    }
+
+    const performedBy = log.performed_by as any;
+    const school = log.school_id as any;
+    const targetUser = log.target_user_id as any;
+
+    return {
+      id: log._id,
+      timestamp: log.created_at,
+      activity_type: log.activity_type,
+      category: log.category,
+      level: log.level,
+      description: log.description,
+      performed_by:
+        performedBy && performedBy.first_name
+          ? {
+              id: performedBy._id,
+              name: `${performedBy.first_name} ${performedBy.last_name}`.trim(),
+              email: performedBy.email,
+              role: log.performed_by_role,
+            }
+          : null,
+      school:
+        school && school.name
+          ? {
+              id: school._id,
+              name: school.name,
+            }
+          : null,
+      target_user:
+        targetUser && targetUser.first_name
+          ? {
+              id: targetUser._id,
+              name: `${targetUser.first_name} ${targetUser.last_name}`.trim(),
+              email: targetUser.email,
+              role: log.target_user_role,
+            }
+          : null,
+      module: log.module_id
+        ? {
+            id: log.module_id,
+            name: log.module_name,
+          }
+        : null,
+      chapter: log.chapter_id
+        ? {
+            id: log.chapter_id,
+            name: log.chapter_name,
+          }
+        : null,
+      metadata: log.metadata,
+      ip_address: log.ip_address,
+      user_agent: log.user_agent,
+      is_success: log.is_success,
+      error_message: log.error_message,
+      execution_time_ms: log.execution_time_ms,
+      endpoint: log.endpoint,
+      http_method: log.http_method,
+      http_status_code: log.http_status_code,
+      status: log.status,
+    };
+  }
+
+  async getActivityStats(currentUser: JWTUserPayload, days: number = 30) {
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - days);
+
+    const query: any = { created_at: { $gte: startDate } };
+    await this.applyAccessControl(query, currentUser);
+
+    const stats = await this.activityLogModel.aggregate([
+      { $match: query },
+      {
+        $group: {
+          _id: {
+            activity_type: '$activity_type',
+            category: '$category',
+            level: '$level',
+            is_success: '$is_success',
+          },
+          count: { $sum: 1 },
+        },
+      },
+      {
+        $group: {
+          _id: '$_id.category',
+          activities: {
+            $push: {
+              type: '$_id.activity_type',
+              level: '$_id.level',
+              success_count: {
+                $cond: [{ $eq: ['$_id.is_success', true] }, '$count', 0],
+              },
+              error_count: {
+                $cond: [{ $eq: ['$_id.is_success', false] }, '$count', 0],
+              },
+              total_count: '$count',
+            },
+          },
+        },
+      },
+    ]);
+
+    return stats;
+  }
+
+  async exportActivityLogs(
+    currentUser: JWTUserPayload,
+    filterDto: ActivityLogFilterDto,
+  ): Promise<any[]> {
+    this.logger.log(`Exporting activity logs for user: ${currentUser.id}`);
+
+    const query: any = {};
+    await this.applyAccessControl(query, currentUser);
+
+    // Apply the same filters as getActivityLogs
+    if (filterDto.activity_type) query.activity_type = filterDto.activity_type;
+    if (filterDto.category) query.category = filterDto.category;
+    if (filterDto.level) query.level = filterDto.level;
+    if (filterDto.performed_by_role)
+      query.performed_by_role = filterDto.performed_by_role;
+    if (filterDto.school_id)
+      query.school_id = new Types.ObjectId(filterDto.school_id);
+    if (filterDto.target_user_id)
+      query.target_user_id = new Types.ObjectId(filterDto.target_user_id);
+    if (filterDto.module_id) query.module_id = filterDto.module_id;
+    if (filterDto.chapter_id) query.chapter_id = filterDto.chapter_id;
+    if (filterDto.is_success !== undefined)
+      query.is_success = filterDto.is_success;
+
+    if (filterDto.start_date || filterDto.end_date) {
+      query.created_at = {};
+      if (filterDto.start_date)
+        query.created_at.$gte = new Date(filterDto.start_date);
+      if (filterDto.end_date)
+        query.created_at.$lte = new Date(filterDto.end_date);
+    }
+
+    if (filterDto.search) {
+      query.$or = [
+        { description: { $regex: filterDto.search, $options: 'i' } },
+        { school_name: { $regex: filterDto.search, $options: 'i' } },
+        { target_user_email: { $regex: filterDto.search, $options: 'i' } },
+        { module_name: { $regex: filterDto.search, $options: 'i' } },
+        { chapter_name: { $regex: filterDto.search, $options: 'i' } },
+      ];
+    }
+
+    const logs = await this.activityLogModel
+      .find(query)
+      .populate('performed_by', 'first_name last_name email')
+      .populate('school_id', 'name')
+      .populate('target_user_id', 'first_name last_name email')
+      .sort({ created_at: -1 })
+      .lean();
+
+    return logs.map((log) => {
+      const performedBy = log.performed_by as any;
+      const school = log.school_id as any;
+      const targetUser = log.target_user_id as any;
+
+      return {
+        timestamp: log.created_at,
+        activity_type: log.activity_type,
+        category: log.category,
+        level: log.level,
+        description: log.description,
+        performed_by:
+          performedBy && performedBy.first_name
+            ? `${performedBy.first_name} ${performedBy.last_name}`.trim()
+            : 'N/A',
+        performed_by_email:
+          performedBy && performedBy.email ? performedBy.email : 'N/A',
+        performed_by_role: log.performed_by_role,
+        school: school && school.name ? school.name : 'N/A',
+        target_user:
+          targetUser && targetUser.first_name
+            ? `${targetUser.first_name} ${targetUser.last_name}`.trim()
+            : 'N/A',
+        target_user_email:
+          targetUser && targetUser.email ? targetUser.email : 'N/A',
+        target_user_role: log.target_user_role || 'N/A',
+        module: log.module_name || 'N/A',
+        chapter: log.chapter_name || 'N/A',
+        is_success: log.is_success ? 'Success' : 'Failed',
+        error_message: log.error_message || 'N/A',
+        execution_time_ms: log.execution_time_ms || 'N/A',
+        ip_address: log.ip_address || 'N/A',
+        endpoint: log.endpoint || 'N/A',
+        http_method: log.http_method || 'N/A',
+        http_status_code: log.http_status_code || 'N/A',
+        status: log.status,
+      };
+    });
+  }
+}

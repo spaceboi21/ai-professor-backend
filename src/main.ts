@@ -5,6 +5,7 @@ import { AppModule } from './app.module';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { join } from 'path';
+import { ActivityLogInterceptor } from './common/interceptors/activity-log.interceptor';
 
 async function bootstrap() {
   const logger = new Logger('Bootstrap');
@@ -13,6 +14,10 @@ async function bootstrap() {
     // Create the NestJS application
     const app = await NestFactory.create<NestExpressApplication>(AppModule);
     const configService = app.get(ConfigService);
+
+    // Apply global interceptor for activity logging
+    const activityLogInterceptor = app.get(ActivityLogInterceptor);
+    app.useGlobalInterceptors(activityLogInterceptor);
 
     // Parse multiple frontend origins from environment variable
     const frontendOriginString =
