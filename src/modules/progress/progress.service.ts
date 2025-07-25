@@ -657,10 +657,10 @@ export class ProgressService {
     }
 
     // TODO: Remove this after testing
-    // const isPassed =
-    //   (aiVerificationResult?.score_percentage || 0) >=
-    //   attempt.passing_threshold;
-    const isPassed = true;
+    const isPassed =
+      (aiVerificationResult?.score_percentage || 0) >=
+      attempt.passing_threshold;
+    // const isPassed = true;
 
     // Update attempt
     attempt.status = AttemptStatusEnum.COMPLETED;
