@@ -527,7 +527,12 @@ export class AIChatService {
       deleted_at: null,
     });
 
-    return { messages, supervisor_feedback, professor_resources, sessionDetails };
+    return {
+      messages,
+      supervisor_feedback,
+      professor_resources,
+      sessionDetails,
+    };
   }
 
   // ========== FEEDBACK OPERATIONS ==========
