@@ -122,7 +122,7 @@ export class ActivityLogService {
       this.logger.error('Error creating activity log (non-critical):', {
         error: error.message,
         activityType: createActivityLogDto.activity_type,
-        performedBy: createActivityLogDto.performed_by,
+        performedBy: new Types.ObjectId(createActivityLogDto.performed_by),
         endpoint: createActivityLogDto.endpoint,
       });
 
@@ -133,7 +133,7 @@ export class ActivityLogService {
         category: ACTIVITY_CATEGORY_MAPPING[createActivityLogDto.activity_type],
         level: ACTIVITY_LEVEL_MAPPING[createActivityLogDto.activity_type],
         description: createActivityLogDto.description,
-        performed_by: createActivityLogDto.performed_by,
+        performed_by: new Types.ObjectId(createActivityLogDto.performed_by),
         performed_by_role: createActivityLogDto.performed_by_role,
         is_success: false,
         status: 'ERROR',
@@ -184,11 +184,11 @@ export class ActivityLogService {
       }
 
       if (filterDto.module_id) {
-        query.module_id = filterDto.module_id;
+        query.module_id = new Types.ObjectId(filterDto.module_id);
       }
 
       if (filterDto.chapter_id) {
-        query.chapter_id = filterDto.chapter_id;
+        query.chapter_id = new Types.ObjectId(filterDto.chapter_id);
       }
 
       if (filterDto.is_success !== undefined) {

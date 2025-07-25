@@ -15,6 +15,7 @@ import {
 import { ActivityTypeEnum } from 'src/common/constants/activity.constant';
 import { RoleEnum } from 'src/common/constants/roles.constant';
 import { JWTUserPayload } from 'src/common/types/jwr-user.type';
+import { Types } from 'mongoose';
 
 @Injectable()
 export class ActivityLogInterceptor implements NestInterceptor {
@@ -114,11 +115,11 @@ export class ActivityLogInterceptor implements NestInterceptor {
       const createActivityLogDto: CreateActivityLogDto = {
         activity_type: activityType,
         description,
-        performed_by: user.id as any,
+        performed_by: new Types.ObjectId(user.id) as any,
         performed_by_role: user.role.name as RoleEnum,
-        school_id: user.school_id as any,
+        school_id: user.school_id as Types.ObjectId,
         school_name: metadata.school_name,
-        target_user_id: metadata.target_user_id,
+        target_user_id: new Types.ObjectId(metadata.target_user_id),
         target_user_email: metadata.target_user_email,
         target_user_role: metadata.target_user_role,
         module_id: metadata.module_id,
