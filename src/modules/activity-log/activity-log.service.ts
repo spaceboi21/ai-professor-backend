@@ -37,9 +37,9 @@ export interface CreateActivityLogDto {
   target_user_id?: Types.ObjectId;
   target_user_email?: string;
   target_user_role?: RoleEnum;
-  module_id?: string;
+  module_id?: Types.ObjectId;
   module_name?: string;
-  chapter_id?: string;
+  chapter_id?: Types.ObjectId;
   chapter_name?: string;
   metadata?: Record<string, any>;
   ip_address?: string;
@@ -219,11 +219,19 @@ export class ActivityLogService {
       }
 
       if (filterDto.module_id) {
-        query.module_id = filterDto.module_id;
+        const moduleObjectId = this.safeObjectIdConversion(filterDto.module_id);
+        if (moduleObjectId) {
+          query.module_id = moduleObjectId;
+        }
       }
 
       if (filterDto.chapter_id) {
-        query.chapter_id = filterDto.chapter_id;
+        const chapterObjectId = this.safeObjectIdConversion(
+          filterDto.chapter_id,
+        );
+        if (chapterObjectId) {
+          query.chapter_id = chapterObjectId;
+        }
       }
 
       if (filterDto.is_success !== undefined) {
@@ -587,8 +595,18 @@ export class ActivityLogService {
         query.target_user_id = targetUserObjectId;
       }
     }
-    if (filterDto.module_id) query.module_id = filterDto.module_id;
-    if (filterDto.chapter_id) query.chapter_id = filterDto.chapter_id;
+    if (filterDto.module_id) {
+      const moduleObjectId = this.safeObjectIdConversion(filterDto.module_id);
+      if (moduleObjectId) {
+        query.module_id = moduleObjectId;
+      }
+    }
+    if (filterDto.chapter_id) {
+      const chapterObjectId = this.safeObjectIdConversion(filterDto.chapter_id);
+      if (chapterObjectId) {
+        query.chapter_id = chapterObjectId;
+      }
+    }
     if (filterDto.is_success !== undefined)
       query.is_success = filterDto.is_success;
 

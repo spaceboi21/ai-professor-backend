@@ -115,7 +115,7 @@ export class ActivityLogInterceptor implements NestInterceptor {
         activityType,
         isSuccess,
       );
-      const metadata = this.extractMetadata(request, response);
+      const metadata = this.extractMetadata(request, response, activityType);
 
       // Determine status based on HTTP response code and success
       let status: 'SUCCESS' | 'WARNING' | 'ERROR' | 'INFO' = 'SUCCESS';
@@ -141,9 +141,11 @@ export class ActivityLogInterceptor implements NestInterceptor {
         ),
         target_user_email: metadata.target_user_email,
         target_user_role: metadata.target_user_role,
-        module_id: metadata.module_id || undefined,
+        module_id: this.safeObjectIdConversion(metadata.module_id?.toString()),
         module_name: metadata.module_name,
-        chapter_id: metadata.chapter_id || undefined,
+        chapter_id: this.safeObjectIdConversion(
+          metadata.chapter_id?.toString(),
+        ),
         chapter_name: metadata.chapter_name,
         metadata: {
           ...metadata,
@@ -383,6 +385,7 @@ export class ActivityLogInterceptor implements NestInterceptor {
   private extractMetadata(
     request: Request,
     response: Response,
+    activityType: ActivityTypeEnum,
   ): Record<string, any> {
     const metadata: Record<string, any> = {};
 
@@ -401,20 +404,30 @@ export class ActivityLogInterceptor implements NestInterceptor {
         metadata.target_user_id = request.params.id;
       }
 
-      // Extract module information
-      if (request.params?.module_id) {
-        metadata.module_id = request.params.module_id;
-      }
-      if (request.body?.module_name) {
-        metadata.module_name = request.body.module_name;
+      // Only extract module information for module-related activities
+      if (this.isModuleRelatedActivity(activityType)) {
+        if (request.params?.module_id) {
+          metadata.module_id = request.params.module_id;
+        }
+        if (request.body?.module_id) {
+          metadata.module_id = request.body.module_id;
+        }
+        if (request.body?.module_name) {
+          metadata.module_name = request.body.module_name;
+        }
       }
 
-      // Extract chapter information
-      if (request.params?.chapter_id) {
-        metadata.chapter_id = request.params.chapter_id;
-      }
-      if (request.body?.chapter_name) {
-        metadata.chapter_name = request.body.chapter_name;
+      // Only extract chapter information for chapter-related activities
+      if (this.isChapterRelatedActivity(activityType)) {
+        if (request.params?.chapter_id) {
+          metadata.chapter_id = request.params.chapter_id;
+        }
+        if (request.body?.chapter_id) {
+          metadata.chapter_id = request.body.chapter_id;
+        }
+        if (request.body?.chapter_name) {
+          metadata.chapter_name = request.body.chapter_name;
+        }
       }
     } catch (error) {
       // If metadata extraction fails, just log it and continue
@@ -422,6 +435,36 @@ export class ActivityLogInterceptor implements NestInterceptor {
     }
 
     return metadata;
+  }
+
+  private isModuleRelatedActivity(activityType: ActivityTypeEnum): boolean {
+    return [
+      ActivityTypeEnum.MODULE_CREATED,
+      ActivityTypeEnum.MODULE_UPDATED,
+      ActivityTypeEnum.MODULE_DELETED,
+      ActivityTypeEnum.MODULE_ASSIGNED,
+      ActivityTypeEnum.CHAPTER_CREATED,
+      ActivityTypeEnum.CHAPTER_UPDATED,
+      ActivityTypeEnum.CHAPTER_DELETED,
+      ActivityTypeEnum.CHAPTER_REORDERED,
+      ActivityTypeEnum.QUIZ_CREATED,
+      ActivityTypeEnum.QUIZ_UPDATED,
+      ActivityTypeEnum.QUIZ_DELETED,
+      ActivityTypeEnum.QUIZ_ATTEMPTED,
+    ].includes(activityType);
+  }
+
+  private isChapterRelatedActivity(activityType: ActivityTypeEnum): boolean {
+    return [
+      ActivityTypeEnum.CHAPTER_CREATED,
+      ActivityTypeEnum.CHAPTER_UPDATED,
+      ActivityTypeEnum.CHAPTER_DELETED,
+      ActivityTypeEnum.CHAPTER_REORDERED,
+      ActivityTypeEnum.QUIZ_CREATED,
+      ActivityTypeEnum.QUIZ_UPDATED,
+      ActivityTypeEnum.QUIZ_DELETED,
+      ActivityTypeEnum.QUIZ_ATTEMPTED,
+    ].includes(activityType);
   }
 
   private sanitizeRequestBody(body: any): any {

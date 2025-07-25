@@ -57,14 +57,14 @@ export class ActivityLog extends Document {
   @Prop({ type: String })
   target_user_role: RoleEnum;
 
-  @Prop({ type: String })
-  module_id: string;
+  @Prop({ type: Types.ObjectId, index: true })
+  module_id: Types.ObjectId;
 
   @Prop({ type: String })
   module_name: string;
 
-  @Prop({ type: String })
-  chapter_id: string;
+  @Prop({ type: Types.ObjectId, index: true })
+  chapter_id: Types.ObjectId;
 
   @Prop({ type: String })
   chapter_name: string;
