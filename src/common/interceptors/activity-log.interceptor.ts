@@ -65,6 +65,23 @@ export class ActivityLogInterceptor implements NestInterceptor {
     );
   }
 
+  private safeObjectIdConversion(
+    id: string | undefined | null,
+  ): Types.ObjectId | undefined {
+    if (!id) return undefined;
+
+    try {
+      if (!Types.ObjectId.isValid(id)) {
+        this.logger.debug(`Invalid ObjectId format: ${id}`);
+        return undefined;
+      }
+      return new Types.ObjectId(id);
+    } catch (error) {
+      this.logger.debug(`Error converting to ObjectId: ${id}`, error.message);
+      return undefined;
+    }
+  }
+
   /**
    * Safely log activity without blocking the main application
    * This method is completely non-blocking and handles all errors internally
@@ -115,16 +132,18 @@ export class ActivityLogInterceptor implements NestInterceptor {
       const createActivityLogDto: CreateActivityLogDto = {
         activity_type: activityType,
         description,
-        performed_by: new Types.ObjectId(user.id) as any,
+        performed_by: this.safeObjectIdConversion(user.id?.toString()) as any,
         performed_by_role: user.role.name as RoleEnum,
-        school_id: user.school_id as Types.ObjectId,
+        school_id: this.safeObjectIdConversion(user.school_id?.toString()),
         school_name: metadata.school_name,
-        target_user_id: new Types.ObjectId(metadata.target_user_id),
+        target_user_id: this.safeObjectIdConversion(
+          metadata.target_user_id?.toString(),
+        ),
         target_user_email: metadata.target_user_email,
         target_user_role: metadata.target_user_role,
-        module_id: new Types.ObjectId(metadata.module_id).toString(),
+        module_id: metadata.module_id || undefined,
         module_name: metadata.module_name,
-        chapter_id: new Types.ObjectId(metadata.chapter_id).toString(),
+        chapter_id: metadata.chapter_id || undefined,
         chapter_name: metadata.chapter_name,
         metadata: {
           ...metadata,

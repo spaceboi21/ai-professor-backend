@@ -95,6 +95,33 @@ export class ActivityLogService {
     private readonly schoolModel: Model<School>,
   ) {}
 
+  private safeObjectIdConversion(
+    id: string | undefined | null | Types.ObjectId,
+  ): Types.ObjectId | undefined {
+    if (!id) return undefined;
+
+    try {
+      // If it's already an ObjectId, return it
+      if (id instanceof Types.ObjectId) {
+        return id;
+      }
+
+      // If it's a string, validate and convert
+      if (typeof id === 'string') {
+        if (!Types.ObjectId.isValid(id)) {
+          this.logger.warn(`Invalid ObjectId format: ${id}`);
+          return undefined;
+        }
+        return new Types.ObjectId(id);
+      }
+
+      return undefined;
+    } catch (error) {
+      this.logger.warn(`Error converting to ObjectId: ${id}`, error.message);
+      return undefined;
+    }
+  }
+
   async createActivityLog(
     createActivityLogDto: CreateActivityLogDto,
   ): Promise<ActivityLog> {
@@ -122,7 +149,7 @@ export class ActivityLogService {
       this.logger.error('Error creating activity log (non-critical):', {
         error: error.message,
         activityType: createActivityLogDto.activity_type,
-        performedBy: new Types.ObjectId(createActivityLogDto.performed_by),
+        performedBy: createActivityLogDto.performed_by,
         endpoint: createActivityLogDto.endpoint,
       });
 
@@ -133,7 +160,7 @@ export class ActivityLogService {
         category: ACTIVITY_CATEGORY_MAPPING[createActivityLogDto.activity_type],
         level: ACTIVITY_LEVEL_MAPPING[createActivityLogDto.activity_type],
         description: createActivityLogDto.description,
-        performed_by: new Types.ObjectId(createActivityLogDto.performed_by),
+        performed_by: createActivityLogDto.performed_by,
         performed_by_role: createActivityLogDto.performed_by_role,
         is_success: false,
         status: 'ERROR',
@@ -176,19 +203,27 @@ export class ActivityLogService {
       }
 
       if (filterDto.school_id) {
-        query.school_id = new Types.ObjectId(filterDto.school_id);
+        const schoolObjectId = this.safeObjectIdConversion(filterDto.school_id);
+        if (schoolObjectId) {
+          query.school_id = schoolObjectId;
+        }
       }
 
       if (filterDto.target_user_id) {
-        query.target_user_id = new Types.ObjectId(filterDto.target_user_id);
+        const targetUserObjectId = this.safeObjectIdConversion(
+          filterDto.target_user_id,
+        );
+        if (targetUserObjectId) {
+          query.target_user_id = targetUserObjectId;
+        }
       }
 
       if (filterDto.module_id) {
-        query.module_id = new Types.ObjectId(filterDto.module_id);
+        query.module_id = filterDto.module_id;
       }
 
       if (filterDto.chapter_id) {
-        query.chapter_id = new Types.ObjectId(filterDto.chapter_id);
+        query.chapter_id = filterDto.chapter_id;
       }
 
       if (filterDto.is_success !== undefined) {
@@ -334,7 +369,13 @@ export class ActivityLogService {
             'School admin must belong to a school',
           );
         }
-        query.school_id = new Types.ObjectId(currentUser.school_id);
+        const schoolObjectId = this.safeObjectIdConversion(
+          currentUser.school_id,
+        );
+        if (!schoolObjectId) {
+          throw new UnauthorizedException('Invalid school ID format');
+        }
+        query.school_id = schoolObjectId;
         break;
 
       case RoleEnum.PROFESSOR:
@@ -342,15 +383,30 @@ export class ActivityLogService {
         if (!currentUser.school_id) {
           throw new UnauthorizedException('Professor must belong to a school');
         }
+        const professorSchoolObjectId = this.safeObjectIdConversion(
+          currentUser.school_id,
+        );
+        const professorUserObjectId = this.safeObjectIdConversion(
+          currentUser.id,
+        );
+
+        if (!professorSchoolObjectId || !professorUserObjectId) {
+          throw new UnauthorizedException('Invalid user or school ID format');
+        }
+
         query.$or = [
-          { school_id: new Types.ObjectId(currentUser.school_id) },
-          { performed_by: new Types.ObjectId(currentUser.id) },
+          { school_id: professorSchoolObjectId },
+          { performed_by: professorUserObjectId },
         ];
         break;
 
       case RoleEnum.STUDENT:
         // Students can only see their own activities
-        query.performed_by = new Types.ObjectId(currentUser.id);
+        const studentUserObjectId = this.safeObjectIdConversion(currentUser.id);
+        if (!studentUserObjectId) {
+          throw new UnauthorizedException('Invalid user ID format');
+        }
+        query.performed_by = studentUserObjectId;
         break;
 
       default:
@@ -362,85 +418,101 @@ export class ActivityLogService {
     logId: string,
     currentUser: JWTUserPayload,
   ): Promise<any> {
-    const log = await this.activityLogModel
-      .findById(logId)
-      .populate('performed_by', 'first_name last_name email')
-      .populate('school_id', 'name')
-      .populate('target_user_id', 'first_name last_name email')
-      .lean();
+    try {
+      // Validate ObjectId format
+      if (!Types.ObjectId.isValid(logId)) {
+        throw new BadRequestException('Invalid activity log ID format');
+      }
 
-    if (!log) {
-      throw new BadRequestException('Activity log not found');
+      const log = await this.activityLogModel
+        .findById(logId)
+        .populate('performed_by', 'first_name last_name email')
+        .populate('school_id', 'name')
+        .populate('target_user_id', 'first_name last_name email')
+        .lean();
+
+      if (!log) {
+        throw new BadRequestException('Activity log not found');
+      }
+
+      // Check access control
+      const query: any = { _id: new Types.ObjectId(logId) };
+      await this.applyAccessControl(query, currentUser);
+
+      const hasAccess = await this.activityLogModel.exists(query);
+      if (!hasAccess) {
+        throw new UnauthorizedException('Access denied to this activity log');
+      }
+
+      const performedBy = log.performed_by as any;
+      const school = log.school_id as any;
+      const targetUser = log.target_user_id as any;
+
+      return {
+        id: log._id,
+        timestamp: log.created_at,
+        activity_type: log.activity_type,
+        category: log.category,
+        level: log.level,
+        description: log.description,
+        performed_by:
+          performedBy && performedBy.first_name
+            ? {
+                id: performedBy._id,
+                name: `${performedBy.first_name} ${performedBy.last_name}`.trim(),
+                email: performedBy.email,
+                role: log.performed_by_role,
+              }
+            : null,
+        school:
+          school && school.name
+            ? {
+                id: school._id,
+                name: school.name,
+              }
+            : null,
+        target_user:
+          targetUser && targetUser.first_name
+            ? {
+                id: targetUser._id,
+                name: `${targetUser.first_name} ${targetUser.last_name}`.trim(),
+                email: targetUser.email,
+                role: log.target_user_role,
+              }
+            : null,
+        module: log.module_id
+          ? {
+              id: log.module_id,
+              name: log.module_name,
+            }
+          : null,
+        chapter: log.chapter_id
+          ? {
+              id: log.chapter_id,
+              name: log.chapter_name,
+            }
+          : null,
+        metadata: log.metadata,
+        ip_address: log.ip_address,
+        user_agent: log.user_agent,
+        is_success: log.is_success,
+        error_message: log.error_message,
+        execution_time_ms: log.execution_time_ms,
+        endpoint: log.endpoint,
+        http_method: log.http_method,
+        http_status_code: log.http_status_code,
+        status: log.status,
+      };
+    } catch (error) {
+      if (
+        error instanceof BadRequestException ||
+        error instanceof UnauthorizedException
+      ) {
+        throw error;
+      }
+      this.logger.error('Error getting activity log by ID:', error);
+      throw new BadRequestException('Failed to retrieve activity log');
     }
-
-    // Check access control
-    const query: any = { _id: new Types.ObjectId(logId) };
-    await this.applyAccessControl(query, currentUser);
-
-    const hasAccess = await this.activityLogModel.exists(query);
-    if (!hasAccess) {
-      throw new UnauthorizedException('Access denied to this activity log');
-    }
-
-    const performedBy = log.performed_by as any;
-    const school = log.school_id as any;
-    const targetUser = log.target_user_id as any;
-
-    return {
-      id: log._id,
-      timestamp: log.created_at,
-      activity_type: log.activity_type,
-      category: log.category,
-      level: log.level,
-      description: log.description,
-      performed_by:
-        performedBy && performedBy.first_name
-          ? {
-              id: performedBy._id,
-              name: `${performedBy.first_name} ${performedBy.last_name}`.trim(),
-              email: performedBy.email,
-              role: log.performed_by_role,
-            }
-          : null,
-      school:
-        school && school.name
-          ? {
-              id: school._id,
-              name: school.name,
-            }
-          : null,
-      target_user:
-        targetUser && targetUser.first_name
-          ? {
-              id: targetUser._id,
-              name: `${targetUser.first_name} ${targetUser.last_name}`.trim(),
-              email: targetUser.email,
-              role: log.target_user_role,
-            }
-          : null,
-      module: log.module_id
-        ? {
-            id: log.module_id,
-            name: log.module_name,
-          }
-        : null,
-      chapter: log.chapter_id
-        ? {
-            id: log.chapter_id,
-            name: log.chapter_name,
-          }
-        : null,
-      metadata: log.metadata,
-      ip_address: log.ip_address,
-      user_agent: log.user_agent,
-      is_success: log.is_success,
-      error_message: log.error_message,
-      execution_time_ms: log.execution_time_ms,
-      endpoint: log.endpoint,
-      http_method: log.http_method,
-      http_status_code: log.http_status_code,
-      status: log.status,
-    };
   }
 
   async getActivityStats(currentUser: JWTUserPayload, days: number = 30) {
@@ -501,10 +573,20 @@ export class ActivityLogService {
     if (filterDto.level) query.level = filterDto.level;
     if (filterDto.performed_by_role)
       query.performed_by_role = filterDto.performed_by_role;
-    if (filterDto.school_id)
-      query.school_id = new Types.ObjectId(filterDto.school_id);
-    if (filterDto.target_user_id)
-      query.target_user_id = new Types.ObjectId(filterDto.target_user_id);
+    if (filterDto.school_id) {
+      const schoolObjectId = this.safeObjectIdConversion(filterDto.school_id);
+      if (schoolObjectId) {
+        query.school_id = schoolObjectId;
+      }
+    }
+    if (filterDto.target_user_id) {
+      const targetUserObjectId = this.safeObjectIdConversion(
+        filterDto.target_user_id,
+      );
+      if (targetUserObjectId) {
+        query.target_user_id = targetUserObjectId;
+      }
+    }
     if (filterDto.module_id) query.module_id = filterDto.module_id;
     if (filterDto.chapter_id) query.chapter_id = filterDto.chapter_id;
     if (filterDto.is_success !== undefined)
