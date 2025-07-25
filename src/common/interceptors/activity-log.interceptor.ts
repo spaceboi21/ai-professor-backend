@@ -122,9 +122,9 @@ export class ActivityLogInterceptor implements NestInterceptor {
         target_user_id: new Types.ObjectId(metadata.target_user_id),
         target_user_email: metadata.target_user_email,
         target_user_role: metadata.target_user_role,
-        module_id: metadata.module_id,
+        module_id: new Types.ObjectId(metadata.module_id).toString(),
         module_name: metadata.module_name,
-        chapter_id: metadata.chapter_id,
+        chapter_id: new Types.ObjectId(metadata.chapter_id).toString(),
         chapter_name: metadata.chapter_name,
         metadata: {
           ...metadata,
