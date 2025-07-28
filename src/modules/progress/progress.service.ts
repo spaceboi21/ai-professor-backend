@@ -1296,7 +1296,6 @@ export class ProgressService {
       const tenantConnection =
         await this.tenantConnectionService.getTenantConnection(school.db_name);
       const StudentModel = tenantConnection.model(Student.name, StudentSchema);
-      console.log(studentId);
       const student = await StudentModel.findById(
         new Types.ObjectId(studentId),
       );

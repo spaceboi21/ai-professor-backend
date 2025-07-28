@@ -338,7 +338,6 @@ export class StudentController {
     @User() user: JWTUserPayload,
     @Query('school_id') school_id?: string,
   ) {
-    console.log({ user });
     return this.studentService.updateStudentStatus(
       id,
       updateStatusDto.status,

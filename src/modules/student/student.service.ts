@@ -250,12 +250,10 @@ export class StudentService {
     } else {
       throw new BadRequestException('Unauthorized role for accessing students');
     }
-    console.log({ targetSchoolId });
     // Get school information
     school = await this.schoolModel.findById(
       new Types.ObjectId(targetSchoolId),
     );
-    console.log({ school });
     if (!school) {
       throw new NotFoundException('School not found');
     }

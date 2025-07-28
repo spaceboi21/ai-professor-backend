@@ -33,9 +33,13 @@ import { ToggleModuleVisibilityDto } from './dto/toggle-module-visibility.dto';
 import {
   AssignProfessorDto,
   UnassignProfessorDto,
+  ManageModuleAssignmentsDto,
 } from './dto/assign-professor.dto';
 import { ModulesService } from './modules.service';
-import { ModuleAssignmentService } from './module-assignment.service';
+import {
+  ModuleAssignmentService,
+  ManageModuleAssignmentsResponse,
+} from './module-assignment.service';
 import { PaginationDto } from 'src/common/dto/pagination.dto';
 import { DifficultyEnum } from 'src/common/constants/difficulty.constant';
 
@@ -83,37 +87,21 @@ export class ModulesController {
     return this.modulesService.toggleModuleVisibility(publishModuleDto, user);
   }
 
-  @Post('assign-professors')
+  @Post('manage-assignments')
   @Roles(RoleEnum.SUPER_ADMIN, RoleEnum.SCHOOL_ADMIN)
-  @ApiOperation({ summary: 'Assign professors to a module' })
-  @ApiBody({ type: AssignProfessorDto })
-  @ApiResponse({ status: 200, description: 'Professors assigned successfully' })
-  @ApiResponse({ status: 404, description: 'Module or professor not found' })
-  async assignProfessorsToModule(
-    @Body() assignDto: AssignProfessorDto,
-    @User() user: JWTUserPayload,
-  ): Promise<any> {
-    return this.moduleAssignmentService.assignProfessorsToModule(
-      assignDto,
-      user,
-    );
-  }
-
-  @Post('unassign-professor')
-  @Roles(RoleEnum.SUPER_ADMIN, RoleEnum.SCHOOL_ADMIN)
-  @ApiOperation({ summary: 'Unassign a professor from a module' })
-  @ApiBody({ type: UnassignProfessorDto })
+  @ApiOperation({ summary: 'Manage module assignments (assign/unassign)' })
+  @ApiBody({ type: ManageModuleAssignmentsDto })
   @ApiResponse({
     status: 200,
-    description: 'Professor unassigned successfully',
+    description: 'Module assignments managed successfully',
   })
   @ApiResponse({ status: 404, description: 'Module or professor not found' })
-  async unassignProfessorFromModule(
-    @Body() unassignDto: UnassignProfessorDto,
+  async manageModuleAssignments(
+    @Body() manageAssignmentsDto: ManageModuleAssignmentsDto,
     @User() user: JWTUserPayload,
-  ) {
-    return this.moduleAssignmentService.unassignProfessorFromModule(
-      unassignDto,
+  ): Promise<ManageModuleAssignmentsResponse> {
+    return this.moduleAssignmentService.manageModuleAssignments(
+      manageAssignmentsDto,
       user,
     );
   }

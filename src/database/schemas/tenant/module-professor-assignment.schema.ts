@@ -20,8 +20,8 @@ export class ModuleProfessorAssignment extends Document {
   @Prop({ type: Types.ObjectId, ref: User.name, required: true, index: true })
   professor_id: Types.ObjectId;
 
-  @Prop({ type: Types.ObjectId, ref: User.name, required: true, index: true })
-  assigned_by: Types.ObjectId;
+  @Prop({ type: Types.ObjectId, ref: User.name, index: true, default: null })
+  assigned_by: Types.ObjectId | null;
 
   @Prop({ type: String, enum: RoleEnum, default: null })
   assigned_by_role: RoleEnum | null;

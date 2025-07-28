@@ -69,3 +69,37 @@ export class UnassignProfessorDto {
   @IsMongoId({ message: 'School ID must be a valid MongoDB ObjectId' })
   school_id?: string | Types.ObjectId;
 }
+
+export class ManageModuleAssignmentsDto {
+  @ApiProperty({
+    example: '507f1f77bcf86cd799439011',
+    description: 'Module ID',
+  })
+  @IsMongoId({ message: 'Module ID must be a valid MongoDB ObjectId' })
+  @IsNotEmpty({ message: 'Module ID is required' })
+  module_id: string | Types.ObjectId;
+
+  @ApiProperty({
+    example: ['507f1f77bcf86cd799439011', '507f1f77bcf86cd799439012'],
+    description:
+      'Array of professor IDs to assign to the module. Professors not in this list will be unassigned.',
+    type: [String],
+  })
+  @IsArray({ message: 'Professor IDs must be an array' })
+  @IsMongoId({
+    each: true,
+    message: 'Each professor ID must be a valid MongoDB ObjectId',
+  })
+  @IsNotEmpty({ each: true, message: 'Professor ID cannot be empty' })
+  professor_ids: (string | Types.ObjectId)[];
+
+  @ApiProperty({
+    example: '507f1f77bcf86cd799439011',
+    description:
+      'School ID (required for super admin, optional for other roles)',
+    required: false,
+  })
+  @IsOptional()
+  @IsMongoId({ message: 'School ID must be a valid MongoDB ObjectId' })
+  school_id?: string | Types.ObjectId;
+}

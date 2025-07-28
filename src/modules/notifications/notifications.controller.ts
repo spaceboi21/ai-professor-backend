@@ -71,7 +71,12 @@ export class NotificationsController {
   }
 
   @Get('unread-count')
-  @Roles(RoleEnum.STUDENT, RoleEnum.PROFESSOR)
+  @Roles(
+    RoleEnum.STUDENT,
+    RoleEnum.PROFESSOR,
+    RoleEnum.SUPER_ADMIN,
+    RoleEnum.SCHOOL_ADMIN,
+  )
   @ApiOperation({
     summary: 'Get unread notifications count (Student or Professor)',
   })

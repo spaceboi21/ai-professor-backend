@@ -28,6 +28,7 @@ import { ROLE_IDS, RoleEnum } from 'src/common/constants/roles.constant';
 import {
   AssignProfessorDto,
   UnassignProfessorDto,
+  ManageModuleAssignmentsDto,
 } from './dto/assign-professor.dto';
 import { NotificationsService } from '../notifications/notifications.service';
 import { PaginationDto } from 'src/common/dto/pagination.dto';
@@ -41,10 +42,30 @@ import {
 } from 'src/common/constants/notification.constant';
 import { RecipientTypeEnum } from 'src/database/schemas/tenant/notification.schema';
 
-interface AssignmentResult {
+export interface AssignmentResult {
   professor_id: string | Types.ObjectId;
-  status: string;
+  status: string; // 'assigned', 'unassigned', 'unchanged', 'reactivated', 'error'
   message: string;
+}
+
+export interface ManageModuleAssignmentsResponse {
+  message: string;
+  data: {
+    module_id: string | Types.ObjectId;
+    module_title: string;
+    summary: {
+      total_assigned: number;
+      total_unassigned: number;
+      total_unchanged: number;
+      total_processed: number;
+    };
+    results: {
+      assigned: AssignmentResult[];
+      unassigned: AssignmentResult[];
+      unchanged: AssignmentResult[];
+    };
+    audit_logs_created: number;
+  };
 }
 
 interface NotificationData {
@@ -97,7 +118,6 @@ export class ModuleAssignmentService {
     assignDto: AssignProfessorDto,
     user: JWTUserPayload,
   ) {
-    console.log('anushka');
     this.logger.log(`Assigning professors to module: ${assignDto.module_id}`);
 
     // Resolve school_id based on user role
@@ -133,19 +153,12 @@ export class ModuleAssignmentService {
       (id) => new Types.ObjectId(id),
     );
 
-    console.log({
-      _id: { $in: professorIds },
-      school_id: new Types.ObjectId(resolvedSchoolId),
-      role: new Types.ObjectId(ROLE_IDS.PROFESSOR), // PROFESSOR role ID
-      deleted_at: null,
-    });
     const professors = await this.userModel.find({
       _id: { $in: professorIds },
       school_id: new Types.ObjectId(resolvedSchoolId),
       role: new Types.ObjectId(ROLE_IDS.PROFESSOR), // PROFESSOR role ID
       deleted_at: null,
     });
-    console.log(professors);
     if (professors.length !== assignDto.professor_ids.length) {
       throw new NotFoundException(
         'One or more professors not found or not from this school',
@@ -222,6 +235,9 @@ export class ModuleAssignmentService {
             assigned_by_role: user.role.name as RoleEnum,
             assigned_at: new Date(),
             is_active: true,
+            unassigned_at: null,
+            unassigned_by: null,
+            unassigned_by_role: null,
           });
 
           await newAssignment.save();
@@ -291,6 +307,316 @@ export class ModuleAssignmentService {
       data: {
         module_id: assignDto.module_id,
         module_title: module.title,
+        results,
+        audit_logs_created: auditLogs.length,
+      },
+    };
+  }
+
+  async manageModuleAssignments(
+    manageDto: ManageModuleAssignmentsDto,
+    user: JWTUserPayload,
+  ): Promise<ManageModuleAssignmentsResponse> {
+    this.logger.log(`Managing assignments for module: ${manageDto.module_id}`);
+
+    // Resolve school_id based on user role
+    const resolvedSchoolId = this.resolveSchoolId(user, manageDto.school_id);
+
+    // Validate school exists
+    const school = await this.schoolModel.findById(
+      new Types.ObjectId(resolvedSchoolId),
+    );
+    if (!school) {
+      throw new NotFoundException('School not found');
+    }
+
+    // Get tenant connection
+    const tenantConnection =
+      await this.tenantConnectionService.getTenantConnection(school.db_name);
+    const ModuleModel = tenantConnection.model(Module.name, ModuleSchema);
+    const AssignmentModel = tenantConnection.model(
+      ModuleProfessorAssignment.name,
+      ModuleProfessorAssignmentSchema,
+    );
+    const AuditLogModel = tenantConnection.model(
+      AssignmentAuditLog.name,
+      AssignmentAuditLogSchema,
+    );
+
+    // Validate module exists
+    const module = await ModuleModel.findById(manageDto.module_id);
+    if (!module) {
+      throw new NotFoundException('Module not found');
+    }
+
+    // Validate all professors exist and are from the same school
+    const professorIds = manageDto.professor_ids.map(
+      (id) => new Types.ObjectId(id),
+    );
+
+    const professors = await this.userModel.find({
+      _id: { $in: professorIds },
+      school_id: new Types.ObjectId(resolvedSchoolId),
+      role: new Types.ObjectId(ROLE_IDS.PROFESSOR),
+      deleted_at: null,
+    });
+
+    if (professors.length !== manageDto.professor_ids.length) {
+      throw new NotFoundException(
+        'One or more professors not found or not from this school',
+      );
+    }
+
+    // Get current assignments for this module
+    const currentAssignments = await AssignmentModel.find({
+      module_id: new Types.ObjectId(manageDto.module_id),
+      is_active: true,
+    });
+
+    // Get ALL existing assignments for this module (both active and inactive)
+    const allExistingAssignments = await AssignmentModel.find({
+      module_id: new Types.ObjectId(manageDto.module_id),
+    });
+
+    // Create sets for efficient comparison
+    const targetProfessorIds = new Set(
+      manageDto.professor_ids.map((id) => id.toString()),
+    );
+    const currentProfessorIds = new Set(
+      currentAssignments.map((a) => a.professor_id.toString()),
+    );
+    const allExistingProfessorIds = new Set(
+      allExistingAssignments.map((a) => a.professor_id.toString()),
+    );
+    // Determine which professors to assign and which to unassign
+    const professorsToAssign = manageDto.professor_ids.filter(
+      (id) => !currentProfessorIds.has(id.toString()),
+    );
+    const professorsToUnassign = currentAssignments.filter(
+      (assignment) =>
+        !targetProfessorIds.has(assignment.professor_id.toString()),
+    );
+    const results = {
+      assigned: [] as AssignmentResult[],
+      unassigned: [] as AssignmentResult[],
+      unchanged: [] as AssignmentResult[],
+    };
+
+    const notifications: NotificationData[] = [];
+    const auditLogs: any[] = [];
+
+    // Process assignments (new professors)
+    for (const professorId of professorsToAssign) {
+      try {
+        // Check if there's an existing assignment (active or inactive)
+        const existingAssignment = await AssignmentModel.findOne({
+          module_id: new Types.ObjectId(manageDto.module_id),
+          professor_id: new Types.ObjectId(professorId),
+        });
+
+        if (existingAssignment) {
+          // Update existing assignment (reactivate it)
+          existingAssignment.assigned_by = new Types.ObjectId(user.id);
+          existingAssignment.assigned_by_role = user.role.name as RoleEnum;
+          existingAssignment.assigned_at = new Date();
+          existingAssignment.is_active = true;
+          existingAssignment.unassigned_at = null;
+          existingAssignment.unassigned_by = null;
+          existingAssignment.unassigned_by_role = null;
+
+          await existingAssignment.save();
+
+          // Create audit log
+          const auditLog = new AuditLogModel({
+            module_id: new Types.ObjectId(manageDto.module_id),
+            professor_id: new Types.ObjectId(professorId),
+            action: AssignmentActionEnum.ASSIGN,
+            performed_by: new Types.ObjectId(user.id),
+            performed_by_role: user.role.name as RoleEnum,
+            action_description: `Reactivated professor assignment`,
+            new_data: {
+              assigned_at: existingAssignment.assigned_at,
+              assigned_by: existingAssignment.assigned_by,
+              is_active: true,
+            },
+          });
+          await auditLog.save();
+          auditLogs.push(auditLog);
+
+          results.assigned.push({
+            professor_id: professorId,
+            status: 'reactivated',
+            message: 'Professor assignment reactivated successfully',
+          });
+        } else {
+          // Create new assignment
+          const newAssignment = new AssignmentModel({
+            module_id: new Types.ObjectId(manageDto.module_id),
+            professor_id: new Types.ObjectId(professorId),
+            assigned_by: new Types.ObjectId(user.id),
+            assigned_by_role: user.role.name as RoleEnum,
+            assigned_at: new Date(),
+            is_active: true,
+            unassigned_at: null,
+            unassigned_by: null,
+            unassigned_by_role: null,
+          });
+
+          await newAssignment.save();
+
+          // Create audit log
+          const auditLog = new AuditLogModel({
+            module_id: new Types.ObjectId(manageDto.module_id),
+            professor_id: new Types.ObjectId(professorId),
+            action: AssignmentActionEnum.ASSIGN,
+            performed_by: new Types.ObjectId(user.id),
+            performed_by_role: user.role.name as RoleEnum,
+            action_description: `Assigned professor to module`,
+            new_data: {
+              assigned_at: newAssignment.assigned_at,
+              assigned_by: newAssignment.assigned_by,
+            },
+          });
+          await auditLog.save();
+          auditLogs.push(auditLog);
+
+          results.assigned.push({
+            professor_id: professorId,
+            status: 'assigned',
+            message: 'Professor assigned successfully',
+          });
+        }
+
+        // Add notification for professor
+        notifications.push({
+          professor_id: professorId,
+          type: 'assignment_created',
+          module_title: module.title,
+          module_data: module,
+          assigned_by: user,
+        });
+      } catch (error) {
+        this.logger.error(`Error assigning professor ${professorId}:`, error);
+        results.assigned.push({
+          professor_id: professorId,
+          status: 'error',
+          message: 'Failed to assign professor',
+        });
+      }
+    }
+
+    // Process unassignments (professors to remove)
+    for (const assignment of professorsToUnassign) {
+      try {
+        // Create audit log before deactivating
+        const auditLog = new AuditLogModel({
+          module_id: new Types.ObjectId(manageDto.module_id),
+          professor_id: assignment.professor_id,
+          action: AssignmentActionEnum.UNASSIGN,
+          performed_by: new Types.ObjectId(user.id),
+          performed_by_role: user.role.name as RoleEnum,
+          action_description: `Unassigned professor from module`,
+          previous_data: {
+            assigned_at: assignment.assigned_at,
+            assigned_by: assignment.assigned_by,
+            is_active: assignment.is_active,
+          },
+          new_data: {
+            is_active: false,
+            unassigned_at: new Date(),
+            unassigned_by: new Types.ObjectId(user.id),
+            assigned_by: null, // Include assigned_by being set to null
+            assigned_by_role: null, // Include assigned_by_role being set to null
+            assigned_at: null, // Include assigned_at being set to null
+          },
+        });
+        await auditLog.save();
+        auditLogs.push(auditLog);
+
+        // Deactivate assignment
+        assignment.is_active = false;
+        assignment.unassigned_at = new Date();
+        assignment.unassigned_by = new Types.ObjectId(user.id);
+        assignment.unassigned_by_role = user.role.name as RoleEnum;
+        assignment.assigned_by = null; // Set assigned_by to null when unassigning
+        assignment.assigned_by_role = null; // Set assigned_by_role to null when unassigning
+        assignment.assigned_at = null; // Set assigned_at to null when unassigning
+
+        await assignment.save();
+
+        results.unassigned.push({
+          professor_id: assignment.professor_id.toString(),
+          status: 'unassigned',
+          message: 'Professor unassigned successfully',
+        });
+
+        // Add notification for professor
+        notifications.push({
+          professor_id: assignment.professor_id,
+          type: 'assignment_removed',
+          module_title: module.title,
+          module_data: module,
+          assigned_by: user,
+        });
+      } catch (error) {
+        this.logger.error(
+          `Error unassigning professor ${assignment.professor_id}:`,
+          error,
+        );
+        results.unassigned.push({
+          professor_id: assignment.professor_id.toString(),
+          status: 'error',
+          message: 'Failed to unassign professor',
+        });
+      }
+    }
+
+    // Process unchanged assignments (professors that remain assigned)
+    const unchangedAssignments = currentAssignments.filter((assignment) =>
+      targetProfessorIds.has(assignment.professor_id.toString()),
+    );
+
+    for (const assignment of unchangedAssignments) {
+      results.unchanged.push({
+        professor_id: assignment.professor_id.toString(),
+        status: 'unchanged',
+        message: 'Professor already assigned',
+      });
+    }
+
+    // Send notifications using the universal notification service
+    for (const notification of notifications) {
+      try {
+        await this.createAssignmentNotification(
+          notification.professor_id,
+          notification.type,
+          notification.module_title,
+          school._id,
+          notification.module_data,
+          notification.assigned_by,
+        );
+      } catch (error) {
+        this.logger.error(
+          `Error sending notification to professor ${notification.professor_id}:`,
+          error,
+        );
+      }
+    }
+
+    return {
+      message: 'Module assignments managed successfully',
+      data: {
+        module_id: manageDto.module_id,
+        module_title: module.title,
+        summary: {
+          total_assigned: results.assigned.length,
+          total_unassigned: results.unassigned.length,
+          total_unchanged: results.unchanged.length,
+          total_processed:
+            results.assigned.length +
+            results.unassigned.length +
+            results.unchanged.length,
+        },
         results,
         audit_logs_created: auditLogs.length,
       },
@@ -379,6 +705,9 @@ export class ModuleAssignmentService {
         is_active: false,
         unassigned_at: new Date(),
         unassigned_by: new Types.ObjectId(user.id),
+        assigned_by: null, // Include assigned_by being set to null
+        assigned_by_role: null, // Include assigned_by_role being set to null
+        assigned_at: null, // Include assigned_at being set to null
       },
     });
     await auditLog.save();
@@ -388,6 +717,9 @@ export class ModuleAssignmentService {
     assignment.unassigned_at = new Date();
     assignment.unassigned_by = new Types.ObjectId(user.id);
     assignment.unassigned_by_role = user.role.name as RoleEnum;
+    assignment.assigned_by = null; // Set assigned_by to null when unassigning
+    assignment.assigned_by_role = null; // Set assigned_by_role to null when unassigning
+    assignment.assigned_at = null; // Set assigned_at to null when unassigning
 
     await assignment.save();
 
