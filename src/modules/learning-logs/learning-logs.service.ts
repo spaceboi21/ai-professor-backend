@@ -62,11 +62,8 @@ export class LearningLogsService {
     // Execute aggregation with pagination
     const results = await AIChatFeedbackModel.aggregate(pipeline);
 
-    // Transform results
-    const transformedResults = this.transformResults(results[0].data);
-
     return createPaginationResult(
-      transformedResults,
+      results[0].data,
       results[0].totalCount[0].total,
       options,
     );
@@ -86,8 +83,7 @@ export class LearningLogsService {
       throw new NotFoundException('Learning log not found');
     }
 
-    const transformedResults = this.transformResults(results);
-    return transformedResults[0];
+    return results[0];
   }
 
   async getSkillGapStats(user: JWTUserPayload) {
@@ -172,17 +168,17 @@ export class LearningLogsService {
             {
               $project: {
                 _id: 1,
-                session_title: 1,
-                session_description: 1,
+                // session_title: 1,
+                // session_description: 1,
                 status: 1,
                 started_at: 1,
                 ended_at: 1,
-                total_messages: 1,
-                student_messages: 1,
-                ai_messages: 1,
-                scenario: 1,
-                session_metadata: 1,
-                created_at: 1,
+                // total_messages: 1,
+                // student_messages: 1,
+                // ai_messages: 1,
+                // scenario: 1,
+                // session_metadata: 1,
+                // created_at: 1,
               },
             },
           ],
@@ -210,12 +206,12 @@ export class LearningLogsService {
                 title: 1,
                 subject: 1,
                 description: 1,
-                category: 1,
-                duration: 1,
+                // category: 1,
+                // duration: 1,
                 difficulty: 1,
-                tags: 1,
+                // tags: 1,
                 thumbnail: 1,
-                created_at: 1,
+                published_at: 1,
               },
             },
           ],
@@ -243,7 +239,7 @@ export class LearningLogsService {
                 first_name: 1,
                 last_name: 1,
                 email: 1,
-                student_code: 1,
+                // student_code: 1,
                 profile_pic: 1,
                 created_at: 1,
               },
@@ -259,6 +255,16 @@ export class LearningLogsService {
         $project: {
           keywords_for_learning: 0,
           feedback_updated_at: 0,
+          session_id: 0,
+          module_id: 0,
+          student_id: 0,
+        },
+      },
+      {
+        $addFields: {
+          areas_for_improvement: { $slice: ['$areas_for_improvement', 2] },
+          missed_opportunities: { $slice: ['$missed_opportunities', 2] },
+          suggestions: { $slice: ['$suggestions', 2] },
         },
       },
       {
@@ -269,7 +275,7 @@ export class LearningLogsService {
           ],
           totalCount: [{ $count: 'total' }],
         },
-      }
+      },
     ];
 
     return pipeline;
@@ -384,37 +390,6 @@ export class LearningLogsService {
     ];
   }
 
-  private async getTotalCount(
-    user: JWTUserPayload,
-    filterDto?: LearningLogsFilterDto,
-    connection?: Connection,
-  ): Promise<number> {
-    if (!connection) {
-      const { connection: conn } = await this.getConnectionAndModel(user);
-      connection = conn;
-    }
-
-    const AIChatFeedbackModel = connection.model(
-      AIChatFeedback.name,
-      AIChatFeedbackSchema,
-    );
-
-    const countPipeline = [
-      {
-        $match: {
-          ...this.getRoleBasedFilter(user),
-          ...this.getFilterConditions(filterDto),
-        },
-      },
-      {
-        $count: 'total',
-      },
-    ];
-
-    const result = await AIChatFeedbackModel.aggregate(countPipeline);
-    return result.length > 0 ? result[0].total : 0;
-  }
-
   private getRoleBasedFilter(user: JWTUserPayload) {
     if (user.role.name === RoleEnum.STUDENT) {
       return {
@@ -453,82 +428,5 @@ export class LearningLogsService {
     }
 
     return conditions;
-  }
-
-  private transformResults(results: any[]): LearningLogsResponseDto[] {
-    return results.map((result) => {
-      // Get primary skill gap (first one in the array)
-      const primarySkillGap =
-        result.skill_gaps && result.skill_gaps.length > 0
-          ? result.skill_gaps[0]
-          : null;
-
-      // Validate skill gaps against the constant
-      const validSkillGaps =
-        result.skill_gaps?.filter((gap: string) =>
-          AI_LEARNING_ERROR_TYPES.includes(gap),
-        ) || [];
-
-      // Transform student details
-      const studentDetails = {
-        _id: result.student?._id?.toString() || result.student_id?.toString(),
-        first_name: result.student?.first_name || '',
-        last_name: result.student?.last_name || '',
-        email: result.student?.email || '',
-        student_code: result.student?.student_code || '',
-        profile_pic: result.student?.profile_pic || '',
-        created_at: result.student?.created_at,
-      };
-
-      // Transform module details
-      const moduleDetails = {
-        _id: result.module?._id?.toString() || result.module_id?.toString(),
-        title: result.module?.title || 'Unknown Module',
-        subject: result.module?.subject || '',
-        description: result.module?.description || '',
-        category: result.module?.category || '',
-        duration: result.module?.duration || 0,
-        difficulty: result.module?.difficulty || '',
-        tags: result.module?.tags || [],
-        thumbnail: result.module?.thumbnail || '',
-        created_at: result.module?.created_at,
-      };
-
-      // Transform session details
-      const sessionDetails = {
-        _id: result.session?._id?.toString() || result.session_id?.toString(),
-        session_title: result.session?.session_title || '',
-        session_description: result.session?.session_description || '',
-        status: result.session?.status || '',
-        started_at: result.session?.started_at || result.session?.created_at,
-        ended_at: result.session?.ended_at,
-        total_messages: result.session?.total_messages || 0,
-        student_messages: result.session?.student_messages || 0,
-        ai_messages: result.session?.ai_messages || 0,
-        scenario: result.session?.scenario || '',
-        session_metadata: result.session?.session_metadata || {},
-        created_at: result.session?.created_at,
-      };
-
-      return {
-        _id: result._id.toString(),
-        session_id: result.session_id.toString(),
-        module_id: result.module_id.toString(),
-        student_id: result.student_id.toString(),
-        primary_skill_gap: primarySkillGap,
-        skill_gaps: validSkillGaps,
-        strengths: result.strengths || [],
-        areas_for_improvement: result.areas_for_improvement || [],
-        missed_opportunities: result.missed_opportunities || [],
-        suggestions: result.suggestions || [],
-        keywords_for_learning: result.keywords_for_learning || [],
-        rating: result.rating || {},
-        feedback_created_at: result.created_at,
-        feedback_updated_at: result.updated_at,
-        student: studentDetails,
-        module: moduleDetails,
-        session: sessionDetails,
-      };
-    });
   }
 }

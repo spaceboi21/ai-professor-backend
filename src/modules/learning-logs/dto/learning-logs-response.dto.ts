@@ -27,12 +27,6 @@ export class StudentDetailsDto {
   email: string;
 
   @ApiProperty({
-    example: 'STU001',
-    description: 'Student code',
-  })
-  student_code: string;
-
-  @ApiProperty({
     example: 'https://example.com/profile.jpg',
     description: 'Student profile picture URL',
     required: false,
@@ -66,35 +60,17 @@ export class ModuleDetailsDto {
   subject: string;
 
   @ApiProperty({
-    example: 'This module covers the fundamental principles of child and adolescent development psychology.',
+    example:
+      'This module covers the fundamental principles of child and adolescent development psychology.',
     description: 'Module description',
   })
   description: string;
-
-  @ApiProperty({
-    example: 'Psychology',
-    description: 'Module category',
-    required: false,
-  })
-  category?: string;
-
-  @ApiProperty({
-    example: 120,
-    description: 'Module duration in minutes',
-  })
-  duration: number;
 
   @ApiProperty({
     example: 'INTERMEDIATE',
     description: 'Module difficulty level',
   })
   difficulty: string;
-
-  @ApiProperty({
-    example: ['psychology', 'child-development', 'counseling'],
-    description: 'Module tags',
-  })
-  tags: string[];
 
   @ApiProperty({
     example: 'https://example.com/thumbnail.jpg',
@@ -104,9 +80,9 @@ export class ModuleDetailsDto {
 
   @ApiProperty({
     example: '2024-01-15T10:30:00.000Z',
-    description: 'Module creation date',
+    description: 'Module published date',
   })
-  created_at: Date;
+  published_at: Date;
 }
 
 export class SessionDetailsDto {
@@ -115,18 +91,6 @@ export class SessionDetailsDto {
     description: 'Session ID',
   })
   _id: string;
-
-  @ApiProperty({
-    example: 'Child Counseling Session',
-    description: 'Session title',
-  })
-  session_title: string;
-
-  @ApiProperty({
-    example: 'Practice session focusing on child counseling techniques',
-    description: 'Session description',
-  })
-  session_description: string;
 
   @ApiProperty({
     example: 'ACTIVE',
@@ -146,44 +110,6 @@ export class SessionDetailsDto {
     required: false,
   })
   ended_at?: Date;
-
-  @ApiProperty({
-    example: 15,
-    description: 'Total messages in session',
-  })
-  total_messages: number;
-
-  @ApiProperty({
-    example: 8,
-    description: 'Number of student messages',
-  })
-  student_messages: number;
-
-  @ApiProperty({
-    example: 7,
-    description: 'Number of AI messages',
-  })
-  ai_messages: number;
-
-  @ApiProperty({
-    example: 'child-counseling-scenario',
-    description: 'Session scenario',
-    required: false,
-  })
-  scenario?: string;
-
-  @ApiProperty({
-    example: { difficulty: 'intermediate', focus: 'empathy' },
-    description: 'Session metadata',
-    required: false,
-  })
-  session_metadata?: Record<string, any>;
-
-  @ApiProperty({
-    example: '2024-01-15T10:30:00.000Z',
-    description: 'Session creation date',
-  })
-  created_at: Date;
 }
 
 export class LearningLogsResponseDto {
@@ -192,24 +118,6 @@ export class LearningLogsResponseDto {
     description: 'Unique identifier for the learning log entry',
   })
   _id: string;
-
-  @ApiProperty({
-    example: '507f1f77bcf86cd799439011',
-    description: 'AI chat session ID',
-  })
-  session_id: string;
-
-  @ApiProperty({
-    example: '507f1f77bcf86cd799439011',
-    description: 'Module ID',
-  })
-  module_id: string;
-
-  @ApiProperty({
-    example: '507f1f77bcf86cd799439011',
-    description: 'Student ID',
-  })
-  student_id: string;
 
   @ApiProperty({
     example: 'empathy',
@@ -236,7 +144,10 @@ export class LearningLogsResponseDto {
   areas_for_improvement: string[];
 
   @ApiProperty({
-    example: ['Missed opportunity to show empathy', 'Could have asked more probing questions'],
+    example: [
+      'Missed opportunity to show empathy',
+      'Could have asked more probing questions',
+    ],
     description: 'Missed opportunities during the session',
   })
   missed_opportunities: string[];
@@ -293,4 +204,4 @@ export class LearningLogsResponseDto {
     description: 'Detailed session information',
   })
   session: SessionDetailsDto;
-} 
+}
