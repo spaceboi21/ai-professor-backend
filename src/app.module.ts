@@ -3,6 +3,7 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { MongooseModule } from '@nestjs/mongoose';
 import { ConfigModule, ConfigService } from '@nestjs/config';
+import { HttpModule } from '@nestjs/axios';
 import { CentralModule } from './modules/central/central.module';
 import { DatabaseModule } from './database/database.module';
 import { RoleModule } from './modules/roles/role.module';
@@ -128,6 +129,7 @@ import { CommunityModule } from './modules/community/community.module';
     LearningLogsModule,
     ActivityLogModule,
     CommunityModule,
+    HttpModule,
   ],
   controllers: [AppController],
   providers: [AppService, JwtStrategy],

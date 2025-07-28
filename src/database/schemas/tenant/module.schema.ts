@@ -53,6 +53,20 @@ export class Module extends Document {
   @Prop({ type: Date, default: null })
   deleted_at: Date;
 
+  // Module validation fields
+  @Prop({ type: Boolean, default: false })
+  is_validated: boolean;
+
+  @Prop({ type: Number, default: 0 })
+  validation_confidence_score: number;
+
+
+  @Prop({ type: String, default: null })
+  validation_coverage_type: string;
+
+  @Prop({ type: Number, default: 0 })
+  validation_max_similarity_score: number;
+
   readonly created_at?: Date;
   readonly updated_at?: Date;
 }
