@@ -188,6 +188,19 @@ export class LearningLogsResponseDto {
   feedback_updated_at: Date;
 
   @ApiProperty({
+    example: 3,
+    description: 'Number of times this skill gap has occurred for this student in this module',
+  })
+  frequency: number;
+
+  @ApiProperty({
+    example: 'Improving',
+    description: 'Status indicating if the student is improving, stable, or declining',
+    enum: ['Improving', 'Stable', 'Declining'],
+  })
+  status: string;
+
+  @ApiProperty({
     type: StudentDetailsDto,
     description: 'Detailed student information',
   })

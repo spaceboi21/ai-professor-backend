@@ -251,6 +251,132 @@ export class LearningLogsService {
       {
         $unwind: '$student',
       },
+      // Calculate frequency across all sessions for this student-module combination
+      {
+        $lookup: {
+          from: 'ai_chat_feedback',
+          let: { 
+            studentId: '$student_id', 
+            moduleId: '$module_id'
+          },
+          pipeline: [
+            {
+              $match: {
+                $expr: {
+                  $and: [
+                    { $eq: ['$student_id', '$$studentId'] },
+                    { $eq: ['$module_id', '$$moduleId'] },
+                    { $eq: ['$deleted_at', null] }
+                  ]
+                }
+              }
+            },
+            {
+              $unwind: '$skill_gaps'
+            },
+            {
+              $group: {
+                _id: '$skill_gaps',
+                count: { $sum: 1 }
+              }
+            }
+          ],
+          as: 'all_skill_gap_counts'
+        }
+      },
+      // Lookup all feedback for this student-module combination to calculate status
+      {
+        $lookup: {
+          from: 'ai_chat_feedback',
+          let: {
+            studentId: '$student_id',
+            moduleId: '$module_id',
+            currentSkillGaps: '$skill_gaps',
+          },
+          pipeline: [
+            {
+              $match: {
+                $expr: {
+                  $and: [
+                    { $eq: ['$student_id', '$$studentId'] },
+                    { $eq: ['$module_id', '$$moduleId'] },
+                    { $eq: ['$deleted_at', null] },
+                  ],
+                },
+              },
+            },
+            {
+              $sort: { created_at: -1 },
+            },
+            {
+              $limit: 5, // Get last 5 sessions for trend analysis
+            },
+          ],
+          as: 'recent_feedback',
+        },
+      },
+      // Calculate status based on recent performance
+      {
+        $addFields: {
+          status: {
+            $cond: {
+              if: {
+                $gt: [
+                  {
+                    $size: {
+                      $filter: {
+                        input: '$recent_feedback',
+                        cond: {
+                          $anyElementTrue: {
+                            $map: {
+                              input: '$$this.skill_gaps',
+                              as: 'gap',
+                              in: {
+                                $in: ['$$gap', '$skill_gaps'],
+                              },
+                            },
+                          },
+                        },
+                      },
+                    },
+                  },
+                  0,
+                ],
+              },
+              then: {
+                $cond: {
+                  if: {
+                    $gt: [
+                      {
+                        $size: {
+                          $filter: {
+                            input: { $slice: ['$recent_feedback', 2] },
+                            cond: {
+                              $anyElementTrue: {
+                                $map: {
+                                  input: '$$this.skill_gaps',
+                                  as: 'gap',
+                                  in: {
+                                    $in: ['$$gap', '$skill_gaps'],
+                                  },
+                                },
+                              },
+                            },
+                          },
+                        },
+                      },
+                      0,
+                    ],
+                  },
+                  then: 'Stable',
+                  else: 'Improving',
+                },
+              },
+              else: 'Improving',
+            },
+          },
+        },
+      },
       {
         $project: {
           keywords_for_learning: 0,
@@ -258,6 +384,7 @@ export class LearningLogsService {
           session_id: 0,
           module_id: 0,
           student_id: 0,
+          recent_feedback: 0,
         },
       },
       {
@@ -265,8 +392,42 @@ export class LearningLogsService {
           areas_for_improvement: { $slice: ['$areas_for_improvement', 2] },
           missed_opportunities: { $slice: ['$missed_opportunities', 2] },
           suggestions: { $slice: ['$suggestions', 2] },
+          // Add frequency and status to the main document
+          frequency: {
+            $reduce: {
+              input: '$skill_gaps',
+              initialValue: 0,
+              in: {
+                $max: [
+                  '$$value',
+                  {
+                    $let: {
+                      vars: {
+                        skillGapCount: {
+                          $size: {
+                            $filter: {
+                              input: '$all_skill_gap_counts',
+                              cond: { $eq: ['$$this._id', '$$this'] }
+                            }
+                          }
+                        }
+                      },
+                      in: {
+                        $ifNull: [
+                          { $arrayElemAt: ['$$skillGapCount.count', 0] },
+                          0
+                        ]
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          },
+          status: '$status',
         },
       },
+      
       {
         $facet: {
           data: [
@@ -386,6 +547,163 @@ export class LearningLogsService {
       },
       {
         $unwind: '$student',
+      },
+      // Calculate frequency across all sessions for this student-module combination
+      {
+        $lookup: {
+          from: 'ai_chat_feedback',
+          let: { 
+            studentId: '$student_id', 
+            moduleId: '$module_id'
+          },
+          pipeline: [
+            {
+              $match: {
+                $expr: {
+                  $and: [
+                    { $eq: ['$student_id', '$$studentId'] },
+                    { $eq: ['$module_id', '$$moduleId'] },
+                    { $eq: ['$deleted_at', null] }
+                  ]
+                }
+              }
+            },
+            {
+              $unwind: '$skill_gaps'
+            },
+            {
+              $group: {
+                _id: '$skill_gaps',
+                count: { $sum: 1 }
+              }
+            }
+          ],
+          as: 'all_skill_gap_counts'
+        }
+      },
+      // Lookup all feedback for this student-module combination to calculate status
+      {
+        $lookup: {
+          from: 'ai_chat_feedback',
+          let: {
+            studentId: '$student_id',
+            moduleId: '$module_id',
+            currentSkillGaps: '$skill_gaps',
+          },
+          pipeline: [
+            {
+              $match: {
+                $expr: {
+                  $and: [
+                    { $eq: ['$student_id', '$$studentId'] },
+                    { $eq: ['$module_id', '$$moduleId'] },
+                    { $eq: ['$deleted_at', null] },
+                  ],
+                },
+              },
+            },
+            {
+              $sort: { created_at: -1 },
+            },
+            {
+              $limit: 5, // Get last 5 sessions for trend analysis
+            },
+          ],
+          as: 'recent_feedback',
+        },
+      },
+      // Calculate status based on recent performance
+      {
+        $addFields: {
+          status: {
+            $cond: {
+              if: {
+                $gt: [
+                  {
+                    $size: {
+                      $filter: {
+                        input: '$recent_feedback',
+                        cond: {
+                          $anyElementTrue: {
+                            $map: {
+                              input: '$$this.skill_gaps',
+                              as: 'gap',
+                              in: {
+                                $in: ['$$gap', '$skill_gaps'],
+                              },
+                            },
+                          },
+                        },
+                      },
+                    },
+                  },
+                  0,
+                ],
+              },
+              then: {
+                $cond: {
+                  if: {
+                    $gt: [
+                      {
+                        $size: {
+                          $filter: {
+                            input: { $slice: ['$recent_feedback', 2] },
+                            cond: {
+                              $anyElementTrue: {
+                                $map: {
+                                  input: '$$this.skill_gaps',
+                                  as: 'gap',
+                                  in: {
+                                    $in: ['$$gap', '$skill_gaps'],
+                                  },
+                                },
+                              },
+                            },
+                          },
+                        },
+                      },
+                      0,
+                    ],
+                  },
+                  then: 'Stable',
+                  else: 'Improving',
+                },
+              },
+              else: 'Improving',
+            },
+          },
+          frequency: {
+            $reduce: {
+              input: '$skill_gaps',
+              initialValue: 0,
+              in: {
+                $max: [
+                  '$$value',
+                  {
+                    $let: {
+                      vars: {
+                        skillGapCount: {
+                          $size: {
+                            $filter: {
+                              input: '$all_skill_gap_counts',
+                              cond: { $eq: ['$$this._id', '$$this'] }
+                            }
+                          }
+                        }
+                      },
+                      in: {
+                        $ifNull: [
+                          { $arrayElemAt: ['$$skillGapCount.count', 0] },
+                          0
+                        ]
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          },
+        },
       },
     ];
   }
