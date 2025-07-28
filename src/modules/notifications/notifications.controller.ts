@@ -34,7 +34,12 @@ export class NotificationsController {
   constructor(private readonly notificationsService: NotificationsService) {}
 
   @Get()
-  @Roles(RoleEnum.STUDENT, RoleEnum.PROFESSOR)
+  @Roles(
+    RoleEnum.STUDENT,
+    RoleEnum.PROFESSOR,
+    RoleEnum.SUPER_ADMIN,
+    RoleEnum.SCHOOL_ADMIN,
+  )
   @ApiOperation({ summary: 'Get user notifications (Student or Professor)' })
   @ApiQuery({
     name: 'page',
@@ -94,7 +99,12 @@ export class NotificationsController {
   }
 
   @Patch(':id/read')
-  @Roles(RoleEnum.STUDENT, RoleEnum.PROFESSOR)
+  @Roles(
+    RoleEnum.STUDENT,
+    RoleEnum.PROFESSOR,
+    RoleEnum.SUPER_ADMIN,
+    RoleEnum.SCHOOL_ADMIN,
+  )
   @ApiOperation({
     summary: 'Mark a notification as read (Student or Professor)',
   })
@@ -123,7 +133,12 @@ export class NotificationsController {
   }
 
   @Patch('mark-all-read')
-  @Roles(RoleEnum.STUDENT, RoleEnum.PROFESSOR)
+  @Roles(
+    RoleEnum.STUDENT,
+    RoleEnum.PROFESSOR,
+    RoleEnum.SUPER_ADMIN,
+    RoleEnum.SCHOOL_ADMIN,
+  )
   @ApiOperation({
     summary: 'Mark all notifications as read (Student or Professor)',
   })
