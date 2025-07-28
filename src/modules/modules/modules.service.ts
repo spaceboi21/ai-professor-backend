@@ -124,30 +124,42 @@ export class ModulesService {
 
     // Validate module against knowledge base if enabled
     let validationResult: ModuleValidationResponse | null = null;
-    const shouldValidate = process.env.VALIDATE_MODULE_KNOWLEDGE_BASE === 'true';
-    
-    if (shouldValidate) {
+    const isValidationDisabled =
+      process.env.VALIDATE_MODULE_KNOWLEDGE_BASE === 'false';
+
+    if (isValidationDisabled) {
+      this.logger.log(
+        'Module knowledge base validation is disabled by config.',
+      );
+    } else {
       try {
         this.logger.log(`Validating module: ${title} against knowledge base`);
         validationResult = await this.pythonService.validateModule(
           title,
           subject,
           description,
-          category || 'general'
+          category || 'general',
         );
-        this.logger.log(`Module validation completed: ${validationResult?.module_exists}`);
+        this.logger.log(
+          `Module validation completed: ${validationResult?.module_exists}`,
+        );
       } catch (error) {
         this.logger.error('Module validation failed', error?.stack || error);
         throw new BadRequestException(
-          'Module validation failed. Please try again or contact support.'
+          'Module validation failed. Please try again or contact support.',
         );
       }
     }
 
     // Check if module validation passed
-    if (shouldValidate && validationResult && !validationResult.module_exists) {
+    if (
+      !isValidationDisabled &&
+      validationResult &&
+      !validationResult.module_exists
+    ) {
       throw new BadRequestException(
-        validationResult.message || 'Module validation failed. Please choose a different topic.'
+        validationResult.message ||
+          'Module validation failed. Please choose a different topic.',
       );
     }
 
@@ -170,10 +182,12 @@ export class ModulesService {
         created_by: new Types.ObjectId(user.id),
         created_by_role: user.role.name as RoleEnum,
         // Add validation fields
-        is_validated: shouldValidate,
+        is_validated: !isValidationDisabled,
         validation_confidence_score: validationResult?.confidence_score || 0,
-        validation_coverage_type: validationResult?.validation_details?.coverage_type || null,
-        validation_max_similarity_score: validationResult?.validation_details?.max_similarity_score || 0,
+        validation_coverage_type:
+          validationResult?.validation_details?.coverage_type || null,
+        validation_max_similarity_score:
+          validationResult?.validation_details?.max_similarity_score || 0,
       };
 
       // Create module in tenant database
@@ -199,7 +213,8 @@ export class ModulesService {
           is_validated: savedModule.is_validated,
           validation_confidence_score: savedModule.validation_confidence_score,
           validation_coverage_type: savedModule.validation_coverage_type,
-          validation_max_similarity_score: savedModule.validation_max_similarity_score,
+          validation_max_similarity_score:
+            savedModule.validation_max_similarity_score,
           created_at: savedModule.created_at,
           updated_at: savedModule.updated_at,
         },
