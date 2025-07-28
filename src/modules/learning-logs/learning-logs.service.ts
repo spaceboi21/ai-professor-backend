@@ -401,24 +401,27 @@ export class LearningLogsService {
                 $max: [
                   '$$value',
                   {
-                    $let: {
-                      vars: {
-                        skillGapCount: {
-                          $size: {
-                            $filter: {
+                    $ifNull: [
+                      {
+                        $arrayElemAt: [
+                          {
+                            $map: {
                               input: '$all_skill_gap_counts',
-                              cond: { $eq: ['$$this._id', '$$this'] }
+                              as: 'count',
+                              in: {
+                                $cond: {
+                                  if: { $eq: ['$$count._id', '$$this'] },
+                                  then: '$$count.count',
+                                  else: null
+                                }
+                              }
                             }
-                          }
-                        }
-                      },
-                      in: {
-                        $ifNull: [
-                          { $arrayElemAt: ['$$skillGapCount.count', 0] },
+                          },
                           0
                         ]
-                      }
-                    }
+                      },
+                      0
+                    ]
                   }
                 ]
               }
@@ -680,24 +683,27 @@ export class LearningLogsService {
                 $max: [
                   '$$value',
                   {
-                    $let: {
-                      vars: {
-                        skillGapCount: {
-                          $size: {
-                            $filter: {
+                    $ifNull: [
+                      {
+                        $arrayElemAt: [
+                          {
+                            $map: {
                               input: '$all_skill_gap_counts',
-                              cond: { $eq: ['$$this._id', '$$this'] }
+                              as: 'count',
+                              in: {
+                                $cond: {
+                                  if: { $eq: ['$$count._id', '$$this'] },
+                                  then: '$$count.count',
+                                  else: null
+                                }
+                              }
                             }
-                          }
-                        }
-                      },
-                      in: {
-                        $ifNull: [
-                          { $arrayElemAt: ['$$skillGapCount.count', 0] },
+                          },
                           0
                         ]
-                      }
-                    }
+                      },
+                      0
+                    ]
                   }
                 ]
               }
