@@ -33,6 +33,7 @@ import { join } from 'path';
 import { AIChatModule } from './modules/ai-chat/ai-chat.module';
 import { LearningLogsModule } from './modules/learning-logs/learning-logs.module';
 import { ActivityLogModule } from './modules/activity-log/activity-log.module';
+import { CommunityModule } from './modules/community/community.module';
 
 @Module({
   imports: [
@@ -126,6 +127,7 @@ import { ActivityLogModule } from './modules/activity-log/activity-log.module';
     AIChatModule,
     LearningLogsModule,
     ActivityLogModule,
+    CommunityModule,
   ],
   controllers: [AppController],
   providers: [AppService, JwtStrategy],
