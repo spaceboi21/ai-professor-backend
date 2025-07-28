@@ -16,6 +16,46 @@ All user details include the following fields:
 }
 ```
 
+## 🗄️ **Database Source by Role**
+
+The system fetches user details from different databases based on the user's role:
+
+### **Students**
+
+- ✅ **Source**: Tenant database (`students` collection)
+- ✅ **Location**: School-specific database
+- ✅ **Fields**: `first_name`, `last_name`, `email`
+
+### **Professors, Admins, Super Admins**
+
+- ✅ **Source**: Central database (`users` collection)
+- ✅ **Location**: Central database
+- ✅ **Fields**: `first_name`, `last_name`, `email`, `role`
+
+## 🔧 **Smart User Details Fetching**
+
+The system automatically determines the correct database source:
+
+```typescript
+// For STUDENT role
+if (userRole === RoleEnum.STUDENT) {
+  // Fetch from tenant database students collection
+  const StudentModel = tenantConnection.model('Student', 'students');
+  const student = await StudentModel.findById(userId)
+    .select('first_name last_name email')
+    .lean();
+}
+
+// For other roles (PROFESSOR, SCHOOL_ADMIN, SUPER_ADMIN)
+else {
+  // Fetch from central database users collection
+  const user = await userModel
+    .findById(userId)
+    .select('first_name last_name email role')
+    .lean();
+}
+```
+
 ## 📝 **Discussion Responses**
 
 ### **Create Discussion Response**

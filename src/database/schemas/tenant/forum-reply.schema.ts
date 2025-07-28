@@ -36,13 +36,20 @@ export class ForumReply extends Document {
   @Prop({ required: true, enum: RoleEnum })
   created_by_role: RoleEnum;
 
-  @Prop({ type: Types.ObjectId, ref: 'ForumReply' })
+  @Prop({ type: Types.ObjectId, ref: 'ForumReply', default: null, index: true })
   parent_reply_id: Types.ObjectId; // For nested replies
 
   @Prop({ type: Number, default: 0 })
   like_count: number;
 
-  @Prop({ enum: ReplyStatusEnum, default: ReplyStatusEnum.ACTIVE, index: true })
+  @Prop({ type: Number, default: 0 })
+  sub_reply_count: number; // Count of sub-replies to this reply
+
+  @Prop({
+    enum: ReplyStatusEnum,
+    default: ReplyStatusEnum.ACTIVE,
+    index: true,
+  })
   status: ReplyStatusEnum;
 
   @Prop({ type: Date, default: null })
@@ -58,7 +65,7 @@ export class ForumReply extends Document {
 export const ForumReplySchema = SchemaFactory.createForClass(ForumReply);
 
 // Create indexes for better query performance
-ForumReplySchema.index({ discussion_id: 1, status: 1 });
-ForumReplySchema.index({ created_by: 1, status: 1 });
-ForumReplySchema.index({ parent_reply_id: 1, status: 1 });
-ForumReplySchema.index({ created_at: 1 });
+ForumReplySchema.index({ discussion_id: 1, created_at: 1 });
+ForumReplySchema.index({ parent_reply_id: 1, created_at: 1 });
+ForumReplySchema.index({ created_by: 1 });
+ForumReplySchema.index({ status: 1 });

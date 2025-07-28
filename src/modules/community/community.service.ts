@@ -168,10 +168,15 @@ export class CommunityService {
       const savedDiscussion = await newDiscussion.save();
 
       // Attach user details to the response
-      const discussionWithUser = await attachUserDetailsToEntity(
-        savedDiscussion.toObject(),
-        this.userModel,
+      const userDetails = await this.getUserDetails(
+        user.id.toString(),
+        user.role.name,
+        tenantConnection,
       );
+      const discussionWithUser = {
+        ...savedDiscussion.toObject(),
+        created_by_user: userDetails || null,
+      };
 
       this.logger.log(`Discussion created: ${savedDiscussion._id}`);
 
@@ -278,10 +283,19 @@ export class CommunityService {
 
       this.logger.debug(`Found ${discussions.length} discussions`);
 
-      // Attach user details
-      const discussionsWithUsers = await attachUserDetails(
-        discussions,
-        this.userModel,
+      // Attach user details for each discussion
+      const discussionsWithUsers = await Promise.all(
+        discussions.map(async (discussion) => {
+          const userDetails = await this.getUserDetails(
+            discussion.created_by.toString(),
+            discussion.created_by_role,
+            tenantConnection,
+          );
+          return {
+            ...discussion,
+            created_by_user: userDetails || null,
+          };
+        }),
       );
 
       const result = createPaginationResult(
@@ -339,10 +353,15 @@ export class CommunityService {
       );
 
       // Attach user details
-      const discussionWithUser = await attachUserDetailsToEntity(
-        discussion,
-        this.userModel,
+      const userDetails = await this.getUserDetails(
+        discussion.created_by.toString(),
+        discussion.created_by_role,
+        tenantConnection,
       );
+      const discussionWithUser = {
+        ...discussion,
+        created_by_user: userDetails || null,
+      };
 
       return {
         message: 'Discussion retrieved successfully',
@@ -433,11 +452,24 @@ export class CommunityService {
         { $inc: { reply_count: 1 } },
       );
 
+      // If this is a sub-reply, increment sub_reply_count on parent reply
+      if (parent_reply_id) {
+        await ReplyModel.updateOne(
+          { _id: parent_reply_id },
+          { $inc: { sub_reply_count: 1 } },
+        );
+      }
+
       // Attach user details to the response
-      const replyWithUser = await attachUserDetailsToEntity(
-        savedReply.toObject(),
-        this.userModel,
+      const userDetails = await this.getUserDetails(
+        user.id.toString(),
+        user.role.name,
+        tenantConnection,
       );
+      const replyWithUser = {
+        ...savedReply.toObject(),
+        created_by_user: userDetails || null,
+      };
 
       this.logger.log(`Reply created: ${savedReply._id}`);
 
@@ -500,10 +532,11 @@ export class CommunityService {
 
       const options = getPaginationOptions(paginationDto || {});
 
-      // Get replies
+      // Get replies (only top-level replies, not sub-replies)
       const [replies, total] = await Promise.all([
         ReplyModel.find({
           discussion_id: new Types.ObjectId(discussionId),
+          parent_reply_id: null, // Only top-level replies
           deleted_at: null,
           status: ReplyStatusEnum.ACTIVE,
         })
@@ -513,13 +546,30 @@ export class CommunityService {
           .lean(),
         ReplyModel.countDocuments({
           discussion_id: new Types.ObjectId(discussionId),
+          parent_reply_id: null, // Only top-level replies
           deleted_at: null,
           status: ReplyStatusEnum.ACTIVE,
         }),
       ]);
 
-      // Attach user details
-      const repliesWithUsers = await attachUserDetails(replies, this.userModel);
+      this.logger.debug(`Found ${replies.length} replies`);
+
+      // Attach user details for each reply
+      const repliesWithUsers = await Promise.all(
+        replies.map(async (reply) => {
+          const userDetails = await this.getUserDetails(
+            reply.created_by.toString(),
+            reply.created_by_role,
+            tenantConnection,
+          );
+          return {
+            ...reply,
+            created_by_user: userDetails || null,
+            has_sub_replies: reply.sub_reply_count > 0,
+            sub_reply_count: reply.sub_reply_count || 0,
+          };
+        }),
+      );
 
       const result = createPaginationResult(repliesWithUsers, total, options);
 
@@ -533,6 +583,100 @@ export class CommunityService {
         throw error;
       }
       throw new BadRequestException('Failed to retrieve replies');
+    }
+  }
+
+  /**
+   * Get sub-replies for a specific reply
+   */
+  async findSubRepliesByReplyId(
+    replyId: string,
+    user: JWTUserPayload,
+    paginationDto?: PaginationDto,
+  ) {
+    this.logger.log(`Finding sub-replies for reply: ${replyId}`);
+
+    const resolvedSchoolId = this.resolveSchoolId(user);
+
+    // Validate school exists
+    const school = await this.schoolModel.findById(resolvedSchoolId);
+    if (!school) {
+      throw new NotFoundException('School not found');
+    }
+
+    // Get tenant connection
+    const tenantConnection =
+      await this.tenantConnectionService.getTenantConnection(school.db_name);
+    const ReplyModel = tenantConnection.model(
+      ForumReply.name,
+      ForumReplySchema,
+    );
+
+    try {
+      // Validate parent reply exists
+      const parentReply = await ReplyModel.findOne({
+        _id: replyId,
+        deleted_at: null,
+        status: ReplyStatusEnum.ACTIVE,
+      });
+
+      if (!parentReply) {
+        throw new NotFoundException('Parent reply not found or not active');
+      }
+
+      const options = getPaginationOptions(paginationDto || {});
+
+      // Get sub-replies
+      const [subReplies, total] = await Promise.all([
+        ReplyModel.find({
+          parent_reply_id: new Types.ObjectId(replyId),
+          deleted_at: null,
+          status: ReplyStatusEnum.ACTIVE,
+        })
+          .sort({ created_at: 1 })
+          .skip(options.skip)
+          .limit(options.limit)
+          .lean(),
+        ReplyModel.countDocuments({
+          parent_reply_id: new Types.ObjectId(replyId),
+          deleted_at: null,
+          status: ReplyStatusEnum.ACTIVE,
+        }),
+      ]);
+
+      this.logger.debug(`Found ${subReplies.length} sub-replies`);
+
+      // Attach user details for each sub-reply
+      const subRepliesWithUsers = await Promise.all(
+        subReplies.map(async (reply) => {
+          const userDetails = await this.getUserDetails(
+            reply.created_by.toString(),
+            reply.created_by_role,
+            tenantConnection,
+          );
+          return {
+            ...reply,
+            created_by_user: userDetails || null,
+          };
+        }),
+      );
+
+      const result = createPaginationResult(
+        subRepliesWithUsers,
+        total,
+        options,
+      );
+
+      return {
+        message: 'Sub-replies retrieved successfully',
+        ...result,
+      };
+    } catch (error) {
+      this.logger.error('Error finding sub-replies', error?.stack || error);
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
+      throw new BadRequestException('Failed to retrieve sub-replies');
     }
   }
 
@@ -575,10 +719,11 @@ export class CommunityService {
         await this.updateLikeCount(entityType, entityId, -1, tenantConnection);
 
         // Get user details for response
-        const userDetails = await this.userModel
-          .findById(user.id)
-          .select('first_name last_name email role')
-          .lean();
+        const userDetails = await this.getUserDetails(
+          user.id.toString(),
+          user.role.name,
+          tenantConnection,
+        );
 
         return {
           message: 'Like removed successfully',
@@ -597,10 +742,11 @@ export class CommunityService {
         await this.updateLikeCount(entityType, entityId, 1, tenantConnection);
 
         // Get user details for response
-        const userDetails = await this.userModel
-          .findById(user.id)
-          .select('first_name last_name email role')
-          .lean();
+        const userDetails = await this.getUserDetails(
+          user.id.toString(),
+          user.role.name,
+          tenantConnection,
+        );
 
         return {
           message: 'Like added successfully',
@@ -707,14 +853,14 @@ export class CommunityService {
       );
 
       // Attach user details to the response
-      const reporter = await this.userModel
-        .findById(savedReport.reported_by)
-        .select('first_name last_name email role')
-        .lean();
-
+      const userDetails = await this.getUserDetails(
+        user.id.toString(),
+        user.role.name,
+        tenantConnection,
+      );
       const reportWithUser = {
         ...savedReport.toObject(),
-        reported_by_user: reporter || null,
+        reported_by_user: userDetails || null,
       };
 
       this.logger.log(`Report created: ${savedReport._id}`);
@@ -811,10 +957,11 @@ export class CommunityService {
       // Attach detailed user information for reporters
       const reportsWithUsers = await Promise.all(
         reports.map(async (report) => {
-          const reporter = await this.userModel
-            .findById(report.reported_by)
-            .select('first_name last_name email role')
-            .lean();
+          const reporter = await this.getUserDetails(
+            report.reported_by.toString(),
+            report.reported_by_role,
+            tenantConnection,
+          );
 
           // Get the reported content creator details
           let reportedContentCreator: any = null;
@@ -824,15 +971,15 @@ export class CommunityService {
               ForumDiscussionSchema,
             );
             const discussion = await DiscussionModel.findById(report.entity_id)
-              .select('created_by title')
+              .select('created_by created_by_role')
               .lean();
 
             if (discussion) {
-              const creator = await this.userModel
-                .findById(discussion.created_by)
-                .select('first_name last_name email role')
-                .lean();
-              reportedContentCreator = creator || null;
+              reportedContentCreator = await this.getUserDetails(
+                discussion.created_by.toString(),
+                discussion.created_by_role,
+                tenantConnection,
+              );
             }
           } else if (report.entity_type === ReportEntityTypeEnum.REPLY) {
             const ReplyModel = tenantConnection.model(
@@ -840,15 +987,15 @@ export class CommunityService {
               ForumReplySchema,
             );
             const reply = await ReplyModel.findById(report.entity_id)
-              .select('created_by content')
+              .select('created_by created_by_role')
               .lean();
 
             if (reply) {
-              const creator = await this.userModel
-                .findById(reply.created_by)
-                .select('first_name last_name email role')
-                .lean();
-              reportedContentCreator = creator || null;
+              reportedContentCreator = await this.getUserDetails(
+                reply.created_by.toString(),
+                reply.created_by_role,
+                tenantConnection,
+              );
             }
           }
 
@@ -933,6 +1080,58 @@ export class CommunityService {
         throw error;
       }
       throw new BadRequestException('Failed to archive discussion');
+    }
+  }
+
+  /**
+   * Helper method to get user details based on role
+   */
+  private async getUserDetails(
+    userId: string,
+    userRole: string,
+    tenantConnection?: any,
+  ) {
+    try {
+      if (userRole === RoleEnum.STUDENT && tenantConnection) {
+        // Students are stored in tenant database
+        const StudentModel = tenantConnection.model('Student', 'students');
+        const student = await StudentModel.findById(userId)
+          .select('first_name last_name email image')
+          .lean();
+
+        if (student) {
+          return {
+            _id: student._id,
+            first_name: student.first_name,
+            last_name: student.last_name,
+            email: student.email,
+            image: student.image || null,
+            role: RoleEnum.STUDENT,
+          };
+        }
+      } else {
+        // Professors, admins, etc. are stored in central database
+        const user = await this.userModel
+          .findById(userId)
+          .select('first_name last_name email role image')
+          .lean();
+
+        if (user) {
+          return {
+            _id: user._id,
+            first_name: user.first_name,
+            last_name: user.last_name,
+            email: user.email,
+            image: user.profile_pic || null,
+            role: user.role,
+          };
+        }
+      }
+
+      return null;
+    } catch (error) {
+      this.logger.error('Error fetching user details', error);
+      return null;
     }
   }
 }

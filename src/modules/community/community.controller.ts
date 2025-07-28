@@ -201,6 +201,41 @@ export class CommunityController {
     );
   }
 
+  @Get('replies/:id/sub-replies')
+  @Roles(
+    RoleEnum.STUDENT,
+    RoleEnum.PROFESSOR,
+    RoleEnum.SCHOOL_ADMIN,
+    RoleEnum.SUPER_ADMIN,
+  )
+  @ApiOperation({ summary: 'Get sub-replies for a specific reply' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Sub-replies retrieved successfully',
+  })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'Parent reply not found',
+  })
+  @ApiResponse({
+    status: HttpStatus.FORBIDDEN,
+    description: 'Access denied - insufficient permissions',
+  })
+  @ApiParam({ name: 'id', description: 'Reply ID' })
+  @ApiQuery({ name: 'page', required: false, type: Number })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  async findSubRepliesByReplyId(
+    @Param('id') id: string,
+    @Query() paginationDto: PaginationDto,
+    @Request() req: any,
+  ) {
+    return this.communityService.findSubRepliesByReplyId(
+      id,
+      req.user as JWTUserPayload,
+      paginationDto,
+    );
+  }
+
   @Post('like/:entityType/:entityId')
   @Roles(
     RoleEnum.STUDENT,
