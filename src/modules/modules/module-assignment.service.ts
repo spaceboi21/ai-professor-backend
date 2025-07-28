@@ -439,6 +439,8 @@ export class ModuleAssignmentService {
     // Get tenant connection
     const tenantConnection =
       await this.tenantConnectionService.getTenantConnection(school.db_name);
+
+    // Register tenant models
     const ModuleModel = tenantConnection.model(Module.name, ModuleSchema);
     const AssignmentModel = tenantConnection.model(
       ModuleProfessorAssignment.name,
@@ -451,21 +453,41 @@ export class ModuleAssignmentService {
       throw new NotFoundException('Module not found');
     }
 
-    // Get active assignments
+    // Get active assignments (NO populate)
     const assignments = await AssignmentModel.find({
       module_id: new Types.ObjectId(moduleId),
       is_active: true,
-    }).populate('professor_id', 'first_name last_name email');
+    });
 
-    const assignmentData = assignments.map((assignment) => ({
-      id: assignment._id,
-      professor_id: assignment.professor_id._id,
-      professor_name:
-        `${(assignment.professor_id as any).first_name} ${(assignment.professor_id as any).last_name}`.trim(),
-      professor_email: (assignment.professor_id as any).email,
-      assigned_at: assignment.assigned_at,
-      assigned_by: assignment.assigned_by,
-    }));
+    // Get professor_ids
+    const professorIds = assignments.map((a) => a.professor_id);
+
+    // Fetch professor details
+    const professors = await this.userModel
+      .find({
+        _id: { $in: professorIds },
+      })
+      .select('first_name last_name email');
+
+    // Create map for fast lookup
+    const professorMap = new Map(
+      professors.map((prof) => [prof._id.toString(), prof]),
+    );
+
+    // Merge assignments with professor data
+    const assignmentData = assignments.map((assignment) => {
+      const prof = professorMap.get(assignment.professor_id.toString());
+      return {
+        id: assignment._id,
+        professor_id: assignment.professor_id,
+        professor_name: prof
+          ? `${prof.first_name} ${prof.last_name}`.trim()
+          : 'N/A',
+        professor_email: prof?.email ?? 'N/A',
+        assigned_at: assignment.assigned_at,
+        assigned_by: assignment.assigned_by,
+      };
+    });
 
     return {
       message: 'Module assignments retrieved successfully',
