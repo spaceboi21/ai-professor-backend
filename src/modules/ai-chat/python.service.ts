@@ -121,6 +121,24 @@ export class PythonService {
   }
 
   /**
+   * Validate module against knowledge base
+   * POST /chat/module/validate
+   */
+  async validateModule(
+    module_title: string,
+    module_subject: string,
+    module_description: string,
+    module_category: string,
+  ) {
+    return this._post('/chat/module/validate', {
+      module_title,
+      module_subject,
+      module_description,
+      module_category,
+    });
+  }
+
+  /**
    * Generic POST helper with improved error handling
    */
   private async _post(path: string, payload: any) {

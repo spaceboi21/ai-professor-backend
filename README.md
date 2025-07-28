@@ -41,6 +41,7 @@ Tenant Databases (Per School)
 - Node.js 18+
 - MongoDB 4.4+
 - Yarn package manager
+- Python API service (for module validation)
 
 ### Local Development Setup
 

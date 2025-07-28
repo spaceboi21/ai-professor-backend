@@ -12,6 +12,8 @@ import { ModulesModule } from '../modules/modules.module';
 import { ModulesService } from '../modules/modules.service';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { ProgressModule } from '../progress/progress.module';
+import { HttpModule } from '@nestjs/axios';
+import { PythonService } from '../modules/python.service';
 @Module({
   imports: [
     MongooseModule.forFeature([
@@ -21,9 +23,10 @@ import { ProgressModule } from '../progress/progress.module';
     ModulesModule,
     NotificationsModule,
     ProgressModule,
+    HttpModule,
   ],
   controllers: [ChaptersController],
-  providers: [ChaptersService, TenantConnectionService, ModulesService],
+  providers: [ChaptersService, TenantConnectionService, ModulesService, PythonService],
   exports: [ChaptersService],
 })
 export class ChaptersModule {}

@@ -57,6 +57,7 @@ import {
   ModuleProfessorAssignmentSchema,
 } from 'src/database/schemas/tenant/module-professor-assignment.schema';
 import { QuizTypeEnum } from 'src/common/constants/quiz.constant';
+import { PythonService, ModuleValidationResponse } from './python.service';
 
 @Injectable()
 export class ModulesService {
@@ -70,6 +71,7 @@ export class ModulesService {
     private readonly tenantConnectionService: TenantConnectionService,
     private readonly notificationsService: NotificationsService,
     private readonly moduleAssignmentService: ModuleAssignmentService,
+    private readonly pythonService: PythonService,
   ) {}
 
   /**
@@ -120,14 +122,43 @@ export class ModulesService {
       throw new NotFoundException('School not found');
     }
 
+    // Validate module against knowledge base if enabled
+    let validationResult: ModuleValidationResponse | null = null;
+    const shouldValidate = process.env.VALIDATE_MODULE_KNOWLEDGE_BASE === 'true';
+    
+    if (shouldValidate) {
+      try {
+        this.logger.log(`Validating module: ${title} against knowledge base`);
+        validationResult = await this.pythonService.validateModule(
+          title,
+          subject,
+          description,
+          category || 'general'
+        );
+        this.logger.log(`Module validation completed: ${validationResult?.module_exists}`);
+      } catch (error) {
+        this.logger.error('Module validation failed', error?.stack || error);
+        throw new BadRequestException(
+          'Module validation failed. Please try again or contact support.'
+        );
+      }
+    }
+
+    // Check if module validation passed
+    if (shouldValidate && validationResult && !validationResult.module_exists) {
+      throw new BadRequestException(
+        validationResult.message || 'Module validation failed. Please choose a different topic.'
+      );
+    }
+
     // Get tenant connection for the school
     const tenantConnection =
       await this.tenantConnectionService.getTenantConnection(school.db_name);
     const ModuleModel = tenantConnection.model(Module.name, ModuleSchema);
 
     try {
-      // Create module in tenant database
-      const newModule = new ModuleModel({
+      // Prepare module data with validation info
+      const moduleData = {
         title,
         subject,
         description,
@@ -138,7 +169,15 @@ export class ModulesService {
         thumbnail: thumbnail || '/uploads/default-module-thumbnail.jpg',
         created_by: new Types.ObjectId(user.id),
         created_by_role: user.role.name as RoleEnum,
-      });
+        // Add validation fields
+        is_validated: shouldValidate,
+        validation_confidence_score: validationResult?.confidence_score || 0,
+        validation_coverage_type: validationResult?.validation_details?.coverage_type || null,
+        validation_max_similarity_score: validationResult?.validation_details?.max_similarity_score || 0,
+      };
+
+      // Create module in tenant database
+      const newModule = new ModuleModel(moduleData);
 
       const savedModule = await newModule.save();
 
@@ -157,6 +196,10 @@ export class ModulesService {
           tags: savedModule.tags,
           created_by: savedModule.created_by,
           created_by_role: savedModule.created_by_role,
+          is_validated: savedModule.is_validated,
+          validation_confidence_score: savedModule.validation_confidence_score,
+          validation_coverage_type: savedModule.validation_coverage_type,
+          validation_max_similarity_score: savedModule.validation_max_similarity_score,
           created_at: savedModule.created_at,
           updated_at: savedModule.updated_at,
         },

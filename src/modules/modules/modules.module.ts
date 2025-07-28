@@ -11,6 +11,8 @@ import {
 import { DatabaseModule } from 'src/database/database.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { NotificationsService } from '../notifications/notifications.service';
+import { PythonService } from './python.service';
+import { HttpModule } from '@nestjs/axios';
 
 @Module({
   imports: [
@@ -20,9 +22,10 @@ import { NotificationsService } from '../notifications/notifications.service';
     ]),
     DatabaseModule,
     NotificationsModule,
+    HttpModule,
   ],
   controllers: [ModulesController],
-  providers: [ModulesService, ModuleAssignmentService, NotificationsService],
+  providers: [ModulesService, ModuleAssignmentService, NotificationsService, PythonService],
   exports: [ModulesService, ModuleAssignmentService],
 })
 export class ModulesModule {}
