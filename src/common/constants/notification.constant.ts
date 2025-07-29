@@ -13,6 +13,8 @@ export enum NotificationTypeEnum {
   FORUM_LIKE = 'FORUM_LIKE',
   FORUM_REPORT = 'FORUM_REPORT',
   FORUM_DISCUSSION_ARCHIVED = 'FORUM_DISCUSSION_ARCHIVED',
+  // Learning log review notifications
+  LEARNING_LOG_REVIEWED = 'LEARNING_LOG_REVIEWED',
 }
 
 export enum NotificationStatusEnum {

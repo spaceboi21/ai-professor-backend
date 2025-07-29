@@ -1,6 +1,8 @@
 import {
   Controller,
   Get,
+  Post,
+  Body,
   Query,
   Param,
   UseGuards,
@@ -25,6 +27,8 @@ import { LearningLogsService } from './learning-logs.service';
 import { LearningLogsFilterDto } from './dto/learning-logs-filter.dto';
 import { LearningLogsResponseDto } from './dto/learning-logs-response.dto';
 import { PaginationDto } from 'src/common/dto/pagination.dto';
+import { CreateLearningLogReviewDto } from './dto/create-learning-log-review.dto';
+import { LearningLogReviewResponseDto } from './dto/learning-log-review-response.dto';
 
 @ApiTags('Learning Logs')
 @ApiBearerAuth()
@@ -36,7 +40,7 @@ export class LearningLogsController {
   constructor(private readonly learningLogsService: LearningLogsService) {}
 
   @Get()
-  @Roles(RoleEnum.STUDENT, RoleEnum.SCHOOL_ADMIN)
+  @Roles(RoleEnum.STUDENT, RoleEnum.SCHOOL_ADMIN, RoleEnum.PROFESSOR, RoleEnum.SUPER_ADMIN)
   @ApiOperation({
     summary: 'Get learning logs',
     description: 'Get learning logs with role-based access control. Students can only see their own logs, while school admins can see all students\' logs.',
@@ -130,7 +134,7 @@ export class LearningLogsController {
   }
 
   @Get(':id')
-  @Roles(RoleEnum.STUDENT, RoleEnum.SCHOOL_ADMIN)
+  @Roles(RoleEnum.STUDENT, RoleEnum.SCHOOL_ADMIN, RoleEnum.PROFESSOR, RoleEnum.SUPER_ADMIN)
   @ApiOperation({
     summary: 'Get learning log by ID',
     description: 'Get a specific learning log by ID with role-based access control.',
@@ -158,7 +162,7 @@ export class LearningLogsController {
   }
 
   @Get('stats/skill-gaps')
-  @Roles(RoleEnum.STUDENT, RoleEnum.SCHOOL_ADMIN)
+  @Roles(RoleEnum.STUDENT, RoleEnum.SCHOOL_ADMIN, RoleEnum.PROFESSOR, RoleEnum.SUPER_ADMIN)
   @ApiOperation({
     summary: 'Get skill gap statistics',
     description: 'Get statistics about skill gaps identified in learning logs.',
@@ -180,5 +184,66 @@ export class LearningLogsController {
   async getSkillGapStats(@User() user: JWTUserPayload) {
     this.logger.log(`User ${user.id} (${user.role.name}) requesting skill gap statistics`);
     return this.learningLogsService.getSkillGapStats(user);
+  }
+
+  @Post(':id/review')
+  @Roles(RoleEnum.SCHOOL_ADMIN, RoleEnum.PROFESSOR, RoleEnum.SUPER_ADMIN)
+  @ApiOperation({
+    summary: 'Review a learning log',
+    description: 'Create a review for a learning log. Only school admins, professors, and super admins can review learning logs.',
+  })
+  @ApiResponse({
+    status: 201,
+    description: 'Learning log review created successfully',
+    type: LearningLogReviewResponseDto,
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Bad request - Invalid data or user already reviewed this learning log',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Learning log not found',
+  })
+  @ApiParam({
+    name: 'id',
+    description: 'Learning log ID',
+    example: '507f1f77bcf86cd799439011',
+  })
+  async createLearningLogReview(
+    @Param('id') id: string,
+    @Body() createReviewDto: CreateLearningLogReviewDto,
+    @User() user: JWTUserPayload,
+  ): Promise<LearningLogReviewResponseDto> {
+    this.logger.log(`User ${user.id} (${user.role.name}) creating review for learning log ${id}`);
+    return this.learningLogsService.createLearningLogReview(id, createReviewDto, user);
+  }
+
+  @Get(':id/review')
+  @Roles(RoleEnum.SCHOOL_ADMIN, RoleEnum.PROFESSOR, RoleEnum.SUPER_ADMIN)
+  @ApiOperation({
+    summary: 'Get user review for a learning log',
+    description: 'Get the current user\'s review for a specific learning log.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Review retrieved successfully',
+    type: LearningLogReviewResponseDto,
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Review not found',
+  })
+  @ApiParam({
+    name: 'id',
+    description: 'Learning log ID',
+    example: '507f1f77bcf86cd799439011',
+  })
+  async getLearningLogReview(
+    @Param('id') id: string,
+    @User() user: JWTUserPayload,
+  ): Promise<LearningLogReviewResponseDto | null> {
+    this.logger.log(`User ${user.id} (${user.role.name}) requesting review for learning log ${id}`);
+    return this.learningLogsService.getLearningLogReview(id, user);
   }
 } 

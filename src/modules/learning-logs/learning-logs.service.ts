@@ -34,6 +34,15 @@ import { LearningLogsFilterDto } from './dto/learning-logs-filter.dto';
 import { LearningLogsResponseDto } from './dto/learning-logs-response.dto';
 import { RoleEnum } from 'src/common/constants/roles.constant';
 import { AI_LEARNING_ERROR_TYPES } from 'src/common/constants/ai-learning-error.constant';
+import { CreateLearningLogReviewDto } from './dto/create-learning-log-review.dto';
+import { LearningLogReviewResponseDto } from './dto/learning-log-review-response.dto';
+import {
+  LearningLogReview,
+  LearningLogReviewSchema,
+} from 'src/database/schemas/tenant/learning-log-review.schema';
+import { NotificationsService } from '../notifications/notifications.service';
+import { NotificationTypeEnum } from 'src/common/constants/notification.constant';
+import { RecipientTypeEnum } from 'src/database/schemas/tenant/notification.schema';
 
 @Injectable()
 export class LearningLogsService {
@@ -45,6 +54,7 @@ export class LearningLogsService {
     @InjectModel(School.name)
     private readonly schoolModel: Model<School>,
     private readonly tenantConnectionService: TenantConnectionService,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   async getLearningLogs(
@@ -59,8 +69,14 @@ export class LearningLogsService {
     // Build aggregation pipeline with pagination
     const pipeline = this.buildAggregationPipeline(user, filterDto, options);
 
+    this.logger.log(
+      `User role: ${user.role.name}, Pipeline stages: ${pipeline.length}`,
+    );
+
     // Execute aggregation with pagination
     const results = await AIChatFeedbackModel.aggregate(pipeline);
+
+    this.logger.log(`Aggregation results: ${JSON.stringify(results)}`);
 
     return createPaginationResult(
       results[0].data,
@@ -115,6 +131,169 @@ export class LearningLogsService {
     }));
   }
 
+  async createLearningLogReview(
+    aiFeedbackId: string,
+    createReviewDto: CreateLearningLogReviewDto,
+    user: JWTUserPayload,
+  ): Promise<LearningLogReviewResponseDto> {
+    this.logger.log(`Received review DTO: ${JSON.stringify(createReviewDto)}`);
+
+    // Check if user can review (not a student)
+    if (user.role.name === RoleEnum.STUDENT) {
+      throw new BadRequestException('Students cannot review learning logs');
+    }
+
+    const { connection, AIChatFeedbackModel, LearningLogReviewModel } =
+      await this.getConnectionAndModels(user);
+
+    // Check if the learning log exists
+    const learningLog = await AIChatFeedbackModel.findById(aiFeedbackId);
+    if (!learningLog) {
+      throw new NotFoundException('Learning log not found');
+    }
+
+    // Check if user has already reviewed this learning log
+    const existingReview = await LearningLogReviewModel.findOne({
+      ai_feedback_id: new Types.ObjectId(aiFeedbackId),
+      reviewer_id: new Types.ObjectId(user.id),
+      reviewer_role: user.role.name,
+      deleted_at: null,
+    });
+
+    if (existingReview) {
+      throw new BadRequestException(
+        'You have already reviewed this learning log',
+      );
+    }
+
+    // Create the review
+    const reviewData = {
+      ai_feedback_id: new Types.ObjectId(aiFeedbackId),
+      reviewer_id: new Types.ObjectId(user.id),
+      reviewer_role: user.role.name,
+      rating: createReviewDto.rating,
+      feedback: createReviewDto.feedback,
+      metadata: createReviewDto.metadata || {},
+    };
+
+    this.logger.log(
+      `Creating review with metadata: ${JSON.stringify(reviewData.metadata)}`,
+    );
+    this.logger.log(`Full review data: ${JSON.stringify(reviewData)}`);
+
+    const review = new LearningLogReviewModel(reviewData);
+
+    await review.save();
+
+    this.logger.log(`Review saved with ID: ${review._id}`);
+    this.logger.log(
+      `Review saved metadata: ${JSON.stringify(review.metadata)}`,
+    );
+    this.logger.log(
+      `Review saved document: ${JSON.stringify(review.toObject())}`,
+    );
+
+    // Get reviewer information
+    const reviewer = await this.userModel.findById(user.id);
+    if (!reviewer) {
+      throw new NotFoundException('Reviewer not found');
+    }
+    const reviewerInfo = {
+      first_name: reviewer.first_name,
+      last_name: reviewer.last_name,
+      email: reviewer.email,
+      profile_pic: reviewer.profile_pic,
+    };
+
+    // Create notification for the student
+    if (!user.school_id) {
+      throw new BadRequestException('User school ID not found');
+    }
+    await this.notificationsService.createNotification(
+      new Types.ObjectId(learningLog.student_id.toString()),
+      RecipientTypeEnum.STUDENT,
+      'Learning Log Reviewed',
+      `${reviewerInfo.first_name} ${reviewerInfo.last_name} has reviewed your learning log and given you a ${createReviewDto.rating}-star rating.`,
+      NotificationTypeEnum.LEARNING_LOG_REVIEWED,
+      {
+        ai_feedback_id: aiFeedbackId,
+        reviewer_id: user.id,
+        reviewer_role: user.role.name,
+        rating: createReviewDto.rating,
+        review_id: review._id,
+      },
+      new Types.ObjectId(user.school_id.toString()),
+    );
+
+    const response = {
+      _id: review._id.toString(),
+      ai_feedback_id: review.ai_feedback_id.toString(),
+      reviewer_id: review.reviewer_id.toString(),
+      reviewer_role: review.reviewer_role,
+      rating: review.rating,
+      feedback: review.feedback,
+      metadata: review.metadata,
+      reviewer_info: reviewerInfo,
+      created_at: review.created_at!,
+      updated_at: review.updated_at!,
+    };
+
+    this.logger.log(
+      `Returning response with metadata: ${JSON.stringify(response.metadata)}`,
+    );
+
+    return response;
+  }
+
+  async getLearningLogReview(
+    aiFeedbackId: string,
+    user: JWTUserPayload,
+  ): Promise<LearningLogReviewResponseDto | null> {
+    const { LearningLogReviewModel } = await this.getConnectionAndModels(user);
+
+    const review = await LearningLogReviewModel.findOne({
+      ai_feedback_id: new Types.ObjectId(aiFeedbackId),
+      reviewer_id: new Types.ObjectId(user.id),
+      reviewer_role: user.role.name,
+      deleted_at: null,
+    }).lean();
+
+    if (!review) {
+      return null;
+    }
+
+    // Get reviewer information
+    const reviewer = await this.userModel.findById(user.id);
+    if (!reviewer) {
+      throw new NotFoundException('Reviewer not found');
+    }
+    const reviewerInfo = {
+      first_name: reviewer.first_name,
+      last_name: reviewer.last_name,
+      email: reviewer.email,
+      profile_pic: reviewer.profile_pic,
+    };
+
+    const response = {
+      _id: review._id.toString(),
+      ai_feedback_id: review.ai_feedback_id.toString(),
+      reviewer_id: review.reviewer_id.toString(),
+      reviewer_role: review.reviewer_role,
+      rating: review.rating,
+      feedback: review.feedback,
+      metadata: review.metadata,
+      reviewer_info: reviewerInfo,
+      created_at: review.created_at!,
+      updated_at: review.updated_at!,
+    };
+
+    this.logger.log(
+      `Retrieved review with metadata: ${JSON.stringify(response.metadata)}`,
+    );
+
+    return response;
+  }
+
   // Private helper methods
   private async getConnectionAndModel(user: JWTUserPayload) {
     const school = await this.schoolModel.findById(user.school_id);
@@ -132,6 +311,36 @@ export class LearningLogsService {
     );
 
     return { connection, AIChatFeedbackModel };
+  }
+
+  private async getConnectionAndModels(user: JWTUserPayload) {
+    const school = await this.schoolModel.findById(user.school_id);
+    if (!school) {
+      throw new NotFoundException('School not found');
+    }
+
+    const connection = await this.tenantConnectionService.getTenantConnection(
+      school.db_name,
+    );
+
+    const AIChatFeedbackModel = connection.model(
+      AIChatFeedback.name,
+      AIChatFeedbackSchema,
+    );
+
+    const LearningLogReviewModel = connection.model(
+      LearningLogReview.name,
+      LearningLogReviewSchema,
+    );
+
+    this.logger.log(
+      `LearningLogReviewModel created: ${LearningLogReviewModel.modelName}`,
+    );
+    this.logger.log(
+      `Schema fields: ${Object.keys(LearningLogReviewSchema.paths)}`,
+    );
+
+    return { connection, AIChatFeedbackModel, LearningLogReviewModel };
   }
 
   private buildAggregationPipeline(
@@ -255,9 +464,9 @@ export class LearningLogsService {
       {
         $lookup: {
           from: 'ai_chat_feedback',
-          let: { 
-            studentId: '$student_id', 
-            moduleId: '$module_id'
+          let: {
+            studentId: '$student_id',
+            moduleId: '$module_id',
           },
           pipeline: [
             {
@@ -266,23 +475,23 @@ export class LearningLogsService {
                   $and: [
                     { $eq: ['$student_id', '$$studentId'] },
                     { $eq: ['$module_id', '$$moduleId'] },
-                    { $eq: ['$deleted_at', null] }
-                  ]
-                }
-              }
+                    { $eq: ['$deleted_at', null] },
+                  ],
+                },
+              },
             },
             {
-              $unwind: '$skill_gaps'
+              $unwind: '$skill_gaps',
             },
             {
               $group: {
                 _id: '$skill_gaps',
-                count: { $sum: 1 }
-              }
-            }
+                count: { $sum: 1 },
+              },
+            },
           ],
-          as: 'all_skill_gap_counts'
-        }
+          as: 'all_skill_gap_counts',
+        },
       },
       // Lookup all feedback for this student-module combination to calculate status
       {
@@ -385,6 +594,7 @@ export class LearningLogsService {
           module_id: 0,
           student_id: 0,
           recent_feedback: 0,
+          all_skill_gap_counts: 0,
         },
       },
       {
@@ -412,25 +622,57 @@ export class LearningLogsService {
                                 $cond: {
                                   if: { $eq: ['$$count._id', '$$this'] },
                                   then: '$$count.count',
-                                  else: null
-                                }
-                              }
-                            }
+                                  else: null,
+                                },
+                              },
+                            },
                           },
-                          0
-                        ]
+                          0,
+                        ],
                       },
-                      0
-                    ]
-                  }
-                ]
-              }
-            }
+                      0,
+                    ],
+                  },
+                ],
+              },
+            },
           },
           status: '$status',
         },
       },
-      
+
+      // Add review lookup stages
+      ...this.buildReviewLookupStages(user),
+
+      // Add can_review flag and review information
+      {
+        $addFields: {
+          can_review: {
+            $cond: {
+              if: {
+                $and: [
+                  { $ne: ['$user_review', []] },
+                  { $ne: [{ $literal: user.role.name }, 'STUDENT'] },
+                ],
+              },
+              then: false,
+              else: {
+                $ne: [{ $literal: user.role.name }, 'STUDENT'],
+              },
+            },
+          },
+          review: {
+            $cond: {
+              if: { $ne: ['$user_review', []] },
+              then: {
+                $arrayElemAt: ['$user_review', 0],
+              },
+              else: null,
+            },
+          },
+        },
+      },
+
       {
         $facet: {
           data: [
@@ -442,7 +684,84 @@ export class LearningLogsService {
       },
     ];
 
+    this.logger.log(
+      `Built pipeline for user ${user.role.name} with ${pipeline.length} stages`,
+    );
     return pipeline;
+  }
+
+  private buildReviewLookupStages(user: JWTUserPayload): any[] {
+    if (user.role.name === RoleEnum.STUDENT) {
+      return [
+        {
+          $addFields: {
+            user_review: [],
+          },
+        },
+        {
+          $lookup: {
+            from: 'learning_log_reviews',
+            let: {
+              aiFeedbackId: '$_id',
+              currentUserId: { $literal: new Types.ObjectId(user.id) },
+              currentUserRole: { $literal: user.role.name },
+            },
+            pipeline: [
+              {
+                $match: {
+                  $expr: {
+                    $and: [
+                      { $eq: ['$ai_feedback_id', '$$aiFeedbackId'] },
+                      { $eq: ['$deleted_at', null] },
+                    ],
+                  },
+                },
+              },
+              {
+                $limit: 1,
+              },
+            ],
+            as: 'user_review',
+          },
+        },
+      ];
+    }
+
+    return [
+      {
+        $addFields: {
+          user_review: [],
+        },
+      },
+      {
+        $lookup: {
+          from: 'learning_log_reviews',
+          let: {
+            aiFeedbackId: '$_id',
+            currentUserId: { $literal: new Types.ObjectId(user.id) },
+            currentUserRole: { $literal: user.role.name },
+          },
+          pipeline: [
+            {
+              $match: {
+                $expr: {
+                  $and: [
+                    { $eq: ['$ai_feedback_id', '$$aiFeedbackId'] },
+                    { $eq: ['$reviewer_id', '$$currentUserId'] },
+                    { $eq: ['$reviewer_role', '$$currentUserRole'] },
+                    { $eq: ['$deleted_at', null] },
+                  ],
+                },
+              },
+            },
+            {
+              $limit: 1,
+            },
+          ],
+          as: 'user_review',
+        },
+      },
+    ];
   }
 
   private buildSingleLogPipeline(id: string, user: JWTUserPayload): any[] {
@@ -555,9 +874,9 @@ export class LearningLogsService {
       {
         $lookup: {
           from: 'ai_chat_feedback',
-          let: { 
-            studentId: '$student_id', 
-            moduleId: '$module_id'
+          let: {
+            studentId: '$student_id',
+            moduleId: '$module_id',
           },
           pipeline: [
             {
@@ -566,23 +885,23 @@ export class LearningLogsService {
                   $and: [
                     { $eq: ['$student_id', '$$studentId'] },
                     { $eq: ['$module_id', '$$moduleId'] },
-                    { $eq: ['$deleted_at', null] }
-                  ]
-                }
-              }
+                    { $eq: ['$deleted_at', null] },
+                  ],
+                },
+              },
             },
             {
-              $unwind: '$skill_gaps'
+              $unwind: '$skill_gaps',
             },
             {
               $group: {
                 _id: '$skill_gaps',
-                count: { $sum: 1 }
-              }
-            }
+                count: { $sum: 1 },
+              },
+            },
           ],
-          as: 'all_skill_gap_counts'
-        }
+          as: 'all_skill_gap_counts',
+        },
       },
       // Lookup all feedback for this student-module combination to calculate status
       {
@@ -694,20 +1013,52 @@ export class LearningLogsService {
                                 $cond: {
                                   if: { $eq: ['$$count._id', '$$this'] },
                                   then: '$$count.count',
-                                  else: null
-                                }
-                              }
-                            }
+                                  else: null,
+                                },
+                              },
+                            },
                           },
-                          0
-                        ]
+                          0,
+                        ],
                       },
-                      0
-                    ]
-                  }
-                ]
-              }
-            }
+                      0,
+                    ],
+                  },
+                ],
+              },
+            },
+          },
+        },
+      },
+
+      // Add review lookup stages
+      ...this.buildReviewLookupStages(user),
+
+      // Add can_review flag and review information
+      {
+        $addFields: {
+          can_review: {
+            $cond: {
+              if: {
+                $and: [
+                  { $ne: ['$user_review', []] },
+                  { $ne: [{ $literal: user.role.name }, 'STUDENT'] },
+                ],
+              },
+              then: false,
+              else: {
+                $ne: [{ $literal: user.role.name }, 'STUDENT'],
+              },
+            },
+          },
+          review: {
+            $cond: {
+              if: { $ne: ['$user_review', []] },
+              then: {
+                $arrayElemAt: ['$user_review', 0],
+              },
+              else: null,
+            },
           },
         },
       },

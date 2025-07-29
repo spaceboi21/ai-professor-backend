@@ -5,6 +5,7 @@ import { School, SchoolSchema } from 'src/database/schemas/central/school.schema
 import { TenantConnectionService } from 'src/database/tenant-connection.service';
 import { LearningLogsController } from './learning-logs.controller';
 import { LearningLogsService } from './learning-logs.service';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
   imports: [
@@ -12,6 +13,7 @@ import { LearningLogsService } from './learning-logs.service';
       { name: User.name, schema: UserSchema },
       { name: School.name, schema: SchoolSchema },
     ]),
+    NotificationsModule,
   ],
   controllers: [LearningLogsController],
   providers: [LearningLogsService, TenantConnectionService],

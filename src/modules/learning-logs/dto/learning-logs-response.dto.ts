@@ -217,4 +217,43 @@ export class LearningLogsResponseDto {
     description: 'Detailed session information',
   })
   session: SessionDetailsDto;
+
+  @ApiProperty({
+    description: 'Review information if the learning log has been reviewed',
+    required: false,
+    example: {
+      _id: '507f1f77bcf86cd799439011',
+      reviewer_id: '507f1f77bcf86cd799439013',
+      reviewer_role: 'PROFESSOR',
+      rating: 4,
+      feedback: 'Great communication skills demonstrated. Shows good understanding of patient care principles.',
+      reviewer_info: {
+        first_name: 'Dr. John',
+        last_name: 'Smith',
+        email: 'john.smith@university.edu',
+        profile_pic: 'https://example.com/profile.jpg',
+      },
+      created_at: '2024-01-15T10:30:00.000Z',
+    },
+  })
+  review?: {
+    _id: string;
+    reviewer_id: string;
+    reviewer_role: string;
+    rating: number;
+    feedback: string;
+    reviewer_info?: {
+      first_name: string;
+      last_name: string;
+      email: string;
+      profile_pic?: string;
+    };
+    created_at: Date;
+  };
+
+  @ApiProperty({
+    description: 'Whether the current user can review this learning log',
+    example: true,
+  })
+  can_review: boolean;
 }
