@@ -23,6 +23,7 @@ export interface JWTPayload {
   school_id: string;
   role_id: string;
   role_name: string;
+  token_type: 'access';
 }
 
 config();
@@ -50,6 +51,12 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
   async validate(payload: JWTPayload): Promise<JWTUserPayload> {
     this.logger.debug(`Validating JWT payload for user: ${payload.email}`);
     try {
+      // Validate token type
+      if (payload.token_type !== 'access') {
+        this.logger.warn(`Invalid token type for user ${payload.email}`);
+        throw new UnauthorizedException('Invalid token type');
+      }
+
       // Validate role exists
       const role = await this.roleModel.findById(
         new Types.ObjectId(payload.role_id),
@@ -155,7 +162,6 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
   private async validateStudentInTenant(payload: JWTPayload) {
     try {
       // Get tenant db name
-
       const dbName = await this.tenantService.getTenantDbName(
         payload.school_id,
       );
@@ -165,7 +171,6 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
         await this.tenantConnectionService.getTenantConnection(dbName);
 
       // Find student in tenant database
-
       const StudentModel = tenantConnection.model(Student.name, StudentSchema);
       const student = await StudentModel.findOne({
         email: payload.email,
@@ -229,7 +234,7 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
       );
     } catch (error) {
       this.logger.error(
-        `School validation failed for user ${userEmail}: ${error.message}`,
+        `School validation failed for ${userEmail}: ${error.message}`,
       );
       throw new UnauthorizedException(
         `School validation failed: ${error.message}`,

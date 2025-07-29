@@ -3,6 +3,7 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
@@ -25,27 +26,34 @@ import { TenantConnectionService } from 'src/database/tenant-connection.service'
 import { StatusEnum } from 'src/common/constants/status.constant';
 import { MailService } from 'src/mail/mail.service';
 import { ConfigService } from '@nestjs/config';
+import { Request } from 'express';
+import { TokenPair, TokenUtil } from 'src/common/utils/token.util';
 
 @Injectable()
 export class AuthService {
   private readonly logger = new Logger(AuthService.name);
+
   constructor(
     @InjectModel(User.name)
     private readonly userModel: Model<User>,
+    @InjectModel(Role.name)
+    private readonly roleModel: Model<Role>,
     @InjectModel(School.name)
     private readonly schoolModel: Model<School>,
     @InjectModel(GlobalStudent.name)
     private readonly globalStudentModel: Model<GlobalStudent>,
     private readonly bcryptUtil: BcryptUtil,
     private readonly jwtUtil: JwtUtil,
+    private readonly tokenUtil: TokenUtil,
     private readonly tenantConnectionService: TenantConnectionService,
     private readonly mailService: MailService,
     private readonly configService: ConfigService,
   ) {}
 
-  async superAdminLogin(loginData: LoginSuperAdminDto) {
+  async superAdminLogin(loginData: LoginSuperAdminDto, req: Request) {
     const { email, password, rememberMe } = loginData;
     this.logger.log(`SuperAdmin login attempt: ${email}`);
+
     const isSuperAdminExists = (await this.userModel
       .findOne({
         email,
@@ -80,17 +88,14 @@ export class AuthService {
       throw new BadRequestException('Invalid email or password');
     }
 
-    const expiresIn = rememberMe ? '30d' : undefined;
-    const token = await this.jwtUtil.generateToken(
-      {
-        email: isSuperAdminExists.email,
-        id: isSuperAdminExists._id.toString(),
-        role_id: isSuperAdminExists.role._id.toString(),
-        role_name: isSuperAdminExists.role.name as RoleEnum,
-        school_id: isSuperAdminExists.school_id?.toString(),
-      },
-      expiresIn,
-    );
+    const tokenPair = this.tokenUtil.generateTokenPair({
+      email: isSuperAdminExists.email,
+      id: isSuperAdminExists._id.toString(),
+      role_id: isSuperAdminExists.role._id.toString(),
+      role_name: isSuperAdminExists.role.name as RoleEnum,
+      school_id: isSuperAdminExists.school_id?.toString(),
+    });
+
     await this.userModel.findByIdAndUpdate(isSuperAdminExists._id, {
       last_logged_in: new Date(),
     });
@@ -98,7 +103,7 @@ export class AuthService {
     this.logger.log(`SuperAdmin login successful: ${email}`);
     return {
       message: 'Login successful',
-      token,
+      ...tokenPair,
       user: {
         email: isSuperAdminExists.email,
         first_name: isSuperAdminExists.first_name,
@@ -109,9 +114,13 @@ export class AuthService {
     };
   }
 
-  async schoolAdminLogin(loginSchoolAdminDto: LoginSchoolAdminDto) {
+  async schoolAdminLogin(
+    loginSchoolAdminDto: LoginSchoolAdminDto,
+    req: Request,
+  ) {
     const { email, password, rememberMe } = loginSchoolAdminDto;
     this.logger.log(`SchoolAdmin login attempt: ${email}`);
+
     const user = (await this.userModel
       .findOne({
         email,
@@ -165,17 +174,13 @@ export class AuthService {
       );
     }
 
-    const expiresIn = rememberMe ? '30d' : undefined;
-    const token = this.jwtUtil.generateToken(
-      {
-        id: user._id.toString(),
-        email: user.email,
-        role_id: user.role._id.toString(),
-        school_id: school._id.toString(),
-        role_name: user.role.name as RoleEnum,
-      },
-      expiresIn,
-    );
+    const tokenPair = this.tokenUtil.generateTokenPair({
+      id: user._id.toString(),
+      email: user.email,
+      role_id: user.role._id.toString(),
+      school_id: school._id.toString(),
+      role_name: user.role.name as RoleEnum,
+    });
 
     await this.userModel.findByIdAndUpdate(user._id, {
       last_logged_in: new Date(),
@@ -184,7 +189,7 @@ export class AuthService {
     this.logger.log(`SchoolAdmin login successful: ${email}`);
     return {
       message: 'Login successful',
-      token,
+      ...tokenPair,
       user: {
         id: user._id.toString(),
         email: user.email,
@@ -197,9 +202,10 @@ export class AuthService {
     };
   }
 
-  async studentLogin(loginStudentDto: LoginStudentDto) {
+  async studentLogin(loginStudentDto: LoginStudentDto, req: Request) {
     const { email, password, rememberMe } = loginStudentDto;
     this.logger.log(`Student login attempt: ${email}`);
+
     // First, find the student in the global students collection
     const globalStudent = await this.globalStudentModel.findOne({ email });
 
@@ -258,20 +264,14 @@ export class AuthService {
       throw new BadRequestException('Invalid email or password');
     }
 
-    // Generate JWT token
-    const expiresIn = rememberMe ? '30d' : undefined;
-    const token = this.jwtUtil.generateToken(
-      {
-        id: student._id.toString(),
-        email: student.email,
-        role_id: ROLE_IDS.STUDENT,
-        school_id: school._id.toString(),
-        role_name: RoleEnum.STUDENT,
-      },
-      expiresIn,
-    );
+    const tokenPair = this.tokenUtil.generateTokenPair({
+      id: student._id.toString(),
+      email: student.email,
+      role_id: ROLE_IDS.STUDENT,
+      school_id: school._id.toString(),
+      role_name: RoleEnum.STUDENT,
+    });
 
-    // Update last login time
     await StudentModel.findByIdAndUpdate(student._id, {
       last_logged_in: new Date(),
     });
@@ -279,7 +279,7 @@ export class AuthService {
     this.logger.log(`Student login successful: ${email}`);
     return {
       message: 'Login successful',
-      token,
+      ...tokenPair,
       user: {
         id: student._id,
         email: student.email,
@@ -290,6 +290,34 @@ export class AuthService {
         role: ROLE_IDS.STUDENT,
       },
     };
+  }
+
+  async refreshToken(refreshToken: string, req: Request) {
+    try {
+      // Verify refresh token
+      const payload = this.tokenUtil.verifyRefreshToken(refreshToken);
+
+      // Generate new token pair
+      const newTokenPair = this.tokenUtil.generateTokenPair({
+        id: payload.id,
+        email: payload.email,
+        role_id: payload.role_id,
+        role_name: payload.role_name,
+        school_id: payload.school_id,
+      });
+
+      this.logger.log(
+        `Token refreshed successfully for user: ${payload.email}`,
+      );
+
+      return {
+        message: 'Token refreshed successfully',
+        ...newTokenPair,
+      };
+    } catch (error) {
+      this.logger.warn(`Token refresh failed: ${error.message}`);
+      throw new UnauthorizedException('Invalid refresh token');
+    }
   }
 
   async getMe(user: any) {
@@ -325,22 +353,23 @@ export class AuthService {
         role: user.role, // role from JWT (already populated)
       };
     } else {
-      // Get user details from central DB
-      const dbUser = await this.userModel
-        .findOne({
-          _id: user.id,
-          role: new Types.ObjectId(user.role.id),
+      // For other roles, get from central userModel
+      const userData = await this.userModel
+        .findById(user.id)
+        .populate({
+          path: 'role',
+          select: 'name',
         })
         .lean();
 
-      if (!dbUser) {
+      if (!userData) {
         this.logger.warn(`User not found in getMe: ${user.id}`);
         throw new NotFoundException('User not found');
       }
 
       return {
-        ...dbUser,
-        role: user.role, // populated role object
+        ...userData,
+        role: user.role, // role from JWT (already populated)
       };
     }
   }

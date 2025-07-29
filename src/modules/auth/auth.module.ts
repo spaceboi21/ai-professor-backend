@@ -3,6 +3,7 @@ import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
 import { MongooseModule } from '@nestjs/mongoose';
 import { User, UserSchema } from 'src/database/schemas/central/user.schema';
+import { Role, RoleSchema } from 'src/database/schemas/central/role.schema';
 import { UtilsModule } from 'src/common/utils';
 import {
   School,
@@ -19,6 +20,7 @@ import { MailModule } from 'src/mail/mail.module';
   imports: [
     MongooseModule.forFeature([
       { name: User.name, schema: UserSchema },
+      { name: Role.name, schema: RoleSchema },
       { name: School.name, schema: SchoolSchema },
       { name: GlobalStudent.name, schema: GlobalStudentSchema },
     ]),
@@ -27,5 +29,6 @@ import { MailModule } from 'src/mail/mail.module';
   ],
   controllers: [AuthController],
   providers: [AuthService, TenantConnectionService],
+  exports: [AuthService],
 })
 export class AuthModule {}

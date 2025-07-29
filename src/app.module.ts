@@ -95,7 +95,7 @@ import { CommunityModule } from './modules/community/community.module';
       useFactory: async (config: ConfigService) => ({
         secret: config.get<string>('JWT_SECRET') || 'your-secret-key',
         signOptions: {
-          expiresIn: config.get<string>('JWT_EXPIRY') || '24h',
+          expiresIn: config.get<string>('JWT_ACCESS_EXPIRY') || '15m',
         },
       }),
       inject: [ConfigService],

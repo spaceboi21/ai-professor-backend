@@ -24,6 +24,8 @@ import {
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
+import { Request } from 'express';
+import { RefreshTokenDto } from './dto/refresh-token.dto';
 
 @ApiTags('Auth')
 @Controller('auth')
@@ -37,8 +39,11 @@ export class AuthController {
   @ApiBody({ type: LoginSuperAdminDto })
   @ApiResponse({ status: 200, description: 'Login successful' })
   @ApiResponse({ status: 400, description: 'Invalid email or password' })
-  async superAdminLogin(@Body() loginData: LoginSuperAdminDto) {
-    return this.authService.superAdminLogin(loginData);
+  async superAdminLogin(
+    @Body() loginData: LoginSuperAdminDto,
+    @Req() req: Request,
+  ) {
+    return this.authService.superAdminLogin(loginData, req);
   }
 
   // School Admin or professor Login endpoint
@@ -48,8 +53,11 @@ export class AuthController {
   @ApiBody({ type: LoginSchoolAdminDto })
   @ApiResponse({ status: 200, description: 'Login successful' })
   @ApiResponse({ status: 400, description: 'Invalid email or password' })
-  async loginSchoolAdmin(@Body() body: LoginSchoolAdminDto) {
-    return this.authService.schoolAdminLogin(body);
+  async schoolAdminLogin(
+    @Body() body: LoginSchoolAdminDto,
+    @Req() req: Request,
+  ) {
+    return this.authService.schoolAdminLogin(body, req);
   }
 
   // Student Login endpoint
@@ -59,8 +67,19 @@ export class AuthController {
   @ApiBody({ type: LoginStudentDto })
   @ApiResponse({ status: 200, description: 'Login successful' })
   @ApiResponse({ status: 400, description: 'Invalid email or password' })
-  async loginStudent(@Body() body: LoginStudentDto) {
-    return this.authService.studentLogin(body);
+  async studentLogin(@Body() body: LoginStudentDto, @Req() req: Request) {
+    return this.authService.studentLogin(body, req);
+  }
+
+  // Refresh Token endpoint
+  @Post('refresh')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Refresh Access Token' })
+  @ApiBody({ type: RefreshTokenDto })
+  @ApiResponse({ status: 200, description: 'Token refreshed successfully' })
+  @ApiResponse({ status: 401, description: 'Invalid refresh token' })
+  async refreshToken(@Body() body: RefreshTokenDto, @Req() req: Request) {
+    return this.authService.refreshToken(body.refresh_token, req);
   }
 
   @UseGuards(JwtAuthGuard)
