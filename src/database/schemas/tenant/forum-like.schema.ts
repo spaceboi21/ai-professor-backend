@@ -3,8 +3,8 @@ import { Document, Types } from 'mongoose';
 import { User } from '../central/user.schema';
 
 export enum LikeEntityTypeEnum {
-  DISCUSSION = 'discussion',
-  REPLY = 'reply',
+  DISCUSSION = 'DISCUSSION',
+  REPLY = 'REPLY',
 }
 
 @Schema({

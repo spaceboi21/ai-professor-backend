@@ -4,25 +4,25 @@ import { User } from '../central/user.schema';
 import { RoleEnum } from 'src/common/constants/roles.constant';
 
 export enum DiscussionTypeEnum {
-  DISCUSSION = 'discussion',
-  QUESTION = 'question',
-  CASE_STUDY = 'case_study',
-  ANNOUNCEMENT = 'announcement',
-  MEETING = 'meeting',
+  DISCUSSION = 'DISCUSSION',
+  QUESTION = 'QUESTION',
+  CASE_STUDY = 'CASE_STUDY',
+  ANNOUNCEMENT = 'ANNOUNCEMENT',
+  MEETING = 'MEETING',
 }
 
 export enum DiscussionStatusEnum {
-  ACTIVE = 'active',
-  ARCHIVED = 'archived',
-  REPORTED = 'reported',
-  DELETED = 'deleted',
+  ACTIVE = 'ACTIVE',
+  ARCHIVED = 'ARCHIVED',
+  REPORTED = 'REPORTED',
+  DELETED = 'DELETED',
 }
 
 export enum VideoPlatformEnum {
-  GOOGLE_MEET = 'google_meet',
-  ZOOM = 'zoom',
-  TEAMS = 'teams',
-  OTHER = 'other',
+  GOOGLE_MEET = 'GOOGLE_MEET',
+  ZOOM = 'ZOOM',
+  TEAMS = 'TEAMS',
+  OTHER = 'OTHER',
 }
 
 @Schema({
@@ -70,10 +70,13 @@ export class ForumDiscussion extends Document {
   meeting_platform: VideoPlatformEnum;
 
   @Prop({ type: Date })
-  meeting_scheduled_at: Date;
+  meeting_scheduled_at?: Date;
 
   @Prop({ type: Number })
-  meeting_duration_minutes: number;
+  meeting_duration_minutes?: number;
+
+  @Prop({ type: Date })
+  last_reply_at?: Date;
 
   @Prop({
     enum: DiscussionStatusEnum,
@@ -82,8 +85,8 @@ export class ForumDiscussion extends Document {
   })
   status: DiscussionStatusEnum;
 
-  @Prop({ type: Date, default: null })
-  archived_at: Date;
+  @Prop({ type: Date })
+  archived_at?: Date;
 
   @Prop({ type: Types.ObjectId, ref: User.name })
   archived_by: Types.ObjectId;

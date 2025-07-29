@@ -4,23 +4,23 @@ import { User } from '../central/user.schema';
 import { RoleEnum } from 'src/common/constants/roles.constant';
 
 export enum ReportTypeEnum {
-  INAPPROPRIATE_CONTENT = 'inappropriate_content',
-  SPAM = 'spam',
-  HARASSMENT = 'harassment',
-  MISLEADING = 'misleading',
-  OTHER = 'other',
+  INAPPROPRIATE_CONTENT = 'INAPPROPRIATE_CONTENT',
+  SPAM = 'SPAM',
+  HARASSMENT = 'HARASSMENT',
+  MISLEADING = 'MISLEADING',
+  OTHER = 'OTHER',
 }
 
 export enum ReportStatusEnum {
-  PENDING = 'pending',
-  REVIEWED = 'reviewed',
-  RESOLVED = 'resolved',
-  DISMISSED = 'dismissed',
+  PENDING = 'PENDING',
+  REVIEWED = 'REVIEWED',
+  RESOLVED = 'RESOLVED',
+  DISMISSED = 'DISMISSED',
 }
 
 export enum ReportEntityTypeEnum {
-  DISCUSSION = 'discussion',
-  REPLY = 'reply',
+  DISCUSSION = 'DISCUSSION',
+  REPLY = 'REPLY',
 }
 
 @Schema({

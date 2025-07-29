@@ -4,9 +4,9 @@ import { User } from '../central/user.schema';
 import { RoleEnum } from 'src/common/constants/roles.constant';
 
 export enum ReplyStatusEnum {
-  ACTIVE = 'active',
-  REPORTED = 'reported',
-  DELETED = 'deleted',
+  ACTIVE = 'ACTIVE',
+  REPORTED = 'REPORTED',
+  DELETED = 'DELETED',
 }
 
 @Schema({

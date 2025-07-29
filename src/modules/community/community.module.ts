@@ -8,6 +8,7 @@ import {
   SchoolSchema,
 } from 'src/database/schemas/central/school.schema';
 import { DatabaseModule } from 'src/database/database.module';
+import { NotificationsModule } from 'src/modules/notifications/notifications.module';
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { DatabaseModule } from 'src/database/database.module';
       { name: School.name, schema: SchoolSchema },
     ]),
     DatabaseModule,
+    NotificationsModule,
   ],
   controllers: [CommunityController],
   providers: [CommunityService],

@@ -23,6 +23,9 @@ export async function up(
   await connection
     .collection('forum_discussions')
     .createIndex({ meeting_scheduled_at: 1, status: 1 });
+  await connection
+    .collection('forum_discussions')
+    .createIndex({ last_reply_at: -1, created_at: -1 });
 
   // Create forum_replies collection
   await connection.createCollection('forum_replies');
@@ -65,6 +68,15 @@ export async function up(
     .collection('forum_reports')
     .createIndex({ report_type: 1, status: 1 });
 
+  // Create forum_views collection
+  await connection.createCollection('forum_views');
+  await connection
+    .collection('forum_views')
+    .createIndex({ user_id: 1, discussion_id: 1 }, { unique: true });
+  await connection.collection('forum_views').createIndex({ user_id: 1 });
+  await connection.collection('forum_views').createIndex({ discussion_id: 1 });
+  await connection.collection('forum_views').createIndex({ viewed_at: -1 });
+
   console.info(
     `Migration up: Community schemas created successfully in ${tenantDbName}`,
   );
@@ -83,6 +95,7 @@ export async function down(
   await connection.collection('forum_replies').drop();
   await connection.collection('forum_likes').drop();
   await connection.collection('forum_reports').drop();
+  await connection.collection('forum_views').drop();
 
   console.info(
     `Migration down: Community schemas dropped from ${tenantDbName}`,

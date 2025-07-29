@@ -338,4 +338,24 @@ export class CommunityController {
       req.user as JWTUserPayload,
     );
   }
+
+  @Get('unread-counts')
+  @Roles(
+    RoleEnum.STUDENT,
+    RoleEnum.PROFESSOR,
+    RoleEnum.SCHOOL_ADMIN,
+    RoleEnum.SUPER_ADMIN,
+  )
+  @ApiOperation({ summary: 'Get unread counts for forum content' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Unread counts retrieved successfully',
+  })
+  @ApiResponse({
+    status: HttpStatus.FORBIDDEN,
+    description: 'Access denied - insufficient permissions',
+  })
+  async getUnreadCounts(@Request() req: any) {
+    return this.communityService.getUnreadCounts(req.user as JWTUserPayload);
+  }
 }

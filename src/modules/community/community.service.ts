@@ -50,6 +50,13 @@ import {
   ReportEntityTypeEnum,
   ReportStatusEnum,
 } from 'src/database/schemas/tenant/forum-report.schema';
+import {
+  ForumView,
+  ForumViewSchema,
+} from 'src/database/schemas/tenant/forum-view.schema';
+import { NotificationsService } from 'src/modules/notifications/notifications.service';
+import { NotificationTypeEnum } from 'src/common/constants/notification.constant';
+import { RecipientTypeEnum } from 'src/database/schemas/tenant/notification.schema';
 
 @Injectable()
 export class CommunityService {
@@ -61,6 +68,7 @@ export class CommunityService {
     @InjectModel(School.name)
     private readonly schoolModel: Model<School>,
     private readonly tenantConnectionService: TenantConnectionService,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   /**
@@ -166,6 +174,14 @@ export class CommunityService {
       });
 
       const savedDiscussion = await newDiscussion.save();
+
+      // Send notifications to all school members about new discussion
+      await this.notifyNewDiscussion(
+        savedDiscussion,
+        user,
+        resolvedSchoolId,
+        tenantConnection,
+      );
 
       // Attach user details to the response
       const userDetails = await this.getUserDetails(
@@ -274,7 +290,7 @@ export class CommunityService {
 
       // Get discussions with pagination
       const discussions = await DiscussionModel.find(filter)
-        .sort({ created_at: -1 })
+        .sort({ last_reply_at: -1, created_at: -1 }) // Sort by last reply, then by creation date
         .skip(options.skip)
         .limit(options.limit)
         .lean();
@@ -291,9 +307,26 @@ export class CommunityService {
             discussion.created_by_role,
             tenantConnection,
           );
+
+          // Check if discussion is unread for current user
+          const isUnread = await this.isContentUnread(
+            new Types.ObjectId(user.id),
+            discussion._id.toString(),
+            discussion.created_at || new Date(),
+            tenantConnection,
+          );
+
+          // Get last reply information
+          const lastReply = await this.getLastReplyInfo(
+            discussion._id.toString(),
+            tenantConnection,
+          );
+
           return {
             ...discussion,
             created_by_user: userDetails || null,
+            is_unread: isUnread,
+            last_reply: lastReply,
           };
         }),
       );
@@ -350,6 +383,13 @@ export class CommunityService {
       await DiscussionModel.updateOne(
         { _id: discussionId },
         { $inc: { view_count: 1 } },
+      );
+
+      // Mark discussion as viewed by this user
+      await this.markContentAsViewed(
+        new Types.ObjectId(user.id),
+        discussionId,
+        tenantConnection,
       );
 
       // Attach user details
@@ -449,7 +489,10 @@ export class CommunityService {
       // Increment reply count on discussion
       await DiscussionModel.updateOne(
         { _id: discussion_id },
-        { $inc: { reply_count: 1 } },
+        {
+          $inc: { reply_count: 1 },
+          $set: { last_reply_at: new Date() },
+        },
       );
 
       // If this is a sub-reply, increment sub_reply_count on parent reply
@@ -457,6 +500,47 @@ export class CommunityService {
         await ReplyModel.updateOne(
           { _id: parent_reply_id },
           { $inc: { sub_reply_count: 1 } },
+        );
+      }
+
+      // Send notifications
+      const replyCreator = await this.getUserDetails(
+        user.id.toString(),
+        user.role.name,
+        tenantConnection,
+      );
+      const discussionCreator = await this.getUserDetails(
+        discussion.created_by.toString(),
+        discussion.created_by_role,
+        tenantConnection,
+      );
+
+      if (parent_reply_id) {
+        // This is a sub-reply, notify parent reply creator
+        const parentReply = await ReplyModel.findById(parent_reply_id).lean();
+        if (parentReply) {
+          const parentReplyCreator = await this.getUserDetails(
+            parentReply.created_by.toString(),
+            parentReply.created_by_role,
+            tenantConnection,
+          );
+          await this.notifyNewSubReply(
+            savedReply,
+            replyCreator,
+            parentReply,
+            parentReplyCreator,
+            discussion,
+            resolvedSchoolId,
+          );
+        }
+      } else {
+        // This is a top-level reply, notify discussion creator
+        await this.notifyNewReply(
+          savedReply,
+          replyCreator,
+          discussion,
+          discussionCreator,
+          resolvedSchoolId,
         );
       }
 
@@ -554,6 +638,13 @@ export class CommunityService {
 
       this.logger.debug(`Found ${replies.length} replies`);
 
+      // Mark forum as viewed by this user
+      await this.markContentAsViewed(
+        new Types.ObjectId(user.id),
+        discussionId,
+        tenantConnection,
+      );
+
       // Attach user details for each reply
       const repliesWithUsers = await Promise.all(
         replies.map(async (reply) => {
@@ -562,11 +653,21 @@ export class CommunityService {
             reply.created_by_role,
             tenantConnection,
           );
+
+          // Check if reply is unread for current user
+          const isUnread = await this.isContentUnread(
+            new Types.ObjectId(user.id),
+            discussionId,
+            reply.created_at || new Date(),
+            tenantConnection,
+          );
+
           return {
             ...reply,
             created_by_user: userDetails || null,
             has_sub_replies: reply.sub_reply_count > 0,
             sub_reply_count: reply.sub_reply_count || 0,
+            is_unread: isUnread,
           };
         }),
       );
@@ -741,6 +842,57 @@ export class CommunityService {
         await newLike.save();
         await this.updateLikeCount(entityType, entityId, 1, tenantConnection);
 
+        // Send notification for new like
+        const liker = await this.getUserDetails(
+          user.id.toString(),
+          user.role.name,
+          tenantConnection,
+        );
+
+        if (entityType === LikeEntityTypeEnum.DISCUSSION) {
+          const DiscussionModel = tenantConnection.model(
+            ForumDiscussion.name,
+            ForumDiscussionSchema,
+          );
+          const discussion = await DiscussionModel.findById(entityId).lean();
+          if (discussion) {
+            const discussionCreator = await this.getUserDetails(
+              discussion.created_by.toString(),
+              discussion.created_by_role,
+              tenantConnection,
+            );
+            await this.notifyNewLike(
+              newLike,
+              liker,
+              'discussion',
+              discussion,
+              discussionCreator,
+              resolvedSchoolId,
+            );
+          }
+        } else if (entityType === LikeEntityTypeEnum.REPLY) {
+          const ReplyModel = tenantConnection.model(
+            ForumReply.name,
+            ForumReplySchema,
+          );
+          const reply = await ReplyModel.findById(entityId).lean();
+          if (reply) {
+            const replyCreator = await this.getUserDetails(
+              reply.created_by.toString(),
+              reply.created_by_role,
+              tenantConnection,
+            );
+            await this.notifyNewLike(
+              newLike,
+              liker,
+              'reply',
+              reply,
+              replyCreator,
+              resolvedSchoolId,
+            );
+          }
+        }
+
         // Get user details for response
         const userDetails = await this.getUserDetails(
           user.id.toString(),
@@ -851,6 +1003,55 @@ export class CommunityService {
         entity_id.toString(),
         tenantConnection,
       );
+
+      // Send notification to admins about new report
+      const reporter = await this.getUserDetails(
+        user.id.toString(),
+        user.role.name,
+        tenantConnection,
+      );
+
+      if (entity_type === ReportEntityTypeEnum.DISCUSSION) {
+        const DiscussionModel = tenantConnection.model(
+          ForumDiscussion.name,
+          ForumDiscussionSchema,
+        );
+        const discussion = await DiscussionModel.findById(entity_id).lean();
+        if (discussion) {
+          const discussionCreator = await this.getUserDetails(
+            discussion.created_by.toString(),
+            discussion.created_by_role,
+            tenantConnection,
+          );
+          await this.notifyNewReport(
+            savedReport,
+            reporter,
+            discussion,
+            discussionCreator,
+            resolvedSchoolId,
+          );
+        }
+      } else if (entity_type === ReportEntityTypeEnum.REPLY) {
+        const ReplyModel = tenantConnection.model(
+          ForumReply.name,
+          ForumReplySchema,
+        );
+        const reply = await ReplyModel.findById(entity_id).lean();
+        if (reply) {
+          const replyCreator = await this.getUserDetails(
+            reply.created_by.toString(),
+            reply.created_by_role,
+            tenantConnection,
+          );
+          await this.notifyNewReport(
+            savedReport,
+            reporter,
+            reply,
+            replyCreator,
+            resolvedSchoolId,
+          );
+        }
+      }
 
       // Attach user details to the response
       const userDetails = await this.getUserDetails(
@@ -1084,6 +1285,46 @@ export class CommunityService {
   }
 
   /**
+   * Helper method to get last reply information for a discussion
+   */
+  private async getLastReplyInfo(discussionId: string, tenantConnection: any) {
+    try {
+      const ReplyModel = tenantConnection.model(
+        ForumReply.name,
+        ForumReplySchema,
+      );
+
+      const lastReply = await ReplyModel.findOne({
+        discussion_id: new Types.ObjectId(discussionId),
+        deleted_at: null,
+        status: ReplyStatusEnum.ACTIVE,
+      })
+        .sort({ created_at: -1 })
+        .lean();
+
+      if (lastReply) {
+        const lastReplyUser = await this.getUserDetails(
+          lastReply.created_by.toString(),
+          lastReply.created_by_role,
+          tenantConnection,
+        );
+
+        return {
+          reply_id: lastReply._id,
+          content: lastReply.content,
+          created_by_user: lastReplyUser || null,
+          created_at: lastReply.created_at,
+        };
+      }
+
+      return null;
+    } catch (error) {
+      this.logger.error('Error getting last reply info', error);
+      return null;
+    }
+  }
+
+  /**
    * Helper method to get user details based on role
    */
   private async getUserDetails(
@@ -1132,6 +1373,489 @@ export class CommunityService {
     } catch (error) {
       this.logger.error('Error fetching user details', error);
       return null;
+    }
+  }
+
+  /**
+   * Helper method to create forum notifications
+   */
+  private async createForumNotification(
+    recipientId: Types.ObjectId,
+    recipientType: RecipientTypeEnum,
+    title: string,
+    message: string,
+    type: NotificationTypeEnum,
+    metadata: Record<string, any> = {},
+    schoolId: string,
+  ) {
+    try {
+      await this.notificationsService.createNotification(
+        recipientId,
+        recipientType,
+        title,
+        message,
+        type,
+        metadata,
+        new Types.ObjectId(schoolId),
+      );
+    } catch (error) {
+      this.logger.error('Error creating forum notification', error);
+      // Don't throw error to avoid breaking the main functionality
+    }
+  }
+
+  /**
+   * Helper method to notify all school members about new discussion
+   */
+  private async notifyNewDiscussion(
+    discussion: any,
+    creator: any,
+    schoolId: string,
+    tenantConnection: any,
+  ) {
+    try {
+      // Get all students and professors in the school
+      const StudentModel = tenantConnection.model('Student', 'students');
+      const students = await StudentModel.find({
+        school_id: new Types.ObjectId(schoolId),
+        deleted_at: null,
+      }).lean();
+
+      const professors = await this.userModel
+        .find({
+          school_id: new Types.ObjectId(schoolId),
+          role: RoleEnum.PROFESSOR,
+          deleted_at: null,
+        })
+        .lean();
+
+      const title = 'New Forum Discussion';
+      const message = `${creator.first_name} ${creator.last_name} started a new discussion: "${discussion.title}"`;
+      const metadata = {
+        discussion_id: discussion._id,
+        discussion_title: discussion.title,
+        creator_id: discussion.created_by,
+        creator_name: `${creator.first_name} ${creator.last_name}`,
+        creator_role: discussion.created_by_role,
+      };
+
+      // Notify all students
+      for (const student of students) {
+        if (student._id.toString() !== discussion.created_by.toString()) {
+          await this.createForumNotification(
+            student._id,
+            RecipientTypeEnum.STUDENT,
+            title,
+            message,
+            NotificationTypeEnum.FORUM_NEW_DISCUSSION,
+            metadata,
+            schoolId,
+          );
+        }
+      }
+
+      // Notify all professors
+      for (const professor of professors) {
+        if (professor._id.toString() !== discussion.created_by.toString()) {
+          await this.createForumNotification(
+            professor._id,
+            RecipientTypeEnum.PROFESSOR,
+            title,
+            message,
+            NotificationTypeEnum.FORUM_NEW_DISCUSSION,
+            metadata,
+            schoolId,
+          );
+        }
+      }
+    } catch (error) {
+      this.logger.error('Error notifying about new discussion', error);
+    }
+  }
+
+  /**
+   * Helper method to notify discussion creator about new reply
+   */
+  private async notifyNewReply(
+    reply: any,
+    replyCreator: any,
+    discussion: any,
+    discussionCreator: any,
+    schoolId: string,
+  ) {
+    try {
+      // Don't notify if the reply is by the same person who created the discussion
+      if (reply.created_by.toString() === discussion.created_by.toString()) {
+        return;
+      }
+
+      const title = 'New Reply to Your Discussion';
+      const message = `${replyCreator.first_name} ${replyCreator.last_name} replied to your discussion: "${discussion.title}"`;
+      const metadata = {
+        discussion_id: discussion._id,
+        discussion_title: discussion.title,
+        reply_id: reply._id,
+        reply_creator_id: reply.created_by,
+        reply_creator_name: `${replyCreator.first_name} ${replyCreator.last_name}`,
+        reply_creator_role: reply.created_by_role,
+      };
+
+      const recipientType =
+        discussion.created_by_role === RoleEnum.STUDENT
+          ? RecipientTypeEnum.STUDENT
+          : RecipientTypeEnum.PROFESSOR;
+
+      await this.createForumNotification(
+        new Types.ObjectId(discussion.created_by),
+        recipientType,
+        title,
+        message,
+        NotificationTypeEnum.FORUM_NEW_REPLY,
+        metadata,
+        schoolId,
+      );
+    } catch (error) {
+      this.logger.error('Error notifying about new reply', error);
+    }
+  }
+
+  /**
+   * Helper method to notify parent reply creator about new sub-reply
+   */
+  private async notifyNewSubReply(
+    subReply: any,
+    subReplyCreator: any,
+    parentReply: any,
+    parentReplyCreator: any,
+    discussion: any,
+    schoolId: string,
+  ) {
+    try {
+      // Don't notify if the sub-reply is by the same person who created the parent reply
+      if (
+        subReply.created_by.toString() === parentReply.created_by.toString()
+      ) {
+        return;
+      }
+
+      const title = 'New Reply to Your Comment';
+      const message = `${subReplyCreator.first_name} ${subReplyCreator.last_name} replied to your comment in: "${discussion.title}"`;
+      const metadata = {
+        discussion_id: discussion._id,
+        discussion_title: discussion.title,
+        parent_reply_id: parentReply._id,
+        sub_reply_id: subReply._id,
+        sub_reply_creator_id: subReply.created_by,
+        sub_reply_creator_name: `${subReplyCreator.first_name} ${subReplyCreator.last_name}`,
+        sub_reply_creator_role: subReply.created_by_role,
+      };
+
+      const recipientType =
+        parentReply.created_by_role === RoleEnum.STUDENT
+          ? RecipientTypeEnum.STUDENT
+          : RecipientTypeEnum.PROFESSOR;
+
+      await this.createForumNotification(
+        new Types.ObjectId(parentReply.created_by),
+        recipientType,
+        title,
+        message,
+        NotificationTypeEnum.FORUM_NEW_SUB_REPLY,
+        metadata,
+        schoolId,
+      );
+    } catch (error) {
+      this.logger.error('Error notifying about new sub-reply', error);
+    }
+  }
+
+  /**
+   * Helper method to notify content creator about new like
+   */
+  private async notifyNewLike(
+    like: any,
+    liker: any,
+    entityType: string,
+    entity: any,
+    entityCreator: any,
+    schoolId: string,
+  ) {
+    try {
+      // Don't notify if the like is by the same person who created the content
+      if (like.liked_by.toString() === entity.created_by.toString()) {
+        return;
+      }
+
+      const entityTitle =
+        entityType === 'discussion' ? entity.title : 'your comment';
+      const title = 'New Like on Your Content';
+      const message = `${liker.first_name} ${liker.last_name} liked your ${entityType}: "${entityTitle}"`;
+      const metadata = {
+        entity_type: entityType,
+        entity_id: entity._id,
+        entity_title: entityTitle,
+        liker_id: like.liked_by,
+        liker_name: `${liker.first_name} ${liker.last_name}`,
+        liker_role: liker.role,
+      };
+
+      const recipientType =
+        entity.created_by_role === RoleEnum.STUDENT
+          ? RecipientTypeEnum.STUDENT
+          : RecipientTypeEnum.PROFESSOR;
+
+      await this.createForumNotification(
+        new Types.ObjectId(entity.created_by),
+        recipientType,
+        title,
+        message,
+        NotificationTypeEnum.FORUM_LIKE,
+        metadata,
+        schoolId,
+      );
+    } catch (error) {
+      this.logger.error('Error notifying about new like', error);
+    }
+  }
+
+  /**
+   * Helper method to notify admins about new report
+   */
+  private async notifyNewReport(
+    report: any,
+    reporter: any,
+    reportedContent: any,
+    reportedContentCreator: any,
+    schoolId: string,
+  ) {
+    try {
+      // Get all admins in the school
+      const admins = await this.userModel
+        .find({
+          school_id: new Types.ObjectId(schoolId),
+          role: { $in: [RoleEnum.SCHOOL_ADMIN, RoleEnum.SUPER_ADMIN] },
+          deleted_at: null,
+        })
+        .lean();
+
+      const title = 'New Content Report';
+      const message = `${reporter.first_name} ${reporter.last_name} reported ${report.entity_type} by ${reportedContentCreator.first_name} ${reportedContentCreator.last_name}`;
+      const metadata = {
+        report_id: report._id,
+        entity_type: report.entity_type,
+        entity_id: report.entity_id,
+        reporter_id: report.reported_by,
+        reporter_name: `${reporter.first_name} ${reporter.last_name}`,
+        reporter_role: report.reported_by_role,
+        reported_content_creator_id: reportedContent.created_by,
+        reported_content_creator_name: `${reportedContentCreator.first_name} ${reportedContentCreator.last_name}`,
+        reported_content_creator_role: reportedContent.created_by_role,
+        report_reason: report.reason,
+      };
+
+      // Notify all admins
+      for (const admin of admins) {
+        await this.createForumNotification(
+          admin._id,
+          RecipientTypeEnum.PROFESSOR, // Admins are treated as professors for notifications
+          title,
+          message,
+          NotificationTypeEnum.FORUM_REPORT,
+          metadata,
+          schoolId,
+        );
+      }
+    } catch (error) {
+      this.logger.error('Error notifying about new report', error);
+    }
+  }
+
+  /**
+   * Helper method to check if content is unread for user
+   */
+  private async isContentUnread(
+    userId: Types.ObjectId,
+    discussionId: string,
+    contentCreatedAt: Date,
+    tenantConnection: any,
+  ): Promise<boolean> {
+    try {
+      const ViewModel = tenantConnection.model(ForumView.name, ForumViewSchema);
+
+      const lastViewed = await ViewModel.findOne({
+        user_id: userId,
+        discussion_id: new Types.ObjectId(discussionId),
+      });
+
+      // If user has never viewed this discussion, it's unread
+      if (!lastViewed) {
+        return true;
+      }
+
+      // If content was created after user's last view, it's unread
+      return contentCreatedAt > lastViewed.viewed_at;
+    } catch (error) {
+      this.logger.error('Error checking if content is unread', error);
+      return true; // Default to unread if error
+    }
+  }
+
+  /**
+   * Helper method to mark content as viewed by user (per discussion)
+   */
+  private async markContentAsViewed(
+    userId: Types.ObjectId,
+    discussionId: string,
+    tenantConnection: any,
+  ) {
+    try {
+      const ViewModel = tenantConnection.model(ForumView.name, ForumViewSchema);
+
+      // Create or update the latest view timestamp for this user and discussion
+      await ViewModel.findOneAndUpdate(
+        {
+          user_id: userId,
+          discussion_id: new Types.ObjectId(discussionId),
+        },
+        {
+          viewed_at: new Date(),
+        },
+        {
+          upsert: true,
+          new: true,
+        },
+      );
+    } catch (error) {
+      this.logger.error('Error marking content as viewed', error);
+      // Don't throw error to avoid breaking main functionality
+    }
+  }
+
+  /**
+   * Helper method to get unread count for discussions
+   */
+  private async getUnreadDiscussionsCount(
+    userId: Types.ObjectId,
+    tenantConnection: any,
+  ): Promise<number> {
+    try {
+      const DiscussionModel = tenantConnection.model(
+        ForumDiscussion.name,
+        ForumDiscussionSchema,
+      );
+      const ViewModel = tenantConnection.model(ForumView.name, ForumViewSchema);
+
+      // Get all discussions
+      const discussions = await DiscussionModel.find({
+        deleted_at: null,
+        status: DiscussionStatusEnum.ACTIVE,
+      }).lean();
+
+      let unreadCount = 0;
+
+      // Check each discussion individually
+      for (const discussion of discussions) {
+        const lastViewed = await ViewModel.findOne({
+          user_id: userId,
+          discussion_id: discussion._id,
+        });
+
+        // If user has never viewed this discussion or it's newer than last view
+        if (!lastViewed || discussion.created_at > lastViewed.viewed_at) {
+          unreadCount++;
+        }
+      }
+
+      return unreadCount;
+    } catch (error) {
+      this.logger.error('Error getting unread discussions count', error);
+      return 0;
+    }
+  }
+
+  /**
+   * Helper method to get unread count for replies
+   */
+  private async getUnreadRepliesCount(
+    userId: Types.ObjectId,
+    tenantConnection: any,
+  ): Promise<number> {
+    try {
+      const ReplyModel = tenantConnection.model(
+        ForumReply.name,
+        ForumReplySchema,
+      );
+      const ViewModel = tenantConnection.model(ForumView.name, ForumViewSchema);
+
+      // Get all replies
+      const replies = await ReplyModel.find({
+        deleted_at: null,
+        status: ReplyStatusEnum.ACTIVE,
+      }).lean();
+
+      let unreadCount = 0;
+
+      // Check each reply's discussion individually
+      for (const reply of replies) {
+        const lastViewed = await ViewModel.findOne({
+          user_id: userId,
+          discussion_id: reply.discussion_id.toString(),
+        });
+
+        // If user has never viewed this discussion or reply is newer than last view
+        if (!lastViewed || reply.created_at > lastViewed.viewed_at) {
+          unreadCount++;
+        }
+      }
+
+      return unreadCount;
+    } catch (error) {
+      this.logger.error('Error getting unread replies count', error);
+      return 0;
+    }
+  }
+
+  /**
+   * Get unread counts for forum content
+   */
+  async getUnreadCounts(user: JWTUserPayload) {
+    this.logger.log(`Getting unread counts for user: ${user.id}`);
+
+    const resolvedSchoolId = this.resolveSchoolId(user);
+
+    // Validate school exists
+    const school = await this.schoolModel.findById(resolvedSchoolId);
+    if (!school) {
+      throw new NotFoundException('School not found');
+    }
+
+    // Get tenant connection
+    const tenantConnection =
+      await this.tenantConnectionService.getTenantConnection(school.db_name);
+
+    try {
+      const [unreadDiscussions, unreadReplies] = await Promise.all([
+        this.getUnreadDiscussionsCount(
+          new Types.ObjectId(user.id),
+          tenantConnection,
+        ),
+        this.getUnreadRepliesCount(
+          new Types.ObjectId(user.id),
+          tenantConnection,
+        ),
+      ]);
+
+      return {
+        message: 'Unread counts retrieved successfully',
+        data: {
+          unread_discussions: unreadDiscussions,
+          unread_replies: unreadReplies,
+          total_unread: unreadDiscussions + unreadReplies,
+        },
+      };
+    } catch (error) {
+      this.logger.error('Error getting unread counts', error?.stack || error);
+      throw new BadRequestException('Failed to retrieve unread counts');
     }
   }
 }
