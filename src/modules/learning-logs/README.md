@@ -116,7 +116,7 @@ GET /learning-logs
       "_id": "507f1f77bcf86cd799439011",
       "skill_gaps": ["empathy"],
       "can_review": true,
-      "review": null, // or review object if already reviewed
+      "user_review": null, // or review object if already reviewed
       // ... other learning log fields
     }
   ]

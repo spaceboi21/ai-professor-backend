@@ -236,7 +236,7 @@ export class LearningLogsResponseDto {
       created_at: '2024-01-15T10:30:00.000Z',
     },
   })
-  review?: {
+  user_review?: {
     _id: string;
     reviewer_id: string;
     reviewer_role: string;
