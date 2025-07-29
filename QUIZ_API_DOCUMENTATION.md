@@ -340,13 +340,101 @@ http://localhost:5000/api/quiz
 
 ## 4. Student Analytics
 
+### Get Student Attempted Quiz Groups
+
+**Endpoint:** `GET /quiz/student/attempted-groups`  
+**Access:** Students, School Admins, Professors  
+**Description:** Retrieve a list of quiz groups that the student has attempted, with summary statistics for each group.
+
+**Access Control:**
+
+- **Students:** Can view their own attempted quiz groups
+- **Admins (School Admin/Professor):** Can view any student's attempted quiz groups by providing student_id
+
+**Query Parameters:**
+
+- `page` (optional): Page number (default: 1)
+- `limit` (optional): Number of items per page (default: 10, max: 50)
+- `student_id` (optional): Student ID (required for admin access, optional for students)
+
+**Response:**
+
+```json
+{
+  "attempted_quiz_groups": [
+    {
+      "_id": "507f1f77bcf86cd799439011",
+      "quiz_group": {
+        "_id": "507f1f77bcf86cd799439011",
+        "subject": "Mathematics",
+        "description": "Basic algebra concepts",
+        "difficulty": "INTERMEDIATE",
+        "category": "Math"
+      },
+      "module": {
+        "_id": "507f1f77bcf86cd799439011",
+        "title": "Algebra Fundamentals",
+        "subject": "Mathematics"
+      },
+      "chapter": {
+        "_id": "507f1f77bcf86cd799439012",
+        "title": "Linear Equations"
+      },
+      "total_attempts": 3,
+      "average_score": 82.5,
+      "pass_rate": 66.7,
+      "best_score": 95,
+      "worst_score": 70,
+      "total_passed": 2,
+      "last_attempt_date": "2024-01-15T10:45:00Z",
+      "first_attempt_date": "2024-01-10T09:30:00Z"
+    }
+  ],
+  "pagination": {
+    "page": 1,
+    "limit": 10,
+    "total": 25,
+    "totalPages": 3,
+    "hasNextPage": true,
+    "hasPrevPage": false
+  },
+  "summary": {
+    "total_quiz_groups_attempted": 25,
+    "total_attempts": 15,
+    "average_pass_rate": 73.3
+  },
+  "student_info": {
+    "student_id": "507f1f77bcf86cd799439011",
+    "accessed_by": "SCHOOL_ADMIN",
+    "accessed_by_id": "507f1f77bcf86cd799439012"
+  }
+}
+```
+
+**Use Case:** Students can use this to select a specific quiz group to view detailed analytics.
+**Admin Use Case:** Admins can monitor student progress and performance across different quiz groups.
+
+**Pagination Features:**
+
+- **Page Navigation:** Use `page` parameter to navigate through results
+- **Items Per Page:** Use `limit` parameter to control items per page (max 50)
+- **Pagination Metadata:** Includes total count, total pages, and navigation flags
+- **Performance:** Efficient pagination for large datasets
+
 ### Get Student Quiz Analytics
 
 **Endpoint:** `GET /quiz/student/analytics`  
-**Access:** Students only  
+**Access:** Students, School Admins, Professors  
 **Description:** Retrieve detailed personal quiz analytics including attempt history, per-question breakdown, and performance summary.
 
-**Query Parameters:** Same as admin analytics
+**Access Control:**
+
+- **Students:** Can view their own detailed analytics
+- **Admins (School Admin/Professor):** Can view any student's detailed analytics by providing student_id
+
+**Query Parameters:** Same as admin analytics plus:
+
+- `student_id` (optional): Student ID (required for admin access, optional for students)
 
 **Response:**
 
@@ -399,22 +487,36 @@ http://localhost:5000/api/quiz
     "average_time_taken": 1100.2,
     "best_score": 95,
     "worst_score": 65
+  },
+  "student_info": {
+    "student_id": "507f1f77bcf86cd799439011",
+    "accessed_by": "SCHOOL_ADMIN",
+    "accessed_by_id": "507f1f77bcf86cd799439012"
   }
 }
 ```
 
-### Export Student Analytics
+**Use Case:** Students can analyze their performance in detail.
+**Admin Use Case:** Admins can monitor individual student performance and identify areas for improvement.
+
+### Export Student Quiz Analytics
 
 **Endpoint:** `GET /quiz/student/analytics/export`  
-**Access:** Students only  
-**Description:** Export personal quiz analytics in CSV or JSON format.
+**Access:** Students, School Admins, Professors  
+**Description:** Export student quiz analytics in CSV or JSON format.
 
-**Query Parameters:**
+**Access Control:**
+
+- **Students:** Can export their own analytics
+- **Admins (School Admin/Professor):** Can export any student's analytics by providing student_id
+
+**Query Parameters:** Same as student analytics plus:
 
 - `format` (required): Export format (csv or json)
-- All student analytics filter parameters supported
+- `student_id` (optional): Student ID (required for admin access, optional for students)
 
-**Response:** File download with appropriate headers
+**Use Case:** Students can export their performance data for offline analysis.
+**Admin Use Case:** Admins can export student data for reporting and analysis.
 
 ---
 
@@ -498,24 +600,85 @@ analytics.data.analytics.forEach((quiz) => {
 ### Example 2: Student Progress Tracking
 
 ```javascript
-// Get student's personal analytics
-const studentAnalytics = await axios.get('/api/quiz/student/analytics', {
+// Get student's attempted quiz groups
+const attemptedGroups = await axios.get('/api/quiz/student/attempted-groups', {
   headers: { Authorization: `Bearer ${studentToken}` },
 });
 
-// Display personal performance
+// Display attempted quiz groups
 console.log(
-  `Your Average Score: ${studentAnalytics.data.summary.average_score}%`,
+  `Total Quiz Groups Attempted: ${attemptedGroups.data.summary.total_quiz_groups_attempted}`,
 );
-console.log(`Your Pass Rate: ${studentAnalytics.data.summary.pass_rate}%`);
+console.log(`Total Attempts: ${attemptedGroups.data.summary.total_attempts}`);
+console.log(
+  `Average Pass Rate: ${attemptedGroups.data.summary.average_pass_rate}%`,
+);
 
-// Show recent attempts
-studentAnalytics.data.attempts.forEach((attempt) => {
-  console.log(`${attempt.quiz_group.subject}: ${attempt.score_percentage}%`);
+// Display each quiz group with summary
+attemptedGroups.data.attempted_quiz_groups.forEach((group) => {
+  console.log(
+    `${group.quiz_group.subject}: ${group.average_score}% average, ${group.pass_rate}% pass rate`,
+  );
+});
+
+// Get detailed analytics for a specific quiz group
+const detailedAnalytics = await axios.get('/api/quiz/student/analytics', {
+  headers: { Authorization: `Bearer ${studentToken}` },
+  params: {
+    quiz_group_id: '507f1f77bcf86cd799439011', // Selected from attempted groups
+  },
+});
+
+// Display detailed analytics for the selected quiz group
+console.log(
+  `Detailed Analytics for ${detailedAnalytics.data.attempts[0].quiz_group.subject}:`,
+);
+console.log(`Total Attempts: ${detailedAnalytics.data.summary.total_attempts}`);
+console.log(`Average Score: ${detailedAnalytics.data.summary.average_score}%`);
+console.log(`Pass Rate: ${detailedAnalytics.data.summary.pass_rate}%`);
+```
+
+### Example 3: Student Quiz Group Selection Workflow
+
+```javascript
+// Step 1: Get all attempted quiz groups
+const attemptedGroups = await axios.get('/api/quiz/student/attempted-groups', {
+  headers: { Authorization: `Bearer ${studentToken}` },
+});
+
+// Step 2: Display quiz groups for student selection
+const quizGroupOptions = attemptedGroups.data.attempted_quiz_groups.map(
+  (group) => ({
+    id: group._id,
+    subject: group.quiz_group.subject,
+    description: group.quiz_group.description,
+    average_score: group.average_score,
+    pass_rate: group.pass_rate,
+    total_attempts: group.total_attempts,
+  }),
+);
+
+// Step 3: Student selects a quiz group (e.g., by ID)
+const selectedQuizGroupId = '507f1f77bcf86cd799439011';
+
+// Step 4: Get detailed analytics for the selected quiz group
+const selectedGroupAnalytics = await axios.get('/api/quiz/student/analytics', {
+  headers: { Authorization: `Bearer ${studentToken}` },
+  params: {
+    quiz_group_id: selectedQuizGroupId,
+  },
+});
+
+// Step 5: Display detailed analytics
+console.log('Selected Quiz Group Analytics:');
+selectedGroupAnalytics.data.attempts.forEach((attempt, index) => {
+  console.log(
+    `Attempt ${index + 1}: ${attempt.score_percentage}% (${attempt.is_passed ? 'Passed' : 'Failed'})`,
+  );
 });
 ```
 
-### Example 3: Filtered Analytics
+### Example 4: Filtered Analytics
 
 ```javascript
 // Get analytics for specific module in date range
@@ -529,7 +692,7 @@ const filteredAnalytics = await axios.get('/api/quiz/analytics', {
 });
 ```
 
-### Example 4: Export Functionality
+### Example 5: Export Functionality
 
 ```javascript
 // Export admin analytics as CSV

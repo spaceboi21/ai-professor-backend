@@ -341,16 +341,244 @@ export class QuizAnalyticsService {
 
   // ========== STUDENT ANALYTICS ==========
 
+  async getStudentAttemptedQuizGroups(
+    user: JWTUserPayload,
+    page: number = 1,
+    limit: number = 10,
+    studentId?: string,
+  ) {
+    // Determine the target student ID
+    let targetStudentId: string;
+
+    if (user.role.name === RoleEnum.STUDENT) {
+      // Students can only view their own data
+      targetStudentId = user.id.toString();
+      this.logger.log(
+        `Getting attempted quiz groups for student: ${user.id} with pagination - page: ${page}, limit: ${limit}`,
+      );
+    } else if (
+      user.role.name === RoleEnum.SCHOOL_ADMIN ||
+      user.role.name === RoleEnum.PROFESSOR
+    ) {
+      // Admins can view any student's data if student_id is provided
+      if (!studentId) {
+        throw new BadRequestException(
+          'Student ID is required for admin access',
+        );
+      }
+      targetStudentId = studentId;
+      this.logger.log(
+        `Admin ${user.id} getting attempted quiz groups for student: ${studentId} with pagination - page: ${page}, limit: ${limit}`,
+      );
+    } else {
+      throw new BadRequestException(
+        'Only students, school admins, and professors can access this endpoint',
+      );
+    }
+
+    // Get school and tenant connection
+    const school = await this.schoolModel.findById(user.school_id);
+    if (!school) {
+      throw new NotFoundException('School not found');
+    }
+
+    const tenantConnection =
+      await this.tenantConnectionService.getTenantConnection(school.db_name);
+
+    const StudentQuizAttemptModel = tenantConnection.model(
+      StudentQuizAttempt.name,
+      StudentQuizAttemptSchema,
+    );
+    const QuizGroupModel = tenantConnection.model(
+      QuizGroup.name,
+      QuizGroupSchema,
+    );
+    const ModuleModel = tenantConnection.model(Module.name, ModuleSchema);
+    const ChapterModel = tenantConnection.model(Chapter.name, ChapterSchema);
+
+    // Calculate skip value for pagination
+    const skip = (page - 1) * limit;
+
+    // Get total count for pagination
+    const totalCount = await StudentQuizAttemptModel.aggregate([
+      {
+        $match: {
+          student_id: new Types.ObjectId(targetStudentId),
+          status: AttemptStatusEnum.COMPLETED,
+        },
+      },
+      {
+        $group: {
+          _id: '$quiz_group_id',
+        },
+      },
+      {
+        $count: 'total',
+      },
+    ]);
+
+    const total = totalCount.length > 0 ? totalCount[0].total : 0;
+
+    // Get quiz groups that the student has attempted with pagination
+    const attemptedQuizGroups = await StudentQuizAttemptModel.aggregate([
+      {
+        $match: {
+          student_id: new Types.ObjectId(targetStudentId),
+          status: AttemptStatusEnum.COMPLETED,
+        },
+      },
+      {
+        $lookup: {
+          from: 'quiz_group',
+          localField: 'quiz_group_id',
+          foreignField: '_id',
+          as: 'quiz_group',
+        },
+      },
+      { $unwind: '$quiz_group' },
+      {
+        $lookup: {
+          from: 'modules',
+          localField: 'module_id',
+          foreignField: '_id',
+          as: 'module',
+        },
+      },
+      {
+        $lookup: {
+          from: 'chapters',
+          localField: 'chapter_id',
+          foreignField: '_id',
+          as: 'chapter',
+        },
+      },
+      {
+        $group: {
+          _id: '$quiz_group_id',
+          quiz_group: { $first: '$quiz_group' },
+          module: { $first: { $arrayElemAt: ['$module', 0] } },
+          chapter: { $first: { $arrayElemAt: ['$chapter', 0] } },
+          total_attempts: { $sum: 1 },
+          average_score: { $avg: '$score_percentage' },
+          best_score: { $max: '$score_percentage' },
+          worst_score: { $min: '$score_percentage' },
+          total_passed: {
+            $sum: { $cond: ['$is_passed', 1, 0] },
+          },
+          last_attempt_date: { $max: '$completed_at' },
+          first_attempt_date: { $min: '$started_at' },
+        },
+      },
+      {
+        $addFields: {
+          pass_rate: {
+            $multiply: [{ $divide: ['$total_passed', '$total_attempts'] }, 100],
+          },
+        },
+      },
+      {
+        $project: {
+          _id: 1,
+          quiz_group: {
+            _id: 1,
+            subject: 1,
+            description: 1,
+            difficulty: 1,
+            category: 1,
+          },
+          module: {
+            _id: 1,
+            title: 1,
+            subject: 1,
+          },
+          chapter: {
+            _id: 1,
+            title: 1,
+          },
+          total_attempts: 1,
+          average_score: { $round: ['$average_score', 2] },
+          pass_rate: { $round: ['$pass_rate', 2] },
+          best_score: 1,
+          worst_score: 1,
+          total_passed: 1,
+          last_attempt_date: 1,
+          first_attempt_date: 1,
+        },
+      },
+      { $sort: { last_attempt_date: -1 } },
+      { $skip: skip },
+      { $limit: limit },
+    ]);
+
+    // Calculate pagination metadata
+    const totalPages = Math.ceil(total / limit);
+    const hasNextPage = page < totalPages;
+    const hasPrevPage = page > 1;
+
+    return {
+      attempted_quiz_groups: attemptedQuizGroups,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages,
+        hasNextPage,
+        hasPrevPage,
+      },
+      summary: {
+        total_quiz_groups_attempted: total,
+        total_attempts: attemptedQuizGroups.reduce(
+          (sum, group) => sum + group.total_attempts,
+          0,
+        ),
+        average_pass_rate: attemptedQuizGroups.length
+          ? attemptedQuizGroups.reduce(
+              (sum, group) => sum + group.pass_rate,
+              0,
+            ) / attemptedQuizGroups.length
+          : 0,
+      },
+      // Include student information for admin access
+      student_info:
+        user.role.name !== RoleEnum.STUDENT
+          ? {
+              student_id: targetStudentId,
+              accessed_by: user.role.name,
+              accessed_by_id: user.id,
+            }
+          : undefined,
+    };
+  }
+
   async getStudentQuizAnalytics(
     user: JWTUserPayload,
     filterDto?: StudentQuizAnalyticsFilterDto,
+    studentId?: string,
   ) {
-    this.logger.log(`Getting student quiz analytics for user: ${user.id}`);
+    // Determine the target student ID
+    let targetStudentId: string;
 
-    // Validate user is a student
-    if (user.role.name !== RoleEnum.STUDENT) {
+    if (user.role.name === RoleEnum.STUDENT) {
+      // Students can only view their own data
+      targetStudentId = user.id.toString();
+      this.logger.log(`Getting student quiz analytics for user: ${user.id}`);
+    } else if (
+      user.role.name === RoleEnum.SCHOOL_ADMIN ||
+      user.role.name === RoleEnum.PROFESSOR
+    ) {
+      // Admins can view any student's data if student_id is provided
+      if (!studentId) {
+        throw new BadRequestException(
+          'Student ID is required for admin access',
+        );
+      }
+      targetStudentId = studentId;
+      this.logger.log(
+        `Admin ${user.id} getting quiz analytics for student: ${studentId}`,
+      );
+    } else {
       throw new BadRequestException(
-        'Only students can access personal analytics',
+        'Only students, school admins, and professors can access this endpoint',
       );
     }
 
@@ -377,7 +605,7 @@ export class QuizAnalyticsService {
 
     // Build match conditions
     const matchConditions: any = {
-      student_id: new Types.ObjectId(user.id),
+      student_id: new Types.ObjectId(targetStudentId),
       status: AttemptStatusEnum.COMPLETED,
     };
 
@@ -483,6 +711,15 @@ export class QuizAnalyticsService {
     return {
       attempts: attemptsWithDetails,
       summary,
+      // Include student information for admin access
+      student_info:
+        user.role.name !== RoleEnum.STUDENT
+          ? {
+              student_id: targetStudentId,
+              accessed_by: user.role.name,
+              accessed_by_id: user.id,
+            }
+          : undefined,
     };
   }
 
@@ -593,12 +830,17 @@ export class QuizAnalyticsService {
     user: JWTUserPayload,
     format: ExportFormatEnum,
     filterDto?: StudentQuizAnalyticsFilterDto,
+    studentId?: string,
   ) {
     this.logger.log(
       `Exporting student quiz analytics in ${format} format for user: ${user.id}`,
     );
 
-    const analytics = await this.getStudentQuizAnalytics(user, filterDto);
+    const analytics = await this.getStudentQuizAnalytics(
+      user,
+      filterDto,
+      studentId,
+    );
 
     if (format === ExportFormatEnum.CSV) {
       return this.exportStudentToCSV(analytics);

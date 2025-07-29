@@ -822,11 +822,17 @@ export class QuizController {
   }
 
   @Get('student/analytics')
-  @Roles(RoleEnum.STUDENT)
+  @Roles(RoleEnum.STUDENT, RoleEnum.PROFESSOR, RoleEnum.SCHOOL_ADMIN)
   @ApiOperation({
-    summary: 'Get personal quiz analytics for students',
+    summary: 'Get detailed student quiz analytics',
     description: `
-    Retrieve detailed personal quiz analytics including:
+    Retrieve detailed personal quiz analytics including attempt history, per-question breakdown, and performance summary.
+    
+    **Access Control:**
+    - **Students:** Can view their own detailed analytics
+    - **Admins (School Admin/Professor):** Can view any student's detailed analytics by providing student_id
+    
+    **Features:**
     - Personal attempt history with timestamps
     - Per-question accuracy breakdown
     - Score progression over time
@@ -834,9 +840,8 @@ export class QuizController {
     - Performance summary (best/worst scores)
     - Question explanations for incorrect answers
     
-    **Access Control:** Only Students can access this endpoint.
-    **Data Scope:** Students can only view their own personal analytics.
-    **Privacy:** All data is isolated to the authenticated student.
+    **Use Case:** Students can analyze their performance in detail.
+    **Admin Use Case:** Admins can monitor individual student performance and identify areas for improvement.
     `,
   })
   @ApiQuery({
@@ -873,6 +878,14 @@ export class QuizController {
     type: String,
     description: 'Filter by end date (ISO string format)',
     example: '2024-12-31T23:59:59.999Z',
+  })
+  @ApiQuery({
+    name: 'student_id',
+    required: false,
+    type: String,
+    description:
+      'Student ID (required for admin access, optional for students)',
+    example: '507f1f77bcf86cd799439011',
   })
   @ApiResponse({
     status: 200,
@@ -928,34 +941,185 @@ export class QuizController {
           best_score: 95,
           worst_score: 65,
         },
+        student_info: {
+          student_id: '507f1f77bcf86cd799439011',
+          accessed_by: 'SCHOOL_ADMIN',
+          accessed_by_id: '507f1f77bcf86cd799439012',
+        },
       },
     },
   })
   @ApiResponse({
     status: 400,
-    description: 'Invalid filter parameters or validation error',
+    description:
+      'Student ID is required for admin access or invalid filter parameters',
   })
   @ApiResponse({
     status: 403,
-    description: 'Access denied - Only Students can view personal analytics',
+    description:
+      'Access denied - Only students, school admins, and professors can access this endpoint',
   })
   @ApiResponse({
     status: 404,
     description: 'School not found or no data available',
   })
   getStudentQuizAnalytics(
-    @Query() filterDto: StudentQuizAnalyticsFilterDto,
     @User() user: JWTUserPayload,
+    @Query() filterDto: StudentQuizAnalyticsFilterDto,
+    @Query('student_id') studentId?: string,
   ) {
-    return this.quizAnalyticsService.getStudentQuizAnalytics(user, filterDto);
+    return this.quizAnalyticsService.getStudentQuizAnalytics(
+      user,
+      filterDto,
+      studentId,
+    );
+  }
+
+  @Get('student/attempted-groups')
+  @Roles(RoleEnum.STUDENT, RoleEnum.PROFESSOR, RoleEnum.SCHOOL_ADMIN)
+  @ApiOperation({
+    summary: 'Get quiz groups that student has attempted',
+    description: `
+    Retrieve a list of quiz groups that the student has attempted, with summary statistics for each group.
+    
+    **Access Control:**
+    - **Students:** Can view their own attempted quiz groups
+    - **Admins (School Admin/Professor):** Can view any student's attempted quiz groups by providing student_id
+    
+    **Features:**
+    - List of quiz groups with attempt statistics
+    - Average scores and pass rates per group
+    - Best and worst scores per group
+    - Attempt dates and frequency
+    - Module and chapter information
+    - Pagination support for large datasets
+    
+    **Use Case:** Students can use this to select a specific quiz group to view detailed analytics.
+    **Admin Use Case:** Admins can monitor student progress and performance across different quiz groups.
+    `,
+  })
+  @ApiQuery({
+    name: 'page',
+    required: false,
+    type: Number,
+    description: 'Page number (default: 1)',
+    example: 1,
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    type: Number,
+    description: 'Number of items per page (default: 10, max: 50)',
+    example: 10,
+  })
+  @ApiQuery({
+    name: 'student_id',
+    required: false,
+    type: String,
+    description:
+      'Student ID (required for admin access, optional for students)',
+    example: '507f1f77bcf86cd799439011',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Student attempted quiz groups retrieved successfully',
+    schema: {
+      example: {
+        attempted_quiz_groups: [
+          {
+            _id: '507f1f77bcf86cd799439011',
+            quiz_group: {
+              _id: '507f1f77bcf86cd799439011',
+              subject: 'Mathematics',
+              description: 'Basic algebra concepts',
+              difficulty: 'INTERMEDIATE',
+              category: 'Math',
+            },
+            module: {
+              _id: '507f1f77bcf86cd799439011',
+              title: 'Algebra Fundamentals',
+              subject: 'Mathematics',
+            },
+            chapter: {
+              _id: '507f1f77bcf86cd799439012',
+              title: 'Linear Equations',
+            },
+            total_attempts: 3,
+            average_score: 82.5,
+            pass_rate: 66.7,
+            best_score: 95,
+            worst_score: 70,
+            total_passed: 2,
+            last_attempt_date: '2024-01-15T10:45:00Z',
+            first_attempt_date: '2024-01-10T09:30:00Z',
+          },
+        ],
+        pagination: {
+          page: 1,
+          limit: 10,
+          total: 25,
+          totalPages: 3,
+          hasNextPage: true,
+          hasPrevPage: false,
+        },
+        summary: {
+          total_quiz_groups_attempted: 25,
+          total_attempts: 15,
+          average_pass_rate: 73.3,
+        },
+        student_info: {
+          student_id: '507f1f77bcf86cd799439011',
+          accessed_by: 'SCHOOL_ADMIN',
+          accessed_by_id: '507f1f77bcf86cd799439012',
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 400,
+    description:
+      'Student ID is required for admin access or invalid parameters',
+  })
+  @ApiResponse({
+    status: 403,
+    description:
+      'Access denied - Only students, school admins, and professors can access this endpoint',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'School not found or no data available',
+  })
+  getStudentAttemptedQuizGroups(
+    @User() user: JWTUserPayload,
+    @Query('page') page: number = 1,
+    @Query('limit') limit: number = 10,
+    @Query('student_id') studentId?: string,
+  ) {
+    // Validate pagination parameters
+    const validatedPage = Math.max(1, parseInt(page.toString()) || 1);
+    const validatedLimit = Math.min(
+      50,
+      Math.max(1, parseInt(limit.toString()) || 10),
+    );
+
+    return this.quizAnalyticsService.getStudentAttemptedQuizGroups(
+      user,
+      validatedPage,
+      validatedLimit,
+      studentId,
+    );
   }
 
   @Get('student/analytics/export')
-  @Roles(RoleEnum.STUDENT)
+  @Roles(RoleEnum.STUDENT, RoleEnum.PROFESSOR, RoleEnum.SCHOOL_ADMIN)
   @ApiOperation({
-    summary: 'Export personal quiz analytics data',
+    summary: 'Export student quiz analytics data',
     description: `
-    Export personal quiz analytics in CSV or JSON format.
+    Export student quiz analytics in CSV or JSON format.
+    
+    **Access Control:**
+    - **Students:** Can export their own analytics
+    - **Admins (School Admin/Professor):** Can export any student's analytics by providing student_id
     
     **Supported Formats:**
     - CSV: Comma-separated values with attempt details
@@ -967,9 +1131,8 @@ export class QuizController {
     - Score and time analysis
     - Question breakdown with explanations
     
-    **Access Control:** Only Students can export their personal analytics.
-    **Privacy:** All exported data is isolated to the authenticated student.
-    **Filtering:** All personal analytics filters are supported for export.
+    **Use Case:** Students can export their performance data for offline analysis.
+    **Admin Use Case:** Admins can export student data for reporting and analysis.
     `,
   })
   @ApiQuery({
@@ -1013,6 +1176,14 @@ export class QuizController {
     description: 'Filter by end date (ISO string format)',
     example: '2024-12-31T23:59:59.999Z',
   })
+  @ApiQuery({
+    name: 'student_id',
+    required: false,
+    type: String,
+    description:
+      'Student ID (required for admin access, optional for students)',
+    example: '507f1f77bcf86cd799439011',
+  })
   @ApiResponse({
     status: 200,
     description:
@@ -1030,23 +1201,27 @@ export class QuizController {
   })
   @ApiResponse({
     status: 400,
-    description: 'Invalid export format or filter parameters',
+    description:
+      'Student ID is required for admin access or invalid export format',
   })
   @ApiResponse({
     status: 403,
-    description: 'Access denied - Only Students can export personal analytics',
+    description:
+      'Access denied - Only students, school admins, and professors can export analytics',
   })
   async exportStudentQuizAnalytics(
+    @User() user: JWTUserPayload,
     @Query('format') format: ExportFormatEnum,
     @Query() filterDto: StudentQuizAnalyticsFilterDto,
-    @User() user: JWTUserPayload,
     @Res() res: Response,
+    @Query('student_id') studentId?: string,
   ) {
     const exportData =
       await this.quizAnalyticsService.exportStudentQuizAnalytics(
         user,
         format,
         filterDto,
+        studentId,
       );
 
     res.setHeader('Content-Type', exportData.contentType);
