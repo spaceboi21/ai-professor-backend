@@ -100,10 +100,6 @@ import { CommunityModule } from './modules/community/community.module';
       }),
       inject: [ConfigService],
     }),
-    ServeStaticModule.forRoot({
-      rootPath: join(__dirname, '..', 'static'),
-      serveRoot: '/static',
-    }),
     PassportModule,
     CentralModule,
     DatabaseModule,
