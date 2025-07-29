@@ -166,7 +166,7 @@ All passwords must meet the following criteria:
 
 ## Security Features
 
-1. **Token Expiration**: Reset tokens are valid for 24 hours (configurable via JWT_EXPIRY)
+1. **Token Expiration**: Reset tokens are valid for 24 hours (configurable via JWT_ACCESS_EXPIRY)
 2. **Password Hashing**: All passwords are hashed using bcrypt with 12 salt rounds
 3. **Role Validation**: Only school admins and professors can use these endpoints
 4. **Account Status Check**: Inactive accounts cannot reset passwords
@@ -184,7 +184,7 @@ The system uses the existing `forgot-password-email.hbs` template to send passwo
 The following environment variables are used:
 - `BACKEND_URL`: Base URL for the backend application (defaults to http://localhost:3000)
 - `JWT_SECRET`: Secret key for JWT token generation
-- `JWT_EXPIRY`: Token expiration time (defaults to 24h)
+- `JWT_ACCESS_EXPIRY`: Token expiration time (defaults to 24h)
 
 ## Usage Flow
 

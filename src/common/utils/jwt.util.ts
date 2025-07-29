@@ -24,7 +24,7 @@ export class JwtUtil {
     expiresIn?: string,
   ): string {
     const defaultExpiresIn =
-      this.configService.get<string>('JWT_EXPIRY') || '24h';
+      this.configService.get<string>('JWT_ACCESS_EXPIRY') || '24h';
     const tokenExpiresIn = expiresIn || defaultExpiresIn;
     const secret = this.configService.get<string>('JWT_SECRET');
     if (!secret) {

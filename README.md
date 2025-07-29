@@ -134,7 +134,7 @@ Tenant Databases (Per School)
 | `CENTRAL_DB_URI`     | Alternative central database connection string              | Optional      |
 | `MONGODB_BASE_URI`   | Base URI for tenant databases (without database name)      | Required      |
 | `JWT_SECRET`         | JWT signing secret                                          | Required      |
-| `JWT_EXPIRY`         | JWT token expiry                                            | `24h`         |
+| `JWT_ACCESS_EXPIRY`  | JWT token expiry                                            | `24h`         |
 | `ALLOWED_CORS_URLS` | Frontend URL for CORS                                       | Required      |
 
 ### Migration Environment Variables
