@@ -1331,7 +1331,11 @@ export class ProgressService {
     try {
       const studentObjectId = new Types.ObjectId(studentId);
 
-      // Get overall statistics
+      // Get overall statistics, ignoring deleted modules
+      // First, get all non-deleted module IDs
+      const deletedModules = await ModuleModel.find({ deleted_at: { $ne: null } }, { _id: 1 }).lean();
+      const deletedModuleIds = deletedModules.map((m) => m._id);
+
       const [
         totalModules,
         inProgressModules,
@@ -1342,25 +1346,33 @@ export class ProgressService {
       ] = await Promise.all([
         StudentModuleProgressModel.countDocuments({
           student_id: studentObjectId,
+          module_id: { $nin: deletedModuleIds },
         }),
         StudentModuleProgressModel.countDocuments({
           student_id: studentObjectId,
           status: ProgressStatusEnum.IN_PROGRESS,
+          module_id: { $nin: deletedModuleIds },
         }),
         StudentModuleProgressModel.countDocuments({
           student_id: studentObjectId,
           status: ProgressStatusEnum.COMPLETED,
+          module_id: { $nin: deletedModuleIds },
         }),
         StudentQuizAttemptModel.countDocuments({
           student_id: studentObjectId,
           status: AttemptStatusEnum.COMPLETED,
+          module_id: { $nin: deletedModuleIds },
         }),
         StudentQuizAttemptModel.countDocuments({
           student_id: studentObjectId,
           status: AttemptStatusEnum.COMPLETED,
           is_passed: true,
+          module_id: { $nin: deletedModuleIds },
         }),
-        StudentModuleProgressModel.find({ student_id: studentObjectId })
+        StudentModuleProgressModel.find({
+          student_id: studentObjectId,
+          module_id: { $nin: deletedModuleIds },
+        })
           .populate('module_id', 'title subject')
           .sort({ last_accessed_at: -1 })
           .limit(5)
