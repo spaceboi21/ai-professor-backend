@@ -31,7 +31,7 @@ export class JwtUtil {
       throw new Error('JWT_SECRET is not configured');
     }
     return this.jwtService.sign(payload, {
-      expiresIn: '2m',
+      expiresIn: tokenExpiresIn,
       secret,
     });
   }
