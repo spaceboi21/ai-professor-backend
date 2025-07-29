@@ -219,7 +219,7 @@ export class LearningLogsResponseDto {
   session: SessionDetailsDto;
 
   @ApiProperty({
-    description: 'Review information if the learning log has been reviewed',
+    description: 'Review information if the learning log has been reviewed by the current user',
     required: false,
     example: {
       _id: '507f1f77bcf86cd799439011',
@@ -227,11 +227,9 @@ export class LearningLogsResponseDto {
       reviewer_role: 'PROFESSOR',
       rating: 4,
       feedback: 'Great communication skills demonstrated. Shows good understanding of patient care principles.',
-      reviewer_info: {
-        first_name: 'Dr. John',
-        last_name: 'Smith',
-        email: 'john.smith@university.edu',
-        profile_pic: 'https://example.com/profile.jpg',
+      metadata: {
+        strengths: ['communication', 'empathy'],
+        areas_for_improvement: ['documentation']
       },
       created_at: '2024-01-15T10:30:00.000Z',
     },
@@ -242,12 +240,7 @@ export class LearningLogsResponseDto {
     reviewer_role: string;
     rating: number;
     feedback: string;
-    reviewer_info?: {
-      first_name: string;
-      last_name: string;
-      email: string;
-      profile_pic?: string;
-    };
+    metadata?: Record<string, any>;
     created_at: Date;
   };
 

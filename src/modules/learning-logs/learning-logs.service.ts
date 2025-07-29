@@ -644,7 +644,7 @@ export class LearningLogsService {
       // Add review lookup stages
       ...this.buildReviewLookupStages(user),
 
-      // Add can_review flag and review information
+      // Add can_review flag
       {
         $addFields: {
           can_review: {
@@ -659,15 +659,6 @@ export class LearningLogsService {
               else: {
                 $ne: [{ $literal: user.role.name }, 'STUDENT'],
               },
-            },
-          },
-          review: {
-            $cond: {
-              if: { $ne: ['$user_review', []] },
-              then: {
-                $arrayElemAt: ['$user_review', 0],
-              },
-              else: null,
             },
           },
         },
@@ -1034,7 +1025,7 @@ export class LearningLogsService {
       // Add review lookup stages
       ...this.buildReviewLookupStages(user),
 
-      // Add can_review flag and review information
+      // Add can_review flag
       {
         $addFields: {
           can_review: {
@@ -1049,15 +1040,6 @@ export class LearningLogsService {
               else: {
                 $ne: [{ $literal: user.role.name }, 'STUDENT'],
               },
-            },
-          },
-          review: {
-            $cond: {
-              if: { $ne: ['$user_review', []] },
-              then: {
-                $arrayElemAt: ['$user_review', 0],
-              },
-              else: null,
             },
           },
         },
