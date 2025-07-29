@@ -152,7 +152,7 @@ REDIS_DB=0
 
 ```bash
 # Token Expiry Fallbacks
-JWT_EXPIRY=24h  # Legacy support
+JWT_ACCESS_EXPIRY=24h  # Legacy support
 ```
 
 ## Database Schema
