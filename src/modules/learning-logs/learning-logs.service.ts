@@ -78,11 +78,24 @@ export class LearningLogsService {
 
     this.logger.log(`Aggregation results: ${JSON.stringify(results)}`);
 
-    return createPaginationResult(
-      results[0].data,
-      results[0].totalCount[0].total,
-      options,
-    );
+    // Handle case where no results are returned
+    if (!results || results.length === 0 || !results[0]) {
+      return createPaginationResult([], 0, options);
+    }
+
+    const result = results[0];
+    const data = result.data || [];
+    const totalCount = result.totalCount?.[0]?.total || 0;
+
+    // Additional safety check for data integrity
+    if (!Array.isArray(data)) {
+      this.logger.warn(
+        'Aggregation returned non-array data, defaulting to empty array',
+      );
+      return createPaginationResult([], totalCount, options);
+    }
+
+    return createPaginationResult(data, totalCount, options);
   }
 
   async getLearningLogById(
@@ -430,6 +443,10 @@ export class LearningLogsService {
       {
         $unwind: '$module',
       },
+      // Add text filter stage after module lookup
+      ...(filterDto?.text
+        ? [this.buildTextFilterStage(filterDto)].filter(Boolean)
+        : []),
       // Lookup student information with projection
       {
         $lookup: {
@@ -1064,26 +1081,56 @@ export class LearningLogsService {
   private getFilterConditions(filterDto?: LearningLogsFilterDto) {
     const conditions: any = {};
 
-    if (filterDto?.module_id) {
+    if (!filterDto) {
+      return conditions;
+    }
+
+    if (filterDto.module_id) {
       conditions.module_id = new Types.ObjectId(filterDto.module_id);
     }
 
-    if (filterDto?.skill_gap) {
+    if (filterDto.skill_gap) {
       conditions.skill_gaps = filterDto.skill_gap;
     }
 
-    if (filterDto?.start_date || filterDto?.end_date) {
-      conditions.created_at = {};
+    if (filterDto.start_date || filterDto.end_date) {
+      const dateRange: any = {};
       if (filterDto.start_date) {
-        conditions.created_at.$gte = new Date(filterDto.start_date);
+        dateRange.$gte = new Date(`${filterDto.start_date}T00:00:00.000Z`);
       }
       if (filterDto.end_date) {
-        conditions.created_at.$lte = new Date(
-          filterDto.end_date + 'T23:59:59.999Z',
-        );
+        dateRange.$lte = new Date(`${filterDto.end_date}T23:59:59.999Z`);
       }
+
+      conditions.created_at = dateRange;
+      conditions.updated_at = dateRange;
     }
 
     return conditions;
+  }
+
+  private buildTextFilterStage(filterDto?: LearningLogsFilterDto) {
+    if (!filterDto?.text) {
+      return null;
+    }
+
+    return {
+      $match: {
+        $or: [
+          {
+            'module.title': {
+              $regex: filterDto.text,
+              $options: 'i',
+            },
+          },
+          {
+            'module.description': {
+              $regex: filterDto.text,
+              $options: 'i',
+            },
+          },
+        ],
+      },
+    };
   }
 }
