@@ -121,8 +121,8 @@ export class AIChatService {
       created_by_role: user.role.name,
       status: AISessionStatusEnum.ACTIVE,
       started_at: new Date(),
-      session_title: `AI Practice Session - ${moduleExists.title}`,
-      session_description: `AI practice session for ${moduleExists.title}`,
+      session_title: moduleExists.title,
+      session_description: moduleExists.description,
       scenario: '',
     };
 
