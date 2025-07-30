@@ -430,6 +430,8 @@ export class LearningLogsService {
       {
         $unwind: '$module',
       },
+      // Add text filter stage after module lookup
+      ...(filterDto?.text ? [this.buildTextFilterStage(filterDto)] : []),
       // Lookup student information with projection
       {
         $lookup: {
@@ -1073,17 +1075,43 @@ export class LearningLogsService {
     }
 
     if (filterDto?.start_date || filterDto?.end_date) {
-      conditions.created_at = {};
+      const dateRange: any = {};
       if (filterDto.start_date) {
-        conditions.created_at.$gte = new Date(filterDto.start_date);
+        dateRange.$gte = new Date(`${filterDto.start_date}T00:00:00.000Z`);
       }
       if (filterDto.end_date) {
-        conditions.created_at.$lte = new Date(
-          filterDto.end_date + 'T23:59:59.999Z',
-        );
+        dateRange.$lte = new Date(`${filterDto.end_date}T23:59:59.999Z`);
       }
+
+      conditions.created_at = dateRange;
+      conditions.updated_at = dateRange;
     }
 
     return conditions;
+  }
+
+  private buildTextFilterStage(filterDto?: LearningLogsFilterDto) {
+    if (!filterDto?.text) {
+      return null;
+    }
+
+    return {
+      $match: {
+        $or: [
+          {
+            'module.title': {
+              $regex: filterDto.text,
+              $options: 'i',
+            },
+          },
+          {
+            'module.description': {
+              $regex: filterDto.text,
+              $options: 'i',
+            },
+          },
+        ],
+      },
+    };
   }
 }

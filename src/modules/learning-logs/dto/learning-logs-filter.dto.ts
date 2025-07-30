@@ -6,11 +6,12 @@ export class LearningLogsFilterDto {
   @IsOptional()
   @IsString()
   @ApiProperty({
-    example: 'Child Development',
-    description: 'Filter by module title',
+    example: 'child development',
+    description:
+      'Filter by text in module title or description (case-insensitive regex)',
     required: false,
   })
-  module_title?: string;
+  text?: string;
 
   @IsOptional()
   @IsMongoId()
@@ -47,13 +48,4 @@ export class LearningLogsFilterDto {
     required: false,
   })
   end_date?: string;
-
-  @IsOptional()
-  @IsString()
-  @ApiProperty({
-    example: 'John',
-    description: 'Filter by student first name',
-    required: false,
-  })
-  student_name?: string;
-} 
+}
