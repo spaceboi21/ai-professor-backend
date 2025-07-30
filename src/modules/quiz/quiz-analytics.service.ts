@@ -16,19 +16,6 @@ import {
   QuizGroup,
   QuizGroupSchema,
 } from 'src/database/schemas/tenant/quiz-group.schema';
-import { Quiz, QuizSchema } from 'src/database/schemas/tenant/quiz.schema';
-import {
-  Student,
-  StudentSchema,
-} from 'src/database/schemas/tenant/student.schema';
-import {
-  Module,
-  ModuleSchema,
-} from 'src/database/schemas/tenant/module.schema';
-import {
-  Chapter,
-  ChapterSchema,
-} from 'src/database/schemas/tenant/chapter.schema';
 import { TenantConnectionService } from 'src/database/tenant-connection.service';
 import { JWTUserPayload } from 'src/common/types/jwr-user.type';
 import { RoleEnum } from 'src/common/constants/roles.constant';
@@ -78,14 +65,6 @@ export class QuizAnalyticsService {
       StudentQuizAttempt.name,
       StudentQuizAttemptSchema,
     );
-    const QuizGroupModel = tenantConnection.model(
-      QuizGroup.name,
-      QuizGroupSchema,
-    );
-    const QuizModel = tenantConnection.model(Quiz.name, QuizSchema);
-    const StudentModel = tenantConnection.model(Student.name, StudentSchema);
-    const ModuleModel = tenantConnection.model(Module.name, ModuleSchema);
-    const ChapterModel = tenantConnection.model(Chapter.name, ChapterSchema);
 
     // Build match conditions
     const matchConditions: any = {
@@ -253,24 +232,32 @@ export class QuizAnalyticsService {
       StudentQuizAttempt.name,
       StudentQuizAttemptSchema,
     );
-    const QuizModel = tenantConnection.model(Quiz.name, QuizSchema);
 
     const pipeline = [
       { $match: matchConditions },
-      { $unwind: '$answers' },
+      // Only include attempts that have ai_verification_result
       {
-        $lookup: {
-          from: 'quizzes',
-          localField: 'answers.quiz_id',
-          foreignField: '_id',
-          as: 'quiz',
+        $match: {
+          ai_verification_result: { $exists: true, $ne: null },
         },
       },
-      { $unwind: '$quiz' },
+      // Unwind the questions_results array from ai_verification_result
+      {
+        $unwind: '$ai_verification_result.questions_results',
+      },
       {
         $addFields: {
-          is_correct: {
-            $setEquals: ['$answers.selected_answers', '$quiz.answer'],
+          question_data: '$ai_verification_result.questions_results',
+          quiz_id: {
+            $arrayElemAt: [
+              '$answers.quiz_id',
+              {
+                $subtract: [
+                  '$ai_verification_result.questions_results.question_index',
+                  1,
+                ],
+              },
+            ],
           },
         },
       },
@@ -278,13 +265,13 @@ export class QuizAnalyticsService {
         $group: {
           _id: {
             quiz_group_id: '$quiz_group_id',
-            quiz_id: '$answers.quiz_id',
-            question: '$quiz.question',
-            sequence: '$quiz.sequence',
+            quiz_id: '$quiz_id',
+            question: '$question_data.question',
+            question_index: '$question_data.question_index',
           },
           total_attempts: { $sum: 1 },
           correct_attempts: {
-            $sum: { $cond: ['$is_correct', 1, 0] },
+            $sum: { $cond: ['$question_data.is_correct', 1, 0] },
           },
         },
       },
@@ -309,7 +296,7 @@ export class QuizAnalyticsService {
             $push: {
               quiz_id: '$_id.quiz_id',
               question: '$_id.question',
-              sequence: '$_id.sequence',
+              question_index: '$_id.question_index',
               total_attempts: '$total_attempts',
               correct_attempts: '$correct_attempts',
               incorrect_attempts: '$incorrect_attempts',
@@ -389,12 +376,6 @@ export class QuizAnalyticsService {
       StudentQuizAttempt.name,
       StudentQuizAttemptSchema,
     );
-    const QuizGroupModel = tenantConnection.model(
-      QuizGroup.name,
-      QuizGroupSchema,
-    );
-    const ModuleModel = tenantConnection.model(Module.name, ModuleSchema);
-    const ChapterModel = tenantConnection.model(Chapter.name, ChapterSchema);
 
     // Calculate skip value for pagination
     const skip = (page - 1) * limit;
@@ -595,13 +576,6 @@ export class QuizAnalyticsService {
       StudentQuizAttempt.name,
       StudentQuizAttemptSchema,
     );
-    const QuizGroupModel = tenantConnection.model(
-      QuizGroup.name,
-      QuizGroupSchema,
-    );
-    const QuizModel = tenantConnection.model(Quiz.name, QuizSchema);
-    const ModuleModel = tenantConnection.model(Module.name, ModuleSchema);
-    const ChapterModel = tenantConnection.model(Chapter.name, ChapterSchema);
 
     // Build match conditions
     const matchConditions: any = {
@@ -731,35 +705,35 @@ export class QuizAnalyticsService {
       StudentQuizAttempt.name,
       StudentQuizAttemptSchema,
     );
-    const QuizModel = tenantConnection.model(Quiz.name, QuizSchema);
 
     const attempt = await StudentQuizAttemptModel.findById(attemptId);
-    if (!attempt) return [];
+    if (!attempt || !attempt.ai_verification_result) return [];
 
-    const questionDetails = await Promise.all(
-      attempt.answers.map(async (answer: any) => {
-        const quiz = await QuizModel.findById(answer.quiz_id);
-        if (!quiz) return null;
+    // Use the ai_verification_result data which contains all question details
+    const questionDetails =
+      attempt.ai_verification_result.questions_results.map(
+        (questionResult: any, index: number) => {
+          const answer = attempt.answers[index];
 
-        const isCorrect = this.areAnswersEqual(
-          answer.selected_answers,
-          quiz.answer,
-        );
+          return {
+            quiz_id: answer?.quiz_id || null,
+            question: questionResult.question,
+            question_index: questionResult.question_index,
+            question_type: questionResult.question_type,
+            selected_answers: answer?.selected_answers || [],
+            correct_answers: questionResult.correct_answer
+              ? [questionResult.correct_answer]
+              : [],
+            is_correct: questionResult.is_correct,
+            time_spent_seconds: answer?.time_spent_seconds || 0,
+            explanation: questionResult.explanation,
+            feedback: questionResult.feedback,
+            score: questionResult.score,
+          };
+        },
+      );
 
-        return {
-          quiz_id: answer.quiz_id,
-          question: quiz.question,
-          sequence: quiz.sequence,
-          selected_answers: answer.selected_answers,
-          correct_answers: quiz.answer,
-          is_correct: isCorrect,
-          time_spent_seconds: answer.time_spent_seconds,
-          explanation: quiz.explanation,
-        };
-      }),
-    );
-
-    return questionDetails.filter(Boolean);
+    return questionDetails;
   }
 
   private calculateStudentSummary(attempts: any[]) {
@@ -795,13 +769,6 @@ export class QuizAnalyticsService {
       best_score: Math.max(...scores),
       worst_score: Math.min(...scores),
     };
-  }
-
-  private areAnswersEqual(selected: string[], correct: string[]): boolean {
-    if (selected.length !== correct.length) return false;
-    const sortedSelected = [...selected].sort();
-    const sortedCorrect = [...correct].sort();
-    return JSON.stringify(sortedSelected) === JSON.stringify(sortedCorrect);
   }
 
   // ========== EXPORT FUNCTIONALITY ==========
