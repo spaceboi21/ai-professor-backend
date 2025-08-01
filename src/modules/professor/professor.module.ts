@@ -30,6 +30,7 @@ import { ModulesModule } from '../modules/modules.module';
     UtilsModule,
     MailModule,
     ModulesModule,
+    DatabaseModule,
   ],
   controllers: [ProfessorController],
   providers: [ProfessorService],

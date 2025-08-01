@@ -26,6 +26,8 @@ import {
 import { StatusEnum } from 'src/common/constants/status.constant';
 import { PaginationDto } from 'src/common/dto/pagination.dto';
 import { ModuleAssignmentService } from '../modules/module-assignment.service';
+import { TenantConnectionService } from 'src/database/tenant-connection.service';
+import { ModuleProfessorAssignment, ModuleProfessorAssignmentSchema } from 'src/database/schemas/tenant/module-professor-assignment.schema';
 
 @Injectable()
 export class ProfessorService {
@@ -40,6 +42,7 @@ export class ProfessorService {
     private readonly bcryptUtil: BcryptUtil,
     private readonly mailService: MailService,
     private readonly moduleAssignmentService: ModuleAssignmentService,
+    private readonly tenantConnectionService: TenantConnectionService,
   ) {}
 
   async createProfessor(
@@ -441,6 +444,14 @@ export class ProfessorService {
       }
     }
 
+    // Check if professor has assigned modules
+    const hasAssignedModules = await this.checkProfessorHasAssignedModules(id, user);
+    if (hasAssignedModules) {
+      throw new BadRequestException(
+        'Cannot delete professor. Professor has assigned modules. Please unassign all modules before deleting the professor.',
+      );
+    }
+
     // Check if professor is already deleted
     if (professor.deleted_at) {
       throw new BadRequestException('Professor is already deleted');
@@ -478,6 +489,69 @@ export class ProfessorService {
         role: deletedProfessor.role,
       },
     };
+  }
+
+  /**
+   * Check if a professor has any assigned modules
+   * @param professorId - The professor ID to check
+   * @param user - The current user making the request
+   * @returns Promise<boolean> - true if professor has assigned modules, false otherwise
+   */
+  private async checkProfessorHasAssignedModules(
+    professorId: Types.ObjectId,
+    user: JWTUserPayload,
+  ): Promise<boolean> {
+    try {
+      // Get professor details to determine school
+      const professor = await this.userModel.findOne({
+        _id: professorId,
+        role: new Types.ObjectId(ROLE_IDS.PROFESSOR),
+        deleted_at: null,
+      });
+
+      if (!professor) {
+        return false; // Professor doesn't exist, so no assignments
+      }
+
+      // Resolve school_id based on user role
+      let schoolId: string | undefined;
+      if (user.role.name === RoleEnum.SUPER_ADMIN) {
+        // For super admin, use professor's school_id
+        schoolId = professor.school_id?.toString();
+      } else {
+        // For other roles, use user's school_id
+        schoolId = user.school_id?.toString();
+      }
+
+      if (!schoolId) {
+        return false;
+      }
+
+      // Validate school exists
+      const school = await this.schoolModel.findById(new Types.ObjectId(schoolId));
+      if (!school) {
+        return false;
+      }
+
+      // Get tenant connection
+      const tenantConnection = await this.tenantConnectionService.getTenantConnection(school.db_name);
+      const AssignmentModel = tenantConnection.model(
+        ModuleProfessorAssignment.name,
+        ModuleProfessorAssignmentSchema
+      );
+
+      // Check if professor has any active assignments
+      const assignmentCount = await AssignmentModel.countDocuments({
+        professor_id: professorId,
+        is_active: true,
+      });
+
+      return assignmentCount > 0;
+    } catch (error) {
+      this.logger.error('Error checking professor assignments:', error?.stack || error);
+      // If there's an error checking assignments, assume they have assignments to be safe
+      return true;
+    }
   }
 
   async getProfessorAssignments(
