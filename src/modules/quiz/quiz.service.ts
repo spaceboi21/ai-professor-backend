@@ -365,6 +365,7 @@ export class QuizService {
       answer = [],
       explanation,
       sequence,
+      tags = [],
     } = createQuizDto;
 
     // Validate that the quiz group exists
@@ -392,6 +393,7 @@ export class QuizService {
       answer,
       explanation,
       sequence: finalSequence,
+      tags,
       created_by: new Types.ObjectId(user.id),
       created_by_role: user.role.name,
     };
@@ -433,6 +435,9 @@ export class QuizService {
     }
     if (filterDto?.chapter_id) {
       filter.chapter_id = new Types.ObjectId(filterDto.chapter_id);
+    }
+    if (filterDto?.tags) {
+      filter.tags = { $in: [filterDto.tags] };
     }
 
     const [quizzes] = await Promise.all([

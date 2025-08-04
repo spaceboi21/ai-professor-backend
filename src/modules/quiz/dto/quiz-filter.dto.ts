@@ -100,4 +100,13 @@ export class QuizFilterDto extends PaginationDto {
     required: false,
   })
   chapter_id?: string | Types.ObjectId;
+
+  @IsString({ message: 'Tags must be a string' })
+  @IsOptional()
+  @ApiProperty({
+    example: 'Depression',
+    description: 'Filter by tag (will match questions that contain this tag)',
+    required: false,
+  })
+  tags?: string;
 }

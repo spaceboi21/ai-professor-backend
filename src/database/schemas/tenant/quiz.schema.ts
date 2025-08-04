@@ -48,6 +48,9 @@ export class Quiz extends Document {
   @Prop({ type: Number, min: 1 })
   sequence: number; // Order of the question in the quiz group
 
+  @Prop({ type: [String], default: [] })
+  tags: string[]; // Array of tags for the question (e.g., "Depression", "Trauma")
+
   @Prop({ type: Types.ObjectId, ref: User.name, required: true, index: true })
   created_by: Types.ObjectId;
 

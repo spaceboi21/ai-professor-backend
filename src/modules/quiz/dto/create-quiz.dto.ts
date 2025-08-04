@@ -110,4 +110,16 @@ export class CreateQuizDto {
     required: false,
   })
   chapter_id?: string | Types.ObjectId;
+
+  @IsArray({ message: 'Tags must be an array' })
+  @IsString({ each: true, message: 'Each tag must be a string' })
+  @IsOptional()
+  @ApiProperty({
+    example: ['Depression', 'Trauma', 'Anxiety'],
+    description:
+      'Array of tags for categorizing the question (e.g., "Depression", "Trauma")',
+    type: [String],
+    required: false,
+  })
+  tags?: string[];
 }
