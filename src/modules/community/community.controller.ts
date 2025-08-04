@@ -30,6 +30,7 @@ import { PaginationDto } from 'src/common/dto/pagination.dto';
 import { LikeEntityTypeEnum } from 'src/database/schemas/tenant/forum-like.schema';
 import { JWTUserPayload } from 'src/common/types/jwr-user.type';
 import { PinDiscussionDto } from './dto/pin-discussion.dto';
+import { SchoolMembersFilterDto } from './dto/school-members-filter.dto';
 
 @ApiTags('Community')
 @Controller('community')
@@ -441,6 +442,50 @@ export class CommunityController {
     return this.communityService.isDiscussionPinned(
       id,
       req.user as JWTUserPayload,
+    );
+  }
+
+  @Get('mentions')
+  @Roles(
+    RoleEnum.STUDENT,
+    RoleEnum.PROFESSOR,
+    RoleEnum.SCHOOL_ADMIN,
+    RoleEnum.SUPER_ADMIN,
+  )
+  @ApiOperation({ summary: 'Get all school members for mention autocomplete' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'School members retrieved successfully',
+  })
+  @ApiResponse({
+    status: HttpStatus.FORBIDDEN,
+    description: 'Access denied - insufficient permissions',
+  })
+  @ApiQuery({
+    name: 'search',
+    required: false,
+    type: String,
+    description: 'Search term for name or email',
+  })
+  @ApiQuery({
+    name: 'role',
+    required: false,
+    enum: ['STUDENT', 'PROFESSOR', 'SCHOOL_ADMIN'],
+    description: 'Filter by member role',
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    type: String,
+    description: 'Limit number of results (default: 50, max: 100)',
+  })
+  async getSchoolMembersForMentions(
+    @Query() filterDto: SchoolMembersFilterDto,
+    @Request() req: any,
+  ) {
+    return this.communityService.getSchoolMembersForMentions(
+      req.user as JWTUserPayload,
+      filterDto,
     );
   }
 }

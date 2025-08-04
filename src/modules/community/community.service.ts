@@ -34,7 +34,16 @@ import {
   ForumPin,
   ForumPinSchema,
 } from 'src/database/schemas/tenant/forum-pin.schema';
+import {
+  ForumMention,
+  ForumMentionSchema,
+} from 'src/database/schemas/tenant/forum-mention.schema';
 import { PinDiscussionDto } from './dto/pin-discussion.dto';
+
+import {
+  SchoolMembersFilterDto,
+  MemberRoleEnum,
+} from './dto/school-members-filter.dto';
 
 import { CreateDiscussionDto } from './dto/create-discussion.dto';
 import { CreateReplyDto } from './dto/create-reply.dto';
@@ -62,6 +71,16 @@ import {
 import { NotificationsService } from 'src/modules/notifications/notifications.service';
 import { NotificationTypeEnum } from 'src/common/constants/notification.constant';
 import { RecipientTypeEnum } from 'src/database/schemas/tenant/notification.schema';
+import {
+  Student,
+  StudentSchema,
+} from 'src/database/schemas/tenant/student.schema';
+import {
+  resolveMentions,
+  extractMentions,
+  formatMentionsInContent,
+  MentionInfo,
+} from 'src/common/utils/mention.util';
 
 @Injectable()
 export class CommunityService {
@@ -357,10 +376,51 @@ export class CommunityService {
                   last_reply_user: {
                     $cond: {
                       if: { $gt: [{ $size: '$lastReplyUser' }, 0] },
-                      then: { $arrayElemAt: ['$lastReplyUser', 0] },
-                      else: { $arrayElemAt: ['$lastReplyUserCentral', 0] },
+                      then: {
+                        _id: { $arrayElemAt: ['$lastReplyUser._id', 0] },
+                        first_name: {
+                          $arrayElemAt: ['$lastReplyUser.first_name', 0],
+                        },
+                        last_name: {
+                          $arrayElemAt: ['$lastReplyUser.last_name', 0],
+                        },
+                        email: { $arrayElemAt: ['$lastReplyUser.email', 0] },
+                        image: { $arrayElemAt: ['$lastReplyUser.image', 0] },
+                        role: 'STUDENT',
+                      },
+                      else: {
+                        _id: { $arrayElemAt: ['$lastReplyUserCentral._id', 0] },
+                        first_name: {
+                          $arrayElemAt: ['$lastReplyUserCentral.first_name', 0],
+                        },
+                        last_name: {
+                          $arrayElemAt: ['$lastReplyUserCentral.last_name', 0],
+                        },
+                        email: {
+                          $arrayElemAt: ['$lastReplyUserCentral.email', 0],
+                        },
+                        image: {
+                          $arrayElemAt: [
+                            '$lastReplyUserCentral.profile_pic',
+                            0,
+                          ],
+                        },
+                        role: {
+                          $arrayElemAt: ['$lastReplyUserCentral.role', 0],
+                        },
+                      },
                     },
                   },
+                },
+              },
+              {
+                $project: {
+                  _id: 1,
+                  content: 1,
+                  created_by: 1,
+                  created_by_role: 1,
+                  created_at: 1,
+                  last_reply_user: 1,
                 },
               },
             ],
@@ -476,6 +536,7 @@ export class CommunityService {
             createdByUser: 0,
             userView: 0,
             last_reply_date: 0,
+            lastReply: 0, // Remove the array version
           },
         },
       ];
@@ -487,13 +548,6 @@ export class CommunityService {
       ]);
 
       this.logger.debug(`Found ${discussions.length} discussions`);
-
-      // Debug: Log first discussion to check lastReply structure
-      if (discussions.length > 0) {
-        this.logger.debug(
-          `First discussion lastReply: ${JSON.stringify(discussions[0].last_reply)}`,
-        );
-      }
 
       const result = createPaginationResult(discussions, total, options);
 
@@ -580,7 +634,7 @@ export class CommunityService {
    * Create a reply to a discussion
    */
   async createReply(createReplyDto: CreateReplyDto, user: JWTUserPayload) {
-    const { school_id, discussion_id, content, parent_reply_id } =
+    const { school_id, discussion_id, content, parent_reply_id, mentions } =
       createReplyDto;
 
     this.logger.log(
@@ -605,6 +659,10 @@ export class CommunityService {
     const ReplyModel = tenantConnection.model(
       ForumReply.name,
       ForumReplySchema,
+    );
+    const MentionModel = tenantConnection.model(
+      ForumMention.name,
+      ForumMentionSchema,
     );
 
     try {
@@ -633,10 +691,26 @@ export class CommunityService {
         }
       }
 
+      // Extract mentions from content if not provided
+      const extractedMentions = mentions || extractMentions(content);
+
+      // Resolve mentions to user IDs
+      const resolvedMentions = await resolveMentions(
+        extractedMentions,
+        tenantConnection,
+        this.userModel,
+      );
+
+      // Format content with mention links
+      const formattedContent = formatMentionsInContent(
+        content,
+        resolvedMentions,
+      );
+
       // Create reply
       const newReply = new ReplyModel({
         discussion_id: new Types.ObjectId(discussion_id),
-        content,
+        content: formattedContent,
         created_by: new Types.ObjectId(user.id),
         created_by_role: user.role.name as RoleEnum,
         ...(parent_reply_id && {
@@ -645,6 +719,22 @@ export class CommunityService {
       });
 
       const savedReply = await newReply.save();
+
+      // Create mention records
+      const mentionPromises = resolvedMentions.map(async (mention) => {
+        if (mention.userId) {
+          const mentionRecord = new MentionModel({
+            reply_id: savedReply._id,
+            discussion_id: new Types.ObjectId(discussion_id),
+            mentioned_by: new Types.ObjectId(user.id),
+            mentioned_user: mention.userId,
+            mention_text: mention.mentionText,
+          });
+          return mentionRecord.save();
+        }
+      });
+
+      await Promise.all(mentionPromises.filter(Boolean));
 
       // Increment reply count on discussion
       await DiscussionModel.updateOne(
@@ -704,6 +794,15 @@ export class CommunityService {
         );
       }
 
+      // Send notifications to mentioned users
+      await this.notifyMentionedUsers(
+        savedReply,
+        replyCreator,
+        discussion,
+        resolvedMentions,
+        resolvedSchoolId,
+      );
+
       // Attach user details to the response
       const userDetails = await this.getUserDetails(
         user.id.toString(),
@@ -713,6 +812,7 @@ export class CommunityService {
       const replyWithUser = {
         ...savedReply.toObject(),
         created_by_user: userDetails || null,
+        mentions: resolvedMentions,
       };
 
       this.logger.log(`Reply created: ${savedReply._id}`);
@@ -762,6 +862,10 @@ export class CommunityService {
       ForumReply.name,
       ForumReplySchema,
     );
+    const MentionModel = tenantConnection.model(
+      ForumMention.name,
+      ForumMentionSchema,
+    );
 
     try {
       // Validate discussion exists
@@ -776,21 +880,196 @@ export class CommunityService {
 
       const options = getPaginationOptions(paginationDto || {});
 
-      // Get replies (only top-level replies, not sub-replies)
+      // Use aggregation pipeline for better performance
+      const aggregationPipeline: any[] = [
+        {
+          $match: {
+            discussion_id: new Types.ObjectId(discussionId),
+            parent_reply_id: null, // Only top-level replies
+            deleted_at: null,
+            status: ReplyStatusEnum.ACTIVE,
+          },
+        },
+        {
+          $lookup: {
+            from: 'forum_mentions',
+            let: { replyId: '$_id' },
+            pipeline: [
+              {
+                $match: {
+                  $expr: { $eq: ['$reply_id', '$$replyId'] },
+                },
+              },
+              {
+                $lookup: {
+                  from: 'students',
+                  localField: 'mentioned_user',
+                  foreignField: '_id',
+                  as: 'mentionedStudent',
+                },
+              },
+              {
+                $lookup: {
+                  from: 'users',
+                  localField: 'mentioned_user',
+                  foreignField: '_id',
+                  as: 'mentionedUser',
+                },
+              },
+              {
+                $addFields: {
+                  mentioned_user_details: {
+                    $cond: {
+                      if: { $gt: [{ $size: '$mentionedStudent' }, 0] },
+                      then: {
+                        _id: { $arrayElemAt: ['$mentionedStudent._id', 0] },
+                        first_name: {
+                          $arrayElemAt: ['$mentionedStudent.first_name', 0],
+                        },
+                        last_name: {
+                          $arrayElemAt: ['$mentionedStudent.last_name', 0],
+                        },
+                        email: { $arrayElemAt: ['$mentionedStudent.email', 0] },
+                        image: { $arrayElemAt: ['$mentionedStudent.image', 0] },
+                        role: 'STUDENT',
+                      },
+                      else: {
+                        _id: { $arrayElemAt: ['$mentionedUser._id', 0] },
+                        first_name: {
+                          $arrayElemAt: ['$mentionedUser.first_name', 0],
+                        },
+                        last_name: {
+                          $arrayElemAt: ['$mentionedUser.last_name', 0],
+                        },
+                        email: { $arrayElemAt: ['$mentionedUser.email', 0] },
+                        image: {
+                          $arrayElemAt: ['$mentionedUser.profile_pic', 0],
+                        },
+                        role: { $arrayElemAt: ['$mentionedUser.role', 0] },
+                      },
+                    },
+                  },
+                },
+              },
+              {
+                $project: {
+                  _id: 1,
+                  mention_text: 1,
+                  created_at: 1,
+                  mentioned_user_details: 1,
+                },
+              },
+            ],
+            as: 'mentions',
+          },
+        },
+        {
+          $lookup: {
+            from: 'students',
+            localField: 'created_by',
+            foreignField: '_id',
+            as: 'createdByStudent',
+          },
+        },
+        {
+          $lookup: {
+            from: 'users',
+            localField: 'created_by',
+            foreignField: '_id',
+            as: 'createdByUser',
+          },
+        },
+        {
+          $addFields: {
+            created_by_user: {
+              $cond: {
+                if: { $gt: [{ $size: '$createdByStudent' }, 0] },
+                then: {
+                  _id: { $arrayElemAt: ['$createdByStudent._id', 0] },
+                  first_name: {
+                    $arrayElemAt: ['$createdByStudent.first_name', 0],
+                  },
+                  last_name: {
+                    $arrayElemAt: ['$createdByStudent.last_name', 0],
+                  },
+                  email: { $arrayElemAt: ['$createdByStudent.email', 0] },
+                  image: { $arrayElemAt: ['$createdByStudent.image', 0] },
+                  role: 'STUDENT',
+                },
+                else: {
+                  _id: { $arrayElemAt: ['$createdByUser._id', 0] },
+                  first_name: {
+                    $arrayElemAt: ['$createdByUser.first_name', 0],
+                  },
+                  last_name: { $arrayElemAt: ['$createdByUser.last_name', 0] },
+                  email: { $arrayElemAt: ['$createdByUser.email', 0] },
+                  image: { $arrayElemAt: ['$createdByUser.profile_pic', 0] },
+                  role: { $arrayElemAt: ['$createdByUser.role', 0] },
+                },
+              },
+            },
+            has_sub_replies: { $gt: ['$sub_reply_count', 0] },
+            sub_reply_count: { $ifNull: ['$sub_reply_count', 0] },
+          },
+        },
+        {
+          $lookup: {
+            from: 'forum_views',
+            let: {
+              discussionId: new Types.ObjectId(discussionId),
+              userId: new Types.ObjectId(user.id),
+            },
+            pipeline: [
+              {
+                $match: {
+                  $expr: {
+                    $and: [
+                      { $eq: ['$discussion_id', '$$discussionId'] },
+                      { $eq: ['$user_id', '$$userId'] },
+                    ],
+                  },
+                },
+              },
+            ],
+            as: 'userView',
+          },
+        },
+        {
+          $addFields: {
+            is_unread: {
+              $cond: {
+                if: { $eq: [{ $size: '$userView' }, 0] },
+                then: true,
+                else: {
+                  $gt: [
+                    '$created_at',
+                    { $arrayElemAt: ['$userView.viewed_at', 0] },
+                  ],
+                },
+              },
+            },
+          },
+        },
+        {
+          $sort: { created_at: 1 },
+        },
+        { $skip: options.skip },
+        { $limit: options.limit },
+        {
+          $project: {
+            createdByStudent: 0,
+            createdByUser: 0,
+            userView: 0,
+          },
+        },
+      ];
+
+      // Execute aggregation pipeline
       const [replies, total] = await Promise.all([
-        ReplyModel.find({
-          discussion_id: new Types.ObjectId(discussionId),
-          parent_reply_id: null, // Only top-level replies
-          deleted_at: null,
-          status: ReplyStatusEnum.ACTIVE,
-        })
-          .sort({ created_at: 1 })
-          .skip(options.skip)
-          .limit(options.limit)
-          .lean(),
+        ReplyModel.aggregate(aggregationPipeline),
         ReplyModel.countDocuments({
           discussion_id: new Types.ObjectId(discussionId),
-          parent_reply_id: null, // Only top-level replies
+          parent_reply_id: null,
           deleted_at: null,
           status: ReplyStatusEnum.ACTIVE,
         }),
@@ -805,34 +1084,7 @@ export class CommunityService {
         tenantConnection,
       );
 
-      // Attach user details for each reply
-      const repliesWithUsers = await Promise.all(
-        replies.map(async (reply) => {
-          const userDetails = await this.getUserDetails(
-            reply.created_by.toString(),
-            reply.created_by_role,
-            tenantConnection,
-          );
-
-          // Check if reply is unread for current user
-          const isUnread = await this.isContentUnread(
-            new Types.ObjectId(user.id),
-            discussionId,
-            reply.created_at || new Date(),
-            tenantConnection,
-          );
-
-          return {
-            ...reply,
-            created_by_user: userDetails || null,
-            has_sub_replies: reply.sub_reply_count > 0,
-            sub_reply_count: reply.sub_reply_count || 0,
-            is_unread: isUnread,
-          };
-        }),
-      );
-
-      const result = createPaginationResult(repliesWithUsers, total, options);
+      const result = createPaginationResult(replies, total, options);
 
       return {
         message: 'Replies retrieved successfully',
@@ -872,6 +1124,10 @@ export class CommunityService {
       ForumReply.name,
       ForumReplySchema,
     );
+    const MentionModel = tenantConnection.model(
+      ForumMention.name,
+      ForumMentionSchema,
+    );
 
     try {
       // Validate parent reply exists
@@ -887,17 +1143,151 @@ export class CommunityService {
 
       const options = getPaginationOptions(paginationDto || {});
 
-      // Get sub-replies
+      // Use aggregation pipeline for better performance
+      const aggregationPipeline: any[] = [
+        {
+          $match: {
+            parent_reply_id: new Types.ObjectId(replyId),
+            deleted_at: null,
+            status: ReplyStatusEnum.ACTIVE,
+          },
+        },
+        {
+          $lookup: {
+            from: 'forum_mentions',
+            let: { replyId: '$_id' },
+            pipeline: [
+              {
+                $match: {
+                  $expr: { $eq: ['$reply_id', '$$replyId'] },
+                },
+              },
+              {
+                $lookup: {
+                  from: 'students',
+                  localField: 'mentioned_user',
+                  foreignField: '_id',
+                  as: 'mentionedStudent',
+                },
+              },
+              {
+                $lookup: {
+                  from: 'users',
+                  localField: 'mentioned_user',
+                  foreignField: '_id',
+                  as: 'mentionedUser',
+                },
+              },
+              {
+                $addFields: {
+                  mentioned_user_details: {
+                    $cond: {
+                      if: { $gt: [{ $size: '$mentionedStudent' }, 0] },
+                      then: {
+                        _id: { $arrayElemAt: ['$mentionedStudent._id', 0] },
+                        first_name: {
+                          $arrayElemAt: ['$mentionedStudent.first_name', 0],
+                        },
+                        last_name: {
+                          $arrayElemAt: ['$mentionedStudent.last_name', 0],
+                        },
+                        email: { $arrayElemAt: ['$mentionedStudent.email', 0] },
+                        image: { $arrayElemAt: ['$mentionedStudent.image', 0] },
+                        role: 'STUDENT',
+                      },
+                      else: {
+                        _id: { $arrayElemAt: ['$mentionedUser._id', 0] },
+                        first_name: {
+                          $arrayElemAt: ['$mentionedUser.first_name', 0],
+                        },
+                        last_name: {
+                          $arrayElemAt: ['$mentionedUser.last_name', 0],
+                        },
+                        email: { $arrayElemAt: ['$mentionedUser.email', 0] },
+                        image: {
+                          $arrayElemAt: ['$mentionedUser.profile_pic', 0],
+                        },
+                        role: { $arrayElemAt: ['$mentionedUser.role', 0] },
+                      },
+                    },
+                  },
+                },
+              },
+              {
+                $project: {
+                  _id: 1,
+                  mention_text: 1,
+                  created_at: 1,
+                  mentioned_user_details: 1,
+                },
+              },
+            ],
+            as: 'mentions',
+          },
+        },
+        {
+          $lookup: {
+            from: 'students',
+            localField: 'created_by',
+            foreignField: '_id',
+            as: 'createdByStudent',
+          },
+        },
+        {
+          $lookup: {
+            from: 'users',
+            localField: 'created_by',
+            foreignField: '_id',
+            as: 'createdByUser',
+          },
+        },
+        {
+          $addFields: {
+            created_by_user: {
+              $cond: {
+                if: { $gt: [{ $size: '$createdByStudent' }, 0] },
+                then: {
+                  _id: { $arrayElemAt: ['$createdByStudent._id', 0] },
+                  first_name: {
+                    $arrayElemAt: ['$createdByStudent.first_name', 0],
+                  },
+                  last_name: {
+                    $arrayElemAt: ['$createdByStudent.last_name', 0],
+                  },
+                  email: { $arrayElemAt: ['$createdByStudent.email', 0] },
+                  image: { $arrayElemAt: ['$createdByStudent.image', 0] },
+                  role: 'STUDENT',
+                },
+                else: {
+                  _id: { $arrayElemAt: ['$createdByUser._id', 0] },
+                  first_name: {
+                    $arrayElemAt: ['$createdByUser.first_name', 0],
+                  },
+                  last_name: { $arrayElemAt: ['$createdByUser.last_name', 0] },
+                  email: { $arrayElemAt: ['$createdByUser.email', 0] },
+                  image: { $arrayElemAt: ['$createdByUser.profile_pic', 0] },
+                  role: { $arrayElemAt: ['$createdByUser.role', 0] },
+                },
+              },
+            },
+          },
+        },
+        {
+          $sort: { created_at: 1 },
+        },
+        { $skip: options.skip },
+        { $limit: options.limit },
+        {
+          $project: {
+            createdByStudent: 0,
+            createdByUser: 0,
+          },
+        },
+      ];
+
+      // Execute aggregation pipeline
       const [subReplies, total] = await Promise.all([
-        ReplyModel.find({
-          parent_reply_id: new Types.ObjectId(replyId),
-          deleted_at: null,
-          status: ReplyStatusEnum.ACTIVE,
-        })
-          .sort({ created_at: 1 })
-          .skip(options.skip)
-          .limit(options.limit)
-          .lean(),
+        ReplyModel.aggregate(aggregationPipeline),
         ReplyModel.countDocuments({
           parent_reply_id: new Types.ObjectId(replyId),
           deleted_at: null,
@@ -907,26 +1297,7 @@ export class CommunityService {
 
       this.logger.debug(`Found ${subReplies.length} sub-replies`);
 
-      // Attach user details for each sub-reply
-      const subRepliesWithUsers = await Promise.all(
-        subReplies.map(async (reply) => {
-          const userDetails = await this.getUserDetails(
-            reply.created_by.toString(),
-            reply.created_by_role,
-            tenantConnection,
-          );
-          return {
-            ...reply,
-            created_by_user: userDetails || null,
-          };
-        }),
-      );
-
-      const result = createPaginationResult(
-        subRepliesWithUsers,
-        total,
-        options,
-      );
+      const result = createPaginationResult(subReplies, total, options);
 
       return {
         message: 'Sub-replies retrieved successfully',
@@ -1494,8 +1865,11 @@ export class CommunityService {
   ) {
     try {
       if (userRole === RoleEnum.STUDENT && tenantConnection) {
-        // Students are stored in tenant database
-        const StudentModel = tenantConnection.model('Student', 'students');
+        // Students are stored in tenant database - use the tenant connection
+        const StudentModel = tenantConnection.model(
+          Student.name,
+          StudentSchema,
+        );
         const student = await StudentModel.findById(userId)
           .select('first_name last_name email image')
           .lean();
@@ -1514,7 +1888,7 @@ export class CommunityService {
         // Professors, admins, etc. are stored in central database
         const user = await this.userModel
           .findById(userId)
-          .select('first_name last_name email role image')
+          .select('first_name last_name email role profile_pic')
           .lean();
 
         if (user) {
@@ -1827,6 +2201,69 @@ export class CommunityService {
       }
     } catch (error) {
       this.logger.error('Error notifying about new report', error);
+    }
+  }
+
+  /**
+   * Helper method to notify mentioned users about new reply
+   */
+  private async notifyMentionedUsers(
+    reply: any,
+    replyCreator: any,
+    discussion: any,
+    mentionedUsers: MentionInfo[],
+    schoolId: string,
+  ) {
+    try {
+      const tenantConnection =
+        await this.tenantConnectionService.getTenantConnection(schoolId);
+      const MentionModel = tenantConnection.model(
+        ForumMention.name,
+        ForumMentionSchema,
+      );
+
+      const mentionPromises = mentionedUsers.map(async (mention) => {
+        if (mention.userId) {
+          const mentionedUser = await this.getUserDetails(
+            mention.userId.toString(),
+            mention.userRole || 'STUDENT',
+            tenantConnection,
+          );
+
+          if (mentionedUser) {
+            const title = `New Mention in Discussion`;
+            const message = `${replyCreator.first_name} ${replyCreator.last_name} mentioned you in "${discussion.title}": "${mention.mentionText}"`;
+            const metadata = {
+              discussion_id: discussion._id,
+              discussion_title: discussion.title,
+              reply_id: reply._id,
+              reply_creator_id: reply.created_by,
+              reply_creator_name: `${replyCreator.first_name} ${replyCreator.last_name}`,
+              reply_creator_role: reply.created_by_role,
+              mention_text: mention.mentionText,
+            };
+
+            const recipientType =
+              mention.userRole === 'STUDENT'
+                ? RecipientTypeEnum.STUDENT
+                : RecipientTypeEnum.PROFESSOR;
+
+            await this.createForumNotification(
+              new Types.ObjectId(mention.userId),
+              recipientType,
+              title,
+              message,
+              NotificationTypeEnum.FORUM_MENTION,
+              metadata,
+              schoolId,
+            );
+          }
+        }
+      });
+
+      await Promise.all(mentionPromises);
+    } catch (error) {
+      this.logger.error('Error notifying mentioned users', error);
     }
   }
 
@@ -2296,5 +2733,341 @@ export class CommunityService {
       this.logger.error('Error checking pin status', error?.stack || error);
       throw new BadRequestException('Failed to check pin status');
     }
+  }
+
+  /**
+   * Get mentions for a user
+   */
+  async getMentions(user: JWTUserPayload, paginationDto?: PaginationDto) {
+    this.logger.log(`Getting mentions for user: ${user.id}`);
+
+    const resolvedSchoolId = this.resolveSchoolId(user);
+
+    // Validate school exists
+    const school = await this.schoolModel.findById(resolvedSchoolId);
+    if (!school) {
+      throw new NotFoundException('School not found');
+    }
+
+    // Get tenant connection
+    const tenantConnection =
+      await this.tenantConnectionService.getTenantConnection(school.db_name);
+    const MentionModel = tenantConnection.model(
+      ForumMention.name,
+      ForumMentionSchema,
+    );
+
+    try {
+      const options = getPaginationOptions(paginationDto || {});
+
+      // Use aggregation pipeline for better performance
+      const aggregationPipeline: any[] = [
+        {
+          $match: {
+            mentioned_user: new Types.ObjectId(user.id),
+          },
+        },
+        {
+          $lookup: {
+            from: 'forum_replies',
+            localField: 'reply_id',
+            foreignField: '_id',
+            as: 'reply',
+          },
+        },
+        {
+          $unwind: '$reply',
+        },
+        {
+          $match: {
+            'reply.deleted_at': null,
+            'reply.status': ReplyStatusEnum.ACTIVE,
+          },
+        },
+        {
+          $lookup: {
+            from: 'forum_discussions',
+            localField: 'discussion_id',
+            foreignField: '_id',
+            as: 'discussion',
+          },
+        },
+        {
+          $unwind: '$discussion',
+        },
+        {
+          $match: {
+            'discussion.deleted_at': null,
+          },
+        },
+        {
+          $lookup: {
+            from: 'students',
+            localField: 'mentioned_by',
+            foreignField: '_id',
+            as: 'mentionedByStudent',
+          },
+        },
+        {
+          $lookup: {
+            from: 'users',
+            localField: 'mentioned_by',
+            foreignField: '_id',
+            as: 'mentionedByUser',
+          },
+        },
+        {
+          $addFields: {
+            mentioned_by_user: {
+              $cond: {
+                if: { $gt: [{ $size: '$mentionedByStudent' }, 0] },
+                then: {
+                  _id: { $arrayElemAt: ['$mentionedByStudent._id', 0] },
+                  first_name: {
+                    $arrayElemAt: ['$mentionedByStudent.first_name', 0],
+                  },
+                  last_name: {
+                    $arrayElemAt: ['$mentionedByStudent.last_name', 0],
+                  },
+                  email: { $arrayElemAt: ['$mentionedByStudent.email', 0] },
+                  image: { $arrayElemAt: ['$mentionedByStudent.image', 0] },
+                  role: 'STUDENT',
+                },
+                else: {
+                  _id: { $arrayElemAt: ['$mentionedByUser._id', 0] },
+                  first_name: {
+                    $arrayElemAt: ['$mentionedByUser.first_name', 0],
+                  },
+                  last_name: {
+                    $arrayElemAt: ['$mentionedByUser.last_name', 0],
+                  },
+                  email: { $arrayElemAt: ['$mentionedByUser.email', 0] },
+                  image: { $arrayElemAt: ['$mentionedByUser.profile_pic', 0] },
+                  role: { $arrayElemAt: ['$mentionedByUser.role', 0] },
+                },
+              },
+            },
+          },
+        },
+        {
+          $replaceRoot: {
+            newRoot: {
+              $mergeObjects: [
+                {
+                  _id: '$_id',
+                  mention_text: '$mention_text',
+                  created_at: '$created_at',
+                  mentioned_by_user: '$mentioned_by_user',
+                  reply: '$reply',
+                  discussion: '$discussion',
+                },
+              ],
+            },
+          },
+        },
+        {
+          $sort: { created_at: -1 },
+        },
+        { $skip: options.skip },
+        { $limit: options.limit },
+        {
+          $project: {
+            mentionedByStudent: 0,
+            mentionedByUser: 0,
+          },
+        },
+      ];
+
+      // Execute aggregation pipeline
+      const [mentions, total] = await Promise.all([
+        MentionModel.aggregate(aggregationPipeline),
+        MentionModel.countDocuments({
+          mentioned_user: new Types.ObjectId(user.id),
+        }),
+      ]);
+
+      return createPaginationResult(mentions, total, options);
+    } catch (error) {
+      this.logger.error('Error getting mentions', error?.stack || error);
+      throw new BadRequestException('Failed to retrieve mentions');
+    }
+  }
+
+  /**
+   * Get all school members for mention autocomplete
+   */
+  async getSchoolMembersForMentions(
+    user: JWTUserPayload,
+    filterDto?: SchoolMembersFilterDto,
+  ) {
+    this.logger.log(`Getting school members for mentions for user: ${user.id}`);
+
+    const resolvedSchoolId = this.resolveSchoolId(user);
+
+    // Validate school exists
+    const school = await this.schoolModel.findById(resolvedSchoolId);
+    if (!school) {
+      throw new NotFoundException('School not found');
+    }
+
+    // Get tenant connection
+    const tenantConnection =
+      await this.tenantConnectionService.getTenantConnection(school.db_name);
+
+    try {
+      // Build student filter
+      const studentFilter: any = {
+        school_id: new Types.ObjectId(resolvedSchoolId),
+        deleted_at: null,
+      };
+
+      // Build professor filter
+      const professorFilter: any = {
+        school_id: new Types.ObjectId(resolvedSchoolId),
+        role: { $in: [RoleEnum.PROFESSOR, RoleEnum.SCHOOL_ADMIN] },
+        deleted_at: null,
+      };
+
+      // If search term is provided, apply filtering
+      if (filterDto?.search && filterDto.search.trim() !== '') {
+        const searchRegex = new RegExp(filterDto.search, 'i');
+        studentFilter.$or = [
+          { first_name: searchRegex },
+          { last_name: searchRegex },
+          { email: searchRegex },
+        ];
+        professorFilter.$or = [
+          { first_name: searchRegex },
+          { last_name: searchRegex },
+          { email: searchRegex },
+        ];
+      }
+
+      // Apply role filter
+      if (filterDto?.role) {
+        if (filterDto.role === MemberRoleEnum.STUDENT) {
+          // Only get students
+          const students = await this.getFilteredStudents(
+            tenantConnection,
+            studentFilter,
+            filterDto,
+          );
+          return {
+            message: 'School members retrieved successfully',
+            data: {
+              members: students,
+              total: students.length,
+              search_term: filterDto.search || '',
+            },
+          };
+        } else {
+          // Only get professors/admins
+          const professors = await this.getFilteredProfessors(
+            tenantConnection,
+            professorFilter,
+            filterDto,
+          );
+          return {
+            message: 'School members retrieved successfully',
+            data: {
+              members: professors,
+              total: professors.length,
+              search_term: filterDto.search || '',
+            },
+          };
+        }
+      }
+
+      // Get all students in the school
+      const students = await this.getFilteredStudents(
+        tenantConnection,
+        studentFilter,
+        filterDto,
+      );
+
+      // Get all professors and admins in the school
+      const professors = await this.getFilteredProfessors(
+        tenantConnection,
+        professorFilter,
+        filterDto,
+      );
+
+      // Combine and sort by name
+      const allMembers = [...students, ...professors]
+        .filter((member) => member.name && member.email) // Filter out invalid entries
+        .sort((a, b) => a.name.localeCompare(b.name));
+
+      // Apply limit if specified
+      const limit = filterDto?.limit ? parseInt(filterDto.limit) : 50;
+      const limitedMembers = allMembers.slice(0, Math.min(limit, 100));
+
+      return {
+        message: 'School members retrieved successfully',
+        data: {
+          members: limitedMembers,
+          total: allMembers.length,
+          filtered_total: limitedMembers.length,
+          search_term: filterDto?.search || '',
+        },
+      };
+    } catch (error) {
+      this.logger.error('Error getting school members', error?.stack || error);
+      throw new BadRequestException('Failed to retrieve school members');
+    }
+  }
+
+  /**
+   * Helper method to get filtered students
+   */
+  private async getFilteredStudents(
+    tenantConnection: any,
+    baseFilter: any,
+    filterDto?: SchoolMembersFilterDto,
+  ) {
+    const StudentModel = tenantConnection.model(Student.name, StudentSchema);
+
+    const students = await StudentModel.find(baseFilter)
+      .select('first_name last_name email image')
+      .lean();
+
+    return students.map((student: any) => ({
+      id: student._id?.toString() || '',
+      name: `${student.first_name || ''} ${student.last_name || ''}`.trim(),
+      email: student.email || '',
+      image: student.image || null,
+      role: 'STUDENT',
+      mention_text: `@${student.email || ''}`,
+      display_name:
+        `${student.first_name || ''} ${student.last_name || ''} (@${student.email || ''})`.trim(),
+      search_text:
+        `${student.first_name || ''} ${student.last_name || ''} ${student.email || ''}`.toLowerCase(),
+    }));
+  }
+
+  /**
+   * Helper method to get filtered professors
+   */
+  private async getFilteredProfessors(
+    tenantConnection: any,
+    baseFilter: any,
+    filterDto?: SchoolMembersFilterDto,
+  ) {
+    const professors = await this.userModel
+      .find(baseFilter)
+      .select('first_name last_name email profile_pic role')
+      .lean();
+
+    return professors.map((professor: any) => ({
+      id: professor._id?.toString() || '',
+      name: `${professor.first_name || ''} ${professor.last_name || ''}`.trim(),
+      email: professor.email || '',
+      image: professor.profile_pic || null,
+      role: professor.role || 'PROFESSOR',
+      mention_text: `@${professor.email || ''}`,
+      display_name:
+        `${professor.first_name || ''} ${professor.last_name || ''} (@${professor.email || ''})`.trim(),
+      search_text:
+        `${professor.first_name || ''} ${professor.last_name || ''} ${professor.email || ''}`.toLowerCase(),
+    }));
   }
 }

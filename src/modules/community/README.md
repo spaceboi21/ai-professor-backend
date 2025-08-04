@@ -16,6 +16,17 @@ A comprehensive forum system for the AI Professor platform that allows students 
 - **Nested Replies**: Support for threaded conversations
 - **Reply Counts**: Automatic tracking of reply counts
 - **User Attribution**: All replies show who created them
+- **Mentions**: Support for @username mentions with notifications
+
+### 📌 **Mention System**
+
+- **All School Members**: Includes every student and professor in the school
+- **Auto-Detection**: Mentions are automatically extracted from @username pattern
+- **User Resolution**: Mentions are resolved to actual user IDs by email
+- **Notifications**: Mentioned users receive notifications
+- **Formatted Content**: Mentions are converted to clickable links
+- **Mention History**: Users can view all their mentions
+- **Frontend Autocomplete**: Provides complete school member list for @ dropdown
 
 ### 🎥 **Meeting Integration**
 
@@ -135,6 +146,22 @@ A comprehensive forum system for the AI Professor platform that allows students 
 }
 ```
 
+### Forum Mention Schema
+
+```typescript
+{
+  _id: ObjectId,
+  reply_id: ObjectId,
+  discussion_id: ObjectId,
+  mentioned_by: ObjectId, // User who created the mention
+  mentioned_user: ObjectId, // User who was mentioned
+  mention_text: string, // The actual @username text
+
+  created_at: Date,
+  updated_at: Date
+}
+```
+
 ### Forum Report Schema
 
 ```typescript
@@ -207,7 +234,8 @@ Content-Type: application/json
 {
   "discussion_id": "507f1f77bcf86cd799439011",
   "content": "I have found that using motivational interviewing...",
-  "parent_reply_id": "507f1f77bcf86cd799439012" // Optional for nested replies
+  "parent_reply_id": "507f1f77bcf86cd799439012", // Optional for nested replies
+  "mentions": ["john.doe", "jane.smith"] // Optional array of usernames to mention
 }
 ```
 
@@ -216,6 +244,111 @@ Content-Type: application/json
 ```http
 GET /api/community/discussions/:id/replies?page=1&limit=20
 Authorization: Bearer <token>
+```
+
+### Mentions
+
+#### Get User Mentions
+
+```http
+GET /api/community/mentions?page=1&limit=20
+Authorization: Bearer <token>
+```
+
+#### Get School Members for Mention Autocomplete
+
+```http
+# Get all school members (when user types @)
+GET /api/community/school-members
+Authorization: Bearer <token>
+
+# Filter members (when user types @anushka)
+GET /api/community/school-members?search=anushka
+Authorization: Bearer <token>
+
+# Filter by role
+GET /api/community/school-members?search=john&role=STUDENT&limit=20
+Authorization: Bearer <token>
+```
+
+**Query Parameters:**
+
+- `search` (optional): Search term for name or email - when provided, filters the list
+- `role` (optional): Filter by member role (`STUDENT`, `PROFESSOR`, `SCHOOL_ADMIN`)
+- `limit` (optional): Limit number of results (default: 50, max: 100)
+
+**Mention Behavior:**
+
+- **`@`** → Shows ALL school members (no search parameter)
+- **`@anushka`** → Shows only members matching "anushka" (search=anushka)
+- **`@john`** → Shows only members matching "john" (search=john)
+
+**Purpose**: Provides a filtered list of school members for frontend mention autocomplete dropdown.
+
+**Response:**
+
+```json
+{
+  "message": "School members retrieved successfully",
+  "data": {
+    "members": [
+      {
+        "id": "507f1f77bcf86cd799439011",
+        "name": "Anushka Sharma",
+        "email": "anushka.sharma@example.com",
+        "image": "https://example.com/image.jpg",
+        "role": "STUDENT",
+        "mention_text": "@anushka.sharma@example.com",
+        "display_name": "Anushka Sharma (@anushka.sharma@example.com)",
+        "search_text": "anushka sharma anushka.sharma@example.com"
+      }
+    ],
+    "total": 150,
+    "filtered_total": 1,
+    "search_term": "anushka"
+  }
+}
+```
+
+**Frontend Usage Examples:**
+
+```javascript
+// When user types @ (show all members)
+const showAllMembers = () => {
+  fetch('/api/community/school-members', {
+    headers: { Authorization: 'Bearer ' + token },
+  })
+    .then((response) => response.json())
+    .then((data) => {
+      displayMentionDropdown(data.data.members);
+    });
+};
+
+// When user types @anushka (filter members)
+const showFilteredMembers = (searchTerm) => {
+  const url = `/api/community/school-members?search=${encodeURIComponent(searchTerm)}&limit=20`;
+  fetch(url, { headers: { Authorization: 'Bearer ' + token } })
+    .then((response) => response.json())
+    .then((data) => {
+      displayMentionDropdown(data.data.members);
+    });
+};
+
+// Handle mention input
+const handleMentionInput = (content) => {
+  if (content.endsWith('@')) {
+    // User just typed @, show all members
+    showAllMembers();
+  } else if (content.match(/@[a-zA-Z0-9._-]*$/)) {
+    // User is typing after @, filter members
+    const searchTerm = content.match(/@([a-zA-Z0-9._-]*)$/)[1];
+    if (searchTerm) {
+      showFilteredMembers(searchTerm);
+    } else {
+      showAllMembers();
+    }
+  }
+};
 ```
 
 ### Likes

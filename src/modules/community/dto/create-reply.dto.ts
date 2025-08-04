@@ -1,5 +1,11 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsString, IsNotEmpty, IsOptional, IsMongoId } from 'class-validator';
+import {
+  IsString,
+  IsNotEmpty,
+  IsOptional,
+  IsMongoId,
+  IsArray,
+} from 'class-validator';
 import { Types } from 'mongoose';
 
 export class CreateReplyDto {
@@ -38,4 +44,15 @@ export class CreateReplyDto {
     required: false,
   })
   parent_reply_id?: string | Types.ObjectId;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  @ApiProperty({
+    example: ['@john.doe', '@jane.smith'],
+    description: 'Array of usernames to mention (without @ symbol)',
+    type: [String],
+    required: false,
+  })
+  mentions?: string[];
 }
