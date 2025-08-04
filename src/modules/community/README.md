@@ -31,6 +31,15 @@ A comprehensive forum system for the AI Professor platform that allows students 
 - **Count Tracking**: Automatic like count updates
 - **Duplicate Prevention**: Users can't like the same content twice
 
+### 📌 **Pin System**
+
+- **Personal Pins**: Users can pin discussions for quick access
+- **Separate Schema**: Efficient pin tracking without arrays
+- **Toggle Functionality**: Toggle pin status with a single API call
+- **Priority Display**: Pinned discussions appear at the top of lists
+- **User-Specific**: Each user has their own pinned discussions
+- **Pin Status**: Check if a discussion is pinned by current user
+
 ### 🚨 **Reporting System**
 
 - **Content Moderation**: Report inappropriate content
@@ -107,6 +116,19 @@ A comprehensive forum system for the AI Professor platform that allows students 
   entity_type: LikeEntityTypeEnum, // discussion, reply
   entity_id: ObjectId,
   liked_by: ObjectId,
+
+  created_at: Date,
+  updated_at: Date
+}
+```
+
+### Forum Pin Schema
+
+```typescript
+{
+  _id: ObjectId,
+  discussion_id: ObjectId,
+  pinned_by: ObjectId,
 
   created_at: Date,
   updated_at: Date
@@ -202,6 +224,34 @@ Authorization: Bearer <token>
 
 ```http
 POST /api/community/like/discussion/507f1f77bcf86cd799439011
+Authorization: Bearer <token>
+```
+
+### Pins
+
+#### Toggle Pin Status
+
+```http
+POST /api/community/discussions/toggle-pin
+Authorization: Bearer <token>
+Content-Type: application/json
+
+{
+  "discussion_id": "507f1f77bcf86cd799439011"
+}
+```
+
+#### Get Pinned Discussions
+
+```http
+GET /api/community/discussions/pinned?page=1&limit=20
+Authorization: Bearer <token>
+```
+
+#### Check Pin Status
+
+```http
+GET /api/community/discussions/:id/pin-status
 Authorization: Bearer <token>
 ```
 

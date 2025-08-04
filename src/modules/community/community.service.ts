@@ -30,6 +30,11 @@ import {
   ForumLikeSchema,
   LikeEntityTypeEnum,
 } from 'src/database/schemas/tenant/forum-like.schema';
+import {
+  ForumPin,
+  ForumPinSchema,
+} from 'src/database/schemas/tenant/forum-pin.schema';
+import { PinDiscussionDto } from './dto/pin-discussion.dto';
 
 import { CreateDiscussionDto } from './dto/create-discussion.dto';
 import { CreateReplyDto } from './dto/create-reply.dto';
@@ -288,54 +293,209 @@ export class CommunityService {
 
       this.logger.debug(`Filter query: ${JSON.stringify(filter)}`);
 
-      // Get discussions with pagination
-      const discussions = await DiscussionModel.find(filter)
-        .sort({ last_reply_at: -1, created_at: -1 }) // Sort by last reply, then by creation date
-        .skip(options.skip)
-        .limit(options.limit)
-        .lean();
+      // Use aggregation pipeline for better performance
+      const aggregationPipeline: any[] = [
+        { $match: filter },
+        {
+          $lookup: {
+            from: 'forum_pins',
+            let: { discussionId: '$_id', userId: new Types.ObjectId(user.id) },
+            pipeline: [
+              {
+                $match: {
+                  $expr: {
+                    $and: [
+                      { $eq: ['$discussion_id', '$$discussionId'] },
+                      { $eq: ['$pinned_by', '$$userId'] },
+                    ],
+                  },
+                },
+              },
+            ],
+            as: 'userPin',
+          },
+        },
+        {
+          $addFields: {
+            is_pinned: { $gt: [{ $size: '$userPin' }, 0] },
+            pinned_at: { $arrayElemAt: ['$userPin.created_at', 0] },
+          },
+        },
+        {
+          $lookup: {
+            from: 'forum_replies',
+            let: { discussionId: '$_id' },
+            pipeline: [
+              {
+                $match: {
+                  $expr: { $eq: ['$discussion_id', '$$discussionId'] },
+                  parent_reply_id: null, // Only top-level replies
+                  deleted_at: null,
+                  status: ReplyStatusEnum.ACTIVE,
+                },
+              },
+              { $sort: { created_at: -1 } },
+              { $limit: 1 },
+              {
+                $lookup: {
+                  from: 'students',
+                  localField: 'created_by',
+                  foreignField: '_id',
+                  as: 'lastReplyUser',
+                },
+              },
+              {
+                $lookup: {
+                  from: 'users',
+                  localField: 'created_by',
+                  foreignField: '_id',
+                  as: 'lastReplyUserCentral',
+                },
+              },
+              {
+                $addFields: {
+                  last_reply_user: {
+                    $cond: {
+                      if: { $gt: [{ $size: '$lastReplyUser' }, 0] },
+                      then: { $arrayElemAt: ['$lastReplyUser', 0] },
+                      else: { $arrayElemAt: ['$lastReplyUserCentral', 0] },
+                    },
+                  },
+                },
+              },
+            ],
+            as: 'lastReply',
+          },
+        },
+        {
+          $addFields: {
+            last_reply: { $arrayElemAt: ['$lastReply', 0] },
+          },
+        },
+        {
+          $lookup: {
+            from: 'students',
+            localField: 'created_by',
+            foreignField: '_id',
+            as: 'createdByStudent',
+          },
+        },
+        {
+          $lookup: {
+            from: 'users',
+            localField: 'created_by',
+            foreignField: '_id',
+            as: 'createdByUser',
+          },
+        },
+        {
+          $addFields: {
+            created_by_user: {
+              $cond: {
+                if: { $gt: [{ $size: '$createdByStudent' }, 0] },
+                then: {
+                  _id: { $arrayElemAt: ['$createdByStudent._id', 0] },
+                  first_name: {
+                    $arrayElemAt: ['$createdByStudent.first_name', 0],
+                  },
+                  last_name: {
+                    $arrayElemAt: ['$createdByStudent.last_name', 0],
+                  },
+                  email: { $arrayElemAt: ['$createdByStudent.email', 0] },
+                  image: { $arrayElemAt: ['$createdByStudent.image', 0] },
+                  role: 'STUDENT',
+                },
+                else: {
+                  _id: { $arrayElemAt: ['$createdByUser._id', 0] },
+                  first_name: {
+                    $arrayElemAt: ['$createdByUser.first_name', 0],
+                  },
+                  last_name: { $arrayElemAt: ['$createdByUser.last_name', 0] },
+                  email: { $arrayElemAt: ['$createdByUser.email', 0] },
+                  image: { $arrayElemAt: ['$createdByUser.profile_pic', 0] },
+                  role: { $arrayElemAt: ['$createdByUser.role', 0] },
+                },
+              },
+            },
+          },
+        },
+        {
+          $lookup: {
+            from: 'forum_views',
+            let: { discussionId: '$_id', userId: new Types.ObjectId(user.id) },
+            pipeline: [
+              {
+                $match: {
+                  $expr: {
+                    $and: [
+                      { $eq: ['$discussion_id', '$$discussionId'] },
+                      { $eq: ['$user_id', '$$userId'] },
+                    ],
+                  },
+                },
+              },
+            ],
+            as: 'userView',
+          },
+        },
+        {
+          $addFields: {
+            is_unread: {
+              $cond: {
+                if: { $eq: [{ $size: '$userView' }, 0] },
+                then: true,
+                else: {
+                  $gt: [
+                    '$created_at',
+                    { $arrayElemAt: ['$userView.viewed_at', 0] },
+                  ],
+                },
+              },
+            },
+          },
+        },
+        {
+          $addFields: {
+            last_reply_date: {
+              $ifNull: ['$last_reply.created_at', '$created_at'],
+            },
+          },
+        },
+        {
+          $sort: {
+            is_pinned: -1, // Pinned discussions first
+            last_reply_date: -1, // Sort by last reply date or discussion creation date
+          },
+        },
+        { $skip: options.skip },
+        { $limit: options.limit },
+        {
+          $project: {
+            userPin: 0,
+            createdByStudent: 0,
+            createdByUser: 0,
+            userView: 0,
+            last_reply_date: 0,
+          },
+        },
+      ];
 
-      const total = await DiscussionModel.countDocuments(filter);
+      // Execute aggregation pipeline
+      const [discussions, total] = await Promise.all([
+        DiscussionModel.aggregate(aggregationPipeline),
+        DiscussionModel.countDocuments(filter),
+      ]);
 
       this.logger.debug(`Found ${discussions.length} discussions`);
 
-      // Attach user details for each discussion
-      const discussionsWithUsers = await Promise.all(
-        discussions.map(async (discussion) => {
-          const userDetails = await this.getUserDetails(
-            discussion.created_by.toString(),
-            discussion.created_by_role,
-            tenantConnection,
-          );
+      // Debug: Log first discussion to check lastReply structure
+      if (discussions.length > 0) {
+        this.logger.debug(
+          `First discussion lastReply: ${JSON.stringify(discussions[0].last_reply)}`,
+        );
+      }
 
-          // Check if discussion is unread for current user
-          const isUnread = await this.isContentUnread(
-            new Types.ObjectId(user.id),
-            discussion._id.toString(),
-            discussion.created_at || new Date(),
-            tenantConnection,
-          );
-
-          // Get last reply information
-          const lastReply = await this.getLastReplyInfo(
-            discussion._id.toString(),
-            tenantConnection,
-          );
-
-          return {
-            ...discussion,
-            created_by_user: userDetails || null,
-            is_unread: isUnread,
-            last_reply: lastReply,
-          };
-        }),
-      );
-
-      const result = createPaginationResult(
-        discussionsWithUsers,
-        total,
-        options,
-      );
+      const result = createPaginationResult(discussions, total, options);
 
       return {
         message: 'Discussions retrieved successfully',
@@ -1856,6 +2016,285 @@ export class CommunityService {
     } catch (error) {
       this.logger.error('Error getting unread counts', error?.stack || error);
       throw new BadRequestException('Failed to retrieve unread counts');
+    }
+  }
+
+  /**
+   * Toggle pin status for a discussion
+   */
+  async togglePin(pinDiscussionDto: PinDiscussionDto, user: JWTUserPayload) {
+    const { discussion_id } = pinDiscussionDto;
+
+    this.logger.log(
+      `Toggling pin for discussion: ${discussion_id} by user: ${user.id}`,
+    );
+
+    const resolvedSchoolId = this.resolveSchoolId(user);
+
+    // Validate school exists
+    const school = await this.schoolModel.findById(resolvedSchoolId);
+    if (!school) {
+      throw new NotFoundException('School not found');
+    }
+
+    // Get tenant connection
+    const tenantConnection =
+      await this.tenantConnectionService.getTenantConnection(school.db_name);
+    const DiscussionModel = tenantConnection.model(
+      ForumDiscussion.name,
+      ForumDiscussionSchema,
+    );
+    const PinModel = tenantConnection.model(ForumPin.name, ForumPinSchema);
+
+    try {
+      // Validate discussion exists and is active
+      const discussion = await DiscussionModel.findOne({
+        _id: discussion_id,
+        deleted_at: null,
+        status: DiscussionStatusEnum.ACTIVE,
+      }).lean();
+
+      if (!discussion) {
+        throw new NotFoundException('Discussion not found or not accessible');
+      }
+
+      // Check if already pinned
+      const existingPin = await PinModel.findOne({
+        discussion_id: new Types.ObjectId(discussion_id.toString()),
+        pinned_by: new Types.ObjectId(user.id),
+      });
+
+      if (existingPin) {
+        // Unpin the discussion
+        await PinModel.deleteOne({ _id: existingPin._id });
+
+        return {
+          message: 'Discussion unpinned successfully',
+          data: {
+            discussion_id,
+            is_pinned: false,
+            action: 'unpinned',
+            unpinned_at: new Date(),
+          },
+        };
+      } else {
+        // Pin the discussion
+        const newPin = new PinModel({
+          discussion_id: new Types.ObjectId(discussion_id.toString()),
+          pinned_by: new Types.ObjectId(user.id),
+        });
+
+        await newPin.save();
+
+        return {
+          message: 'Discussion pinned successfully',
+          data: {
+            discussion_id,
+            is_pinned: true,
+            action: 'pinned',
+            pinned_at: newPin.created_at,
+          },
+        };
+      }
+    } catch (error) {
+      this.logger.error('Error toggling pin', error?.stack || error);
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
+      throw new BadRequestException('Failed to toggle pin');
+    }
+  }
+
+  /**
+   * Get pinned discussions for a user
+   */
+  async getPinnedDiscussions(
+    user: JWTUserPayload,
+    paginationDto?: PaginationDto,
+  ) {
+    this.logger.log(`Getting pinned discussions for user: ${user.id}`);
+
+    const resolvedSchoolId = this.resolveSchoolId(user);
+
+    // Validate school exists
+    const school = await this.schoolModel.findById(resolvedSchoolId);
+    if (!school) {
+      throw new NotFoundException('School not found');
+    }
+
+    // Get tenant connection
+    const tenantConnection =
+      await this.tenantConnectionService.getTenantConnection(school.db_name);
+    const DiscussionModel = tenantConnection.model(
+      ForumDiscussion.name,
+      ForumDiscussionSchema,
+    );
+
+    try {
+      const options = getPaginationOptions(paginationDto || {});
+
+      // Use aggregation pipeline for better performance
+      const aggregationPipeline: any[] = [
+        {
+          $match: {
+            pinned_by: new Types.ObjectId(user.id),
+          },
+        },
+        {
+          $lookup: {
+            from: 'forum_discussions',
+            localField: 'discussion_id',
+            foreignField: '_id',
+            as: 'discussion',
+          },
+        },
+        {
+          $unwind: '$discussion',
+        },
+        {
+          $match: {
+            'discussion.deleted_at': null,
+          },
+        },
+        {
+          $lookup: {
+            from: 'students',
+            localField: 'discussion.created_by',
+            foreignField: '_id',
+            as: 'createdByStudent',
+          },
+        },
+        {
+          $lookup: {
+            from: 'users',
+            localField: 'discussion.created_by',
+            foreignField: '_id',
+            as: 'createdByUser',
+          },
+        },
+        {
+          $addFields: {
+            created_by_details: {
+              $cond: {
+                if: { $gt: [{ $size: '$createdByStudent' }, 0] },
+                then: {
+                  _id: { $arrayElemAt: ['$createdByStudent._id', 0] },
+                  first_name: {
+                    $arrayElemAt: ['$createdByStudent.first_name', 0],
+                  },
+                  last_name: {
+                    $arrayElemAt: ['$createdByStudent.last_name', 0],
+                  },
+                  email: { $arrayElemAt: ['$createdByStudent.email', 0] },
+                  image: { $arrayElemAt: ['$createdByStudent.image', 0] },
+                  role: 'STUDENT',
+                },
+                else: {
+                  _id: { $arrayElemAt: ['$createdByUser._id', 0] },
+                  first_name: {
+                    $arrayElemAt: ['$createdByUser.first_name', 0],
+                  },
+                  last_name: { $arrayElemAt: ['$createdByUser.last_name', 0] },
+                  email: { $arrayElemAt: ['$createdByUser.email', 0] },
+                  image: { $arrayElemAt: ['$createdByUser.profile_pic', 0] },
+                  role: { $arrayElemAt: ['$createdByUser.role', 0] },
+                },
+              },
+            },
+            is_pinned: true,
+            pinned_at: '$created_at',
+          },
+        },
+        {
+          $replaceRoot: {
+            newRoot: {
+              $mergeObjects: [
+                '$discussion',
+                {
+                  created_by_details: '$created_by_details',
+                  is_pinned: '$is_pinned',
+                  pinned_at: '$pinned_at',
+                },
+              ],
+            },
+          },
+        },
+        {
+          $sort: { pinned_at: -1 },
+        },
+        { $skip: options.skip },
+        { $limit: options.limit },
+        {
+          $project: {
+            createdByStudent: 0,
+            createdByUser: 0,
+          },
+        },
+      ];
+
+      // Execute aggregation pipeline
+      const [discussions, total] = await Promise.all([
+        tenantConnection
+          .model(ForumPin.name, ForumPinSchema)
+          .aggregate(aggregationPipeline),
+        tenantConnection.model(ForumPin.name, ForumPinSchema).countDocuments({
+          pinned_by: new Types.ObjectId(user.id),
+        }),
+      ]);
+
+      return createPaginationResult(discussions, total, options);
+    } catch (error) {
+      this.logger.error(
+        'Error getting pinned discussions',
+        error?.stack || error,
+      );
+      throw new BadRequestException('Failed to retrieve pinned discussions');
+    }
+  }
+
+  /**
+   * Check if a discussion is pinned by the user
+   */
+  async isDiscussionPinned(discussionId: string, user: JWTUserPayload) {
+    const resolvedSchoolId = this.resolveSchoolId(user);
+
+    // Validate school exists
+    const school = await this.schoolModel.findById(resolvedSchoolId);
+    if (!school) {
+      throw new NotFoundException('School not found');
+    }
+
+    // Get tenant connection
+    const tenantConnection =
+      await this.tenantConnectionService.getTenantConnection(school.db_name);
+    const PinModel = tenantConnection.model(ForumPin.name, ForumPinSchema);
+
+    try {
+      // Use projection for better performance - only get the fields we need
+      const pin = await PinModel.findOne(
+        {
+          discussion_id: new Types.ObjectId(discussionId),
+          pinned_by: new Types.ObjectId(user.id),
+        },
+        {
+          created_at: 1,
+          _id: 1,
+        },
+      ).lean();
+
+      const isPinned = !!pin;
+
+      return {
+        message: 'Pin status retrieved successfully',
+        data: {
+          discussion_id: discussionId,
+          is_pinned: isPinned,
+          pinned_at: pin?.created_at || null,
+        },
+      };
+    } catch (error) {
+      this.logger.error('Error checking pin status', error?.stack || error);
+      throw new BadRequestException('Failed to check pin status');
     }
   }
 }

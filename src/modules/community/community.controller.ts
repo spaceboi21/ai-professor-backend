@@ -29,6 +29,7 @@ import { DiscussionFilterDto } from './dto/discussion-filter.dto';
 import { PaginationDto } from 'src/common/dto/pagination.dto';
 import { LikeEntityTypeEnum } from 'src/database/schemas/tenant/forum-like.schema';
 import { JWTUserPayload } from 'src/common/types/jwr-user.type';
+import { PinDiscussionDto } from './dto/pin-discussion.dto';
 
 @ApiTags('Community')
 @Controller('community')
@@ -357,5 +358,89 @@ export class CommunityController {
   })
   async getUnreadCounts(@Request() req: any) {
     return this.communityService.getUnreadCounts(req.user as JWTUserPayload);
+  }
+
+  @Post('discussions/toggle-pin')
+  @Roles(
+    RoleEnum.STUDENT,
+    RoleEnum.PROFESSOR,
+    RoleEnum.SCHOOL_ADMIN,
+    RoleEnum.SUPER_ADMIN,
+  )
+  @ApiOperation({ summary: 'Toggle pin status for a discussion' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Pin status toggled successfully',
+  })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'Discussion not found or not accessible',
+  })
+  @ApiResponse({
+    status: HttpStatus.FORBIDDEN,
+    description: 'Access denied - insufficient permissions',
+  })
+  async togglePin(
+    @Body() pinDiscussionDto: PinDiscussionDto,
+    @Request() req: any,
+  ) {
+    return this.communityService.togglePin(
+      pinDiscussionDto,
+      req.user as JWTUserPayload,
+    );
+  }
+
+  @Get('discussions/pinned')
+  @Roles(
+    RoleEnum.STUDENT,
+    RoleEnum.PROFESSOR,
+    RoleEnum.SCHOOL_ADMIN,
+    RoleEnum.SUPER_ADMIN,
+  )
+  @ApiOperation({ summary: 'Get pinned discussions for the current user' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Pinned discussions retrieved successfully',
+  })
+  @ApiResponse({
+    status: HttpStatus.FORBIDDEN,
+    description: 'Access denied - insufficient permissions',
+  })
+  @ApiQuery({ name: 'page', required: false, type: Number })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  async getPinnedDiscussions(
+    @Query() paginationDto: PaginationDto,
+    @Request() req: any,
+  ) {
+    return this.communityService.getPinnedDiscussions(
+      req.user as JWTUserPayload,
+      paginationDto,
+    );
+  }
+
+  @Get('discussions/:id/pin-status')
+  @Roles(
+    RoleEnum.STUDENT,
+    RoleEnum.PROFESSOR,
+    RoleEnum.SCHOOL_ADMIN,
+    RoleEnum.SUPER_ADMIN,
+  )
+  @ApiOperation({
+    summary: 'Check if a discussion is pinned by the current user',
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Pin status retrieved successfully',
+  })
+  @ApiResponse({
+    status: HttpStatus.FORBIDDEN,
+    description: 'Access denied - insufficient permissions',
+  })
+  @ApiParam({ name: 'id', description: 'Discussion ID' })
+  async isDiscussionPinned(@Param('id') id: string, @Request() req: any) {
+    return this.communityService.isDiscussionPinned(
+      id,
+      req.user as JWTUserPayload,
+    );
   }
 }
