@@ -355,52 +355,43 @@ export class LearningLogsService {
       throw new NotFoundException('No learning logs found for export');
     }
 
-    // Transform data for CSV export
+    // Transform data for CSV export - removing IDs and technical fields
     const csvData = data.map((log: any) => ({
-      'Student ID': log.student?._id || 'N/A',
       'Student Name': log.student ? `${log.student.first_name} ${log.student.last_name}`.trim() : 'N/A',
       'Student Email': log.student?.email || 'N/A',
-      'Module ID': log.module?._id || 'N/A',
       'Module Title': log.module?.title || 'N/A',
       'Module Subject': log.module?.subject || 'N/A',
       'Module Difficulty': log.module?.difficulty || 'N/A',
-      'Session ID': log.session?._id || 'N/A',
       'Session Status': log.session?.status || 'N/A',
       'Session Start Date': log.session?.started_at ? new Date(log.session.started_at).toISOString() : 'N/A',
       'Session End Date': log.session?.ended_at ? new Date(log.session.ended_at).toISOString() : 'N/A',
-      'Primary Skill Gap': log.primary_skill_gap || 'N/A',
+      'Primary Skill Gap': Array.isArray(log.skill_gaps) && log.skill_gaps.length > 0 ? log.skill_gaps[0] : 'N/A',
       'Skill Gaps': Array.isArray(log.skill_gaps) ? log.skill_gaps.join('; ') : 'N/A',
       'Strengths': Array.isArray(log.strengths) ? log.strengths.join('; ') : 'N/A',
       'Areas for Improvement': Array.isArray(log.areas_for_improvement) ? log.areas_for_improvement.join('; ') : 'N/A',
       'Missed Opportunities': Array.isArray(log.missed_opportunities) ? log.missed_opportunities.join('; ') : 'N/A',
       'Suggestions': Array.isArray(log.suggestions) ? log.suggestions.join('; ') : 'N/A',
       'Keywords for Learning': Array.isArray(log.keywords_for_learning) ? log.keywords_for_learning.join('; ') : 'N/A',
-      'Overall Rating': log.rating?.overall || 'N/A',
-      'Communication Rating': log.rating?.communication || 'N/A',
-      'Empathy Rating': log.rating?.empathy || 'N/A',
-      'Professionalism Rating': log.rating?.professionalism || 'N/A',
+      'Overall Rating': log.rating?.overall_score || 'N/A',
+      'Communication Rating': log.rating?.communication_score || 'N/A',
+      'Professionalism Rating': log.rating?.professionalism_score || 'N/A',
       'Status': log.status || 'N/A',
-      'Frequency': log.frequency || 'N/A',
-      'Feedback Created At': log.feedback_created_at ? new Date(log.feedback_created_at).toISOString() : 'N/A',
-      'Feedback Updated At': log.feedback_updated_at ? new Date(log.feedback_updated_at).toISOString() : 'N/A',
-      'Can Review': log.can_review ? 'Yes' : 'No',
-      'Has User Review': log.user_review ? 'Yes' : 'No',
-      'Review Rating': log.user_review?.rating || 'N/A',
-      'Review Feedback': log.user_review?.feedback || 'N/A',
-      'Reviewer Role': log.user_review?.reviewer_role || 'N/A',
-      'Review Created At': log.user_review?.created_at ? new Date(log.user_review.created_at).toISOString() : 'N/A',
+      'Feedback Created At': log.created_at ? new Date(log.created_at).toISOString() : 'N/A',
+      'Feedback Updated At': log.updated_at ? new Date(log.updated_at).toISOString() : 'N/A',
+      'Review Rating': log.user_review?.[0]?.rating || 'N/A',
+      'Review Feedback': log.user_review?.[0]?.feedback || 'N/A',
+      'Reviewer Role': log.user_review?.[0]?.reviewer_role || 'N/A',
+      'Review Created At': log.user_review?.[0]?.created_at ? new Date(log.user_review[0].created_at).toISOString() : 'N/A',
     }));
 
-    // Define CSV headers
+    // Define CSV headers - removing IDs and technical fields
     const headers = [
-      'Student ID', 'Student Name', 'Student Email', 'Module ID', 'Module Title', 
-      'Module Subject', 'Module Difficulty', 'Session ID', 'Session Status',
-      'Session Start Date', 'Session End Date', 'Primary Skill Gap', 'Skill Gaps',
+      'Student Name', 'Student Email', 'Module Title', 'Module Subject', 'Module Difficulty',
+      'Session Status', 'Session Start Date', 'Session End Date', 'Primary Skill Gap', 'Skill Gaps',
       'Strengths', 'Areas for Improvement', 'Missed Opportunities', 'Suggestions',
       'Keywords for Learning', 'Overall Rating', 'Communication Rating', 
-      'Empathy Rating', 'Professionalism Rating', 'Status', 'Frequency',
-      'Feedback Created At', 'Feedback Updated At', 'Can Review', 'Has User Review',
-      'Review Rating', 'Review Feedback', 'Reviewer Role', 'Review Created At'
+      'Professionalism Rating', 'Status', 'Feedback Created At', 
+      'Feedback Updated At', 'Review Rating', 'Review Feedback', 'Reviewer Role', 'Review Created At'
     ];
 
     // Generate CSV file using storage service
@@ -741,13 +732,23 @@ export class LearningLogsService {
       },
       {
         $project: {
-          keywords_for_learning: 0,
-          feedback_updated_at: 0,
-          session_id: 0,
-          module_id: 0,
-          student_id: 0,
-          recent_feedback: 0,
-          all_skill_gap_counts: 0,
+          // Include only the fields we need for CSV export
+          _id: 1,
+          rating: 1,
+          skill_gaps: 1,
+          strengths: 1,
+          areas_for_improvement: 1,
+          missed_opportunities: 1,
+          suggestions: 1,
+          keywords_for_learning: 1,
+          created_at: 1,
+          updated_at: 1,
+          status: 1,
+          frequency: 1,
+          session: 1,
+          module: 1,
+          student: 1,
+          user_review: 1,
         },
       },
       {
@@ -862,7 +863,16 @@ export class LearningLogsService {
                     ],
                   },
                 },
-              }
+              },
+              {
+                $project: {
+                  _id: 1,
+                  rating: 1,
+                  feedback: 1,
+                  reviewer_role: 1,
+                  created_at: 1,
+                },
+              },
             ],
             as: 'user_review',
           },
@@ -896,7 +906,16 @@ export class LearningLogsService {
                   ],
                 },
               },
-            }
+            },
+            {
+              $project: {
+                _id: 1,
+                rating: 1,
+                feedback: 1,
+                reviewer_role: 1,
+                created_at: 1,
+              },
+            },
           ],
           as: 'user_review',
         },
