@@ -341,6 +341,7 @@ export class QuizController {
           explanation:
             'Subtract 5 from both sides: 2x = 8, then divide by 2: x = 4',
           sequence: 1,
+          tags: ['Algebra', 'Equations', 'Basic Math'],
         },
       },
       example2: {
@@ -353,6 +354,27 @@ export class QuizController {
           answer: ['True'],
           explanation: 'Substituting x = 2: 2(2) + 3 = 4 + 3 = 7 ✓',
           sequence: 2,
+          tags: ['Algebra', 'Equations'],
+        },
+      },
+      example3: {
+        summary: 'Psychology Question with Tags',
+        value: {
+          quiz_group_id: '507f1f77bcf86cd799439011',
+          question:
+            'What is the most effective way to establish rapport with a client?',
+          type: 'MULTIPLE_CHOICE',
+          options: [
+            'Listen actively and show empathy',
+            'Maintain professional distance',
+            'Focus on giving advice immediately',
+            'Ask leading questions',
+          ],
+          answer: ['Listen actively and show empathy'],
+          explanation:
+            'Active listening and empathy are fundamental to building trust and rapport with clients.',
+          sequence: 3,
+          tags: ['Depression', 'Trauma', 'Counseling'],
         },
       },
     },
@@ -415,6 +437,13 @@ export class QuizController {
     enum: ['MULTIPLE_CHOICE', 'TRUE_FALSE', 'FILL_IN_THE_BLANK'],
     description: 'Filter by question type',
   })
+  @ApiQuery({
+    name: 'tags',
+    required: false,
+    type: String,
+    description: 'Filter by tag (will match questions that contain this tag)',
+    example: 'Depression',
+  })
   @ApiResponse({
     status: 200,
     description: 'Quiz questions retrieved successfully',
@@ -430,6 +459,7 @@ export class QuizController {
             explanation:
               'Subtract 5 from both sides: 2x = 8, then divide by 2: x = 4',
             sequence: 1,
+            tags: ['Algebra', 'Equations', 'Basic Math'],
             quiz_group_id: '507f1f77bcf86cd799439011',
             created_at: '2024-01-15T10:30:00Z',
           },
@@ -477,6 +507,7 @@ export class QuizController {
         explanation:
           'Subtract 5 from both sides: 2x = 8, then divide by 2: x = 4',
         sequence: 1,
+        tags: ['Algebra', 'Equations', 'Basic Math'],
         quiz_group_id: '507f1f77bcf86cd799439011',
         created_at: '2024-01-15T10:30:00Z',
         updated_at: '2024-01-15T10:30:00Z',
@@ -520,6 +551,7 @@ export class QuizController {
           answer: ['4'],
           explanation:
             'Updated explanation: Subtract 5 from both sides: 2x = 8, then divide by 2: x = 4',
+          tags: ['Algebra', 'Equations', 'Updated Tags'],
         },
       },
     },
