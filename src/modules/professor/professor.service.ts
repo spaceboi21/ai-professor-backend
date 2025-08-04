@@ -278,7 +278,7 @@ export class ProfessorService {
       role: new Types.ObjectId(ROLE_IDS.PROFESSOR),
       school_id: user?.school_id ? new Types.ObjectId(user.school_id) : null,
     };
-
+    console.log(filter);
     if (search) {
       filter.$or = [
         { email: { $regex: search, $options: 'i' } },
@@ -444,6 +444,31 @@ export class ProfessorService {
     // Check if professor is already deleted
     if (professor.deleted_at) {
       throw new BadRequestException('Professor is already deleted');
+    }
+
+    // Check if professor has active module assignments
+    try {
+      const professorAssignments =
+        await this.moduleAssignmentService.getProfessorAssignments(
+          id,
+          user,
+          { page: 1, limit: 1 }, // Just check if there are any assignments
+        );
+
+      if (professorAssignments.data.assignments.length > 0) {
+        throw new BadRequestException(
+          'Cannot delete professor. Professor has active module assignments. Please unassign all modules before deleting.',
+        );
+      }
+    } catch (error) {
+      // If the error is not a BadRequestException (which we just threw), rethrow it
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
+      // For other errors (like NotFoundException for school), log and continue
+      this.logger.warn(
+        `Error checking professor assignments: ${error.message}`,
+      );
     }
 
     // Soft delete the professor by setting deleted_at timestamp
