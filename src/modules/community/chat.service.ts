@@ -27,20 +27,21 @@ import { School } from 'src/database/schemas/central/school.schema';
 @Injectable()
 export class ChatService {
   private readonly logger = new Logger(ChatService.name);
-  private readonly allowedCommunicationPatterns = [
-    { sender: RoleEnum.PROFESSOR, receiver: RoleEnum.STUDENT },
-    { sender: RoleEnum.STUDENT, receiver: RoleEnum.PROFESSOR },
-    { sender: RoleEnum.STUDENT, receiver: RoleEnum.SCHOOL_ADMIN },
-    { sender: RoleEnum.SCHOOL_ADMIN, receiver: RoleEnum.STUDENT },
-    { sender: RoleEnum.PROFESSOR, receiver: RoleEnum.SCHOOL_ADMIN },
-    { sender: RoleEnum.SCHOOL_ADMIN, receiver: RoleEnum.PROFESSOR },
-    { sender: RoleEnum.SUPER_ADMIN, receiver: RoleEnum.SCHOOL_ADMIN },
-    { sender: RoleEnum.SCHOOL_ADMIN, receiver: RoleEnum.SUPER_ADMIN },
-    { sender: RoleEnum.SUPER_ADMIN, receiver: RoleEnum.PROFESSOR },
-    { sender: RoleEnum.PROFESSOR, receiver: RoleEnum.SUPER_ADMIN },
-    { sender: RoleEnum.SUPER_ADMIN, receiver: RoleEnum.STUDENT },
-    { sender: RoleEnum.STUDENT, receiver: RoleEnum.SUPER_ADMIN },
-  ];
+  // TODO: commented for communicate with student to any other role
+  // private readonly allowedCommunicationPatterns = [
+  //   { sender: RoleEnum.PROFESSOR, receiver: RoleEnum.STUDENT },
+  //   { sender: RoleEnum.STUDENT, receiver: RoleEnum.PROFESSOR },
+  //   { sender: RoleEnum.STUDENT, receiver: RoleEnum.SCHOOL_ADMIN },
+  //   { sender: RoleEnum.SCHOOL_ADMIN, receiver: RoleEnum.STUDENT },
+  //   { sender: RoleEnum.PROFESSOR, receiver: RoleEnum.SCHOOL_ADMIN },
+  //   { sender: RoleEnum.SCHOOL_ADMIN, receiver: RoleEnum.PROFESSOR },
+  //   { sender: RoleEnum.SUPER_ADMIN, receiver: RoleEnum.SCHOOL_ADMIN },
+  //   { sender: RoleEnum.SCHOOL_ADMIN, receiver: RoleEnum.SUPER_ADMIN },
+  //   { sender: RoleEnum.SUPER_ADMIN, receiver: RoleEnum.PROFESSOR },
+  //   { sender: RoleEnum.PROFESSOR, receiver: RoleEnum.SUPER_ADMIN },
+  //   { sender: RoleEnum.SUPER_ADMIN, receiver: RoleEnum.STUDENT },
+  //   { sender: RoleEnum.STUDENT, receiver: RoleEnum.SUPER_ADMIN },
+  // ];
 
   constructor(
     @InjectModel(ChatMessage.name)
@@ -76,10 +77,11 @@ export class ChatService {
     );
 
     // Validate communication rules
-    this.validateCommunicationRules(
-      currentUser.role.name,
-      createChatMessageDto.receiver_role,
-    );
+      // TODO: commented for communicate with student to any other role
+    // this.validateCommunicationRules(
+    //   currentUser.role.name,
+    //   createChatMessageDto.receiver_role,
+    // );
 
     // Create and save message
     const message = await this.saveMessage(
@@ -317,21 +319,23 @@ export class ChatService {
     return receiver;
   }
 
-  private validateCommunicationRules(
-    senderRole: RoleEnum,
-    receiverRole: RoleEnum,
-  ): void {
-    const isAllowed = this.allowedCommunicationPatterns.some(
-      (pattern) =>
-        pattern.sender === senderRole && pattern.receiver === receiverRole,
-    );
+  // TODO: commented for communicate with student to any other role
+  // private validateCommunicationRules(
+  //   senderRole: RoleEnum,
+  //   receiverRole: RoleEnum,
+  // ): void {
+  //   const isAllowed = this.allowedCommunicationPatterns.some(
+  //     (pattern) =>
+  //       pattern.sender === senderRole && pattern.receiver === receiverRole,
+  //   );
 
-    if (!isAllowed) {
-      throw new ForbiddenException(
-        `Communication between ${senderRole} and ${receiverRole} is not allowed`,
-      );
-    }
-  }
+  // TODO: commented for communicate with student to any other role
+  //   if (!isAllowed) {
+  //     throw new ForbiddenException(
+  //       `Communication between ${senderRole} and ${receiverRole} is not allowed`,
+  //     );
+  //   }
+  // }
 
   private async saveMessage(
     createChatMessageDto: CreateChatMessageDto,

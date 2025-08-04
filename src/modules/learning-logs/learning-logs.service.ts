@@ -43,6 +43,8 @@ import {
 import { NotificationsService } from '../notifications/notifications.service';
 import { NotificationTypeEnum } from 'src/common/constants/notification.constant';
 import { RecipientTypeEnum } from 'src/database/schemas/tenant/notification.schema';
+import { CSVUtil } from 'src/common/utils/csv.util';
+import { LearningLogsExportResponseDto } from './dto/learning-logs-export-response.dto';
 
 @Injectable()
 export class LearningLogsService {
@@ -55,6 +57,7 @@ export class LearningLogsService {
     private readonly schoolModel: Model<School>,
     private readonly tenantConnectionService: TenantConnectionService,
     private readonly notificationsService: NotificationsService,
+    private readonly csvUtil: CSVUtil,
   ) {}
 
   async getLearningLogs(
@@ -305,6 +308,130 @@ export class LearningLogsService {
     );
 
     return response;
+  }
+
+  async exportLearningLogs(
+    user: JWTUserPayload,
+    filterDto?: LearningLogsFilterDto,
+  ): Promise<LearningLogsExportResponseDto> {
+    this.logger.log(`Exporting learning logs for user: ${user.id}`);
+
+    const { connection, AIChatFeedbackModel } =
+      await this.getConnectionAndModel(user);
+
+    // Build aggregation pipeline without pagination for export
+    const pipeline = this.buildAggregationPipeline(user, filterDto);
+
+    this.logger.log(
+      `Export pipeline stages: ${pipeline.length}`,
+    );
+
+    // Execute aggregation to get all data
+    const results = await AIChatFeedbackModel.aggregate(pipeline);
+
+    this.logger.log(`Export aggregation results count: ${results.length}`);
+
+    // Handle case where no results are returned
+    if (!results || results.length === 0) {
+      throw new NotFoundException('No learning logs found for export');
+    }
+
+    // For export (without pagination), results is a direct array of documents
+    // For paginated queries, results[0] contains { data: [...], totalCount: [...] }
+    let data: any[];
+    if (results.length === 1 && results[0].data) {
+      // Paginated structure
+      data = results[0].data || [];
+    } else {
+      // Direct array structure (export case)
+      data = results;
+    }
+
+    // Additional safety check for data integrity
+    if (!Array.isArray(data)) {
+      this.logger.warn(
+        'Aggregation returned non-array data, defaulting to empty array',
+      );
+      throw new NotFoundException('No learning logs found for export');
+    }
+
+    // Transform data for CSV export - removing IDs and technical fields
+    const csvData = data.map((log: any) => ({
+      'Student Name': log.student ? `${log.student.first_name} ${log.student.last_name}`.trim() : 'N/A',
+      'Student Email': log.student?.email || 'N/A',
+      'Module Title': log.module?.title || 'N/A',
+      'Module Subject': log.module?.subject || 'N/A',
+      'Module Difficulty': log.module?.difficulty || 'N/A',
+      'Session Status': log.session?.status || 'N/A',
+      'Session Start Date': log.session?.started_at ? new Date(log.session.started_at).toISOString() : 'N/A',
+      'Session End Date': log.session?.ended_at ? new Date(log.session.ended_at).toISOString() : 'N/A',
+      'Primary Skill Gap': Array.isArray(log.skill_gaps) && log.skill_gaps.length > 0 ? log.skill_gaps[0] : 'N/A',
+      'Skill Gaps': Array.isArray(log.skill_gaps) ? log.skill_gaps.join('; ') : 'N/A',
+      'Strengths': Array.isArray(log.strengths) ? log.strengths.join('; ') : 'N/A',
+      'Areas for Improvement': Array.isArray(log.areas_for_improvement) ? log.areas_for_improvement.join('; ') : 'N/A',
+      'Missed Opportunities': Array.isArray(log.missed_opportunities) ? log.missed_opportunities.join('; ') : 'N/A',
+      'Suggestions': Array.isArray(log.suggestions) ? log.suggestions.join('; ') : 'N/A',
+      'Keywords for Learning': Array.isArray(log.keywords_for_learning) ? log.keywords_for_learning.join('; ') : 'N/A',
+      'Overall Rating': log.rating?.overall_score || 'N/A',
+      'Communication Rating': log.rating?.communication_score || 'N/A',
+      'Professionalism Rating': log.rating?.professionalism_score || 'N/A',
+      'Status': log.status || 'N/A',
+      'Feedback Created At': log.created_at ? new Date(log.created_at).toISOString() : 'N/A',
+      'Feedback Updated At': log.updated_at ? new Date(log.updated_at).toISOString() : 'N/A',
+      'Review Rating': log.user_review?.[0]?.rating || 'N/A',
+      'Review Feedback': log.user_review?.[0]?.feedback || 'N/A',
+      'Reviewer Role': log.user_review?.[0]?.reviewer_role || 'N/A',
+      'Review Created At': log.user_review?.[0]?.created_at ? new Date(log.user_review[0].created_at).toISOString() : 'N/A',
+    }));
+
+    // Define CSV headers - removing IDs and technical fields
+    const headers = [
+      'Student Name', 'Student Email', 'Module Title', 'Module Subject', 'Module Difficulty',
+      'Session Status', 'Session Start Date', 'Session End Date', 'Primary Skill Gap', 'Skill Gaps',
+      'Strengths', 'Areas for Improvement', 'Missed Opportunities', 'Suggestions',
+      'Keywords for Learning', 'Overall Rating', 'Communication Rating', 
+      'Professionalism Rating', 'Status', 'Feedback Created At', 
+      'Feedback Updated At', 'Review Rating', 'Review Feedback', 'Reviewer Role', 'Review Created At'
+    ];
+
+    // Generate CSV file using storage service
+    const filePath = await this.csvUtil.generateCSVFile({
+      filename: 'learning-logs-export',
+      headers,
+      data: csvData,
+      includeTimestamp: true,
+    });
+
+    // Get file info and download URL
+    const filename = filePath.split('/').pop() || 'learning-logs-export.csv';
+    const fileSize = this.csvUtil.getFileSize(filePath);
+    const downloadUrl = await this.csvUtil.generateDownloadUrl(filename);
+
+    this.logger.log(`CSV export completed: ${filePath}, Size: ${fileSize} bytes, Records: ${csvData.length}`);
+
+    return {
+      filename,
+      file_path: filePath,
+      file_size: fileSize,
+      record_count: csvData.length,
+      exported_at: new Date(),
+      storage_type: process.env.NODE_ENV === 'production' ? 's3' : 'local',
+      download_url: downloadUrl,
+      applied_filters: filterDto ? {
+        text: filterDto.text,
+        module_id: filterDto.module_id,
+        skill_gap: filterDto.skill_gap,
+        start_date: filterDto.start_date,
+        end_date: filterDto.end_date,
+      } : undefined,
+    };
+  }
+
+  /**
+   * Get CSV file content for download
+   */
+  async getCSVFileContent(filename: string): Promise<{ content: Buffer; contentType: string }> {
+    return this.csvUtil.getFileContent(filename);
   }
 
   // Private helper methods
@@ -605,13 +732,23 @@ export class LearningLogsService {
       },
       {
         $project: {
-          keywords_for_learning: 0,
-          feedback_updated_at: 0,
-          session_id: 0,
-          module_id: 0,
-          student_id: 0,
-          recent_feedback: 0,
-          all_skill_gap_counts: 0,
+          // Include only the fields we need for CSV export
+          _id: 1,
+          rating: 1,
+          skill_gaps: 1,
+          strengths: 1,
+          areas_for_improvement: 1,
+          missed_opportunities: 1,
+          suggestions: 1,
+          keywords_for_learning: 1,
+          created_at: 1,
+          updated_at: 1,
+          status: 1,
+          frequency: 1,
+          session: 1,
+          module: 1,
+          student: 1,
+          user_review: 1,
         },
       },
       {
@@ -681,15 +818,17 @@ export class LearningLogsService {
         },
       },
 
-      {
-        $facet: {
-          data: [
-            { $skip: paginationOptions.skip },
-            { $limit: paginationOptions.limit },
-          ],
-          totalCount: [{ $count: 'total' }],
+      ...(paginationOptions ? [
+        {
+          $facet: {
+            data: [
+              { $skip: paginationOptions.skip },
+              { $limit: paginationOptions.limit },
+            ],
+            totalCount: [{ $count: 'total' }],
+          },
         },
-      },
+      ] : []),
     ];
 
     this.logger.log(
@@ -724,7 +863,16 @@ export class LearningLogsService {
                     ],
                   },
                 },
-              }
+              },
+              {
+                $project: {
+                  _id: 1,
+                  rating: 1,
+                  feedback: 1,
+                  reviewer_role: 1,
+                  created_at: 1,
+                },
+              },
             ],
             as: 'user_review',
           },
@@ -758,7 +906,16 @@ export class LearningLogsService {
                   ],
                 },
               },
-            }
+            },
+            {
+              $project: {
+                _id: 1,
+                rating: 1,
+                feedback: 1,
+                reviewer_role: 1,
+                created_at: 1,
+              },
+            },
           ],
           as: 'user_review',
         },
