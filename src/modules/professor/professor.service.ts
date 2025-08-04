@@ -27,7 +27,10 @@ import { StatusEnum } from 'src/common/constants/status.constant';
 import { PaginationDto } from 'src/common/dto/pagination.dto';
 import { ModuleAssignmentService } from '../modules/module-assignment.service';
 import { TenantConnectionService } from 'src/database/tenant-connection.service';
-import { ModuleProfessorAssignment, ModuleProfessorAssignmentSchema } from 'src/database/schemas/tenant/module-professor-assignment.schema';
+import {
+  ModuleProfessorAssignment,
+  ModuleProfessorAssignmentSchema,
+} from 'src/database/schemas/tenant/module-professor-assignment.schema';
 
 @Injectable()
 export class ProfessorService {
@@ -445,7 +448,10 @@ export class ProfessorService {
     }
 
     // Check if professor has assigned modules
-    const hasAssignedModules = await this.checkProfessorHasAssignedModules(id, user);
+    const hasAssignedModules = await this.checkProfessorHasAssignedModules(
+      id,
+      user,
+    );
     if (hasAssignedModules) {
       throw new BadRequestException(
         'Cannot delete professor. Professor has assigned modules. Please unassign all modules before deleting the professor.',
@@ -455,31 +461,6 @@ export class ProfessorService {
     // Check if professor is already deleted
     if (professor.deleted_at) {
       throw new BadRequestException('Professor is already deleted');
-    }
-
-    // Check if professor has active module assignments
-    try {
-      const professorAssignments =
-        await this.moduleAssignmentService.getProfessorAssignments(
-          id,
-          user,
-          { page: 1, limit: 1 }, // Just check if there are any assignments
-        );
-
-      if (professorAssignments.data.assignments.length > 0) {
-        throw new BadRequestException(
-          'Cannot delete professor. Professor has active module assignments. Please unassign all modules before deleting.',
-        );
-      }
-    } catch (error) {
-      // If the error is not a BadRequestException (which we just threw), rethrow it
-      if (error instanceof BadRequestException) {
-        throw error;
-      }
-      // For other errors (like NotFoundException for school), log and continue
-      this.logger.warn(
-        `Error checking professor assignments: ${error.message}`,
-      );
     }
 
     // Soft delete the professor by setting deleted_at timestamp
@@ -553,16 +534,19 @@ export class ProfessorService {
       }
 
       // Validate school exists
-      const school = await this.schoolModel.findById(new Types.ObjectId(schoolId));
+      const school = await this.schoolModel.findById(
+        new Types.ObjectId(schoolId),
+      );
       if (!school) {
         return false;
       }
 
       // Get tenant connection
-      const tenantConnection = await this.tenantConnectionService.getTenantConnection(school.db_name);
+      const tenantConnection =
+        await this.tenantConnectionService.getTenantConnection(school.db_name);
       const AssignmentModel = tenantConnection.model(
         ModuleProfessorAssignment.name,
-        ModuleProfessorAssignmentSchema
+        ModuleProfessorAssignmentSchema,
       );
 
       // Check if professor has any active assignments
@@ -573,7 +557,10 @@ export class ProfessorService {
 
       return assignmentCount > 0;
     } catch (error) {
-      this.logger.error('Error checking professor assignments:', error?.stack || error);
+      this.logger.error(
+        'Error checking professor assignments:',
+        error?.stack || error,
+      );
       // If there's an error checking assignments, assume they have assignments to be safe
       return true;
     }

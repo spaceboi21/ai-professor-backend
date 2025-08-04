@@ -804,6 +804,10 @@ export class ModulesService {
     const tenantConnection =
       await this.tenantConnectionService.getTenantConnection(school.db_name);
     const ModuleModel = tenantConnection.model(Module.name, ModuleSchema);
+    const AssignmentModel = tenantConnection.model(
+      ModuleProfessorAssignment.name,
+      ModuleProfessorAssignmentSchema,
+    );
 
     try {
       // Check professor access if user is a professor
@@ -820,6 +824,34 @@ export class ModulesService {
         }
       }
 
+      // Check if module exists before proceeding
+      const moduleToDelete = await ModuleModel.findOne({
+        _id: new Types.ObjectId(id.toString()),
+        deleted_at: null,
+      });
+
+      if (!moduleToDelete) {
+        throw new NotFoundException('Module not found');
+      }
+
+      // Deactivate all module assignments for this module
+      const assignmentUpdateResult = await AssignmentModel.updateMany(
+        {
+          module_id: new Types.ObjectId(id.toString()),
+          is_active: true,
+        },
+        {
+          is_active: false,
+          updated_at: new Date(),
+          deleted_at: new Date(),
+        },
+      );
+
+      this.logger.log(
+        `Deactivated ${assignmentUpdateResult.modifiedCount} module assignments for module: ${id}`,
+      );
+
+      // Soft delete the module
       const deletedModule = await ModuleModel.findOneAndUpdate(
         { _id: id, deleted_at: null },
         { deleted_at: new Date() },
@@ -832,7 +864,10 @@ export class ModulesService {
 
       return {
         message: 'Module deleted successfully',
-        data: { id: deletedModule._id },
+        data: {
+          id: deletedModule._id,
+          deactivated_assignments: assignmentUpdateResult.modifiedCount,
+        },
       };
     } catch (error) {
       this.logger.error('Error removing module', error?.stack || error);
