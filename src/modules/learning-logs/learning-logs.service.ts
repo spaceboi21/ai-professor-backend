@@ -724,10 +724,7 @@ export class LearningLogsService {
                     ],
                   },
                 },
-              },
-              {
-                $limit: 1,
-              },
+              }
             ],
             as: 'user_review',
           },
@@ -761,10 +758,7 @@ export class LearningLogsService {
                   ],
                 },
               },
-            },
-            {
-              $limit: 1,
-            },
+            }
           ],
           as: 'user_review',
         },

@@ -254,6 +254,7 @@ export class ProfessorController {
   })
   @ApiResponse({ status: 200, description: 'Professor deleted successfully' })
   @ApiResponse({ status: 404, description: 'Professor not found' })
+  @ApiResponse({ status: 400, description: 'Cannot delete professor with assigned modules' })
   async deleteProfessor(
     @Param('id', ParseObjectIdPipe) id: Types.ObjectId,
     @User() user: JWTUserPayload,
