@@ -221,7 +221,7 @@ export class CSVStorageService {
   async generateDownloadUrl(filename: string): Promise<string> {
     if (!this.isProduction) {
       // For local development, return a relative path
-      return `/uploads/csv/${filename}`;
+      return filename;
     }
 
     if (!this.s3Client) {
