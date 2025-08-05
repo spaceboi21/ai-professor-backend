@@ -19,16 +19,16 @@ export enum AssignmentActionEnum {
 export class AssignmentAuditLog extends Document {
   declare _id: Types.ObjectId;
 
-  @Prop({ type: Types.ObjectId, ref: Module.name, required: true, index: true })
+  @Prop({ type: Types.ObjectId, ref: Module.name, required: true })
   module_id: Types.ObjectId;
 
-  @Prop({ type: Types.ObjectId, ref: User.name, required: true, index: true })
+  @Prop({ type: Types.ObjectId, ref: User.name, required: true })
   professor_id: Types.ObjectId;
 
   @Prop({ type: String, required: true, enum: AssignmentActionEnum })
   action: AssignmentActionEnum;
 
-  @Prop({ type: Types.ObjectId, ref: User.name, required: true, index: true })
+  @Prop({ type: Types.ObjectId, ref: User.name, required: true })
   performed_by: Types.ObjectId;
 
   @Prop({ type: String, required: true, enum: RoleEnum })

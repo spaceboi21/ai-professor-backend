@@ -32,16 +32,16 @@ export class QuizGroup extends Document {
   @Prop({ required: true })
   category: string;
 
-  @Prop({ type: Types.ObjectId, ref: Module.name, index: true })
+  @Prop({ type: Types.ObjectId, ref: Module.name })
   module_id: Types.ObjectId;
 
-  @Prop({ type: Types.ObjectId, ref: Chapter.name, index: true })
+  @Prop({ type: Types.ObjectId, ref: Chapter.name })
   chapter_id: Types.ObjectId;
 
   @Prop({ required: true, enum: QuizTypeEnum })
   type: QuizTypeEnum;
 
-  @Prop({ type: Types.ObjectId, ref: User.name, required: true, index: true })
+  @Prop({ type: Types.ObjectId, ref: User.name, required: true })
   created_by: Types.ObjectId;
 
   @Prop({ required: true, enum: RoleEnum })

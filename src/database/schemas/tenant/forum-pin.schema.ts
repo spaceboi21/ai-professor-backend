@@ -16,11 +16,10 @@ export class ForumPin extends Document {
     type: Types.ObjectId,
     ref: 'ForumDiscussion',
     required: true,
-    index: true,
   })
   discussion_id: Types.ObjectId;
 
-  @Prop({ type: Types.ObjectId, ref: User.name, required: true, index: true })
+  @Prop({ type: Types.ObjectId, ref: User.name, required: true })
   pinned_by: Types.ObjectId;
 
   readonly created_at?: Date;

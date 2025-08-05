@@ -21,7 +21,6 @@ export class StudentQuizAttempt extends Document {
     type: Types.ObjectId,
     ref: Student.name,
     required: true,
-    index: true,
   })
   student_id: Types.ObjectId;
 
@@ -29,20 +28,18 @@ export class StudentQuizAttempt extends Document {
     type: Types.ObjectId,
     ref: QuizGroup.name,
     required: true,
-    index: true,
   })
   quiz_group_id: Types.ObjectId;
 
-  @Prop({ type: Types.ObjectId, ref: Module.name, index: true })
+  @Prop({ type: Types.ObjectId, ref: Module.name })
   module_id: Types.ObjectId;
 
-  @Prop({ type: Types.ObjectId, ref: Chapter.name, index: true })
+  @Prop({ type: Types.ObjectId, ref: Chapter.name })
   chapter_id: Types.ObjectId;
 
   @Prop({
     enum: AttemptStatusEnum,
     default: AttemptStatusEnum.IN_PROGRESS,
-    index: true,
   })
   status: AttemptStatusEnum;
 

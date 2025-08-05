@@ -19,25 +19,22 @@ export class StudentChapterProgress extends Document {
     type: Types.ObjectId,
     ref: Student.name,
     required: true,
-    index: true,
   })
   student_id: Types.ObjectId;
 
-  @Prop({ type: Types.ObjectId, ref: Module.name, required: true, index: true })
+  @Prop({ type: Types.ObjectId, ref: Module.name, required: true })
   module_id: Types.ObjectId;
 
   @Prop({
     type: Types.ObjectId,
     ref: Chapter.name,
     required: true,
-    index: true,
   })
   chapter_id: Types.ObjectId;
 
   @Prop({
     enum: ProgressStatusEnum,
     default: ProgressStatusEnum.NOT_STARTED,
-    index: true,
   })
   status: ProgressStatusEnum;
 

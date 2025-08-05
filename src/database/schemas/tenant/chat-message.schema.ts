@@ -13,10 +13,10 @@ import { RoleEnum } from 'src/common/constants/roles.constant';
 export class ChatMessage extends Document {
   declare _id: Types.ObjectId;
 
-  @Prop({ type: Types.ObjectId, ref: User.name, required: true, index: true })
+  @Prop({ type: Types.ObjectId, ref: User.name, required: true })
   sender_id: Types.ObjectId;
 
-  @Prop({ type: Types.ObjectId, ref: User.name, required: true, index: true })
+  @Prop({ type: Types.ObjectId, ref: User.name, required: true })
   receiver_id: Types.ObjectId;
 
   @Prop({ required: true, enum: RoleEnum })
@@ -28,7 +28,7 @@ export class ChatMessage extends Document {
   @Prop({ required: true })
   message: string;
 
-  @Prop({ type: Boolean, default: false, index: true })
+  @Prop({ type: Boolean, default: false })
   is_read: boolean;
 
   @Prop({ type: Date, default: null })

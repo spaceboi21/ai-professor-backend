@@ -24,10 +24,10 @@ export class Quiz extends Document {
   })
   quiz_group_id: Types.ObjectId;
 
-  @Prop({ type: Types.ObjectId, ref: Module.name, index: true })
+  @Prop({ type: Types.ObjectId, ref: Module.name })
   module_id: Types.ObjectId;
 
-  @Prop({ type: Types.ObjectId, ref: Chapter.name, index: true })
+  @Prop({ type: Types.ObjectId, ref: Chapter.name })
   chapter_id: Types.ObjectId;
 
   @Prop({ required: true })
@@ -51,7 +51,7 @@ export class Quiz extends Document {
   @Prop({ type: [String], default: [] })
   tags: string[]; // Array of tags for the question (e.g., "Depression", "Trauma")
 
-  @Prop({ type: Types.ObjectId, ref: User.name, required: true, index: true })
+  @Prop({ type: Types.ObjectId, ref: User.name, required: true })
   created_by: Types.ObjectId;
 
   @Prop({ required: true, enum: RoleEnum })

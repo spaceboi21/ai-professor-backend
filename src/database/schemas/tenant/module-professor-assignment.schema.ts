@@ -14,13 +14,13 @@ import { RoleEnum } from 'src/common/constants/roles.constant';
 export class ModuleProfessorAssignment extends Document {
   declare _id: Types.ObjectId;
 
-  @Prop({ type: Types.ObjectId, ref: Module.name, required: true, index: true })
+  @Prop({ type: Types.ObjectId, ref: Module.name, required: true })
   module_id: Types.ObjectId;
 
-  @Prop({ type: Types.ObjectId, ref: User.name, required: true, index: true })
+  @Prop({ type: Types.ObjectId, ref: User.name, required: true })
   professor_id: Types.ObjectId;
 
-  @Prop({ type: Types.ObjectId, ref: User.name, index: true, default: null })
+  @Prop({ type: Types.ObjectId, ref: User.name, default: null })
   assigned_by: Types.ObjectId | null;
 
   @Prop({ type: String, enum: RoleEnum, default: null })
@@ -32,13 +32,13 @@ export class ModuleProfessorAssignment extends Document {
   @Prop({ type: Date, default: null })
   unassigned_at: Date | null;
 
-  @Prop({ type: Types.ObjectId, ref: User.name, index: true, default: null })
+  @Prop({ type: Types.ObjectId, ref: User.name, default: null })
   unassigned_by: Types.ObjectId | null;
 
   @Prop({ type: String, enum: RoleEnum, default: null })
   unassigned_by_role: RoleEnum | null;
 
-  @Prop({ type: Boolean, default: true, index: true })
+  @Prop({ type: Boolean, default: true })
   is_active: boolean;
 
   @Prop({ type: Date, default: null })

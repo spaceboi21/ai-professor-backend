@@ -16,7 +16,6 @@ export class LearningLogReview extends Document {
   @Prop({
     type: Types.ObjectId,
     required: true,
-    index: true,
     ref: 'ai_chat_feedback',
   })
   ai_feedback_id: Types.ObjectId;
@@ -25,7 +24,6 @@ export class LearningLogReview extends Document {
   @Prop({
     type: Types.ObjectId,
     required: true,
-    index: true,
   })
   reviewer_id: Types.ObjectId;
 
@@ -34,7 +32,6 @@ export class LearningLogReview extends Document {
     type: String,
     required: true,
     enum: RoleEnum,
-    index: true,
   })
   reviewer_role: RoleEnum;
 

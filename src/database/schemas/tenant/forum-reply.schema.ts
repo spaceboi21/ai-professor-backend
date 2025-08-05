@@ -23,20 +23,19 @@ export class ForumReply extends Document {
     type: Types.ObjectId,
     ref: 'ForumDiscussion',
     required: true,
-    index: true,
   })
   discussion_id: Types.ObjectId;
 
   @Prop({ required: true })
   content: string;
 
-  @Prop({ type: Types.ObjectId, ref: User.name, required: true, index: true })
+  @Prop({ type: Types.ObjectId, ref: User.name, required: true })
   created_by: Types.ObjectId;
 
   @Prop({ required: true, enum: RoleEnum })
   created_by_role: RoleEnum;
 
-  @Prop({ type: Types.ObjectId, ref: 'ForumReply', default: null, index: true })
+  @Prop({ type: Types.ObjectId, ref: 'ForumReply', default: null })
   parent_reply_id: Types.ObjectId; // For nested replies
 
   @Prop({ type: Number, default: 0 })
@@ -48,7 +47,6 @@ export class ForumReply extends Document {
   @Prop({
     enum: ReplyStatusEnum,
     default: ReplyStatusEnum.ACTIVE,
-    index: true,
   })
   status: ReplyStatusEnum;
 

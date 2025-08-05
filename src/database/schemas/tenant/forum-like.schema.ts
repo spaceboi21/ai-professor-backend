@@ -20,10 +20,10 @@ export class ForumLike extends Document {
   @Prop({ required: true, enum: LikeEntityTypeEnum })
   entity_type: LikeEntityTypeEnum;
 
-  @Prop({ type: Types.ObjectId, required: true, index: true })
+  @Prop({ type: Types.ObjectId, required: true })
   entity_id: Types.ObjectId; // ID of the liked discussion or reply
 
-  @Prop({ type: Types.ObjectId, ref: User.name, required: true, index: true })
+  @Prop({ type: Types.ObjectId, ref: User.name, required: true })
   liked_by: Types.ObjectId;
 
   readonly created_at?: Date;

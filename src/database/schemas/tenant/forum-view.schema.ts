@@ -12,10 +12,10 @@ import { User } from '../central/user.schema';
 export class ForumView extends Document {
   declare _id: Types.ObjectId;
 
-  @Prop({ type: Types.ObjectId, ref: User.name, required: true, index: true })
+  @Prop({ type: Types.ObjectId, ref: User.name, required: true })
   user_id: Types.ObjectId;
 
-  @Prop({ type: Types.ObjectId, required: true, index: true })
+  @Prop({ type: Types.ObjectId, required: true })
   discussion_id: Types.ObjectId;
 
   @Prop({ type: Date, default: Date.now })

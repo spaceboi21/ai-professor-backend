@@ -47,7 +47,7 @@ export class ForumDiscussion extends Document {
   @Prop({ type: [String], default: [] })
   tags: string[];
 
-  @Prop({ type: Types.ObjectId, ref: User.name, required: true, index: true })
+  @Prop({ type: Types.ObjectId, ref: User.name, required: true })
   created_by: Types.ObjectId;
 
   @Prop({ required: true, enum: RoleEnum })
@@ -81,7 +81,6 @@ export class ForumDiscussion extends Document {
   @Prop({
     enum: DiscussionStatusEnum,
     default: DiscussionStatusEnum.ACTIVE,
-    index: true,
   })
   status: DiscussionStatusEnum;
 

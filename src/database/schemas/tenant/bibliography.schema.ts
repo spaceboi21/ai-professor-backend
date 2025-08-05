@@ -15,14 +15,13 @@ import { RoleEnum } from 'src/common/constants/roles.constant';
 export class Bibliography extends Document {
   declare _id: Types.ObjectId;
 
-  @Prop({ type: Types.ObjectId, ref: Module.name, required: true, index: true })
+  @Prop({ type: Types.ObjectId, ref: Module.name, required: true })
   module_id: Types.ObjectId;
 
   @Prop({
     type: Types.ObjectId,
     ref: Chapter.name,
     required: true,
-    index: true,
   })
   chapter_id: Types.ObjectId;
 
@@ -50,7 +49,7 @@ export class Bibliography extends Document {
   @Prop({ required: true, type: Number, min: 1 })
   sequence: number;
 
-  @Prop({ type: Types.ObjectId, ref: User.name, required: true, index: true })
+  @Prop({ type: Types.ObjectId, ref: User.name, required: true })
   created_by: Types.ObjectId;
 
   @Prop({ required: true, enum: RoleEnum })

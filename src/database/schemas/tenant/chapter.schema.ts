@@ -13,7 +13,7 @@ import { RoleEnum } from 'src/common/constants/roles.constant';
 export class Chapter extends Document {
   declare _id: Types.ObjectId;
 
-  @Prop({ type: Types.ObjectId, ref: Module.name, required: true, index: true })
+  @Prop({ type: Types.ObjectId, ref: Module.name, required: true })
   module_id: Types.ObjectId;
 
   @Prop({ required: true })
@@ -22,7 +22,7 @@ export class Chapter extends Document {
   @Prop()
   description: string;
 
-  @Prop({ type: Types.ObjectId, ref: User.name, required: true, index: true })
+  @Prop({ type: Types.ObjectId, ref: User.name, required: true })
   created_by: Types.ObjectId;
 
   @Prop({ required: true, enum: RoleEnum })

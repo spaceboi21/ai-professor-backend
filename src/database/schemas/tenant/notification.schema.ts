@@ -25,14 +25,12 @@ export class Notification extends Document {
     type: String,
     enum: RecipientTypeEnum,
     required: true,
-    index: true,
   })
   recipient_type: RecipientTypeEnum;
 
   @Prop({
     type: Types.ObjectId,
     required: true,
-    index: true,
   })
   recipient_id: Types.ObjectId;
 

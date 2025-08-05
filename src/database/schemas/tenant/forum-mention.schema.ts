@@ -16,7 +16,6 @@ export class ForumMention extends Document {
     type: Types.ObjectId,
     ref: 'ForumReply',
     required: true,
-    index: true,
   })
   reply_id: Types.ObjectId;
 
@@ -24,14 +23,13 @@ export class ForumMention extends Document {
     type: Types.ObjectId,
     ref: 'ForumDiscussion',
     required: true,
-    index: true,
   })
   discussion_id: Types.ObjectId;
 
-  @Prop({ type: Types.ObjectId, ref: User.name, required: true, index: true })
+  @Prop({ type: Types.ObjectId, ref: User.name, required: true })
   mentioned_by: Types.ObjectId; // User who created the mention
 
-  @Prop({ type: Types.ObjectId, ref: User.name, required: true, index: true })
+  @Prop({ type: Types.ObjectId, ref: User.name, required: true })
   mentioned_user: Types.ObjectId; // User who was mentioned
 
   @Prop({ type: String, required: true })

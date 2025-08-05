@@ -36,7 +36,7 @@ export class ForumReport extends Document {
   @Prop({ required: true, enum: ReportEntityTypeEnum })
   entity_type: ReportEntityTypeEnum;
 
-  @Prop({ type: Types.ObjectId, required: true, index: true })
+  @Prop({ type: Types.ObjectId, required: true })
   entity_id: Types.ObjectId; // ID of the reported discussion or reply
 
   @Prop({ required: true, enum: ReportTypeEnum })
@@ -45,7 +45,7 @@ export class ForumReport extends Document {
   @Prop({ required: true })
   reason: string;
 
-  @Prop({ type: Types.ObjectId, ref: User.name, required: true, index: true })
+  @Prop({ type: Types.ObjectId, ref: User.name, required: true })
   reported_by: Types.ObjectId;
 
   @Prop({ required: true, enum: RoleEnum })
@@ -54,7 +54,6 @@ export class ForumReport extends Document {
   @Prop({
     enum: ReportStatusEnum,
     default: ReportStatusEnum.PENDING,
-    index: true,
   })
   status: ReportStatusEnum;
 
