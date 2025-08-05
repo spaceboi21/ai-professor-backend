@@ -146,7 +146,11 @@ export class ProfessorService {
       this.logger.log(`Credentials email sent to: ${email}`);
 
       return {
-        message: 'Professor created successfully',
+        message: this.errorMessageService.getMessageWithLanguage(
+          'PROFESSOR',
+          'PROFESSOR_CREATED_SUCCESSFULLY',
+          adminUser?.preferred_language || DEFAULT_LANGUAGE,
+        ),
         data: {
           id: newStudent._id,
           first_name: newStudent.first_name,
@@ -236,7 +240,11 @@ export class ProfessorService {
     try {
       const updatedProfessor = await professor.save();
       return {
-        message: 'Professor updated successfully',
+        message: this.errorMessageService.getMessageWithLanguage(
+          'PROFESSOR',
+          'PROFESSOR_UPDATED_SUCCESSFULLY',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
         data: {
           id: updatedProfessor._id,
           first_name: updatedProfessor.first_name,
@@ -514,7 +522,7 @@ export class ProfessorService {
       `Professor status updated successfully: ${id} to ${status}`,
     );
     return {
-      message: this.errorMessageService.getMessageWithLanguage(
+      message: this.errorMessageService.getSuccessMessageWithLanguage(
         'PROFESSOR',
         'PROFESSOR_STATUS_UPDATED_SUCCESSFULLY',
         user?.preferred_language || DEFAULT_LANGUAGE,
