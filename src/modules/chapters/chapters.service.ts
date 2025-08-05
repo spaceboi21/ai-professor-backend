@@ -41,6 +41,8 @@ import {
   BibliographySchema,
 } from 'src/database/schemas/tenant/bibliography.schema';
 import { ProgressService } from '../progress/progress.service';
+import { ErrorMessageService } from 'src/common/services/error-message.service';
+import { DEFAULT_LANGUAGE } from 'src/common/constants/language.constant';
 
 @Injectable()
 export class ChaptersService {
@@ -54,6 +56,7 @@ export class ChaptersService {
     private readonly tenantConnectionService: TenantConnectionService,
     private readonly modulesService: ModulesService,
     private readonly progressService: ProgressService,
+    private readonly errorMessageService: ErrorMessageService,
   ) {}
 
   /**
@@ -68,14 +71,24 @@ export class ChaptersService {
     if (user.role.name === RoleEnum.SUPER_ADMIN) {
       if (!bodySchoolId) {
         throw new BadRequestException(
-          'School ID is required in request body for super admin',
+          this.errorMessageService.getMessageWithLanguage(
+            'CHAPTER',
+            'SUPER_ADMIN_SCHOOL_ID_REQUIRED',
+            user?.preferred_language || DEFAULT_LANGUAGE,
+          ),
         );
       }
       return bodySchoolId.toString();
     } else {
       // For other roles, use school_id from user context
       if (!user.school_id) {
-        throw new BadRequestException('User school ID not found');
+        throw new BadRequestException(
+          this.errorMessageService.getMessageWithLanguage(
+            'SCHOOL',
+            'USER_SCHOOL_ID_NOT_FOUND',
+            user?.preferred_language || DEFAULT_LANGUAGE,
+          ),
+        );
       }
       return user.school_id.toString();
     }
@@ -98,7 +111,13 @@ export class ChaptersService {
     // Validate school
     const school = await this.schoolModel.findById(user.school_id);
     if (!school) {
-      throw new NotFoundException('School not found');
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'SCHOOL',
+          'NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     // Get tenant connection
@@ -140,10 +159,16 @@ export class ChaptersService {
     // Resolve school_id based on user role
     const resolvedSchoolId = this.resolveSchoolId(user, school_id);
 
-    // Validate school exists and user has access
+    // Validate school exists
     const school = await this.schoolModel.findById(resolvedSchoolId);
     if (!school) {
-      throw new NotFoundException('School not found');
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'SCHOOL',
+          'NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     // Get tenant connection for the school
@@ -159,7 +184,13 @@ export class ChaptersService {
         deleted_at: null,
       });
       if (!module) {
-        throw new NotFoundException('Module not found');
+        throw new NotFoundException(
+          this.errorMessageService.getMessageWithLanguage(
+            'MODULE',
+            'NOT_FOUND',
+            user?.preferred_language || DEFAULT_LANGUAGE,
+          ),
+        );
       }
 
       // Check if another chapter with the same (trimmed, case-insensitive) title exists in this module
@@ -171,7 +202,11 @@ export class ChaptersService {
 
       if (titleExists) {
         throw new ConflictException(
-          `Chapter with title "${title.trim()}" already exists in this module`,
+          this.errorMessageService.getMessageWithLanguage(
+            'CHAPTER',
+            'CHAPTER_TITLE_ALREADY_EXISTS',
+            user?.preferred_language || DEFAULT_LANGUAGE,
+          ),
         );
       }
 
@@ -192,7 +227,11 @@ export class ChaptersService {
       this.logger.log(`Chapter created in tenant DB: ${savedChapter._id}`);
 
       return {
-        message: 'Chapter created successfully',
+        message: this.errorMessageService.getSuccessMessageWithLanguage(
+          'CHAPTER',
+          'CREATED_SUCCESSFULLY',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
         data: savedChapter,
       };
     } catch (error) {
@@ -203,7 +242,13 @@ export class ChaptersService {
       ) {
         throw error;
       }
-      throw new BadRequestException('Failed to create chapter');
+      throw new BadRequestException(
+        this.errorMessageService.getMessageWithLanguage(
+          'CHAPTER',
+          'CREATE_FAILED',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
   }
 
@@ -219,7 +264,13 @@ export class ChaptersService {
     // Validate school exists
     const school = await this.schoolModel.findById(user.school_id);
     if (!school) {
-      throw new NotFoundException('School not found');
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'SCHOOL',
+          'NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     // Get tenant connection for the school
@@ -517,10 +568,19 @@ export class ChaptersService {
 
             // Add locked reason
             if (!isPrevCompleted) {
-              chapter.locked_reason = 'Complete the previous chapter first';
+              chapter.locked_reason =
+                this.errorMessageService.getMessageWithLanguage(
+                  'CHAPTER',
+                  'LOCKED_REASON_PREVIOUS_CHAPTER',
+                  user?.preferred_language || DEFAULT_LANGUAGE,
+                );
             } else if (!isPrevQuizCompleted) {
               chapter.locked_reason =
-                'Retake and pass the quiz to unlock this chapter';
+                this.errorMessageService.getMessageWithLanguage(
+                  'CHAPTER',
+                  'LOCKED_REASON_QUIZ_REQUIRED',
+                  user?.preferred_language || DEFAULT_LANGUAGE,
+                );
             } else {
               chapter.locked_reason = null;
             }
@@ -542,13 +602,23 @@ export class ChaptersService {
       );
 
       return {
-        message: 'Chapters retrieved successfully',
+        message: this.errorMessageService.getSuccessMessageWithLanguage(
+          'CHAPTER',
+          'CHAPTERS_RETRIEVED_SUCCESSFULLY',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
         data: result.data,
         pagination_data: result.pagination_data,
       };
     } catch (error) {
       this.logger.error('Error finding chapters', error?.stack || error);
-      throw new BadRequestException('Failed to retrieve chapters');
+      throw new BadRequestException(
+        this.errorMessageService.getMessageWithLanguage(
+          'CHAPTER',
+          'RETRIEVE_ALL_FAILED',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
   }
 
@@ -558,7 +628,13 @@ export class ChaptersService {
     // Validate school exists
     const school = await this.schoolModel.findById(user.school_id);
     if (!school) {
-      throw new NotFoundException('School not found');
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'SCHOOL',
+          'NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     // Get tenant connection for the school
@@ -574,6 +650,7 @@ export class ChaptersService {
         user.id,
         chapter,
         tenantConnection,
+        user,
       );
     }
 
@@ -850,10 +927,19 @@ export class ChaptersService {
 
             // Add locked reason
             if (!isPrevCompleted) {
-              chapter.locked_reason = 'Complete the previous chapter first';
+              chapter.locked_reason =
+                this.errorMessageService.getMessageWithLanguage(
+                  'CHAPTER',
+                  'LOCKED_REASON_PREVIOUS_CHAPTER',
+                  user?.preferred_language || DEFAULT_LANGUAGE,
+                );
             } else if (!isPrevQuizCompleted) {
               chapter.locked_reason =
-                'Retake and pass the quiz to unlock this chapter';
+                this.errorMessageService.getMessageWithLanguage(
+                  'CHAPTER',
+                  'LOCKED_REASON_QUIZ_REQUIRED',
+                  user?.preferred_language || DEFAULT_LANGUAGE,
+                );
             } else {
               chapter.locked_reason = null;
             }
@@ -862,7 +948,13 @@ export class ChaptersService {
       }
 
       if (chapters.length === 0) {
-        throw new NotFoundException('Chapter not found');
+        throw new NotFoundException(
+          this.errorMessageService.getMessageWithLanguage(
+            'CHAPTER',
+            'NOT_FOUND',
+            user?.preferred_language || DEFAULT_LANGUAGE,
+          ),
+        );
       }
 
       const chapter = chapters[0];
@@ -907,7 +999,11 @@ export class ChaptersService {
       );
 
       return {
-        message: 'Chapter retrieved successfully',
+        message: this.errorMessageService.getSuccessMessageWithLanguage(
+          'CHAPTER',
+          'RETRIEVED_SUCCESSFULLY',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
         data: {
           ...chapterWithUser,
           previous_chapter_id,
@@ -919,7 +1015,13 @@ export class ChaptersService {
       if (error instanceof NotFoundException) {
         throw error;
       }
-      throw new BadRequestException('Failed to retrieve chapter');
+      throw new BadRequestException(
+        this.errorMessageService.getMessageWithLanguage(
+          'CHAPTER',
+          'RETRIEVE_FAILED',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
   }
 
@@ -938,7 +1040,13 @@ export class ChaptersService {
     // Validate school exists
     const school = await this.schoolModel.findById(resolvedSchoolId);
     if (!school) {
-      throw new NotFoundException('School not found');
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'SCHOOL',
+          'NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     // Get tenant connection for the school
@@ -956,7 +1064,13 @@ export class ChaptersService {
         });
 
         if (!currentChapter) {
-          throw new NotFoundException('Chapter not found');
+          throw new NotFoundException(
+            this.errorMessageService.getMessageWithLanguage(
+              'CHAPTER',
+              'NOT_FOUND',
+              user?.preferred_language || DEFAULT_LANGUAGE,
+            ),
+          );
         }
 
         // Check if another chapter with the same (trimmed, case-insensitive) title exists in this module
@@ -969,7 +1083,11 @@ export class ChaptersService {
 
         if (titleExists) {
           throw new ConflictException(
-            `Chapter with title "${chapterUpdateData.title.trim()}" already exists in this module`,
+            this.errorMessageService.getMessageWithLanguage(
+              'CHAPTER',
+              'CHAPTER_TITLE_ALREADY_EXISTS',
+              user?.preferred_language || DEFAULT_LANGUAGE,
+            ),
           );
         }
       }
@@ -985,7 +1103,13 @@ export class ChaptersService {
       ).lean();
 
       if (!updatedChapter) {
-        throw new NotFoundException('Chapter not found');
+        throw new NotFoundException(
+          this.errorMessageService.getMessageWithLanguage(
+            'CHAPTER',
+            'NOT_FOUND',
+            user?.preferred_language || DEFAULT_LANGUAGE,
+          ),
+        );
       }
 
       // Attach user details to chapter
@@ -995,7 +1119,11 @@ export class ChaptersService {
       );
 
       return {
-        message: 'Chapter updated successfully',
+        message: this.errorMessageService.getSuccessMessageWithLanguage(
+          'CHAPTER',
+          'UPDATED_SUCCESSFULLY',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
         data: chapterWithUser,
       };
     } catch (error) {
@@ -1006,7 +1134,13 @@ export class ChaptersService {
       ) {
         throw error;
       }
-      throw new BadRequestException('Failed to update chapter');
+      throw new BadRequestException(
+        this.errorMessageService.getMessageWithLanguage(
+          'CHAPTER',
+          'UPDATE_FAILED',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
   }
 
@@ -1183,7 +1317,11 @@ export class ChaptersService {
         }).lean();
 
         return {
-          message: 'Chapters reordered successfully',
+          message: this.errorMessageService.getSuccessMessageWithLanguage(
+            'CHAPTER',
+            'REORDERED_SUCCESSFULLY',
+            user?.preferred_language || DEFAULT_LANGUAGE,
+          ),
           data: updatedChapters
             .filter((chapter) => chapter !== null)
             .map((chapter) => ({
@@ -1200,7 +1338,13 @@ export class ChaptersService {
         ) {
           throw error;
         }
-        throw new BadRequestException('Failed to reorder chapters');
+        throw new BadRequestException(
+          this.errorMessageService.getMessageWithLanguage(
+            'CHAPTER',
+            'REORDER_FAILED',
+            user?.preferred_language || DEFAULT_LANGUAGE,
+          ),
+        );
       } finally {
         await session.endSession();
       }
@@ -1212,7 +1356,13 @@ export class ChaptersService {
       ) {
         throw error;
       }
-      throw new BadRequestException('Failed to reorder chapters');
+      throw new BadRequestException(
+        this.errorMessageService.getMessageWithLanguage(
+          'CHAPTER',
+          'REORDER_FAILED',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
   }
 
@@ -1223,7 +1373,13 @@ export class ChaptersService {
     // Validate school exists
     const school = await this.schoolModel.findById(user.school_id);
     if (!school) {
-      throw new NotFoundException('School not found');
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'SCHOOL',
+          'NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     // Get tenant connection for the school
@@ -1242,7 +1398,13 @@ export class ChaptersService {
       return lastChapter ? lastChapter.sequence + 1 : 1;
     } catch (error) {
       this.logger.error('Error getting next sequence', error?.stack || error);
-      throw new BadRequestException('Failed to get next sequence');
+      throw new BadRequestException(
+        this.errorMessageService.getMessageWithLanguage(
+          'CHAPTER',
+          'SEQUENCE_FAILED',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
   }
 

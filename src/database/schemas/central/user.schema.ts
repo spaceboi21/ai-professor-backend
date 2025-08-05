@@ -6,6 +6,10 @@ import {
   StatusEnum,
   DEFAULT_STATUS,
 } from 'src/common/constants/status.constant';
+import {
+  LanguageEnum,
+  DEFAULT_LANGUAGE,
+} from 'src/common/constants/language.constant';
 
 @Schema({
   timestamps: {
@@ -55,6 +59,13 @@ export class User extends Document {
 
   @Prop({ enum: StatusEnum, default: DEFAULT_STATUS, index: true })
   status: StatusEnum;
+
+  @Prop({
+    enum: LanguageEnum,
+    default: DEFAULT_LANGUAGE,
+    required: true,
+  })
+  preferred_language: LanguageEnum;
 
   readonly created_at?: Date;
   readonly updated_at?: Date;

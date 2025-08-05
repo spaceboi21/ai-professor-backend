@@ -59,12 +59,14 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
       // Set user data on socket
       client.user = this.reconstructUserPayload(payload);
-      
+
       // Store connection
       this.connectedUsers.set(client.user.id.toString(), client.id);
-      
-      this.logger.log(`✅ User authenticated: ${client.user.id} (${client.user.email})`);
-      
+
+      this.logger.log(
+        `✅ User authenticated: ${client.user.id} (${client.user.email})`,
+      );
+
       // Emit connection success
       client.emit('CONNECTED', {
         user_id: client.user.id,
@@ -74,7 +76,6 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
       // Broadcast online status
       this.broadcastOnlineStatus(client.user.id.toString(), true);
-
     } catch (error) {
       this.logger.error(`❌ Connection error: ${error.message}`);
       this.handleAuthError(client, error.message);
@@ -104,11 +105,14 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
 
     try {
-      const savedMessage = await this.chatService.createMessage(messageData, client.user!);
-      
+      const savedMessage = await this.chatService.createMessage(
+        messageData,
+        client.user!,
+      );
+
       // Emit to sender
       client.emit('MESSAGE_SENT', savedMessage);
-      
+
       // Emit to receiver if online
       this.emitToReceiver(messageData.receiver_id, 'NEW_MESSAGE', savedMessage);
 
@@ -124,22 +128,28 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     @ConnectedSocket() client: AuthenticatedSocket,
     @MessageBody() data: { sender_id: string },
   ) {
-    this.logger.log(`👁️ MARK_READ from user: ${client.user?.id} for sender: ${data.sender_id}`);
+    this.logger.log(
+      `👁️ MARK_READ from user: ${client.user?.id} for sender: ${data.sender_id}`,
+    );
 
     if (!this.validateUser(client)) return { error: 'Unauthorized' };
 
-    if(!client.user?.school_id){
+    if (!client.user?.school_id) {
       throw new BadRequestException('School ID is required');
     }
 
-    const connection = await this.chatService.getTenantConnection(client.user.school_id.toString());
+    const connection = await this.chatService.getTenantConnection(
+      client.user.school_id.toString(),
+    );
 
     try {
       // Convert string IDs to ObjectId
       const currentUserId = new Types.ObjectId(client.user!.id);
       const senderId = new Types.ObjectId(data.sender_id);
-      
-      this.logger.log(`Converting IDs - Current: ${currentUserId}, Sender: ${senderId}`);
+
+      this.logger.log(
+        `Converting IDs - Current: ${currentUserId}, Sender: ${senderId}`,
+      );
 
       await this.chatService.markMessagesAsRead(
         currentUserId,
@@ -170,19 +180,19 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
     try {
       await this.chatService.deleteMessage(data.message_id, client.user!);
-      
+
       // Emit to sender for confirmation
       client.emit('MESSAGE_DELETED', {
         message_id: data.message_id,
-        success: true
+        success: true,
       });
-      
+
       // Broadcast to all connected users that message was deleted
       this.server.emit('MESSAGE_DELETED', {
         message_id: data.message_id,
-        deleted_by: client.user!.id.toString()
+        deleted_by: client.user!.id.toString(),
       });
-      
+
       return { success: true };
     } catch (error) {
       this.logger.error(`❌ Error deleting message: ${error.message}`);
@@ -219,11 +229,11 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @SubscribeMessage('PING')
   async handlePing(@ConnectedSocket() client: AuthenticatedSocket) {
     this.logger.log(`🏓 PING from user: ${client.user?.id}`);
-    
+
     client.emit('PONG', {
       message: 'Pong from server',
       timestamp: new Date().toISOString(),
-      user_id: client.user?.id
+      user_id: client.user?.id,
     });
   }
 
@@ -238,33 +248,36 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   getOnlineStatusForUsers(userIds: string[]): { [userId: string]: boolean } {
     const statusMap: { [userId: string]: boolean } = {};
-    userIds.forEach(userId => {
+    userIds.forEach((userId) => {
       statusMap[userId] = this.connectedUsers.has(userId);
     });
     return statusMap;
   }
 
-  getConnectionDetails(): { 
-    totalConnected: number; 
-    connectedUsers: Array<{ userId: string; socketId: string }> 
+  getConnectionDetails(): {
+    totalConnected: number;
+    connectedUsers: Array<{ userId: string; socketId: string }>;
   } {
-    const connectedUsers = Array.from(this.connectedUsers.entries()).map(([userId, socketId]) => ({
-      userId,
-      socketId
-    }));
-    
+    const connectedUsers = Array.from(this.connectedUsers.entries()).map(
+      ([userId, socketId]) => ({
+        userId,
+        socketId,
+      }),
+    );
+
     return {
       totalConnected: this.connectedUsers.size,
-      connectedUsers
+      connectedUsers,
     };
   }
 
   // Private helper methods
   private extractToken(client: AuthenticatedSocket): string | null {
-    const auth = client.handshake.auth?.token || 
-                 client.handshake.headers?.authorization ||
-                 client.handshake.query?.token;
-    
+    const auth =
+      client.handshake.auth?.token ||
+      client.handshake.headers?.authorization ||
+      client.handshake.query?.token;
+
     if (typeof auth === 'string' && auth.startsWith('Bearer ')) {
       return auth.substring(7);
     }
@@ -291,6 +304,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
         name: payload.role_name,
       },
       school_id: payload.school_id,
+      preferred_language: payload.preferred_language,
     };
   }
 
@@ -309,7 +323,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   private parseMessageData(data: any): CreateChatMessageDto | null {
     let messageData = data;
-    
+
     // Handle string data
     if (typeof data === 'string') {
       try {
@@ -318,14 +332,16 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
         } else {
           // Extract object properties from string
           const receiverIdMatch = data.match(/receiver_id:\s*['"]([^'"]+)['"]/);
-          const receiverRoleMatch = data.match(/receiver_role:\s*['"]([^'"]+)['"]/);
+          const receiverRoleMatch = data.match(
+            /receiver_role:\s*['"]([^'"]+)['"]/,
+          );
           const messageMatch = data.match(/message:\s*['"]([^'"]+)['"]/);
-          
+
           if (receiverIdMatch && receiverRoleMatch && messageMatch) {
             messageData = {
               receiver_id: receiverIdMatch[1],
               receiver_role: receiverRoleMatch[1],
-              message: messageMatch[1]
+              message: messageMatch[1],
             };
           } else {
             throw new Error('Could not parse object properties from string');
@@ -338,7 +354,12 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
 
     // Validate required fields
-    if (!messageData || !messageData.receiver_id || !messageData.receiver_role || !messageData.message) {
+    if (
+      !messageData ||
+      !messageData.receiver_id ||
+      !messageData.receiver_role ||
+      !messageData.message
+    ) {
       this.logger.error(`Invalid message data: ${JSON.stringify(messageData)}`);
       return null;
     }

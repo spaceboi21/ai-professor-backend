@@ -49,10 +49,16 @@ export class SchoolsController {
   })
   async getAllSchools(
     @Query() paginationDto: PaginationDto,
+    @User() user: JWTUserPayload,
     @Query('search') search?: string,
     @Query('status') status?: string,
   ) {
-    return this.schoolsService.getAllSchools(paginationDto, search, status);
+    return this.schoolsService.getAllSchools(
+      paginationDto,
+      search,
+      status,
+      user,
+    );
   }
 
   @Get(':id')
@@ -94,8 +100,13 @@ export class SchoolsController {
   async updateSchoolStatus(
     @Param('id', ParseObjectIdPipe) id: Types.ObjectId,
     @Body() updateStatusDto: UpdateStatusDto,
+    @User() user: JWTUserPayload,
   ) {
-    return this.schoolsService.updateSchoolStatus(id, updateStatusDto.status);
+    return this.schoolsService.updateSchoolStatus(
+      id,
+      updateStatusDto.status,
+      user,
+    );
   }
 
   @Patch(':id')

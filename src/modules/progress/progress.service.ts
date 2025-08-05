@@ -64,6 +64,8 @@ import {
   QuizQuestion,
   QuizVerificationResponse,
 } from 'src/common/types/quiz.type';
+import { ErrorMessageService } from 'src/common/services/error-message.service';
+import { DEFAULT_LANGUAGE } from 'src/common/constants/language.constant';
 
 @Injectable()
 export class ProgressService {
@@ -76,6 +78,7 @@ export class ProgressService {
     private readonly schoolModel: Model<School>,
     private readonly tenantConnectionService: TenantConnectionService,
     private readonly pythonService: PythonService,
+    private readonly errorMessageService: ErrorMessageService,
   ) {}
 
   // ========== MODULE PROGRESS OPERATIONS ==========
@@ -87,13 +90,25 @@ export class ProgressService {
 
     // Validate user is a student
     if (user.role.name !== RoleEnum.STUDENT) {
-      throw new ForbiddenException('Only students can start modules');
+      throw new ForbiddenException(
+        this.errorMessageService.getMessageWithLanguage(
+          'PROGRESS',
+          'ONLY_STUDENTS_CAN_START_MODULES',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     // Get school and tenant connection
     const school = await this.schoolModel.findById(user.school_id);
     if (!school) {
-      throw new NotFoundException('School not found');
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'PROGRESS',
+          'SCHOOL_NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     const tenantConnection =
@@ -110,7 +125,13 @@ export class ProgressService {
       // Validate student exists in tenant database
       const student = await StudentModel.findById(user.id);
       if (!student) {
-        throw new NotFoundException('Student not found');
+        throw new NotFoundException(
+          this.errorMessageService.getMessageWithLanguage(
+            'PROGRESS',
+            'STUDENT_NOT_FOUND',
+            user?.preferred_language || DEFAULT_LANGUAGE,
+          ),
+        );
       }
 
       // Validate module exists
@@ -119,7 +140,13 @@ export class ProgressService {
         deleted_at: null,
       });
       if (!module) {
-        throw new NotFoundException('Module not found');
+        throw new NotFoundException(
+          this.errorMessageService.getMessageWithLanguage(
+            'PROGRESS',
+            'MODULE_NOT_FOUND',
+            user?.preferred_language || DEFAULT_LANGUAGE,
+          ),
+        );
       }
 
       // Get total chapters count for this module
@@ -163,7 +190,11 @@ export class ProgressService {
       );
 
       return {
-        message: 'Module started successfully',
+        message: this.errorMessageService.getMessageWithLanguage(
+          'PROGRESS',
+          'MODULE_STARTED_SUCCESSFULLY',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
         data: {
           progress_id: progress._id,
           module_id: progress.module_id,
@@ -182,7 +213,13 @@ export class ProgressService {
       ) {
         throw error;
       }
-      throw new BadRequestException('Failed to start module');
+      throw new BadRequestException(
+        this.errorMessageService.getMessageWithLanguage(
+          'PROGRESS',
+          'FAILED_TO_START_MODULE',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
   }
 
@@ -195,13 +232,25 @@ export class ProgressService {
 
     // Validate user is a student
     if (user.role.name !== RoleEnum.STUDENT) {
-      throw new ForbiddenException('Only students can start chapters');
+      throw new ForbiddenException(
+        this.errorMessageService.getMessageWithLanguage(
+          'PROGRESS',
+          'ONLY_STUDENTS_CAN_START_CHAPTERS',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     // Get school and tenant connection
     const school = await this.schoolModel.findById(user.school_id);
     if (!school) {
-      throw new NotFoundException('School not found');
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'PROGRESS',
+          'SCHOOL_NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     const tenantConnection =
@@ -217,7 +266,13 @@ export class ProgressService {
       // Validate student exists
       const student = await StudentModel.findById(user.id);
       if (!student) {
-        throw new NotFoundException('Student not found');
+        throw new NotFoundException(
+          this.errorMessageService.getMessageWithLanguage(
+            'PROGRESS',
+            'STUDENT_NOT_FOUND',
+            user?.preferred_language || DEFAULT_LANGUAGE,
+          ),
+        );
       }
 
       // Validate chapter exists
@@ -226,11 +281,22 @@ export class ProgressService {
         deleted_at: null,
       });
       if (!chapter) {
-        throw new NotFoundException('Chapter not found');
+        throw new NotFoundException(
+          this.errorMessageService.getMessageWithLanguage(
+            'PROGRESS',
+            'CHAPTER_NOT_FOUND',
+            user?.preferred_language || DEFAULT_LANGUAGE,
+          ),
+        );
       }
 
       // Check if student can access this chapter (validate sequence)
-      await this.validateChapterAccess(user.id, chapter, tenantConnection);
+      await this.validateChapterAccess(
+        user.id,
+        chapter,
+        tenantConnection,
+        user,
+      );
 
       // Start the module if not already started
       await this.startModule(
@@ -271,7 +337,11 @@ export class ProgressService {
       );
 
       return {
-        message: 'Chapter started successfully',
+        message: this.errorMessageService.getMessageWithLanguage(
+          'PROGRESS',
+          'CHAPTER_STARTED_SUCCESSFULLY',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
         data: {
           progress_id: progress._id,
           chapter_id: progress.chapter_id,
@@ -289,7 +359,13 @@ export class ProgressService {
       ) {
         throw error;
       }
-      throw new BadRequestException('Failed to start chapter');
+      throw new BadRequestException(
+        this.errorMessageService.getMessageWithLanguage(
+          'PROGRESS',
+          'FAILED_TO_START_CHAPTER',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
   }
 
@@ -308,14 +384,24 @@ export class ProgressService {
     // Validate user is a student
     if (user.role.name !== RoleEnum.STUDENT) {
       throw new ForbiddenException(
-        'Only students can mark chapters as complete',
+        this.errorMessageService.getMessageWithLanguage(
+          'PROGRESS',
+          'ONLY_STUDENTS_CAN_MARK_CHAPTERS_AS_COMPLETE',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
       );
     }
 
     // Get school and tenant connection
     const school = await this.schoolModel.findById(user.school_id);
     if (!school) {
-      throw new NotFoundException('School not found');
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'PROGRESS',
+          'SCHOOL_NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     const tenantConnection =
@@ -335,7 +421,13 @@ export class ProgressService {
       // Validate student exists
       const student = await StudentModel.findById(user.id);
       if (!student) {
-        throw new NotFoundException('Student not found');
+        throw new NotFoundException(
+          this.errorMessageService.getMessageWithLanguage(
+            'PROGRESS',
+            'STUDENT_NOT_FOUND',
+            user?.preferred_language || DEFAULT_LANGUAGE,
+          ),
+        );
       }
 
       // Validate chapter exists
@@ -344,7 +436,13 @@ export class ProgressService {
         deleted_at: null,
       });
       if (!chapter) {
-        throw new NotFoundException('Chapter not found');
+        throw new NotFoundException(
+          this.errorMessageService.getMessageWithLanguage(
+            'PROGRESS',
+            'CHAPTER_NOT_FOUND',
+            user?.preferred_language || DEFAULT_LANGUAGE,
+          ),
+        );
       }
 
       // Check if chapter has any quiz groups
@@ -400,7 +498,11 @@ export class ProgressService {
       );
 
       return {
-        message: 'Chapter marked as complete successfully',
+        message: this.errorMessageService.getMessageWithLanguage(
+          'PROGRESS',
+          'CHAPTER_MARKED_AS_COMPLETE_SUCCESSFULLY',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
         data: {
           chapter_id: chapterProgress.chapter_id,
           module_id: chapterProgress.module_id,
@@ -417,7 +519,13 @@ export class ProgressService {
       ) {
         throw error;
       }
-      throw new BadRequestException('Failed to mark chapter as complete');
+      throw new BadRequestException(
+        this.errorMessageService.getMessageWithLanguage(
+          'PROGRESS',
+          'FAILED_TO_MARK_CHAPTER_AS_COMPLETE',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
   }
 
@@ -435,13 +543,25 @@ export class ProgressService {
 
     // Validate user is a student
     if (user.role.name !== RoleEnum.STUDENT) {
-      throw new ForbiddenException('Only students can start quiz attempts');
+      throw new ForbiddenException(
+        this.errorMessageService.getMessageWithLanguage(
+          'PROGRESS',
+          'ONLY_STUDENTS_CAN_START_QUIZ_ATTEMPTS',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     // Get school and tenant connection
     const school = await this.schoolModel.findById(user.school_id);
     if (!school) {
-      throw new NotFoundException('School not found');
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'PROGRESS',
+          'SCHOOL_NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     const tenantConnection =
@@ -461,7 +581,13 @@ export class ProgressService {
       // Validate student exists
       const student = await StudentModel.findById(user.id);
       if (!student) {
-        throw new NotFoundException('Student not found');
+        throw new NotFoundException(
+          this.errorMessageService.getMessageWithLanguage(
+            'PROGRESS',
+            'STUDENT_NOT_FOUND',
+            user?.preferred_language || DEFAULT_LANGUAGE,
+          ),
+        );
       }
 
       // Validate quiz group exists
@@ -470,12 +596,23 @@ export class ProgressService {
         deleted_at: null,
       });
       if (!quizGroup) {
-        throw new NotFoundException('Quiz group not found');
+        throw new NotFoundException(
+          this.errorMessageService.getMessageWithLanguage(
+            'PROGRESS',
+            'QUIZ_GROUP_NOT_FOUND',
+            user?.preferred_language || DEFAULT_LANGUAGE,
+          ),
+        );
       }
 
       // Validate access to this quiz (chapter-based validation)
       if (quizGroup.chapter_id) {
-        await this.validateQuizAccess(user.id, quizGroup, tenantConnection);
+        await this.validateQuizAccess(
+          user.id,
+          quizGroup,
+          tenantConnection,
+          user,
+        );
       }
 
       // Check for existing in-progress attempt
@@ -487,7 +624,11 @@ export class ProgressService {
 
       if (existingAttempt) {
         return {
-          message: 'Quiz attempt already in progress',
+          message: this.errorMessageService.getMessageWithLanguage(
+            'PROGRESS',
+            'QUIZ_ATTEMPT_ALREADY_IN_PROGRESS',
+            user?.preferred_language || DEFAULT_LANGUAGE,
+          ),
           data: {
             attempt_id: existingAttempt._id,
             quiz_group_id: existingAttempt.quiz_group_id,
@@ -533,7 +674,11 @@ export class ProgressService {
       );
 
       return {
-        message: 'Quiz attempt started successfully',
+        message: this.errorMessageService.getMessageWithLanguage(
+          'PROGRESS',
+          'QUIZ_ATTEMPT_STARTED_SUCCESSFULLY',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
         data: {
           attempt_id: newAttempt._id,
           quiz_group_id: newAttempt.quiz_group_id,
@@ -551,7 +696,13 @@ export class ProgressService {
       ) {
         throw error;
       }
-      throw new BadRequestException('Failed to start quiz attempt');
+      throw new BadRequestException(
+        this.errorMessageService.getMessageWithLanguage(
+          'PROGRESS',
+          'FAILED_TO_START_QUIZ_ATTEMPT',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
   }
 
@@ -568,13 +719,25 @@ export class ProgressService {
 
     // Validate user is a student
     if (user.role.name !== RoleEnum.STUDENT) {
-      throw new ForbiddenException('Only students can submit quiz answers');
+      throw new ForbiddenException(
+        this.errorMessageService.getMessageWithLanguage(
+          'PROGRESS',
+          'ONLY_STUDENTS_CAN_SUBMIT_QUIZ_ANSWERS',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     // Get school and tenant connection
     const school = await this.schoolModel.findById(user.school_id);
     if (!school) {
-      throw new NotFoundException('School not found');
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'PROGRESS',
+          'SCHOOL_NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     const tenantConnection =
@@ -598,7 +761,13 @@ export class ProgressService {
     });
 
     if (!attempt) {
-      throw new NotFoundException('No in-progress quiz attempt found');
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'PROGRESS',
+          'NO_IN_PROGRESS_QUIZ_ATTEMPT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     // Get quiz group details
@@ -606,13 +775,25 @@ export class ProgressService {
       new Types.ObjectId(quiz_group_id),
     );
     if (!quizGroup) {
-      throw new NotFoundException('Quiz group not found');
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'PROGRESS',
+          'QUIZ_GROUP_NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     // Get module details for AI verification
     const module = await ModuleModel.findById(quizGroup.module_id);
     if (!module) {
-      throw new NotFoundException('Module not found');
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'PROGRESS',
+          'MODULE_NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     // Get all quizzes for this group with correct answers
@@ -693,7 +874,11 @@ export class ProgressService {
     );
 
     return {
-      message: 'Quiz answers submitted successfully',
+      message: this.errorMessageService.getMessageWithLanguage(
+        'PROGRESS',
+        'QUIZ_ANSWERS_SUBMITTED_SUCCESSFULLY',
+        user?.preferred_language || DEFAULT_LANGUAGE,
+      ),
       data: {
         attempt_id: attempt._id,
         score_percentage: attempt.score_percentage,
@@ -715,6 +900,7 @@ export class ProgressService {
     studentId: string | Types.ObjectId,
     chapter: any,
     tenantConnection: any,
+    user: JWTUserPayload,
   ) {
     // If this is the first chapter (sequence 1), allow access
     if (chapter.sequence === 1) {
@@ -735,7 +921,13 @@ export class ProgressService {
     });
 
     if (!previousChapter) {
-      throw new BadRequestException('Previous chapter not found');
+      throw new BadRequestException(
+        this.errorMessageService.getMessageWithLanguage(
+          'PROGRESS',
+          'PREVIOUS_CHAPTER_NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     // Check if previous chapter quiz is completed
@@ -747,7 +939,11 @@ export class ProgressService {
 
     if (!previousChapterProgress) {
       throw new ForbiddenException(
-        `The chapter is locked. Please complete the quiz for "${previousChapter.title}" to continue.`,
+        this.errorMessageService.getMessageWithLanguage(
+          'PROGRESS',
+          'CHAPTER_IS_LOCKED',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
       );
     }
 
@@ -758,6 +954,7 @@ export class ProgressService {
     studentId: string | Types.ObjectId,
     quizGroup: any,
     tenantConnection: any,
+    user: JWTUserPayload,
   ) {
     // If this is a module-level quiz, check if all chapters are completed
     if (quizGroup.type === QuizTypeEnum.MODULE) {
@@ -784,7 +981,11 @@ export class ProgressService {
 
       if (completedChapters < totalChapters) {
         throw new ForbiddenException(
-          'You must complete all chapters and their quizzes before taking the module quiz',
+          this.errorMessageService.getMessageWithLanguage(
+            'PROGRESS',
+            'YOU_MUST_COMPLETE_ALL_CHAPTERS_AND_QUIZZES_BEFORE_TAKING_THE_MODULE_QUIZ',
+            user?.preferred_language || DEFAULT_LANGUAGE,
+          ),
         );
       }
     }
@@ -812,7 +1013,11 @@ export class ProgressService {
         const chapterTitle = chapter?.title || 'this chapter';
 
         throw new ForbiddenException(
-          `You must mark "${chapterTitle}" as complete before taking the quiz`,
+          this.errorMessageService.getMessageWithLanguage(
+            'PROGRESS',
+            'YOU_MUST_MARK_CHAPTER_AS_COMPLETE_BEFORE_TAKING_QUIZ',
+            user?.preferred_language || DEFAULT_LANGUAGE,
+          ),
         );
       }
     }
@@ -1000,7 +1205,13 @@ export class ProgressService {
     // Get school and tenant connection
     const school = await this.schoolModel.findById(user.school_id);
     if (!school) {
-      throw new NotFoundException('School not found');
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'PROGRESS',
+          'SCHOOL_NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     const tenantConnection =
@@ -1070,13 +1281,25 @@ export class ProgressService {
 
     // Validate user is a student
     if (user.role.name !== RoleEnum.STUDENT) {
-      throw new ForbiddenException('Only students can view their own progress');
+      throw new ForbiddenException(
+        this.errorMessageService.getMessageWithLanguage(
+          'PROGRESS',
+          'ONLY_STUDENTS_CAN_VIEW_PROGRESS',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     // Get school and tenant connection
     const school = await this.schoolModel.findById(user.school_id);
     if (!school) {
-      throw new NotFoundException('School not found');
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'PROGRESS',
+          'SCHOOL_NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     const tenantConnection =
@@ -1132,7 +1355,11 @@ export class ProgressService {
       const result = createPaginationResult(progress, total, paginationOptions);
 
       return {
-        message: 'Chapter progress retrieved successfully',
+        message: this.errorMessageService.getMessageWithLanguage(
+          'PROGRESS',
+          'CHAPTER_PROGRESS_RETRIEVED_SUCCESSFULLY',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
         data: result.data,
         pagination_data: result.pagination_data,
       };
@@ -1141,7 +1368,13 @@ export class ProgressService {
         'Error getting chapter progress',
         error?.stack || error,
       );
-      throw new BadRequestException('Failed to retrieve chapter progress');
+      throw new BadRequestException(
+        this.errorMessageService.getMessageWithLanguage(
+          'PROGRESS',
+          'FAILED_TO_RETRIEVE_CHAPTER_PROGRESS',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
   }
 
@@ -1155,14 +1388,24 @@ export class ProgressService {
     // Validate user is a student
     if (user.role.name !== RoleEnum.STUDENT) {
       throw new ForbiddenException(
-        'Only students can view their own quiz attempts',
+        this.errorMessageService.getMessageWithLanguage(
+          'PROGRESS',
+          'ONLY_STUDENTS_CAN_VIEW_QUIZ_ATTEMPTS',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
       );
     }
 
     // Get school and tenant connection
     const school = await this.schoolModel.findById(user.school_id);
     if (!school) {
-      throw new NotFoundException('School not found');
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'PROGRESS',
+          'SCHOOL_NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     const tenantConnection =
@@ -1222,13 +1465,23 @@ export class ProgressService {
       const result = createPaginationResult(attempts, total, paginationOptions);
 
       return {
-        message: 'Quiz attempts retrieved successfully',
+        message: this.errorMessageService.getMessageWithLanguage(
+          'PROGRESS',
+          'QUIZ_ATTEMPTS_RETRIEVED_SUCCESSFULLY',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
         data: result.data,
         pagination_data: result.pagination_data,
       };
     } catch (error) {
       this.logger.error('Error getting quiz attempts', error?.stack || error);
-      throw new BadRequestException('Failed to retrieve quiz attempts');
+      throw new BadRequestException(
+        this.errorMessageService.getMessageWithLanguage(
+          'PROGRESS',
+          'FAILED_TO_RETRIEVE_QUIZ_ATTEMPTS',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
   }
 
@@ -1251,14 +1504,24 @@ export class ProgressService {
       // For students, use their own ID and school
       studentId = user.id.toString();
       if (!user.school_id) {
-        throw new BadRequestException('Student must have a school_id');
+        throw new BadRequestException(
+          this.errorMessageService.getMessageWithLanguage(
+            'PROGRESS',
+            'STUDENT_MUST_HAVE_SCHOOL_ID',
+            user?.preferred_language || DEFAULT_LANGUAGE,
+          ),
+        );
       }
       schoolId = user.school_id.toString();
     } else if (user.role.name === RoleEnum.SUPER_ADMIN) {
       // For super admin, both student_id and school_id are required in params
       if (!queryDto?.student_id || !queryDto?.school_id) {
         throw new BadRequestException(
-          'Both student_id and school_id are required for super admin access',
+          this.errorMessageService.getMessageWithLanguage(
+            'PROGRESS',
+            'BOTH_STUDENT_ID_AND_SCHOOL_ID_REQUIRED_FOR_SUPER_ADMIN_ACCESS',
+            user?.preferred_language || DEFAULT_LANGUAGE,
+          ),
         );
       }
       studentId = queryDto.student_id;
@@ -1270,22 +1533,44 @@ export class ProgressService {
       // For school admin/professor, student_id is required in params
       if (!queryDto?.student_id) {
         throw new BadRequestException(
-          'student_id is required for admin/professor access',
+          this.errorMessageService.getMessageWithLanguage(
+            'PROGRESS',
+            'STUDENT_ID_REQUIRED_FOR_ADMIN_PROFESSOR_ACCESS',
+            user?.preferred_language || DEFAULT_LANGUAGE,
+          ),
         );
       }
       studentId = queryDto.student_id;
       if (!user.school_id) {
-        throw new BadRequestException('Admin/Professor must have a school_id');
+        throw new BadRequestException(
+          this.errorMessageService.getMessageWithLanguage(
+            'PROGRESS',
+            'ADMIN_PROFESSOR_MUST_HAVE_SCHOOL_ID',
+            user?.preferred_language || DEFAULT_LANGUAGE,
+          ),
+        );
       }
       schoolId = user.school_id.toString(); // Use their school_id
     } else {
-      throw new ForbiddenException('Access denied - insufficient permissions');
+      throw new ForbiddenException(
+        this.errorMessageService.getMessageWithLanguage(
+          'PROGRESS',
+          'ACCESS_DENIED_INSUFFICIENT_PERMISSIONS',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     // Validate school exists
     school = await this.schoolModel.findById(new Types.ObjectId(schoolId));
     if (!school) {
-      throw new NotFoundException('School not found');
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'PROGRESS',
+          'SCHOOL_NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     // For school admin/professor, validate that the student belongs to their school
@@ -1300,13 +1585,23 @@ export class ProgressService {
         new Types.ObjectId(studentId),
       );
       if (!student) {
-        throw new NotFoundException('Student not found');
+        throw new NotFoundException(
+          this.errorMessageService.getMessageWithLanguage(
+            'PROGRESS',
+            'STUDENT_NOT_FOUND',
+            user?.preferred_language || DEFAULT_LANGUAGE,
+          ),
+        );
       }
 
       // Validate student belongs to the same school as the admin/professor
       if (student.school_id.toString() !== user.school_id?.toString()) {
         throw new ForbiddenException(
-          'Access denied - student does not belong to your school',
+          this.errorMessageService.getMessageWithLanguage(
+            'PROGRESS',
+            'ACCESS_DENIED_STUDENT_DOES_NOT_BELONG_TO_YOUR_SCHOOL',
+            user?.preferred_language || DEFAULT_LANGUAGE,
+          ),
         );
       }
     }
@@ -1333,7 +1628,10 @@ export class ProgressService {
 
       // Get overall statistics, ignoring deleted modules
       // First, get all non-deleted module IDs
-      const deletedModules = await ModuleModel.find({ deleted_at: { $ne: null } }, { _id: 1 }).lean();
+      const deletedModules = await ModuleModel.find(
+        { deleted_at: { $ne: null } },
+        { _id: 1 },
+      ).lean();
       const deletedModuleIds = deletedModules.map((m) => m._id);
 
       const [
@@ -1410,7 +1708,13 @@ export class ProgressService {
         'Error getting student dashboard',
         error?.stack || error,
       );
-      throw new BadRequestException('Failed to retrieve dashboard data');
+      throw new BadRequestException(
+        this.errorMessageService.getMessageWithLanguage(
+          'PROGRESS',
+          'FAILED_TO_RETRIEVE_DASHBOARD_DATA',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
   }
 
@@ -1422,14 +1726,24 @@ export class ProgressService {
     // Validate user is school admin or professor
     if (![RoleEnum.SCHOOL_ADMIN, RoleEnum.PROFESSOR].includes(user.role.name)) {
       throw new ForbiddenException(
-        'Only school admins and professors can view school dashboard',
+        this.errorMessageService.getMessageWithLanguage(
+          'PROGRESS',
+          'ONLY_SCHOOL_ADMINS_AND_PROFESSORS_CAN_VIEW_SCHOOL_DASHBOARD',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
       );
     }
 
     // Get school and tenant connection
     const school = await this.schoolModel.findById(user.school_id);
     if (!school) {
-      throw new NotFoundException('School not found');
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'PROGRESS',
+          'SCHOOL_NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     const tenantConnection =
@@ -1515,7 +1829,13 @@ export class ProgressService {
       };
     } catch (error) {
       this.logger.error('Error getting admin dashboard', error?.stack || error);
-      throw new BadRequestException('Failed to retrieve admin dashboard data');
+      throw new BadRequestException(
+        this.errorMessageService.getMessageWithLanguage(
+          'PROGRESS',
+          'FAILED_TO_RETRIEVE_ADMIN_DASHBOARD_DATA',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
   }
 }

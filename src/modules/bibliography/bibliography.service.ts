@@ -38,6 +38,8 @@ import {
   createPaginationResult,
 } from 'src/common/utils/pagination.util';
 import { ChaptersService } from '../chapters/chapters.service';
+import { ErrorMessageService } from 'src/common/services/error-message.service';
+import { DEFAULT_LANGUAGE } from 'src/common/constants/language.constant';
 
 @Injectable()
 export class BibliographyService {
@@ -50,6 +52,7 @@ export class BibliographyService {
     private readonly schoolModel: Model<School>,
     private readonly tenantConnectionService: TenantConnectionService,
     private readonly chaptersService: ChaptersService,
+    private readonly errorMessageService: ErrorMessageService,
   ) {}
 
   /**
@@ -64,14 +67,24 @@ export class BibliographyService {
     if (user.role.name === RoleEnum.SUPER_ADMIN) {
       if (!bodySchoolId) {
         throw new BadRequestException(
-          'School ID is required in request body for super admin',
+          this.errorMessageService.getMessageWithLanguage(
+            'BIBLIOGRAPHY',
+            'SUPER_ADMIN_SCHOOL_ID_REQUIRED',
+            user?.preferred_language || DEFAULT_LANGUAGE,
+          ),
         );
       }
       return bodySchoolId.toString();
     } else {
       // For other roles, use school_id from user context
       if (!user.school_id) {
-        throw new BadRequestException('User school ID not found');
+        throw new BadRequestException(
+          this.errorMessageService.getMessageWithLanguage(
+            'SCHOOL',
+            'USER_SCHOOL_ID_NOT_FOUND',
+            user?.preferred_language || DEFAULT_LANGUAGE,
+          ),
+        );
       }
       return user.school_id.toString();
     }
@@ -102,7 +115,13 @@ export class BibliographyService {
     // Validate school exists and user has access
     const school = await this.schoolModel.findById(resolvedSchoolId);
     if (!school) {
-      throw new NotFoundException('School not found');
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'SCHOOL',
+          'NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     // Get tenant connection for the school
@@ -122,7 +141,13 @@ export class BibliographyService {
         deleted_at: null,
       });
       if (!module) {
-        throw new NotFoundException('Module not found');
+        throw new NotFoundException(
+          this.errorMessageService.getMessageWithLanguage(
+            'MODULE',
+            'NOT_FOUND',
+            user?.preferred_language || DEFAULT_LANGUAGE,
+          ),
+        );
       }
 
       // Validate chapter exists and belongs to the module
@@ -133,7 +158,11 @@ export class BibliographyService {
       });
       if (!chapter) {
         throw new NotFoundException(
-          'Chapter not found or does not belong to the specified module',
+          this.errorMessageService.getMessageWithLanguage(
+            'CHAPTER',
+            'NOT_FOUND',
+            user?.preferred_language || DEFAULT_LANGUAGE,
+          ),
         );
       }
 
@@ -169,7 +198,11 @@ export class BibliographyService {
       );
 
       return {
-        message: 'Bibliography created successfully',
+        message: this.errorMessageService.getSuccessMessageWithLanguage(
+          'BIBLIOGRAPHY',
+          'CREATED_SUCCESSFULLY',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
         data: savedBibliography,
       };
     } catch (error) {
@@ -180,7 +213,13 @@ export class BibliographyService {
         throw error;
       }
       this.logger.error('Error creating bibliography', error?.stack || error);
-      throw new BadRequestException('Failed to create bibliography');
+      throw new BadRequestException(
+        this.errorMessageService.getMessageWithLanguage(
+          'BIBLIOGRAPHY',
+          'CREATE_FAILED',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
   }
 
@@ -194,7 +233,13 @@ export class BibliographyService {
     // Validate school exists
     const school = await this.schoolModel.findById(user.school_id);
     if (!school) {
-      throw new NotFoundException('School not found');
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'SCHOOL',
+          'NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     // Get tenant connection for the school
@@ -359,13 +404,23 @@ export class BibliographyService {
       );
 
       return {
-        message: 'Bibliography retrieved successfully',
+        message: this.errorMessageService.getSuccessMessageWithLanguage(
+          'BIBLIOGRAPHY',
+          'RETRIEVED_SUCCESSFULLY',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
         data: result.data,
         pagination_data: result.pagination_data,
       };
     } catch (error) {
       this.logger.error('Error finding bibliography', error?.stack || error);
-      throw new BadRequestException('Failed to retrieve bibliography');
+      throw new BadRequestException(
+        this.errorMessageService.getMessageWithLanguage(
+          'BIBLIOGRAPHY',
+          'RETRIEVE_FAILED',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
   }
 
@@ -378,7 +433,13 @@ export class BibliographyService {
     // Validate school exists
     const school = await this.schoolModel.findById(user.school_id);
     if (!school) {
-      throw new NotFoundException('School not found');
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'SCHOOL',
+          'NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     // Get tenant connection for the school
@@ -396,7 +457,13 @@ export class BibliographyService {
       }).lean();
 
       if (!bibliography) {
-        throw new NotFoundException('Bibliography not found');
+        throw new NotFoundException(
+          this.errorMessageService.getMessageWithLanguage(
+            'BIBLIOGRAPHY',
+            'NOT_FOUND',
+            user?.preferred_language || DEFAULT_LANGUAGE,
+          ),
+        );
       }
 
       // Attach user details
@@ -406,18 +473,25 @@ export class BibliographyService {
       );
 
       return {
-        message: 'Bibliography retrieved successfully',
+        message: this.errorMessageService.getSuccessMessageWithLanguage(
+          'BIBLIOGRAPHY',
+          'RETRIEVED_SUCCESSFULLY',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
         data: bibliographyWithUser,
       };
     } catch (error) {
+      this.logger.error('Error finding bibliography', error?.stack || error);
       if (error instanceof NotFoundException) {
         throw error;
       }
-      this.logger.error(
-        'Error finding bibliography by id',
-        error?.stack || error,
+      throw new BadRequestException(
+        this.errorMessageService.getMessageWithLanguage(
+          'BIBLIOGRAPHY',
+          'RETRIEVE_FAILED',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
       );
-      throw new BadRequestException('Failed to retrieve bibliography');
     }
   }
 
@@ -436,7 +510,13 @@ export class BibliographyService {
     // Validate school exists
     const school = await this.schoolModel.findById(resolvedSchoolId);
     if (!school) {
-      throw new NotFoundException('School not found');
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'SCHOOL',
+          'NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     // Get tenant connection for the school
@@ -456,7 +536,13 @@ export class BibliographyService {
         deleted_at: null,
       });
       if (!existingBibliography) {
-        throw new NotFoundException('Bibliography not found');
+        throw new NotFoundException(
+          this.errorMessageService.getMessageWithLanguage(
+            'BIBLIOGRAPHY',
+            'NOT_FOUND',
+            user?.preferred_language || DEFAULT_LANGUAGE,
+          ),
+        );
       }
 
       // Validate module if provided
@@ -466,7 +552,13 @@ export class BibliographyService {
           deleted_at: null,
         });
         if (!module) {
-          throw new NotFoundException('Module not found');
+          throw new NotFoundException(
+            this.errorMessageService.getMessageWithLanguage(
+              'MODULE',
+              'NOT_FOUND',
+              user?.preferred_language || DEFAULT_LANGUAGE,
+            ),
+          );
         }
       }
 
@@ -480,7 +572,11 @@ export class BibliographyService {
         });
         if (!chapter) {
           throw new NotFoundException(
-            'Chapter not found or does not belong to the specified module',
+            this.errorMessageService.getMessageWithLanguage(
+              'CHAPTER',
+              'NOT_FOUND',
+              user?.preferred_language || DEFAULT_LANGUAGE,
+            ),
           );
         }
       }
@@ -503,7 +599,13 @@ export class BibliographyService {
       );
 
       if (!updatedBibliography) {
-        throw new NotFoundException('Bibliography not found');
+        throw new NotFoundException(
+          this.errorMessageService.getMessageWithLanguage(
+            'BIBLIOGRAPHY',
+            'NOT_FOUND_DURING_UPDATE',
+            user?.preferred_language || DEFAULT_LANGUAGE,
+          ),
+        );
       }
 
       this.logger.log(`Bibliography updated: ${updatedBibliography._id}`);
@@ -515,7 +617,11 @@ export class BibliographyService {
       );
 
       return {
-        message: 'Bibliography updated successfully',
+        message: this.errorMessageService.getSuccessMessageWithLanguage(
+          'BIBLIOGRAPHY',
+          'UPDATED_SUCCESSFULLY',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
         data: {
           id: updatedBibliography._id,
           module_id: updatedBibliography.module_id,
@@ -542,7 +648,13 @@ export class BibliographyService {
         throw error;
       }
       this.logger.error('Error updating bibliography', error?.stack || error);
-      throw new BadRequestException('Failed to update bibliography');
+      throw new BadRequestException(
+        this.errorMessageService.getMessageWithLanguage(
+          'BIBLIOGRAPHY',
+          'UPDATE_FAILED',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
   }
 
@@ -559,7 +671,13 @@ export class BibliographyService {
     // Validate school exists
     const school = await this.schoolModel.findById(resolvedSchoolId);
     if (!school) {
-      throw new NotFoundException('School not found');
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'SCHOOL',
+          'NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     // Get tenant connection for the school
@@ -581,7 +699,13 @@ export class BibliographyService {
         }).session(session);
 
         if (!bibliography) {
-          throw new NotFoundException('Bibliography not found');
+          throw new NotFoundException(
+            this.errorMessageService.getMessageWithLanguage(
+              'BIBLIOGRAPHY',
+              'NOT_FOUND',
+              user?.preferred_language || DEFAULT_LANGUAGE,
+            ),
+          );
         }
 
         // Optional: If `sequence` exists and you need to reorder, extract it here
@@ -601,7 +725,13 @@ export class BibliographyService {
         );
 
         if (!deletedBibliography) {
-          throw new NotFoundException('Bibliography not found during update');
+          throw new NotFoundException(
+            this.errorMessageService.getMessageWithLanguage(
+              'BIBLIOGRAPHY',
+              'NOT_FOUND_DURING_UPDATE',
+              user?.preferred_language || DEFAULT_LANGUAGE,
+            ),
+          );
         }
 
         // Optional Step 3: after deleting a bibliography, we need to decrement the sequence of the other bibliographies in the same chapter
@@ -625,7 +755,11 @@ export class BibliographyService {
       });
 
       return {
-        message: 'Bibliography deleted successfully',
+        message: this.errorMessageService.getSuccessMessageWithLanguage(
+          'BIBLIOGRAPHY',
+          'DELETED_SUCCESSFULLY',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
         data: {
           id,
         },
@@ -635,7 +769,13 @@ export class BibliographyService {
         throw error;
       }
       this.logger.error('Error deleting bibliography', error?.stack || error);
-      throw new BadRequestException('Failed to delete bibliography');
+      throw new BadRequestException(
+        this.errorMessageService.getMessageWithLanguage(
+          'BIBLIOGRAPHY',
+          'DELETE_FAILED',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     } finally {
       await session.endSession();
     }
@@ -653,7 +793,11 @@ export class BibliographyService {
       bibliography_items.length === 0
     ) {
       throw new BadRequestException(
-        'Bibliography items array is required and must not be empty',
+        this.errorMessageService.getMessageWithLanguage(
+          'BIBLIOGRAPHY',
+          'BIBLIOGRAPHY_ITEMS_REQUIRED',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
       );
     }
 
@@ -665,7 +809,13 @@ export class BibliographyService {
     // Validate school exists
     const school = await this.schoolModel.findById(resolvedSchoolId);
     if (!school) {
-      throw new NotFoundException('School not found');
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'SCHOOL',
+          'NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     // Get tenant connection for the school
@@ -685,7 +835,13 @@ export class BibliographyService {
       }).lean();
 
       if (existingBibliography.length !== bibliography_items.length) {
-        throw new NotFoundException('One or more bibliography items not found');
+        throw new NotFoundException(
+          this.errorMessageService.getMessageWithLanguage(
+            'BIBLIOGRAPHY',
+            'ONE_OR_MORE_NOT_FOUND',
+            user?.preferred_language || DEFAULT_LANGUAGE,
+          ),
+        );
       }
 
       // Check if all bibliography items belong to the same chapter
@@ -694,7 +850,11 @@ export class BibliographyService {
       ];
       if (chapterIds.length > 1) {
         throw new BadRequestException(
-          'All bibliography items must belong to the same chapter',
+          this.errorMessageService.getMessageWithLanguage(
+            'BIBLIOGRAPHY',
+            'SAME_CHAPTER_REQUIRED',
+            user?.preferred_language || DEFAULT_LANGUAGE,
+          ),
         );
       }
 
@@ -703,7 +863,11 @@ export class BibliographyService {
       const uniqueSequences = [...new Set(sequences)];
       if (sequences.length !== uniqueSequences.length) {
         throw new BadRequestException(
-          'Duplicate sequence numbers are not allowed',
+          this.errorMessageService.getMessageWithLanguage(
+            'BIBLIOGRAPHY',
+            'DUPLICATE_SEQUENCE',
+            user?.preferred_language || DEFAULT_LANGUAGE,
+          ),
         );
       }
 
@@ -744,7 +908,11 @@ export class BibliographyService {
         }).lean();
 
         return {
-          message: 'Bibliography items reordered successfully',
+          message: this.errorMessageService.getSuccessMessageWithLanguage(
+            'BIBLIOGRAPHY',
+            'REORDERED_SUCCESSFULLY',
+            user?.preferred_language || DEFAULT_LANGUAGE,
+          ),
           data: updatedBibliography
             .filter((bibliography) => bibliography !== null)
             .map((bibliography) => ({
@@ -764,7 +932,13 @@ export class BibliographyService {
         ) {
           throw error;
         }
-        throw new BadRequestException('Failed to reorder bibliography items');
+        throw new BadRequestException(
+          this.errorMessageService.getMessageWithLanguage(
+            'BIBLIOGRAPHY',
+            'REORDER_FAILED',
+            user?.preferred_language || DEFAULT_LANGUAGE,
+          ),
+        );
       } finally {
         await session.endSession();
       }
@@ -779,7 +953,13 @@ export class BibliographyService {
       ) {
         throw error;
       }
-      throw new BadRequestException('Failed to reorder bibliography items');
+      throw new BadRequestException(
+        this.errorMessageService.getMessageWithLanguage(
+          'BIBLIOGRAPHY',
+          'REORDER_FAILED',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
   }
 
@@ -790,7 +970,13 @@ export class BibliographyService {
     // Validate school exists
     const school = await this.schoolModel.findById(user.school_id);
     if (!school) {
-      throw new NotFoundException('School not found');
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'SCHOOL',
+          'NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     // Get tenant connection for the school
@@ -814,7 +1000,13 @@ export class BibliographyService {
       return lastBibliography ? lastBibliography.sequence + 1 : 1;
     } catch (error) {
       this.logger.error('Error getting next sequence', error?.stack || error);
-      throw new BadRequestException('Failed to get next sequence');
+      throw new BadRequestException(
+        this.errorMessageService.getMessageWithLanguage(
+          'BIBLIOGRAPHY',
+          'SEQUENCE_FAILED',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
   }
 }

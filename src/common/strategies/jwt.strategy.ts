@@ -16,6 +16,8 @@ import { JWTUserPayload } from '../types/jwr-user.type';
 import { User } from 'src/database/schemas/central/user.schema';
 import { School } from 'src/database/schemas/central/school.schema';
 import { StatusEnum } from '../constants/status.constant';
+import { DEFAULT_LANGUAGE } from '../constants/language.constant';
+import { ErrorMessageService } from '../services/error-message.service';
 
 export interface JWTPayload {
   id: string;
@@ -40,6 +42,7 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
     private readonly schoolModel: Model<School>,
     private readonly tenantService: TenantService,
     private readonly tenantConnectionService: TenantConnectionService,
+    private readonly errorMessageService: ErrorMessageService,
   ) {
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
@@ -54,7 +57,13 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
       // Validate token type
       if (payload.token_type !== 'access') {
         this.logger.warn(`Invalid token type for user ${payload.email}`);
-        throw new UnauthorizedException('Invalid token type');
+        throw new UnauthorizedException(
+          this.errorMessageService.getMessageWithLanguage(
+            'AUTH',
+            'INVALID_TOKEN_TYPE',
+            DEFAULT_LANGUAGE,
+          ),
+        );
       }
 
       // Validate role exists
@@ -65,7 +74,13 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
         this.logger.warn(
           `Invalid role information for user ${payload.email}: role not found or name mismatch`,
         );
-        throw new UnauthorizedException('Invalid role information');
+        throw new UnauthorizedException(
+          this.errorMessageService.getMessageWithLanguage(
+            'AUTH',
+            'INVALID_ROLE_INFORMATION',
+            DEFAULT_LANGUAGE,
+          ),
+        );
       }
 
       // Check school status if user belongs to a school
@@ -81,7 +96,11 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
             `Student ${payload.email} not found in tenant database for school: ${payload.school_id}`,
           );
           throw new UnauthorizedException(
-            'Student not found in tenant database',
+            this.errorMessageService.getMessageWithLanguage(
+              'STUDENT',
+              'NOT_FOUND_IN_TENANT_DATABASE',
+              DEFAULT_LANGUAGE,
+            ),
           );
         }
 
@@ -89,7 +108,11 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
         if (studentData.status === StatusEnum.INACTIVE) {
           this.logger.warn(`Student ${payload.email} account is inactive`);
           throw new UnauthorizedException(
-            'Your account has been deactivated. Please contact support for assistance.',
+            this.errorMessageService.getMessageWithLanguage(
+              'STUDENT',
+              'ACCOUNT_DEACTIVATED',
+              DEFAULT_LANGUAGE,
+            ),
           );
         }
 
@@ -104,6 +127,8 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
             id: payload.role_id,
             name: payload.role_name,
           },
+          preferred_language:
+            studentData.preferred_language || DEFAULT_LANGUAGE,
         };
       } else {
         // For other roles, validate in central userModel
@@ -117,14 +142,24 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
           this.logger.warn(
             `User ${payload.email} with role ${payload.role_name} not found in central users`,
           );
-          throw new UnauthorizedException('User not found in central users');
+          throw new UnauthorizedException(
+            this.errorMessageService.getMessageWithLanguage(
+              'AUTH',
+              'USER_NOT_FOUND_CENTRAL',
+              DEFAULT_LANGUAGE,
+            ),
+          );
         }
 
         // Check if user is deleted
         if (user.deleted_at) {
           this.logger.warn(`User ${payload.email} account has been deleted`);
           throw new UnauthorizedException(
-            'Your account has been deleted. Please contact support for assistance.',
+            this.errorMessageService.getMessageWithLanguage(
+              'USER',
+              'ACCOUNT_DELETED',
+              DEFAULT_LANGUAGE,
+            ),
           );
         }
 
@@ -132,7 +167,11 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
         if (user.status === StatusEnum.INACTIVE) {
           this.logger.warn(`User ${payload.email} account is inactive`);
           throw new UnauthorizedException(
-            'Your account has been deactivated. Please contact support for assistance.',
+            this.errorMessageService.getMessageWithLanguage(
+              'USER',
+              'ACCOUNT_DEACTIVATED',
+              DEFAULT_LANGUAGE,
+            ),
           );
         }
 
@@ -147,6 +186,7 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
             id: user.role.toString(),
             name: payload.role_name as RoleEnum,
           },
+          preferred_language: user.preferred_language || DEFAULT_LANGUAGE,
         };
       }
     } catch (error) {
@@ -154,7 +194,12 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
         `Token validation failed for user ${payload.email}: ${error.message}`,
       );
       throw new UnauthorizedException(
-        `Token validation failed: ${error.message}`,
+        this.errorMessageService.getMessageWithParamsAndLanguage(
+          'AUTH',
+          'TOKEN_VALIDATION_FAILED',
+          { error: error.message },
+          DEFAULT_LANGUAGE,
+        ),
       );
     }
   }
@@ -191,6 +236,8 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
         email: student.email,
         school_id: student.school_id,
         status: student.status,
+        preferred_language:
+          (student as any).preferred_language || DEFAULT_LANGUAGE,
         role: {
           id: payload.role_id,
           name: payload.role_name as RoleEnum,
@@ -201,7 +248,12 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
         `Student validation failed for ${payload.email}: ${error.message}`,
       );
       throw new UnauthorizedException(
-        `Student validation failed: ${error.message}`,
+        this.errorMessageService.getMessageWithParamsAndLanguage(
+          'STUDENT',
+          'VALIDATION_FAILED',
+          { error: error.message },
+          DEFAULT_LANGUAGE,
+        ),
       );
     }
   }
@@ -217,7 +269,13 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
 
       if (!school) {
         this.logger.warn(`School not found for user ${userEmail}: ${schoolId}`);
-        throw new UnauthorizedException('School not found');
+        throw new UnauthorizedException(
+          this.errorMessageService.getMessageWithLanguage(
+            'SCHOOL',
+            'NOT_FOUND',
+            DEFAULT_LANGUAGE,
+          ),
+        );
       }
 
       if (school.status === StatusEnum.INACTIVE) {
@@ -225,7 +283,11 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
           `School ${schoolId} is inactive for user ${userEmail}`,
         );
         throw new UnauthorizedException(
-          'Your school has been deactivated. Please contact support for assistance.',
+          this.errorMessageService.getMessageWithLanguage(
+            'SCHOOL',
+            'ACCOUNT_DEACTIVATED',
+            DEFAULT_LANGUAGE,
+          ),
         );
       }
 
@@ -237,7 +299,12 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
         `School validation failed for ${userEmail}: ${error.message}`,
       );
       throw new UnauthorizedException(
-        `School validation failed: ${error.message}`,
+        this.errorMessageService.getMessageWithParamsAndLanguage(
+          'SCHOOL',
+          'VALIDATION_FAILED',
+          { error: error.message },
+          DEFAULT_LANGUAGE,
+        ),
       );
     }
   }

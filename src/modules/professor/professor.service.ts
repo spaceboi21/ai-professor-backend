@@ -31,6 +31,8 @@ import {
   ModuleProfessorAssignment,
   ModuleProfessorAssignmentSchema,
 } from 'src/database/schemas/tenant/module-professor-assignment.schema';
+import { ErrorMessageService } from 'src/common/services/error-message.service';
+import { DEFAULT_LANGUAGE } from 'src/common/constants/language.constant';
 
 @Injectable()
 export class ProfessorService {
@@ -46,6 +48,7 @@ export class ProfessorService {
     private readonly mailService: MailService,
     private readonly moduleAssignmentService: ModuleAssignmentService,
     private readonly tenantConnectionService: TenantConnectionService,
+    private readonly errorMessageService: ErrorMessageService,
   ) {}
 
   async createProfessor(
@@ -63,14 +66,24 @@ export class ProfessorService {
       new Types.ObjectId(school_id),
     );
     if (!school) {
-      throw new NotFoundException('School not found');
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'PROFESSOR',
+          'SCHOOL_NOT_FOUND',
+          adminUser?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     // If admin is SCHOOL_ADMIN, ensure they belong to this school
     if (adminUser.role.name === RoleEnum.SCHOOL_ADMIN) {
       if (adminUser.school_id?.toString() !== school_id) {
         throw new BadRequestException(
-          'You can only create professor for your own school',
+          this.errorMessageService.getMessageWithLanguage(
+            'PROFESSOR',
+            'CAN_ONLY_CREATE_PROFESSOR_FOR_OWN_SCHOOL',
+            adminUser?.preferred_language || DEFAULT_LANGUAGE,
+          ),
         );
       }
     }
@@ -78,7 +91,13 @@ export class ProfessorService {
     // Check if email already exists in central users
     const existingUser = await this.userModel.findOne({ email });
     if (existingUser) {
-      throw new ConflictException('Email already exists in the system');
+      throw new ConflictException(
+        this.errorMessageService.getMessageWithLanguage(
+          'PROFESSOR',
+          'EMAIL_ALREADY_EXISTS_IN_THE_SYSTEM',
+          adminUser?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     // Check if email already exists in global professors
@@ -86,7 +105,13 @@ export class ProfessorService {
       email,
     });
     if (existingGlobalStudent) {
-      throw new ConflictException('Email already exists');
+      throw new ConflictException(
+        this.errorMessageService.getMessageWithLanguage(
+          'PROFESSOR',
+          'EMAIL_ALREADY_EXISTS',
+          adminUser?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     // Generate a random password
@@ -135,18 +160,34 @@ export class ProfessorService {
     } catch (error) {
       this.logger.error('Error creating Professor', error?.stack || error);
 
-      throw new BadRequestException('Failed to create Professor');
+      throw new BadRequestException(
+        this.errorMessageService.getMessageWithLanguage(
+          'PROFESSOR',
+          'CREATE_FAILED',
+          adminUser?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
   }
 
-  async updateProfessor(id: Types.ObjectId, data: UpdateProfessorDto) {
+  async updateProfessor(
+    id: Types.ObjectId,
+    data: UpdateProfessorDto,
+    user: JWTUserPayload,
+  ) {
     // Find the professor by ID
     const professor = await this.userModel.findOne({
       _id: id,
       deleted_at: null, // Exclude deleted professors
     });
     if (!professor) {
-      throw new NotFoundException('Professor not found');
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'PROFESSOR',
+          'PROFESSOR_NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     // Update fields if provided
@@ -210,15 +251,28 @@ export class ProfessorService {
     } catch (error) {
       console.error('Error updating Professor:', error);
       if (error?.code === 11000) {
-        throw new ConflictException('Email already exists');
+        throw new ConflictException(
+          this.errorMessageService.getMessageWithLanguage(
+            'PROFESSOR',
+            'EMAIL_ALREADY_EXISTS',
+            user?.preferred_language || DEFAULT_LANGUAGE,
+          ),
+        );
       }
-      throw new BadRequestException('Failed to update Professor');
+      throw new BadRequestException(
+        this.errorMessageService.getMessageWithLanguage(
+          'PROFESSOR',
+          'UPDATE_FAILED',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
   }
 
   async updateProfessorPassword(
     id: Types.ObjectId,
     data: UpdateProfessorPasswordDto,
+    user: JWTUserPayload,
   ) {
     // Find the professor by ID
     const professor = await this.userModel.findOne({
@@ -226,7 +280,13 @@ export class ProfessorService {
       deleted_at: null, // Exclude deleted professors
     });
     if (!professor) {
-      throw new NotFoundException('Professor not found');
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'PROFESSOR',
+          'PROFESSOR_NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
     // Validate old password
     const isPasswordValid = await this.bcryptUtil.comparePassword(
@@ -235,7 +295,13 @@ export class ProfessorService {
     );
 
     if (!isPasswordValid) {
-      throw new BadRequestException('Invalid old password');
+      throw new BadRequestException(
+        this.errorMessageService.getMessageWithLanguage(
+          'PROFESSOR',
+          'INVALID_OLD_PASSWORD',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     // Hash the new password
@@ -248,7 +314,11 @@ export class ProfessorService {
     try {
       const updatedProfessor = await professor.save();
       return {
-        message: 'Password updated successfully',
+        message: this.errorMessageService.getMessageWithLanguage(
+          'PROFESSOR',
+          'PASSWORD_UPDATED_SUCCESSFULLY',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
         data: {
           id: updatedProfessor._id,
           first_name: updatedProfessor.first_name,
@@ -262,7 +332,13 @@ export class ProfessorService {
       };
     } catch (error) {
       console.error('Error updating Professor password:', error);
-      throw new BadRequestException('Failed to update Professor password');
+      throw new BadRequestException(
+        this.errorMessageService.getMessageWithLanguage(
+          'PROFESSOR',
+          'UPDATE_FAILED',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
   }
 
@@ -350,7 +426,11 @@ export class ProfessorService {
     });
 
     return {
-      message: 'Professors retrieved successfully',
+      message: this.errorMessageService.getMessageWithLanguage(
+        'PROFESSOR',
+        'PROFESSORS_RETRIEVED_SUCCESSFULLY',
+        user?.preferred_language || DEFAULT_LANGUAGE,
+      ),
       ...pagination,
     };
   }
@@ -370,11 +450,21 @@ export class ProfessorService {
 
     if (!professor) {
       this.logger.warn(`Professor not found: ${id}`);
-      throw new NotFoundException('Professor not found');
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'PROFESSOR',
+          'PROFESSOR_NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     return {
-      message: 'Professor retrieved successfully',
+      message: this.errorMessageService.getMessageWithLanguage(
+        'PROFESSOR',
+        'PROFESSOR_RETRIEVED_SUCCESSFULLY',
+        user?.preferred_language || DEFAULT_LANGUAGE,
+      ),
       data: professor,
     };
   }
@@ -397,7 +487,13 @@ export class ProfessorService {
     });
 
     if (!professor) {
-      throw new NotFoundException('Professor not found or not in your school');
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'PROFESSOR',
+          'PROFESSOR_NOT_FOUND_OR_NOT_IN_YOUR_SCHOOL',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     const updatedProfessor = await this.userModel
@@ -405,14 +501,24 @@ export class ProfessorService {
       .populate('role', 'name');
 
     if (!updatedProfessor) {
-      throw new NotFoundException('Professor not found after update');
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'PROFESSOR',
+          'PROFESSOR_NOT_FOUND_AFTER_UPDATE',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     this.logger.log(
       `Professor status updated successfully: ${id} to ${status}`,
     );
     return {
-      message: 'Professor status updated successfully',
+      message: this.errorMessageService.getMessageWithLanguage(
+        'PROFESSOR',
+        'PROFESSOR_STATUS_UPDATED_SUCCESSFULLY',
+        user?.preferred_language || DEFAULT_LANGUAGE,
+      ),
       data: {
         id: updatedProfessor._id,
         email: updatedProfessor.email,
@@ -435,14 +541,24 @@ export class ProfessorService {
     });
 
     if (!professor) {
-      throw new NotFoundException('Professor not found');
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'PROFESSOR',
+          'PROFESSOR_NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     // If user is SCHOOL_ADMIN, ensure they can only delete professors from their school
     if (user.role.name === RoleEnum.SCHOOL_ADMIN) {
       if (user.school_id?.toString() !== professor.school_id?.toString()) {
         throw new BadRequestException(
-          'You can only delete professors from your own school',
+          this.errorMessageService.getMessageWithLanguage(
+            'PROFESSOR',
+            'CAN_ONLY_DELETE_PROFESSORS_FROM_OWN_SCHOOL',
+            user?.preferred_language || DEFAULT_LANGUAGE,
+          ),
         );
       }
     }
@@ -454,13 +570,23 @@ export class ProfessorService {
     );
     if (hasAssignedModules) {
       throw new BadRequestException(
-        'Cannot delete professor. Professor has assigned modules. Please unassign all modules before deleting the professor.',
+        this.errorMessageService.getMessageWithLanguage(
+          'PROFESSOR',
+          'CANNOT_DELETE_PROFESSOR_HAS_ASSIGNED_MODULES',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
       );
     }
 
     // Check if professor is already deleted
     if (professor.deleted_at) {
-      throw new BadRequestException('Professor is already deleted');
+      throw new BadRequestException(
+        this.errorMessageService.getMessageWithLanguage(
+          'PROFESSOR',
+          'PROFESSOR_ALREADY_DELETED',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     // Soft delete the professor by setting deleted_at timestamp
@@ -476,7 +602,13 @@ export class ProfessorService {
       .populate('role', 'name');
 
     if (!deletedProfessor) {
-      throw new NotFoundException('Professor not found after deletion');
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'PROFESSOR',
+          'PROFESSOR_NOT_FOUND_AFTER_DELETION',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     this.logger.log(
@@ -484,7 +616,11 @@ export class ProfessorService {
     );
 
     return {
-      message: 'Professor deleted successfully',
+      message: this.errorMessageService.getMessageWithLanguage(
+        'PROFESSOR',
+        'PROFESSOR_DELETED_SUCCESSFULLY',
+        user?.preferred_language || DEFAULT_LANGUAGE,
+      ),
       data: {
         id: deletedProfessor._id,
         email: deletedProfessor.email,

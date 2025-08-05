@@ -26,6 +26,7 @@ import {
 } from '@nestjs/swagger';
 import { Request } from 'express';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
+import { UpdatePreferredLanguageDto } from './dto/update-preferred-language.dto';
 
 @ApiTags('Auth')
 @Controller('auth')
@@ -116,5 +117,26 @@ export class AuthController {
   @ApiResponse({ status: 404, description: 'User not found' })
   async setNewPassword(@Body() setNewPasswordDto: SetNewPasswordDto) {
     return this.authService.setNewPassword(setNewPasswordDto);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('update-preferred-language')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Update preferred language (All users)' })
+  @ApiBody({ type: UpdatePreferredLanguageDto })
+  @ApiResponse({
+    status: 200,
+    description: 'Preferred language updated successfully',
+  })
+  @ApiResponse({ status: 400, description: 'Invalid request' })
+  @ApiResponse({ status: 404, description: 'User not found' })
+  async updatePreferredLanguage(
+    @User() user: JWTUserPayload,
+    @Body() updatePreferredLanguageDto: UpdatePreferredLanguageDto,
+  ) {
+    return this.authService.updatePreferredLanguage(
+      user,
+      updatePreferredLanguageDto,
+    );
   }
 }
