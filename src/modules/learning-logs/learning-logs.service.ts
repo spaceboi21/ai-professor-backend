@@ -1,12 +1,15 @@
 import {
+  BadRequestException,
   Injectable,
   Logger,
   NotFoundException,
-  BadRequestException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Connection, Model, Types } from 'mongoose';
+import { Model, Types } from 'mongoose';
+import { NotificationTypeEnum } from 'src/common/constants/notification.constant';
+import { RoleEnum } from 'src/common/constants/roles.constant';
 import { JWTUserPayload } from 'src/common/types/jwr-user.type';
+import { CSVUtil } from 'src/common/utils/csv.util';
 import {
   createPaginationResult,
   getPaginationOptions,
@@ -18,33 +21,17 @@ import {
   AIChatFeedbackSchema,
 } from 'src/database/schemas/tenant/ai-chat-feedback.schema';
 import {
-  AIChatSession,
-  AIChatSessionSchema,
-} from 'src/database/schemas/tenant/ai-chat-session.schema';
-import {
-  Module,
-  ModuleSchema,
-} from 'src/database/schemas/tenant/module.schema';
-import {
-  Student,
-  StudentSchema,
-} from 'src/database/schemas/tenant/student.schema';
-import { TenantConnectionService } from 'src/database/tenant-connection.service';
-import { LearningLogsFilterDto } from './dto/learning-logs-filter.dto';
-import { LearningLogsResponseDto } from './dto/learning-logs-response.dto';
-import { RoleEnum } from 'src/common/constants/roles.constant';
-import { AI_LEARNING_ERROR_TYPES } from 'src/common/constants/ai-learning-error.constant';
-import { CreateLearningLogReviewDto } from './dto/create-learning-log-review.dto';
-import { LearningLogReviewResponseDto } from './dto/learning-log-review-response.dto';
-import {
   LearningLogReview,
   LearningLogReviewSchema,
 } from 'src/database/schemas/tenant/learning-log-review.schema';
-import { NotificationsService } from '../notifications/notifications.service';
-import { NotificationTypeEnum } from 'src/common/constants/notification.constant';
 import { RecipientTypeEnum } from 'src/database/schemas/tenant/notification.schema';
-import { CSVUtil } from 'src/common/utils/csv.util';
+import { TenantConnectionService } from 'src/database/tenant-connection.service';
+import { NotificationsService } from '../notifications/notifications.service';
+import { CreateLearningLogReviewDto } from './dto/create-learning-log-review.dto';
+import { LearningLogReviewResponseDto } from './dto/learning-log-review-response.dto';
 import { LearningLogsExportResponseDto } from './dto/learning-logs-export-response.dto';
+import { LearningLogsFilterDto } from './dto/learning-logs-filter.dto';
+import { LearningLogsResponseDto } from './dto/learning-logs-response.dto';
 
 @Injectable()
 export class LearningLogsService {
