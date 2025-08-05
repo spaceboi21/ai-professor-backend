@@ -57,7 +57,7 @@ export class AuthService {
   ) {}
 
   async superAdminLogin(loginData: LoginSuperAdminDto, req: Request) {
-    const { email, password, rememberMe } = loginData;
+    const { email, password, rememberMe, preferred_language } = loginData;
     this.logger.log(`SuperAdmin login attempt: ${email}`);
 
     const isSuperAdminExists = (await this.userModel
@@ -107,11 +107,25 @@ export class AuthService {
         message: this.errorMessageService.getMessageWithLanguage(
           'AUTH',
           'INVALID_EMAIL_PASSWORD',
-          isSuperAdminExists.preferred_language || DEFAULT_LANGUAGE,
+          preferred_language || DEFAULT_LANGUAGE,
         ),
-        error: 'Invalid Credentials',
-        statusCode: 400,
       });
+    }
+
+    // Update preferred language if provided
+    let updatedPreferredLanguage = isSuperAdminExists.preferred_language;
+    if (
+      preferred_language &&
+      preferred_language !== isSuperAdminExists.preferred_language
+    ) {
+      await this.userModel.findByIdAndUpdate(isSuperAdminExists._id, {
+        preferred_language,
+        updated_at: new Date(),
+      });
+      updatedPreferredLanguage = preferred_language;
+      this.logger.log(
+        `Updated preferred language for Super Admin ${email} to ${preferred_language}`,
+      );
     }
 
     const tokenPair = this.tokenUtil.generateTokenPair({
@@ -131,7 +145,7 @@ export class AuthService {
       message: this.errorMessageService.getSuccessMessageWithLanguage(
         'AUTH',
         'LOGIN_SUCCESSFUL',
-        isSuperAdminExists?.preferred_language || DEFAULT_LANGUAGE,
+        updatedPreferredLanguage || DEFAULT_LANGUAGE,
       ),
       ...tokenPair,
       user: {
@@ -140,8 +154,7 @@ export class AuthService {
         last_name: isSuperAdminExists.last_name,
         role: isSuperAdminExists.role.toString(),
         _id: isSuperAdminExists._id.toString(),
-        preferred_language:
-          isSuperAdminExists.preferred_language || DEFAULT_LANGUAGE,
+        preferred_language: updatedPreferredLanguage || DEFAULT_LANGUAGE,
       },
     };
   }
@@ -150,7 +163,8 @@ export class AuthService {
     loginSchoolAdminDto: LoginSchoolAdminDto,
     req: Request,
   ) {
-    const { email, password, rememberMe } = loginSchoolAdminDto;
+    const { email, password, rememberMe, preferred_language } =
+      loginSchoolAdminDto;
     this.logger.log(`SchoolAdmin login attempt: ${email}`);
 
     const user = (await this.userModel
@@ -227,8 +241,21 @@ export class AuthService {
         this.errorMessageService.getMessageWithLanguage(
           'SCHOOL',
           'ACCOUNT_DEACTIVATED',
-          user.preferred_language || DEFAULT_LANGUAGE,
+          preferred_language || user.preferred_language || DEFAULT_LANGUAGE,
         ),
+      );
+    }
+
+    // Update preferred language if provided
+    let updatedPreferredLanguage = user.preferred_language;
+    if (preferred_language && preferred_language !== user.preferred_language) {
+      await this.userModel.findByIdAndUpdate(user._id, {
+        preferred_language,
+        updated_at: new Date(),
+      });
+      updatedPreferredLanguage = preferred_language;
+      this.logger.log(
+        `Updated preferred language for School Admin ${email} to ${preferred_language}`,
       );
     }
 
@@ -249,7 +276,7 @@ export class AuthService {
       message: this.errorMessageService.getSuccessMessageWithLanguage(
         'AUTH',
         'LOGIN_SUCCESSFUL',
-        user?.preferred_language || DEFAULT_LANGUAGE,
+        updatedPreferredLanguage || DEFAULT_LANGUAGE,
       ),
       ...tokenPair,
       user: {
@@ -260,13 +287,13 @@ export class AuthService {
         school_id: school._id.toString(),
         role: user.role._id.toString(),
         role_name: user.role.name as RoleEnum,
-        preferred_language: user.preferred_language || DEFAULT_LANGUAGE,
+        preferred_language: updatedPreferredLanguage || DEFAULT_LANGUAGE,
       },
     };
   }
 
   async studentLogin(loginStudentDto: LoginStudentDto, req: Request) {
-    const { email, password, rememberMe } = loginStudentDto;
+    const { email, password, rememberMe, preferred_language } = loginStudentDto;
     this.logger.log(`Student login attempt: ${email}`);
 
     // First, find the student in the global students collection
@@ -354,8 +381,24 @@ export class AuthService {
         this.errorMessageService.getMessageWithLanguage(
           'AUTH',
           'INVALID_EMAIL_PASSWORD',
-          student.preferred_language || DEFAULT_LANGUAGE,
+          preferred_language || student.preferred_language || DEFAULT_LANGUAGE,
         ),
+      );
+    }
+
+    // Update preferred language if provided
+    let updatedPreferredLanguage = student.preferred_language;
+    if (
+      preferred_language &&
+      preferred_language !== student.preferred_language
+    ) {
+      await StudentModel.findByIdAndUpdate(student._id, {
+        preferred_language,
+        updated_at: new Date(),
+      });
+      updatedPreferredLanguage = preferred_language;
+      this.logger.log(
+        `Updated preferred language for Student ${email} to ${preferred_language}`,
       );
     }
 
@@ -372,14 +415,14 @@ export class AuthService {
     });
 
     // Get preferred language from student data
-    const preferredLanguage = student.preferred_language || DEFAULT_LANGUAGE;
+    const finalPreferredLanguage = updatedPreferredLanguage || DEFAULT_LANGUAGE;
 
     this.logger.log(`Student login successful: ${email}`);
     return {
       message: this.errorMessageService.getSuccessMessageWithLanguage(
         'AUTH',
         'LOGIN_SUCCESSFUL',
-        preferredLanguage,
+        finalPreferredLanguage,
       ),
       ...tokenPair,
       user: {
@@ -390,7 +433,7 @@ export class AuthService {
         student_code: student.student_code,
         school_id: school._id.toString(),
         role: ROLE_IDS.STUDENT,
-        preferred_language: preferredLanguage,
+        preferred_language: finalPreferredLanguage,
       },
     };
   }

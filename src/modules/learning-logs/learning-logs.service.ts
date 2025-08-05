@@ -249,11 +249,13 @@ export class LearningLogsService {
         ),
       );
     }
-    await this.notificationsService.createNotification(
+    await this.notificationsService.createMultiLanguageNotification(
       new Types.ObjectId(learningLog.student_id.toString()),
       RecipientTypeEnum.STUDENT,
       'Learning Log Reviewed',
+      "Journal d'Apprentissage Révisé",
       `${reviewerInfo.first_name} ${reviewerInfo.last_name} has reviewed your learning log and given you a ${createReviewDto.rating}-star rating.`,
+      `${reviewerInfo.first_name} ${reviewerInfo.last_name} a révisé votre journal d'apprentissage et vous a donné une note de ${createReviewDto.rating} étoiles.`,
       NotificationTypeEnum.LEARNING_LOG_REVIEWED,
       {
         ai_feedback_id: aiFeedbackId,

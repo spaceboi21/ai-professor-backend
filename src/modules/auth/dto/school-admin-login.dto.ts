@@ -6,7 +6,9 @@ import {
   IsString,
   IsOptional,
   IsBoolean,
+  IsEnum,
 } from 'class-validator';
+import { LanguageEnum } from 'src/common/constants/language.constant';
 
 export class LoginSchoolAdminDto {
   @IsEmail({}, { message: 'Invalid email format' })
@@ -28,4 +30,16 @@ export class LoginSchoolAdminDto {
     description: 'If true, token will be valid for 30 days, otherwise 1 day',
   })
   rememberMe?: boolean;
+
+  @IsOptional()
+  @IsEnum(LanguageEnum, {
+    message: 'Preferred language must be either "en" or "fr"',
+  })
+  @ApiProperty({
+    description: 'Preferred language for the user interface',
+    enum: LanguageEnum,
+    example: LanguageEnum.FRENCH,
+    required: false,
+  })
+  preferred_language?: LanguageEnum;
 }

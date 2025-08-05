@@ -2154,18 +2154,22 @@ export class CommunityService {
   private async createForumNotification(
     recipientId: Types.ObjectId,
     recipientType: RecipientTypeEnum,
-    title: string,
-    message: string,
+    titleEn: string,
+    titleFr: string,
+    messageEn: string,
+    messageFr: string,
     type: NotificationTypeEnum,
     metadata: Record<string, any> = {},
     schoolId: string,
   ) {
     try {
-      await this.notificationsService.createNotification(
+      await this.notificationsService.createMultiLanguageNotification(
         recipientId,
         recipientType,
-        title,
-        message,
+        titleEn,
+        titleFr,
+        messageEn,
+        messageFr,
         type,
         metadata,
         new Types.ObjectId(schoolId),
@@ -2201,8 +2205,10 @@ export class CommunityService {
         })
         .lean();
 
-      const title = 'New Forum Discussion';
-      const message = `${creator.first_name} ${creator.last_name} started a new discussion: "${discussion.title}"`;
+      const titleEn = 'New Forum Discussion';
+      const titleFr = 'Nouvelle Discussion sur le Forum';
+      const messageEn = `${creator.first_name} ${creator.last_name} started a new discussion: "${discussion.title}"`;
+      const messageFr = `${creator.first_name} ${creator.last_name} a commencé une nouvelle discussion: "${discussion.title}"`;
       const metadata = {
         discussion_id: discussion._id,
         discussion_title: discussion.title,
@@ -2217,8 +2223,10 @@ export class CommunityService {
           await this.createForumNotification(
             student._id,
             RecipientTypeEnum.STUDENT,
-            title,
-            message,
+            titleEn,
+            titleFr,
+            messageEn,
+            messageFr,
             NotificationTypeEnum.FORUM_NEW_DISCUSSION,
             metadata,
             schoolId,
@@ -2232,8 +2240,10 @@ export class CommunityService {
           await this.createForumNotification(
             professor._id,
             RecipientTypeEnum.PROFESSOR,
-            title,
-            message,
+            titleEn,
+            titleFr,
+            messageEn,
+            messageFr,
             NotificationTypeEnum.FORUM_NEW_DISCUSSION,
             metadata,
             schoolId,
@@ -2261,8 +2271,10 @@ export class CommunityService {
         return;
       }
 
-      const title = 'New Reply to Your Discussion';
-      const message = `${replyCreator.first_name} ${replyCreator.last_name} replied to your discussion: "${discussion.title}"`;
+      const titleEn = 'New Reply to Your Discussion';
+      const titleFr = 'Nouvelle Réponse à Votre Discussion';
+      const messageEn = `${replyCreator.first_name} ${replyCreator.last_name} replied to your discussion: "${discussion.title}"`;
+      const messageFr = `${replyCreator.first_name} ${replyCreator.last_name} a répondu à votre discussion: "${discussion.title}"`;
       const metadata = {
         discussion_id: discussion._id,
         discussion_title: discussion.title,
@@ -2280,8 +2292,10 @@ export class CommunityService {
       await this.createForumNotification(
         new Types.ObjectId(discussion.created_by),
         recipientType,
-        title,
-        message,
+        titleEn,
+        titleFr,
+        messageEn,
+        messageFr,
         NotificationTypeEnum.FORUM_NEW_REPLY,
         metadata,
         schoolId,
@@ -2310,8 +2324,10 @@ export class CommunityService {
         return;
       }
 
-      const title = 'New Reply to Your Comment';
-      const message = `${subReplyCreator.first_name} ${subReplyCreator.last_name} replied to your comment in: "${discussion.title}"`;
+      const titleEn = 'New Reply to Your Comment';
+      const titleFr = 'Nouvelle Réponse à Votre Commentaire';
+      const messageEn = `${subReplyCreator.first_name} ${subReplyCreator.last_name} replied to your comment in: "${discussion.title}"`;
+      const messageFr = `${subReplyCreator.first_name} ${subReplyCreator.last_name} a répondu à votre commentaire dans: "${discussion.title}"`;
       const metadata = {
         discussion_id: discussion._id,
         discussion_title: discussion.title,
@@ -2330,8 +2346,10 @@ export class CommunityService {
       await this.createForumNotification(
         new Types.ObjectId(parentReply.created_by),
         recipientType,
-        title,
-        message,
+        titleEn,
+        titleFr,
+        messageEn,
+        messageFr,
         NotificationTypeEnum.FORUM_NEW_SUB_REPLY,
         metadata,
         schoolId,
@@ -2360,8 +2378,10 @@ export class CommunityService {
 
       const entityTitle =
         entityType === 'discussion' ? entity.title : 'your comment';
-      const title = 'New Like on Your Content';
-      const message = `${liker.first_name} ${liker.last_name} liked your ${entityType}: "${entityTitle}"`;
+      const titleEn = 'New Like on Your Content';
+      const titleFr = 'Nouveau Like sur Votre Contenu';
+      const messageEn = `${liker.first_name} ${liker.last_name} liked your ${entityType}: "${entityTitle}"`;
+      const messageFr = `${liker.first_name} ${liker.last_name} a aimé votre ${entityType}: "${entityTitle}"`;
       const metadata = {
         entity_type: entityType,
         entity_id: entity._id,
@@ -2379,8 +2399,10 @@ export class CommunityService {
       await this.createForumNotification(
         new Types.ObjectId(entity.created_by),
         recipientType,
-        title,
-        message,
+        titleEn,
+        titleFr,
+        messageEn,
+        messageFr,
         NotificationTypeEnum.FORUM_LIKE,
         metadata,
         schoolId,
@@ -2410,8 +2432,10 @@ export class CommunityService {
         })
         .lean();
 
-      const title = 'New Content Report';
-      const message = `${reporter.first_name} ${reporter.last_name} reported ${report.entity_type} by ${reportedContentCreator.first_name} ${reportedContentCreator.last_name}`;
+      const titleEn = 'New Content Report';
+      const titleFr = 'Nouveau Rapport de Contenu';
+      const messageEn = `${reporter.first_name} ${reporter.last_name} reported ${report.entity_type} by ${reportedContentCreator.first_name} ${reportedContentCreator.last_name}`;
+      const messageFr = `${reporter.first_name} ${reporter.last_name} a signalé ${report.entity_type} par ${reportedContentCreator.first_name} ${reportedContentCreator.last_name}`;
       const metadata = {
         report_id: report._id,
         entity_type: report.entity_type,
@@ -2430,8 +2454,10 @@ export class CommunityService {
         await this.createForumNotification(
           admin._id,
           RecipientTypeEnum.PROFESSOR, // Admins are treated as professors for notifications
-          title,
-          message,
+          titleEn,
+          titleFr,
+          messageEn,
+          messageFr,
           NotificationTypeEnum.FORUM_REPORT,
           metadata,
           schoolId,
@@ -2469,8 +2495,10 @@ export class CommunityService {
           );
 
           if (mentionedUser) {
-            const title = `New Mention in Discussion`;
-            const message = `${replyCreator.first_name} ${replyCreator.last_name} mentioned you in "${discussion.title}": "${mention.mentionText}"`;
+            const titleEn = 'New Mention in Discussion';
+            const titleFr = 'Nouvelle Mention dans la Discussion';
+            const messageEn = `${replyCreator.first_name} ${replyCreator.last_name} mentioned you in "${discussion.title}": "${mention.mentionText}"`;
+            const messageFr = `${replyCreator.first_name} ${replyCreator.last_name} vous a mentionné dans "${discussion.title}": "${mention.mentionText}"`;
             const metadata = {
               discussion_id: discussion._id,
               discussion_title: discussion.title,
@@ -2489,8 +2517,10 @@ export class CommunityService {
             await this.createForumNotification(
               new Types.ObjectId(mention.userId),
               recipientType,
-              title,
-              message,
+              titleEn,
+              titleFr,
+              messageEn,
+              messageFr,
               NotificationTypeEnum.FORUM_MENTION,
               metadata,
               schoolId,

@@ -16,7 +16,7 @@ import { JWTUserPayload } from '../types/jwr-user.type';
 import { User } from 'src/database/schemas/central/user.schema';
 import { School } from 'src/database/schemas/central/school.schema';
 import { StatusEnum } from '../constants/status.constant';
-import { DEFAULT_LANGUAGE } from '../constants/language.constant';
+import { DEFAULT_LANGUAGE, LanguageEnum } from '../constants/language.constant';
 import { ErrorMessageService } from '../services/error-message.service';
 
 export interface JWTPayload {
@@ -25,6 +25,7 @@ export interface JWTPayload {
   school_id: string;
   role_id: string;
   role_name: string;
+  preferred_language?: string;
   token_type: 'access';
 }
 
@@ -128,7 +129,9 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
             name: payload.role_name,
           },
           preferred_language:
-            studentData.preferred_language || DEFAULT_LANGUAGE,
+            (payload.preferred_language as LanguageEnum) ||
+            studentData.preferred_language ||
+            DEFAULT_LANGUAGE,
         };
       } else {
         // For other roles, validate in central userModel
@@ -186,7 +189,10 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
             id: user.role.toString(),
             name: payload.role_name as RoleEnum,
           },
-          preferred_language: user.preferred_language || DEFAULT_LANGUAGE,
+          preferred_language:
+            (payload.preferred_language as LanguageEnum) ||
+            user.preferred_language ||
+            DEFAULT_LANGUAGE,
         };
       }
     } catch (error) {
