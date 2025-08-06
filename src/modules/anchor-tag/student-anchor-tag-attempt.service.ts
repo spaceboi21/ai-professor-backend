@@ -14,6 +14,10 @@ import {
   StudentSchema,
 } from 'src/database/schemas/tenant/student.schema';
 import {
+  Module,
+  ModuleSchema,
+} from 'src/database/schemas/tenant/module.schema';
+import {
   AnchorTag,
   AnchorTagSchema,
 } from 'src/database/schemas/tenant/anchor-tag.schema';
@@ -30,6 +34,12 @@ import {
   AnchorTagTypeEnum,
 } from 'src/common/constants/anchor-tag.constant';
 import { RoleEnum } from 'src/common/constants/roles.constant';
+import { PythonService } from './python.service';
+import {
+  QuizQuestion,
+  QuizVerificationResponse,
+} from 'src/common/types/quiz.type';
+import { QuizQuestionTypeEnum } from 'src/common/constants/quiz.constant';
 
 @Injectable()
 export class StudentAnchorTagAttemptService {
@@ -42,6 +52,7 @@ export class StudentAnchorTagAttemptService {
     private readonly schoolModel: Model<School>,
     private readonly tenantConnectionService: TenantConnectionService,
     private readonly errorMessageService: ErrorMessageService,
+    private readonly pythonService: PythonService,
   ) {}
 
   async startAnchorTagAttempt(
@@ -89,7 +100,7 @@ export class StudentAnchorTagAttemptService {
 
     // Validate student exists
     const student = await StudentModel.findOne({
-      user_id: new Types.ObjectId(user.id),
+      _id: new Types.ObjectId(user.id),
       deleted_at: null,
     });
 
@@ -175,6 +186,7 @@ export class StudentAnchorTagAttemptService {
       StudentAnchorTagAttemptSchema,
     );
     const QuizModel = connection.model(Quiz.name, QuizSchema);
+    const ModuleModel = connection.model(Module.name, ModuleSchema);
 
     // Validate anchor tag exists
     const anchorTag = await AnchorTagModel.findOne({
@@ -195,7 +207,7 @@ export class StudentAnchorTagAttemptService {
 
     // Validate student exists
     const student = await StudentModel.findOne({
-      user_id: new Types.ObjectId(user.id),
+      _id: new Types.ObjectId(user.id),
       deleted_at: null,
     });
 
@@ -227,11 +239,24 @@ export class StudentAnchorTagAttemptService {
       );
     }
 
+    // Get module information for Python service
+    const module = await ModuleModel.findById(anchorTag.module_id);
+    if (!module) {
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'MODULE',
+          'MODULE_NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
+    }
+
     const { quiz_id, selected_answers, text_response } = answerData;
 
     let isCorrect = false;
     let scorePercentage = 0;
     let quizAttempt: any = null;
+    let aiVerificationResult: QuizVerificationResponse | null = null;
 
     // Handle quiz-based answer
     if (quiz_id && selected_answers) {
@@ -246,29 +271,63 @@ export class StudentAnchorTagAttemptService {
         );
       }
 
-      // Calculate score based on quiz type
-      const correctAnswers = quiz.answer || [];
-      const isMultiSelect = quiz.type === 'MULTI_SELECT';
+      // Prepare question data for Python service
+      const questions: QuizQuestion[] = [
+        {
+          question: quiz.question,
+          question_type: quiz.type as QuizQuestionTypeEnum,
+          options: quiz.options || [],
+          user_answer: selected_answers.join(', '),
+        },
+      ];
 
-      if (isMultiSelect) {
-        // For multi-select, all correct answers must be selected and no incorrect ones
-        const correctSelected = selected_answers.filter((answer) =>
-          correctAnswers.includes(answer),
-        ).length;
-        const incorrectSelected = selected_answers.filter(
-          (answer) => !correctAnswers.includes(answer),
-        ).length;
+      // Call Python service for AI verification
+      try {
+        aiVerificationResult = await this.pythonService.validateAnchorTagQuiz(
+          module.title,
+          module.description || '',
+          questions,
+        );
 
+        this.logger.log(
+          'AI verification completed successfully for anchor tag',
+        );
+
+        // Use AI verification results
         isCorrect =
-          correctSelected === correctAnswers.length && incorrectSelected === 0;
-        scorePercentage = isCorrect ? 100 : 0;
-      } else {
-        // For single-select, exact match
-        isCorrect =
-          selected_answers.length === 1 &&
-          correctAnswers.length === 1 &&
-          selected_answers[0] === correctAnswers[0];
-        scorePercentage = isCorrect ? 100 : 0;
+          aiVerificationResult.questions_results?.[0]?.is_correct || false;
+        scorePercentage = aiVerificationResult.score_percentage || 0;
+      } catch (error) {
+        this.logger.error(
+          'AI verification failed for anchor tag:',
+          error.message,
+        );
+
+        // Fallback to manual verification if AI fails
+        const correctAnswers = quiz.answer || [];
+        const isMultiSelect = quiz.type === 'MULTI_SELECT';
+
+        if (isMultiSelect) {
+          // For multi-select, all correct answers must be selected and no incorrect ones
+          const correctSelected = selected_answers.filter((answer) =>
+            correctAnswers.includes(answer),
+          ).length;
+          const incorrectSelected = selected_answers.filter(
+            (answer) => !correctAnswers.includes(answer),
+          ).length;
+
+          isCorrect =
+            correctSelected === correctAnswers.length &&
+            incorrectSelected === 0;
+          scorePercentage = isCorrect ? 100 : 0;
+        } else {
+          // For single-select, exact match
+          isCorrect =
+            selected_answers.length === 1 &&
+            correctAnswers.length === 1 &&
+            selected_answers[0] === correctAnswers[0];
+          scorePercentage = isCorrect ? 100 : 0;
+        }
       }
 
       quizAttempt = {
@@ -284,26 +343,64 @@ export class StudentAnchorTagAttemptService {
 
     // Handle text-based answer
     if (text_response) {
-      // For text responses, we'll mark as correct for now
-      // In a real implementation, you might want to use AI to evaluate the response
-      isCorrect = true;
-      scorePercentage = 100;
+      // For text responses, create a pseudo-question for AI verification
+      const questions: QuizQuestion[] = [
+        {
+          question: 'Text response evaluation',
+          question_type: QuizQuestionTypeEnum.SCENARIO_BASED,
+          options: [],
+          user_answer: text_response,
+        },
+      ];
+
+      // Call Python service for AI verification of text response
+      try {
+        aiVerificationResult = await this.pythonService.validateAnchorTagQuiz(
+          module.title,
+          module.description || '',
+          questions,
+        );
+
+        this.logger.log(
+          'AI verification completed successfully for text response',
+        );
+
+        // Use AI verification results
+        isCorrect =
+          aiVerificationResult.questions_results?.[0]?.is_correct || false;
+        scorePercentage = aiVerificationResult.score_percentage || 0;
+      } catch (error) {
+        this.logger.error(
+          'AI verification failed for text response:',
+          error.message,
+        );
+
+        // Fallback: For text responses without AI, we'll mark as correct for now
+        isCorrect = true;
+        scorePercentage = 100;
+      }
     }
 
-    // Update attempt
+    // Calculate time spent
+    const timeSpentSeconds = Math.floor(
+      (Date.now() - attempt.started_at.getTime()) / 1000,
+    );
+
+    // Update attempt with comprehensive data
+    const updateData = {
+      status: AnchorTagAttemptStatusEnum.COMPLETED,
+      completed_at: new Date(),
+      time_spent_seconds: timeSpentSeconds,
+      is_correct: isCorrect,
+      score_percentage: scorePercentage,
+      quiz_attempt: quizAttempt,
+      text_response,
+      ai_verification_result: aiVerificationResult,
+    };
+
     const updatedAttempt = await StudentAnchorTagAttemptModel.findByIdAndUpdate(
       attempt._id,
-      {
-        status: AnchorTagAttemptStatusEnum.COMPLETED,
-        completed_at: new Date(),
-        time_spent_seconds: Math.floor(
-          (Date.now() - attempt.started_at.getTime()) / 1000,
-        ),
-        is_correct: isCorrect,
-        score_percentage: scorePercentage,
-        quiz_attempt: quizAttempt,
-        text_response,
-      },
+      updateData,
       { new: true },
     );
 
@@ -316,6 +413,10 @@ export class StudentAnchorTagAttemptService {
         ),
       );
     }
+
+    this.logger.log(
+      `Anchor tag attempt completed for student ${user.id}, score: ${scorePercentage}%`,
+    );
 
     return updatedAttempt;
   }
