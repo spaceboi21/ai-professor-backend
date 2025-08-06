@@ -448,6 +448,7 @@ export class ProgressService {
       // Check if chapter has any quiz groups
       const hasQuiz = await QuizGroupModel.exists({
         chapter_id: new Types.ObjectId(chapter_id),
+        type: QuizTypeEnum.CHAPTER,
         deleted_at: null,
       });
 
