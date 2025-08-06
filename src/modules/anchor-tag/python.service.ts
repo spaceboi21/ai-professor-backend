@@ -1,7 +1,6 @@
 import { HttpService } from '@nestjs/axios';
 import { Injectable, Logger } from '@nestjs/common';
 import { firstValueFrom } from 'rxjs';
-import { QuizQuestionTypeEnum } from 'src/common/constants/quiz.constant';
 import { QuizQuestion, QuizVerificationResponse } from 'src/common/types/quiz.type';
 
 @Injectable()
