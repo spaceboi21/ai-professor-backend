@@ -12,12 +12,12 @@ import {
 } from 'src/database/schemas/central/school.schema';
 import { User, UserSchema } from 'src/database/schemas/central/user.schema';
 import { TenantConnectionService } from 'src/database/tenant-connection.service';
+import { NotificationsModule } from '../notifications/notifications.module';
 import { ProgressModule } from '../progress/progress.module';
 import { AnchorTagController } from './anchor-tag.controller';
 import { AnchorTagService } from './anchor-tag.service';
-import { StudentAnchorTagAttemptService } from './student-anchor-tag-attempt.service';
 import { PythonService } from './python.service';
-import { NotificationsModule } from '../notifications/notifications.module';
+import { StudentAnchorTagAttemptService } from './student-anchor-tag-attempt.service';
 
 @Module({
   imports: [
