@@ -141,6 +141,7 @@ export class ProfessorService {
         `${first_name}${last_name ? ` ${last_name}` : ''}`,
         generatedPassword,
         RoleEnum.PROFESSOR,
+        adminUser?.preferred_language,
       );
 
       this.logger.log(`Credentials email sent to: ${email}`);

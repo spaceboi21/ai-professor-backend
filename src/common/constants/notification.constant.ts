@@ -16,6 +16,8 @@ export enum NotificationTypeEnum {
   FORUM_MENTION = 'FORUM_MENTION',
   // Learning log review notifications
   LEARNING_LOG_REVIEWED = 'LEARNING_LOG_REVIEWED',
+  // Anchor tag notifications
+  ANCHOR_TAG_MISSED = 'ANCHOR_TAG_MISSED',
 }
 
 export enum NotificationStatusEnum {

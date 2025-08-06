@@ -17,6 +17,7 @@ import { AnchorTagController } from './anchor-tag.controller';
 import { AnchorTagService } from './anchor-tag.service';
 import { StudentAnchorTagAttemptService } from './student-anchor-tag-attempt.service';
 import { PythonService } from './python.service';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
   imports: [
@@ -27,6 +28,7 @@ import { PythonService } from './python.service';
     ]),
     HttpModule,
     ProgressModule,
+    NotificationsModule,
   ],
   controllers: [AnchorTagController],
   providers: [

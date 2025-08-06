@@ -1283,6 +1283,30 @@ export const ERROR_MESSAGES: {
       [LanguageEnum.FRENCH]:
         "Tentatives de tags d'ancrage de l'étudiant récupérées avec succès",
     },
+    NO_MANDATORY_ANCHOR_TAGS_FOUND: {
+      [LanguageEnum.ENGLISH]:
+        'No mandatory anchor tags found for this bibliography',
+      [LanguageEnum.FRENCH]:
+        "Aucun tag d'ancrage obligatoire trouvé pour cette bibliographie",
+    },
+    NO_STUDENTS_FOUND_IN_SCHOOL: {
+      [LanguageEnum.ENGLISH]: 'No students found in school',
+      [LanguageEnum.FRENCH]: "Aucun étudiant trouvé dans l'école",
+    },
+    MISSED_ANCHOR_TAG_NOTIFICATIONS_PROCESSED: {
+      [LanguageEnum.ENGLISH]:
+        'Missed anchor tag notifications processed successfully',
+      [LanguageEnum.FRENCH]:
+        "Notifications de tags d'ancrage manqués traitées avec succès",
+    },
+    NOTIFICATION_SENT_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'Notification sent successfully',
+      [LanguageEnum.FRENCH]: 'Notification envoyée avec succès',
+    },
+    FAILED_TO_SEND_NOTIFICATION: {
+      [LanguageEnum.ENGLISH]: 'Failed to send notification',
+      [LanguageEnum.FRENCH]: "Échec de l'envoi de la notification",
+    },
   },
 
   // School Admin Related

@@ -30,7 +30,10 @@ import { StatusEnum } from 'src/common/constants/status.constant';
 import * as csv from 'csv-parser';
 import { Readable } from 'stream';
 import { ErrorMessageService } from 'src/common/services/error-message.service';
-import { DEFAULT_LANGUAGE } from 'src/common/constants/language.constant';
+import {
+  DEFAULT_LANGUAGE,
+  LanguageEnum,
+} from 'src/common/constants/language.constant';
 
 @Injectable()
 export class StudentService {
@@ -232,6 +235,7 @@ export class StudentService {
         `${first_name}${last_name ? ` ${last_name}` : ''}`,
         generatedPassword,
         RoleEnum.STUDENT,
+        adminUser?.preferred_language,
       );
 
       this.logger.log(`Credentials email queued for: ${email}`);
@@ -749,6 +753,7 @@ export class StudentService {
           `${updatedStudent.first_name}${updatedStudent.last_name ? ` ${updatedStudent.last_name}` : ''}`,
           newPassword,
           RoleEnum.STUDENT,
+          user?.preferred_language,
         );
 
         this.logger.log(
@@ -1250,6 +1255,7 @@ export class StudentService {
       name: string;
       password: string;
       role: RoleEnum;
+      preferredLanguage?: LanguageEnum;
     }> = [];
 
     // Process each student
@@ -1397,6 +1403,7 @@ export class StudentService {
           name: `${student.first_name}${student.last_name ? ` ${student.last_name}` : ''}`,
           password: generatedPassword,
           role: RoleEnum.STUDENT,
+          preferredLanguage: adminUser?.preferred_language,
         });
 
         result.success.push(student);
