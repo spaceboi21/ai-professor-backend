@@ -47,6 +47,14 @@ export enum ActivityTypeEnum {
   QUIZ_DELETED = 'QUIZ_DELETED',
   QUIZ_ATTEMPTED = 'QUIZ_ATTEMPTED',
 
+  // Anchor Tag Management
+  ANCHOR_TAG_CREATED = 'ANCHOR_TAG_CREATED',
+  ANCHOR_TAG_UPDATED = 'ANCHOR_TAG_UPDATED',
+  ANCHOR_TAG_DELETED = 'ANCHOR_TAG_DELETED',
+  ANCHOR_TAG_ATTEMPT_STARTED = 'ANCHOR_TAG_ATTEMPT_STARTED',
+  ANCHOR_TAG_ATTEMPT_COMPLETED = 'ANCHOR_TAG_ATTEMPT_COMPLETED',
+  ANCHOR_TAG_SKIPPED = 'ANCHOR_TAG_SKIPPED',
+
   // Progress Tracking
   PROGRESS_UPDATED = 'PROGRESS_UPDATED',
   PROGRESS_COMPLETED = 'PROGRESS_COMPLETED',
@@ -156,6 +164,19 @@ export const ACTIVITY_CATEGORY_MAPPING: Record<
   [ActivityTypeEnum.QUIZ_DELETED]: ActivityCategoryEnum.CONTENT_MANAGEMENT,
   [ActivityTypeEnum.QUIZ_ATTEMPTED]: ActivityCategoryEnum.CONTENT_MANAGEMENT,
 
+  // Anchor Tag Management
+  [ActivityTypeEnum.ANCHOR_TAG_CREATED]:
+    ActivityCategoryEnum.CONTENT_MANAGEMENT,
+  [ActivityTypeEnum.ANCHOR_TAG_UPDATED]:
+    ActivityCategoryEnum.CONTENT_MANAGEMENT,
+  [ActivityTypeEnum.ANCHOR_TAG_DELETED]:
+    ActivityCategoryEnum.CONTENT_MANAGEMENT,
+  [ActivityTypeEnum.ANCHOR_TAG_ATTEMPT_STARTED]:
+    ActivityCategoryEnum.PROGRESS_TRACKING,
+  [ActivityTypeEnum.ANCHOR_TAG_ATTEMPT_COMPLETED]:
+    ActivityCategoryEnum.PROGRESS_TRACKING,
+  [ActivityTypeEnum.ANCHOR_TAG_SKIPPED]: ActivityCategoryEnum.PROGRESS_TRACKING,
+
   // Progress Tracking
   [ActivityTypeEnum.PROGRESS_UPDATED]: ActivityCategoryEnum.PROGRESS_TRACKING,
   [ActivityTypeEnum.PROGRESS_COMPLETED]: ActivityCategoryEnum.PROGRESS_TRACKING,
@@ -223,6 +244,12 @@ export const ACTIVITY_LEVEL_MAPPING: Record<
   [ActivityTypeEnum.DATABASE_MIGRATION]: ActivityLevelEnum.INFO,
   [ActivityTypeEnum.CONFIGURATION_CHANGED]: ActivityLevelEnum.INFO,
 
+  // Anchor Tag Management
+  [ActivityTypeEnum.ANCHOR_TAG_CREATED]: ActivityLevelEnum.INFO,
+  [ActivityTypeEnum.ANCHOR_TAG_UPDATED]: ActivityLevelEnum.INFO,
+  [ActivityTypeEnum.ANCHOR_TAG_ATTEMPT_STARTED]: ActivityLevelEnum.INFO,
+  [ActivityTypeEnum.ANCHOR_TAG_ATTEMPT_COMPLETED]: ActivityLevelEnum.INFO,
+
   // Warning level activities
   [ActivityTypeEnum.USER_DELETED]: ActivityLevelEnum.WARNING,
   [ActivityTypeEnum.SCHOOL_DELETED]: ActivityLevelEnum.WARNING,
@@ -241,6 +268,8 @@ export const ACTIVITY_LEVEL_MAPPING: Record<
   [ActivityTypeEnum.CHAPTER_REORDERED]: ActivityLevelEnum.WARNING,
   [ActivityTypeEnum.QUIZ_ATTEMPTED]: ActivityLevelEnum.WARNING,
   [ActivityTypeEnum.STUDENT_BULK_IMPORT]: ActivityLevelEnum.WARNING,
+  [ActivityTypeEnum.ANCHOR_TAG_DELETED]: ActivityLevelEnum.WARNING,
+  [ActivityTypeEnum.ANCHOR_TAG_SKIPPED]: ActivityLevelEnum.WARNING,
 
   // Error level activities
   [ActivityTypeEnum.LOGIN_FAILED]: ActivityLevelEnum.ERROR,

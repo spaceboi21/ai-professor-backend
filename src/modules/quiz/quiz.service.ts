@@ -23,6 +23,10 @@ import {
   ModuleSchema,
 } from 'src/database/schemas/tenant/module.schema';
 import {
+  Bibliography,
+  BibliographySchema,
+} from 'src/database/schemas/tenant/bibliography.schema';
+import {
   QuizGroup,
   QuizGroupSchema,
 } from 'src/database/schemas/tenant/quiz-group.schema';
@@ -75,11 +79,16 @@ export class QuizService {
     const QuizGroupModel = connection.model(QuizGroup.name, QuizGroupSchema);
     const ModuleModel = connection.model(Module.name, ModuleSchema);
     const ChapterModel = connection.model(Chapter.name, ChapterSchema);
+    const BibliographyModel = connection.model(
+      Bibliography.name,
+      BibliographySchema,
+    );
 
     const {
       type,
       module_id,
       chapter_id,
+      bibliography_id,
       subject,
       description,
       difficulty,
@@ -102,6 +111,25 @@ export class QuizService {
         this.errorMessageService.getMessageWithLanguage(
           'QUIZ',
           'CHAPTER_ID_REQUIRED_WHEN_TYPE_IS_CHAPTER',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
+    }
+    if (type === QuizTypeEnum.ANCHOR_TAG && !module_id) {
+      throw new BadRequestException(
+        this.errorMessageService.getMessageWithLanguage(
+          'QUIZ',
+          'MODULE_ID_REQUIRED_WHEN_TYPE_IS_ANCHOR_TAG',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
+    }
+
+    if (type === QuizTypeEnum.ANCHOR_TAG && !bibliography_id) {
+      throw new BadRequestException(
+        this.errorMessageService.getMessageWithLanguage(
+          'QUIZ',
+          'BIBLIOGRAPHY_ID_REQUIRED_WHEN_TYPE_IS_ANCHOR_TAG',
           user?.preferred_language || DEFAULT_LANGUAGE,
         ),
       );
@@ -140,6 +168,22 @@ export class QuizService {
       }
     }
 
+    if (type === QuizTypeEnum.ANCHOR_TAG) {
+      const bibliographyExists = await BibliographyModel.findOne({
+        _id: bibliography_id,
+        deleted_at: null,
+      });
+      if (!bibliographyExists) {
+        throw new NotFoundException(
+          this.errorMessageService.getMessageWithLanguage(
+            'QUIZ',
+            'BIBLIOGRAPHY_NOT_FOUND',
+            user?.preferred_language || DEFAULT_LANGUAGE,
+          ),
+        );
+      }
+    }
+
     const quizGroupData = {
       subject,
       description,
@@ -148,11 +192,19 @@ export class QuizService {
       category,
       type,
       module_id:
-        type === QuizTypeEnum.CHAPTER || type === QuizTypeEnum.MODULE
+        type === QuizTypeEnum.CHAPTER ||
+        type === QuizTypeEnum.MODULE ||
+        type === QuizTypeEnum.ANCHOR_TAG
           ? new Types.ObjectId(module_id)
           : null,
       chapter_id:
-        type === QuizTypeEnum.CHAPTER ? new Types.ObjectId(chapter_id) : null,
+        type === QuizTypeEnum.CHAPTER || type === QuizTypeEnum.ANCHOR_TAG
+          ? new Types.ObjectId(chapter_id)
+          : null,
+      bibliography_id:
+        type === QuizTypeEnum.ANCHOR_TAG
+          ? new Types.ObjectId(bibliography_id)
+          : null,
       created_by: new Types.ObjectId(user.id),
       created_by_role: user.role.name,
     };
@@ -210,6 +262,10 @@ export class QuizService {
     if (filterDto?.chapter_id) {
       filter.chapter_id = new Types.ObjectId(filterDto.chapter_id);
       filter.type = QuizTypeEnum.CHAPTER;
+    }
+    if (filterDto?.bibliography_id) {
+      filter.bibliography_id = new Types.ObjectId(filterDto.bibliography_id);
+      filter.type = QuizTypeEnum.ANCHOR_TAG;
     }
 
     const quizGroups = await QuizGroupModel.findOne(filter).lean();

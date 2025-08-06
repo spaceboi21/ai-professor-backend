@@ -504,6 +504,31 @@ export const ERROR_MESSAGES: {
       [LanguageEnum.ENGLISH]: 'Failed to retrieve module overview',
       [LanguageEnum.FRENCH]: "Échec de la récupération de l'aperçu du module",
     },
+    MODULE_ID_REQUIRED_WHEN_TYPE_IS_MODULE: {
+      [LanguageEnum.ENGLISH]: 'Module ID is required when type is MODULE',
+      [LanguageEnum.FRENCH]:
+        "L'ID du module est requis lorsque le type est MODULE",
+    },
+    CHAPTER_ID_REQUIRED_WHEN_TYPE_IS_CHAPTER: {
+      [LanguageEnum.ENGLISH]: 'Chapter ID is required when type is CHAPTER',
+      [LanguageEnum.FRENCH]:
+        "L'ID du chapitre est requis lorsque le type est CHAPTER",
+    },
+    MODULE_ID_REQUIRED_WHEN_TYPE_IS_ANCHOR_TAG: {
+      [LanguageEnum.ENGLISH]: 'Module ID is required when type is ANCHOR_TAG',
+      [LanguageEnum.FRENCH]:
+        "L'ID du module est requis lorsque le type est ANCHOR_TAG",
+    },
+    BIBLIOGRAPHY_ID_REQUIRED_WHEN_TYPE_IS_ANCHOR_TAG: {
+      [LanguageEnum.ENGLISH]:
+        'Bibliography ID is required when type is ANCHOR_TAG',
+      [LanguageEnum.FRENCH]:
+        "L'ID de la bibliographie est requis lorsque le type est ANCHOR_TAG",
+    },
+    BIBLIOGRAPHY_NOT_FOUND: {
+      [LanguageEnum.ENGLISH]: 'Bibliography not found',
+      [LanguageEnum.FRENCH]: 'Bibliographie non trouvée',
+    },
   },
 
   // Chapter Related
@@ -1133,6 +1158,130 @@ export const ERROR_MESSAGES: {
     FAILED_TO_RETRIEVE_QUIZ_ATTEMPTS: {
       [LanguageEnum.ENGLISH]: 'Failed to retrieve quiz attempts',
       [LanguageEnum.FRENCH]: 'Échec de la récupération des tentatives de quiz',
+    },
+    SCHOOL_NOT_FOUND: {
+      [LanguageEnum.ENGLISH]: 'School not found',
+      [LanguageEnum.FRENCH]: 'École non trouvée',
+    },
+    MODULE_ID_REQUIRED_WHEN_TYPE_IS_MODULE: {
+      [LanguageEnum.ENGLISH]: 'Module ID is required when type is MODULE',
+      [LanguageEnum.FRENCH]:
+        "L'ID du module est requis lorsque le type est MODULE",
+    },
+    CHAPTER_ID_REQUIRED_WHEN_TYPE_IS_CHAPTER: {
+      [LanguageEnum.ENGLISH]: 'Chapter ID is required when type is CHAPTER',
+      [LanguageEnum.FRENCH]:
+        "L'ID du chapitre est requis lorsque le type est CHAPTER",
+    },
+    MODULE_ID_REQUIRED_WHEN_TYPE_IS_ANCHOR_TAG: {
+      [LanguageEnum.ENGLISH]: 'Module ID is required when type is ANCHOR_TAG',
+      [LanguageEnum.FRENCH]:
+        "L'ID du module est requis lorsque le type est ANCHOR_TAG",
+    },
+    QUIZ_GROUP_NOT_FOUND: {
+      [LanguageEnum.ENGLISH]: 'Quiz group not found',
+      [LanguageEnum.FRENCH]: 'Groupe de quiz non trouvé',
+    },
+    MODULE_NOT_FOUND: {
+      [LanguageEnum.ENGLISH]: 'Module not found',
+      [LanguageEnum.FRENCH]: 'Module non trouvé',
+    },
+    CHAPTER_NOT_FOUND: {
+      [LanguageEnum.ENGLISH]: 'Chapter not found',
+      [LanguageEnum.FRENCH]: 'Chapitre non trouvé',
+    },
+    INVALID_QUIZ_IDS: {
+      [LanguageEnum.ENGLISH]: 'Invalid quiz IDs provided',
+      [LanguageEnum.FRENCH]: 'IDs de quiz invalides fournis',
+    },
+  },
+
+  // Anchor Tag Related
+  ANCHOR_TAG: {
+    SCHOOL_NOT_FOUND: {
+      [LanguageEnum.ENGLISH]: 'School not found',
+      [LanguageEnum.FRENCH]: 'École non trouvée',
+    },
+    MODULE_NOT_FOUND: {
+      [LanguageEnum.ENGLISH]: 'Module not found',
+      [LanguageEnum.FRENCH]: 'Module non trouvé',
+    },
+    CHAPTER_NOT_FOUND: {
+      [LanguageEnum.ENGLISH]: 'Chapter not found',
+      [LanguageEnum.FRENCH]: 'Chapitre non trouvé',
+    },
+    BIBLIOGRAPHY_NOT_FOUND: {
+      [LanguageEnum.ENGLISH]: 'Bibliography not found',
+      [LanguageEnum.FRENCH]: 'Bibliographie non trouvée',
+    },
+    QUIZ_GROUP_NOT_FOUND: {
+      [LanguageEnum.ENGLISH]: 'Quiz group not found',
+      [LanguageEnum.FRENCH]: 'Groupe de quiz non trouvé',
+    },
+    ANCHOR_TAG_NOT_FOUND: {
+      [LanguageEnum.ENGLISH]: 'Anchor tag not found',
+      [LanguageEnum.FRENCH]: "Tag d'ancrage non trouvé",
+    },
+    INVALID_QUIZ_IDS: {
+      [LanguageEnum.ENGLISH]: 'Invalid quiz IDs provided',
+      [LanguageEnum.FRENCH]: 'IDs de quiz invalides fournis',
+    },
+    TIMESTAMP_REQUIRED_FOR_VIDEO: {
+      [LanguageEnum.ENGLISH]: 'Timestamp is required for video content',
+      [LanguageEnum.FRENCH]: "L'horodatage est requis pour le contenu vidéo",
+    },
+    PAGE_NUMBER_REQUIRED_FOR_PDF: {
+      [LanguageEnum.ENGLISH]: 'Page number is required for PDF content',
+      [LanguageEnum.FRENCH]: 'Le numéro de page est requis pour le contenu PDF',
+    },
+    SLIDE_NUMBER_REQUIRED_FOR_SLIDE: {
+      [LanguageEnum.ENGLISH]: 'Slide number is required for slide content',
+      [LanguageEnum.FRENCH]:
+        'Le numéro de diapositive est requis pour le contenu de diapositive',
+    },
+    NO_IN_PROGRESS_ATTEMPT_FOUND: {
+      [LanguageEnum.ENGLISH]: 'No in-progress anchor tag attempt found',
+      [LanguageEnum.FRENCH]:
+        "Aucune tentative de tag d'ancrage en cours trouvée",
+    },
+    MANDATORY_ANCHOR_TAG_CANNOT_BE_SKIPPED: {
+      [LanguageEnum.ENGLISH]: 'Mandatory anchor tags cannot be skipped',
+      [LanguageEnum.FRENCH]:
+        "Les tags d'ancrage obligatoires ne peuvent pas être ignorés",
+    },
+    ANCHOR_TAG_CREATED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'Anchor tag created successfully',
+      [LanguageEnum.FRENCH]: "Tag d'ancrage créé avec succès",
+    },
+    ANCHOR_TAG_UPDATED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'Anchor tag updated successfully',
+      [LanguageEnum.FRENCH]: "Tag d'ancrage mis à jour avec succès",
+    },
+    ANCHOR_TAG_DELETED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'Anchor tag deleted successfully',
+      [LanguageEnum.FRENCH]: "Tag d'ancrage supprimé avec succès",
+    },
+    ANCHOR_TAGS_RETRIEVED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'Anchor tags retrieved successfully',
+      [LanguageEnum.FRENCH]: "Tags d'ancrage récupérés avec succès",
+    },
+    ANCHOR_TAG_ATTEMPT_STARTED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'Anchor tag attempt started successfully',
+      [LanguageEnum.FRENCH]: "Tentative de tag d'ancrage commencée avec succès",
+    },
+    ANCHOR_TAG_ANSWER_SUBMITTED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'Anchor tag answer submitted successfully',
+      [LanguageEnum.FRENCH]: "Réponse au tag d'ancrage soumise avec succès",
+    },
+    ANCHOR_TAG_SKIPPED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'Anchor tag skipped successfully',
+      [LanguageEnum.FRENCH]: "Tag d'ancrage ignoré avec succès",
+    },
+    STUDENT_ATTEMPTS_RETRIEVED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]:
+        'Student anchor tag attempts retrieved successfully',
+      [LanguageEnum.FRENCH]:
+        "Tentatives de tags d'ancrage de l'étudiant récupérées avec succès",
     },
   },
 

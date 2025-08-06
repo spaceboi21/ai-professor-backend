@@ -3,6 +3,7 @@ import { Document, Types } from 'mongoose';
 import { User } from '../central/user.schema';
 import { Module } from './module.schema';
 import { Chapter } from './chapter.schema';
+import { Bibliography } from './bibliography.schema';
 import { DifficultyEnum } from 'src/common/constants/difficulty.constant';
 import { QuizTypeEnum } from 'src/common/constants/quiz.constant';
 import { RoleEnum } from 'src/common/constants/roles.constant';
@@ -38,6 +39,9 @@ export class QuizGroup extends Document {
   @Prop({ type: Types.ObjectId, ref: Chapter.name })
   chapter_id: Types.ObjectId;
 
+  @Prop({ type: Types.ObjectId, ref: Bibliography.name, default: null })
+  bibliography_id: Types.ObjectId;
+
   @Prop({ required: true, enum: QuizTypeEnum })
   type: QuizTypeEnum;
 
@@ -59,6 +63,7 @@ export const QuizGroupSchema = SchemaFactory.createForClass(QuizGroup);
 // Create indexes for better query performance
 QuizGroupSchema.index({ module_id: 1, type: 1 });
 QuizGroupSchema.index({ chapter_id: 1, type: 1 });
+QuizGroupSchema.index({ bibliography_id: 1, type: 1 });
 QuizGroupSchema.index({ category: 1 });
 QuizGroupSchema.index({ difficulty: 1 });
 

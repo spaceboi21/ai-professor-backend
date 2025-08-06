@@ -1,6 +1,7 @@
 export enum QuizTypeEnum {
   MODULE = 'MODULE',
   CHAPTER = 'CHAPTER',
+  ANCHOR_TAG = 'ANCHOR_TAG',
 }
 
 export enum QuizQuestionTypeEnum {

@@ -36,6 +36,7 @@ import { LearningLogsModule } from './modules/learning-logs/learning-logs.module
 import { ActivityLogModule } from './modules/activity-log/activity-log.module';
 import { CommunityModule } from './modules/community/community.module';
 import { CommonModule } from './common/common.module';
+import { AnchorTagModule } from './modules/anchor-tag/anchor-tag.module';
 
 @Module({
   imports: [
@@ -127,6 +128,7 @@ import { CommonModule } from './common/common.module';
     LearningLogsModule,
     ActivityLogModule,
     CommunityModule,
+    AnchorTagModule,
     HttpModule,
   ],
   controllers: [AppController],

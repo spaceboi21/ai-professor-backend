@@ -60,13 +60,14 @@ export class CreateQuizGroupDto {
   category: string;
 
   @IsEnum(QuizTypeEnum, {
-    message: 'Type must be MODULE or CHAPTER',
+    message: 'Type must be MODULE, CHAPTER, or ANCHOR_TAG',
   })
   @IsNotEmpty({ message: 'Type is required' })
   @ApiProperty({
     example: QuizTypeEnum.MODULE,
     enum: QuizTypeEnum,
-    description: 'Type of quiz - whether it belongs to a module or chapter',
+    description:
+      'Type of quiz - whether it belongs to a module, chapter, or anchor tag',
   })
   type: QuizTypeEnum;
 
@@ -89,4 +90,17 @@ export class CreateQuizGroupDto {
     required: false,
   })
   chapter_id?: string | Types.ObjectId;
+
+  @ValidateIf((o) => o.type === QuizTypeEnum.ANCHOR_TAG)
+  @IsMongoId({ message: 'Bibliography ID must be a valid MongoDB ObjectId' })
+  @IsNotEmpty({
+    message: 'Bibliography ID is required when type is ANCHOR_TAG',
+  })
+  @ApiProperty({
+    example: '507f1f77bcf86cd799439013',
+    description:
+      'ID of the bibliography item (required when type is ANCHOR_TAG)',
+    required: false,
+  })
+  bibliography_id?: string | Types.ObjectId;
 }

@@ -31,7 +31,7 @@ export class QuizGroupFilterDto extends PaginationDto {
   difficulty?: DifficultyEnum;
 
   @IsEnum(QuizTypeEnum, {
-    message: 'Type must be MODULE or CHAPTER',
+    message: 'Type must be MODULE, CHAPTER, or ANCHOR_TAG',
   })
   @IsOptional()
   @ApiProperty({
@@ -59,6 +59,15 @@ export class QuizGroupFilterDto extends PaginationDto {
     required: false,
   })
   chapter_id?: string | Types.ObjectId;
+
+  @IsMongoId({ message: 'Bibliography ID must be a valid MongoDB ObjectId' })
+  @IsOptional()
+  @ApiProperty({
+    example: '507f1f77bcf86cd799439013',
+    description: 'Filter by bibliography ID',
+    required: false,
+  })
+  bibliography_id?: string | Types.ObjectId;
 }
 
 export class QuizFilterDto extends PaginationDto {
