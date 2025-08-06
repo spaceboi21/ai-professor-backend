@@ -56,8 +56,14 @@ export class StudentService {
     createStudentDto: CreateStudentDto,
     adminUser: JWTUserPayload,
   ) {
-    const { first_name, last_name, email, school_id, status } =
-      createStudentDto;
+    const {
+      first_name,
+      last_name,
+      email,
+      school_id,
+      status,
+      preferred_language,
+    } = createStudentDto;
 
     this.logger.log(
       `Creating student with email: ${email} for school: ${school_id}`,
@@ -214,6 +220,7 @@ export class StudentService {
         created_by: new Types.ObjectId(adminUser?.id),
         created_by_role: adminUser.role.name as RoleEnum,
         is_csv_upload: false, // Mark as non-CSV upload
+        preferred_language: preferred_language || DEFAULT_LANGUAGE, // Use provided language or default
       });
 
       const savedStudent = await newStudent.save();
@@ -229,13 +236,13 @@ export class StudentService {
 
       this.logger.log(`Global student entry created for: ${email}`);
 
-      // Send credentials email
+      // Send credentials email with preferred language from DTO
       await this.mailService.queueCredentialsEmail(
         email,
         `${first_name}${last_name ? ` ${last_name}` : ''}`,
         generatedPassword,
         RoleEnum.STUDENT,
-        adminUser?.preferred_language,
+        preferred_language || adminUser?.preferred_language,
       );
 
       this.logger.log(`Credentials email queued for: ${email}`);

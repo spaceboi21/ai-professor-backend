@@ -51,6 +51,41 @@ export class MailService {
     return baseSubject;
   }
 
+  /**
+   * Get language-specific portal URL based on role and language
+   * @param role - User role
+   * @param language - User's preferred language
+   * @returns Portal URL with language suffix
+   */
+  private getPortalUrl(role: RoleEnum, language: LanguageEnum): string {
+    let baseUrl: string;
+
+    if (role === RoleEnum.STUDENT) {
+      baseUrl =
+        this.configService.get<string>('STUDENT_PORTAL_URL') ||
+        'http://23.239.4.160:3000';
+    } else if (role === RoleEnum.PROFESSOR || role === RoleEnum.SCHOOL_ADMIN) {
+      baseUrl =
+        this.configService.get<string>('SCHOOL_PORTAL_URL') ||
+        'http://23.239.4.160:3001';
+    } else {
+      baseUrl =
+        this.configService.get<string>('ADMIN_PORTAL_URL') ||
+        'http://23.239.4.160:3000';
+    }
+
+    // Add language suffix to the URL
+    const languageSuffix = language === LanguageEnum.FRENCH ? '/fr' : '/en';
+
+    // Ensure the URL doesn't already have a language suffix
+    if (baseUrl.endsWith('/fr') || baseUrl.endsWith('/en')) {
+      return baseUrl;
+    }
+
+    // Add language suffix and login path
+    return `${baseUrl}${languageSuffix}/login`;
+  }
+
   async sendPasswordResetEmail(
     email: string,
     userName: string,
@@ -86,12 +121,7 @@ export class MailService {
   ): Promise<void> {
     const language = preferredLanguage || DEFAULT_LANGUAGE;
     const logoUrl = this.configService.get<string>('LOGO_URL');
-    const portal_url =
-      role === RoleEnum.STUDENT
-        ? this.configService.get<string>('STUDENT_PORTAL_URL')
-        : role === RoleEnum.PROFESSOR || role === RoleEnum.SCHOOL_ADMIN
-          ? this.configService.get<string>('SCHOOL_PORTAL_URL')
-          : this.configService.get<string>('ADMIN_PORTAL_URL');
+    const portal_url = this.getPortalUrl(role, language);
 
     const templateName = this.getTemplateName('credentials-email', language);
     const subject = this.getEmailSubject(

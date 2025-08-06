@@ -8,6 +8,7 @@ import {
   IsEnum,
 } from 'class-validator';
 import { StatusEnum } from 'src/common/constants/status.constant';
+import { LanguageEnum } from 'src/common/constants/language.constant';
 
 export class CreateProfessorDto {
   @ApiProperty({ example: 'John', description: 'First name of the professor' })
@@ -49,4 +50,16 @@ export class CreateProfessorDto {
   @IsEnum(StatusEnum, { message: 'Status must be ACTIVE or INACTIVE' })
   @IsOptional()
   status?: StatusEnum;
+
+  @IsOptional()
+  @IsEnum(LanguageEnum, {
+    message: 'Preferred language must be either "en" or "fr"',
+  })
+  @ApiProperty({
+    description: 'Preferred language for the user interface',
+    enum: LanguageEnum,
+    example: LanguageEnum.FRENCH,
+    required: false,
+  })
+  preferred_language?: LanguageEnum;
 }

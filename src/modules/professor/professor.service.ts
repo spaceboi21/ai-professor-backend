@@ -55,8 +55,14 @@ export class ProfessorService {
     createProfessorDto: CreateProfessorDto,
     adminUser: JWTUserPayload,
   ) {
-    const { first_name, last_name, email, school_id, status } =
-      createProfessorDto;
+    const {
+      first_name,
+      last_name,
+      email,
+      school_id,
+      status,
+      preferred_language,
+    } = createProfessorDto;
 
     this.logger.log(
       `Creating professor with email: ${email} for school: ${school_id}`,
@@ -131,17 +137,18 @@ export class ProfessorService {
         created_by: new Types.ObjectId(adminUser?.id),
         created_by_role: adminUser.role.name as RoleEnum,
         role: new Types.ObjectId(ROLE_IDS[RoleEnum.PROFESSOR]),
+        preferred_language: preferred_language || DEFAULT_LANGUAGE, // Use provided language or default
       });
 
       this.logger.log(`Professor created in user table: ${newStudent._id}`);
 
-      // Send credentials email
+      // Send credentials email with preferred language from DTO
       await this.mailService.sendCredentialsEmail(
         email,
         `${first_name}${last_name ? ` ${last_name}` : ''}`,
         generatedPassword,
         RoleEnum.PROFESSOR,
-        adminUser?.preferred_language,
+        preferred_language || adminUser?.preferred_language,
       );
 
       this.logger.log(`Credentials email sent to: ${email}`);

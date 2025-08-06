@@ -60,6 +60,7 @@ export class SchoolAdminService {
       user_email,
       user_first_name,
       user_last_name,
+      preferred_language,
     } = createSchoolAdminDto;
 
     this.logger.log(
@@ -154,17 +155,17 @@ export class SchoolAdminService {
           password: await this.bcryptUtil.hashPassword(password),
           role: new Types.ObjectId(ROLE_IDS.SCHOOL_ADMIN),
           created_by: new Types.ObjectId(user.id),
+          preferred_language: preferred_language || DEFAULT_LANGUAGE, // Use provided language or default
         },
       ]);
 
-      // Send email to the new school admin
-      // Note: Email sending logic is not implemented here, but you can use a service like
+      // Send email to the new school admin with preferred language from DTO
       await this.mailService.sendCredentialsEmail(
         user_email,
         `${user_first_name}${user_last_name ? ` ${user_last_name}` : ''}`,
         password,
         RoleEnum.SCHOOL_ADMIN,
-        user?.preferred_language,
+        preferred_language || user?.preferred_language,
       );
       this.logger.log(`Credentials email sent to: ${user_email}`);
 
