@@ -29,6 +29,8 @@ import { PaginationDto } from 'src/common/dto/pagination.dto';
 import { StatusEnum } from 'src/common/constants/status.constant';
 import * as csv from 'csv-parser';
 import { Readable } from 'stream';
+import { ErrorMessageService } from 'src/common/services/error-message.service';
+import { DEFAULT_LANGUAGE } from 'src/common/constants/language.constant';
 
 @Injectable()
 export class StudentService {
@@ -44,6 +46,7 @@ export class StudentService {
     private readonly tenantConnectionService: TenantConnectionService,
     private readonly mailService: MailService,
     @InjectConnection() private readonly connection: Connection,
+    private readonly errorMessageService: ErrorMessageService,
   ) {}
 
   async createStudent(
@@ -64,18 +67,34 @@ export class StudentService {
       // School admin can only access their own school
       targetSchoolId = adminUser.school_id as string;
       if (!targetSchoolId) {
-        throw new BadRequestException('School admin must have a school_id');
+        throw new BadRequestException(
+          this.errorMessageService.getMessageWithLanguage(
+            'SCHOOL',
+            'ADMIN_MUST_HAVE_SCHOOL_ID',
+            adminUser?.preferred_language || DEFAULT_LANGUAGE,
+          ),
+        );
       }
     } else if (adminUser.role.name === RoleEnum.SUPER_ADMIN) {
       // Super admin can specify school_id or use their default
       targetSchoolId = school_id?.toString() || (adminUser.school_id as string);
       if (!targetSchoolId) {
         throw new BadRequestException(
-          'Super admin must provide school_id parameter',
+          this.errorMessageService.getMessageWithLanguage(
+            'STUDENT',
+            'SUPER_ADMIN_SCHOOL_ID_REQUIRED',
+            adminUser?.preferred_language || DEFAULT_LANGUAGE,
+          ),
         );
       }
     } else {
-      throw new BadRequestException('Unauthorized role for accessing students');
+      throw new BadRequestException(
+        this.errorMessageService.getMessageWithLanguage(
+          'STUDENT',
+          'UNAUTHORIZED_ACCESS',
+          adminUser?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     // Validate school exists and admin has access
@@ -83,14 +102,24 @@ export class StudentService {
       new Types.ObjectId(targetSchoolId),
     );
     if (!school) {
-      throw new NotFoundException('School not found');
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'SCHOOL',
+          'NOT_FOUND',
+          adminUser?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     // If admin is SCHOOL_ADMIN, ensure they belong to this school
     if (adminUser.role.name === RoleEnum.SCHOOL_ADMIN) {
       if (adminUser.school_id?.toString() !== targetSchoolId.toString()) {
         throw new BadRequestException(
-          'You can only create students for your own school',
+          this.errorMessageService.getMessageWithLanguage(
+            'STUDENT',
+            'ONLY_CREATE_FOR_OWN_SCHOOL',
+            adminUser?.preferred_language || DEFAULT_LANGUAGE,
+          ),
         );
       }
     }
@@ -98,7 +127,13 @@ export class StudentService {
     // Check if email already exists in central users
     const existingUser = await this.userModel.findOne({ email });
     if (existingUser) {
-      throw new ConflictException('Email already exists in the system');
+      throw new ConflictException(
+        this.errorMessageService.getMessageWithLanguage(
+          'STUDENT',
+          'EMAIL_EXISTS_SYSTEM',
+          adminUser?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     // Check if email exists in global students (including deleted ones)
@@ -129,7 +164,13 @@ export class StudentService {
         this.logger.log(`Deleted student entries removed for email: ${email}`);
       } else {
         // Student exists and is not deleted
-        throw new ConflictException('Student with this email already exists');
+        throw new ConflictException(
+          this.errorMessageService.getMessageWithLanguage(
+            'STUDENT',
+            'EMAIL_EXISTS',
+            adminUser?.preferred_language || DEFAULT_LANGUAGE,
+          ),
+        );
       }
     }
 
@@ -148,7 +189,11 @@ export class StudentService {
       const existingTenantStudent = await StudentModel.findOne({ email });
       if (existingTenantStudent) {
         throw new ConflictException(
-          'Student with this email already exists in school database',
+          this.errorMessageService.getMessageWithLanguage(
+            'STUDENT',
+            'EMAIL_EXISTS_IN_SCHOOL',
+            adminUser?.preferred_language || DEFAULT_LANGUAGE,
+          ),
         );
       }
 
@@ -192,7 +237,11 @@ export class StudentService {
       this.logger.log(`Credentials email queued for: ${email}`);
 
       return {
-        message: 'Student created successfully',
+        message: this.errorMessageService.getSuccessMessageWithLanguage(
+          'STUDENT',
+          'CREATED_SUCCESSFULLY',
+          adminUser?.preferred_language || DEFAULT_LANGUAGE,
+        ),
         data: {
           id: savedStudent._id,
           first_name: savedStudent.first_name,
@@ -207,9 +256,21 @@ export class StudentService {
     } catch (error) {
       this.logger.error('Error creating student', error?.stack || error);
       if (error?.code === 11000) {
-        throw new ConflictException('Email already exists');
+        throw new ConflictException(
+          this.errorMessageService.getMessageWithLanguage(
+            'STUDENT',
+            'EMAIL_EXISTS',
+            adminUser?.preferred_language || DEFAULT_LANGUAGE,
+          ),
+        );
       }
-      throw new BadRequestException('Failed to create student');
+      throw new BadRequestException(
+        this.errorMessageService.getMessageWithLanguage(
+          'STUDENT',
+          'CREATE_FAILED',
+          adminUser?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
   }
 
@@ -234,7 +295,13 @@ export class StudentService {
       // School admin can only access their own school
       targetSchoolId = user.school_id as string;
       if (!targetSchoolId) {
-        throw new BadRequestException('School admin must have a school_id');
+        throw new BadRequestException(
+          this.errorMessageService.getMessageWithLanguage(
+            'SCHOOL',
+            'ADMIN_MUST_HAVE_SCHOOL_ID',
+            user?.preferred_language || DEFAULT_LANGUAGE,
+          ),
+        );
       }
     } else if (
       user.role.name === RoleEnum.SUPER_ADMIN ||
@@ -244,18 +311,34 @@ export class StudentService {
       targetSchoolId = school_id?.toString() || (user.school_id as string);
       if (!targetSchoolId) {
         throw new BadRequestException(
-          'Super admin or professor must provide school_id parameter',
+          this.errorMessageService.getMessageWithLanguage(
+            'STUDENT',
+            'SUPER_ADMIN_SCHOOL_ID_REQUIRED',
+            user?.preferred_language || DEFAULT_LANGUAGE,
+          ),
         );
       }
     } else {
-      throw new BadRequestException('Unauthorized role for accessing students');
+      throw new BadRequestException(
+        this.errorMessageService.getMessageWithLanguage(
+          'STUDENT',
+          'UNAUTHORIZED_ACCESS',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
     // Get school information
     school = await this.schoolModel.findById(
       new Types.ObjectId(targetSchoolId),
     );
     if (!school) {
-      throw new NotFoundException('School not found');
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'SCHOOL',
+          'NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     // Get tenant connection
@@ -325,7 +408,11 @@ export class StudentService {
     });
 
     return {
-      message: 'Students retrieved successfully',
+      message: this.errorMessageService.getSuccessMessageWithLanguage(
+        'STUDENT',
+        'STUDENTS_RETRIEVED_SUCCESSFULLY',
+        user?.preferred_language || DEFAULT_LANGUAGE,
+      ),
       ...pagination,
     };
   }
@@ -345,18 +432,34 @@ export class StudentService {
       // School admin can only access their own school
       targetSchoolId = user.school_id as string;
       if (!targetSchoolId) {
-        throw new BadRequestException('School admin must have a school_id');
+        throw new BadRequestException(
+          this.errorMessageService.getMessageWithLanguage(
+            'SCHOOL',
+            'ADMIN_MUST_HAVE_SCHOOL_ID',
+            user?.preferred_language || DEFAULT_LANGUAGE,
+          ),
+        );
       }
     } else if (user.role.name === RoleEnum.SUPER_ADMIN) {
       // Super admin can specify school_id or use their default
       targetSchoolId = school_id?.toString() || (user.school_id as string);
       if (!targetSchoolId) {
         throw new BadRequestException(
-          'Super admin must provide school_id parameter',
+          this.errorMessageService.getMessageWithLanguage(
+            'STUDENT',
+            'SUPER_ADMIN_SCHOOL_ID_REQUIRED',
+            user?.preferred_language || DEFAULT_LANGUAGE,
+          ),
         );
       }
     } else {
-      throw new BadRequestException('Unauthorized role for accessing students');
+      throw new BadRequestException(
+        this.errorMessageService.getMessageWithLanguage(
+          'STUDENT',
+          'UNAUTHORIZED_ACCESS',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     // Get school information
@@ -364,7 +467,13 @@ export class StudentService {
       new Types.ObjectId(targetSchoolId),
     );
     if (!school) {
-      throw new NotFoundException('School not found');
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'SCHOOL',
+          'NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     // Get tenant connection
@@ -380,11 +489,21 @@ export class StudentService {
 
     if (!student) {
       this.logger.warn(`Student not found: ${id}`);
-      throw new NotFoundException('Student not found');
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'STUDENT',
+          'NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     return {
-      message: 'Student retrieved successfully',
+      message: this.errorMessageService.getSuccessMessageWithLanguage(
+        'STUDENT',
+        'RETRIEVED_SUCCESSFULLY',
+        user?.preferred_language || DEFAULT_LANGUAGE,
+      ),
       data: student,
     };
   }
@@ -405,18 +524,34 @@ export class StudentService {
       // School admin can only access their own school
       targetSchoolId = user.school_id as string;
       if (!targetSchoolId) {
-        throw new BadRequestException('School admin must have a school_id');
+        throw new BadRequestException(
+          this.errorMessageService.getMessageWithLanguage(
+            'SCHOOL',
+            'ADMIN_MUST_HAVE_SCHOOL_ID',
+            user?.preferred_language || DEFAULT_LANGUAGE,
+          ),
+        );
       }
     } else if (user.role.name === RoleEnum.SUPER_ADMIN) {
       // Super admin can specify school_id or use their default
       targetSchoolId = school_id?.toString() || (user.school_id as string);
       if (!targetSchoolId) {
         throw new BadRequestException(
-          'Super admin must provide school_id parameter',
+          this.errorMessageService.getMessageWithLanguage(
+            'STUDENT',
+            'SUPER_ADMIN_SCHOOL_ID_REQUIRED',
+            user?.preferred_language || DEFAULT_LANGUAGE,
+          ),
         );
       }
     } else {
-      throw new BadRequestException('Unauthorized role for updating students');
+      throw new BadRequestException(
+        this.errorMessageService.getMessageWithLanguage(
+          'STUDENT',
+          'UNAUTHORIZED_ACCESS',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     // Get school information
@@ -424,7 +559,13 @@ export class StudentService {
       new Types.ObjectId(targetSchoolId),
     );
     if (!school) {
-      throw new NotFoundException('School not found');
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'SCHOOL',
+          'NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     // Get tenant connection
@@ -440,7 +581,13 @@ export class StudentService {
     }).select('+password');
 
     if (!student) {
-      throw new NotFoundException('Student not found');
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'STUDENT',
+          'NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     // Store original email for comparison
@@ -456,7 +603,13 @@ export class StudentService {
         _id: { $ne: new Types.ObjectId(id) },
       });
       if (existingUser) {
-        throw new ConflictException('Email already exists in the system');
+        throw new ConflictException(
+          this.errorMessageService.getMessageWithLanguage(
+            'STUDENT',
+            'EMAIL_EXISTS_SYSTEM',
+            user?.preferred_language || DEFAULT_LANGUAGE,
+          ),
+        );
       }
 
       // Check if email already exists in global students
@@ -503,7 +656,11 @@ export class StudentService {
           } else {
             // Student exists and is not deleted
             throw new ConflictException(
-              'Student with this email already exists',
+              this.errorMessageService.getMessageWithLanguage(
+                'STUDENT',
+                'EMAIL_EXISTS',
+                user?.preferred_language || DEFAULT_LANGUAGE,
+              ),
             );
           }
         } else {
@@ -543,7 +700,11 @@ export class StudentService {
         } else {
           // Student exists and is not deleted
           throw new ConflictException(
-            'Email already exists in school database',
+            this.errorMessageService.getMessageWithLanguage(
+              'STUDENT',
+              'EMAIL_EXISTS_IN_SCHOOL',
+              user?.preferred_language || DEFAULT_LANGUAGE,
+            ),
           );
         }
       }
@@ -598,7 +759,11 @@ export class StudentService {
       this.logger.log(`Student updated successfully: ${id}`);
 
       return {
-        message: 'Student updated successfully',
+        message: this.errorMessageService.getSuccessMessageWithLanguage(
+          'STUDENT',
+          'UPDATED_SUCCESSFULLY',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
         data: {
           id: updatedStudent._id,
           first_name: updatedStudent.first_name,
@@ -613,9 +778,21 @@ export class StudentService {
     } catch (error) {
       this.logger.error('Error updating student', error?.stack || error);
       if (error?.code === 11000) {
-        throw new ConflictException('Email already exists');
+        throw new ConflictException(
+          this.errorMessageService.getMessageWithLanguage(
+            'STUDENT',
+            'EMAIL_EXISTS',
+            user?.preferred_language || DEFAULT_LANGUAGE,
+          ),
+        );
       }
-      throw new BadRequestException('Failed to update student');
+      throw new BadRequestException(
+        this.errorMessageService.getMessageWithLanguage(
+          'STUDENT',
+          'UPDATE_FAILED',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
   }
 
@@ -634,18 +811,34 @@ export class StudentService {
       // School admin can only access their own school
       targetSchoolId = user.school_id as string;
       if (!targetSchoolId) {
-        throw new BadRequestException('School admin must have a school_id');
+        throw new BadRequestException(
+          this.errorMessageService.getMessageWithLanguage(
+            'SCHOOL',
+            'ADMIN_MUST_HAVE_SCHOOL_ID',
+            user?.preferred_language || DEFAULT_LANGUAGE,
+          ),
+        );
       }
     } else if (user.role.name === RoleEnum.SUPER_ADMIN) {
       // Super admin can specify school_id or use their default
       targetSchoolId = school_id?.toString() || (user.school_id as string);
       if (!targetSchoolId) {
         throw new BadRequestException(
-          'Super admin must provide school_id parameter',
+          this.errorMessageService.getMessageWithLanguage(
+            'STUDENT',
+            'SUPER_ADMIN_SCHOOL_ID_REQUIRED',
+            user?.preferred_language || DEFAULT_LANGUAGE,
+          ),
         );
       }
     } else {
-      throw new BadRequestException('Unauthorized role for deleting students');
+      throw new BadRequestException(
+        this.errorMessageService.getMessageWithLanguage(
+          'STUDENT',
+          'UNAUTHORIZED_ACCESS',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     // Get school information
@@ -653,7 +846,13 @@ export class StudentService {
       new Types.ObjectId(targetSchoolId),
     );
     if (!school) {
-      throw new NotFoundException('School not found');
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'SCHOOL',
+          'NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     // Get tenant connection
@@ -669,7 +868,13 @@ export class StudentService {
     });
 
     if (!student) {
-      throw new NotFoundException('Student not found');
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'STUDENT',
+          'NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     // Soft delete the student
@@ -684,7 +889,13 @@ export class StudentService {
       );
 
       if (!deletedStudent) {
-        throw new NotFoundException('Student not found or already deleted');
+        throw new NotFoundException(
+          this.errorMessageService.getMessageWithLanguage(
+            'STUDENT',
+            'NOT_FOUND_OR_ALREADY_DELETED',
+            user?.preferred_language || DEFAULT_LANGUAGE,
+          ),
+        );
       }
 
       // Also soft delete from global students collection
@@ -696,7 +907,11 @@ export class StudentService {
       this.logger.log(`Student deleted successfully: ${id}`);
 
       return {
-        message: 'Student deleted successfully',
+        message: this.errorMessageService.getSuccessMessageWithLanguage(
+          'STUDENT',
+          'DELETED_SUCCESSFULLY',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
         data: {
           id: deletedStudent._id,
           email: deletedStudent.email,
@@ -710,7 +925,13 @@ export class StudentService {
       if (error instanceof NotFoundException) {
         throw error;
       }
-      throw new BadRequestException('Failed to delete student');
+      throw new BadRequestException(
+        this.errorMessageService.getMessageWithLanguage(
+          'STUDENT',
+          'DELETE_FAILED',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
   }
 
@@ -730,19 +951,33 @@ export class StudentService {
       // School admin can only access their own school
       targetSchoolId = user.school_id as string;
       if (!targetSchoolId) {
-        throw new BadRequestException('School admin must have a school_id');
+        throw new BadRequestException(
+          this.errorMessageService.getMessageWithLanguage(
+            'SCHOOL',
+            'ADMIN_MUST_HAVE_SCHOOL_ID',
+            user?.preferred_language || DEFAULT_LANGUAGE,
+          ),
+        );
       }
     } else if (user.role.name === RoleEnum.SUPER_ADMIN) {
       // Super admin can specify school_id or use their default
       targetSchoolId = school_id?.toString() || (user.school_id as string);
       if (!targetSchoolId) {
         throw new BadRequestException(
-          'Super admin must provide school_id parameter',
+          this.errorMessageService.getMessageWithLanguage(
+            'STUDENT',
+            'SUPER_ADMIN_SCHOOL_ID_REQUIRED',
+            user?.preferred_language || DEFAULT_LANGUAGE,
+          ),
         );
       }
     } else {
       throw new BadRequestException(
-        'Unauthorized role for updating student status',
+        this.errorMessageService.getMessageWithLanguage(
+          'STUDENT',
+          'UNAUTHORIZED_ACCESS',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
       );
     }
 
@@ -751,7 +986,13 @@ export class StudentService {
       new Types.ObjectId(targetSchoolId),
     );
     if (!school) {
-      throw new NotFoundException('School not found');
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'SCHOOL',
+          'NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     // Get tenant connection
@@ -767,7 +1008,13 @@ export class StudentService {
     });
 
     if (!student) {
-      throw new NotFoundException('Student not found');
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'STUDENT',
+          'NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     const updatedStudent = await StudentModel.findByIdAndUpdate(
@@ -777,12 +1024,22 @@ export class StudentService {
     );
 
     if (!updatedStudent) {
-      throw new NotFoundException('Student not found after update');
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'STUDENT',
+          'NOT_FOUND_AFTER_UPDATE',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     this.logger.log(`Student status updated successfully: ${id} to ${status}`);
     return {
-      message: 'Student status updated successfully',
+      message: this.errorMessageService.getSuccessMessageWithLanguage(
+        'STUDENT',
+        'STATUS_UPDATED_SUCCESSFULLY',
+        user?.preferred_language || DEFAULT_LANGUAGE,
+      ),
       data: {
         id: updatedStudent._id,
         email: updatedStudent.email,
@@ -826,8 +1083,11 @@ export class StudentService {
                 last_name: row.last_name || '',
                 email: row.email || '',
               },
-              error:
-                'Missing required fields: first_name and email are required',
+              error: this.errorMessageService.getMessageWithLanguage(
+                'STUDENT',
+                'MISSING_REQUIRED_FIELDS',
+                adminUser?.preferred_language || DEFAULT_LANGUAGE,
+              ),
             });
             return;
           }
@@ -843,7 +1103,11 @@ export class StudentService {
                 last_name: row.last_name || '',
                 email: row.email,
               },
-              error: 'Invalid email format',
+              error: this.errorMessageService.getMessageWithLanguage(
+                'STUDENT',
+                'INVALID_EMAIL_FORMAT',
+                adminUser?.preferred_language || DEFAULT_LANGUAGE,
+              ),
             });
             return;
           }
@@ -861,7 +1125,13 @@ export class StudentService {
     result.total = students.length;
 
     if (students.length === 0) {
-      throw new BadRequestException('No valid student data found in CSV file');
+      throw new BadRequestException(
+        this.errorMessageService.getMessageWithLanguage(
+          'STUDENT',
+          'NO_VALID_STUDENT_DATA_FOUND',
+          adminUser?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     // Check for duplicate emails within the CSV
@@ -879,7 +1149,11 @@ export class StudentService {
       if (duplicateEmails.includes(student.email)) {
         result.failed.push({
           row: student,
-          error: 'Duplicate email within CSV file',
+          error: this.errorMessageService.getMessageWithLanguage(
+            'STUDENT',
+            'DUPLICATE_EMAIL_WITHIN_CSV',
+            adminUser?.preferred_language || DEFAULT_LANGUAGE,
+          ),
         });
       }
     });
@@ -985,7 +1259,11 @@ export class StudentService {
         if (existingEmails.has(student.email)) {
           result.failed.push({
             row: student,
-            error: 'Email already exists in the system',
+            error: this.errorMessageService.getMessageWithLanguage(
+              'STUDENT',
+              'EMAIL_EXISTS_SYSTEM',
+              adminUser?.preferred_language || DEFAULT_LANGUAGE,
+            ),
           });
           continue;
         }
@@ -1003,7 +1281,11 @@ export class StudentService {
           if (!school) {
             result.failed.push({
               row: student,
-              error: 'School not found for school admin',
+              error: this.errorMessageService.getMessageWithLanguage(
+                'STUDENT',
+                'SCHOOL_NOT_FOUND_FOR_SCHOOL_ADMIN',
+                adminUser?.preferred_language || DEFAULT_LANGUAGE,
+              ),
             });
             continue;
           }
@@ -1016,14 +1298,22 @@ export class StudentService {
           if (!school) {
             result.failed.push({
               row: student,
-              error: `School not found with ID: ${schoolId}`,
+              error: this.errorMessageService.getMessageWithLanguage(
+                'STUDENT',
+                'SCHOOL_NOT_FOUND_WITH_ID',
+                adminUser?.preferred_language || DEFAULT_LANGUAGE,
+              ),
             });
             continue;
           }
         } else {
           result.failed.push({
             row: student,
-            error: 'Unauthorized role for bulk student creation',
+            error: this.errorMessageService.getMessageWithLanguage(
+              'STUDENT',
+              'UNAUTHORIZED_ROLE_FOR_BULK_STUDENT_CREATION',
+              adminUser?.preferred_language || DEFAULT_LANGUAGE,
+            ),
           });
           continue;
         }
@@ -1062,7 +1352,11 @@ export class StudentService {
             // Student exists and is not deleted
             result.failed.push({
               row: student,
-              error: 'Email already exists in school database',
+              error: this.errorMessageService.getMessageWithLanguage(
+                'STUDENT',
+                'EMAIL_EXISTS_IN_SCHOOL',
+                adminUser?.preferred_language || DEFAULT_LANGUAGE,
+              ),
             });
             continue;
           }
@@ -1115,7 +1409,13 @@ export class StudentService {
         this.logger.error(`Error creating student ${student.email}:`, error);
         result.failed.push({
           row: student,
-          error: error.message || 'Failed to create student',
+          error:
+            error.message ||
+            this.errorMessageService.getMessageWithLanguage(
+              'STUDENT',
+              'CREATE_FAILED',
+              adminUser?.preferred_language || DEFAULT_LANGUAGE,
+            ),
         });
         result.failedCount++;
       }
@@ -1158,14 +1458,26 @@ export class StudentService {
 
     if (!globalStudent) {
       this.logger.warn(`Global student not found: ${userId}`);
-      throw new NotFoundException('Student not found');
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'STUDENT',
+          'NOT_FOUND',
+          DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     // Get the school information
     const school = await this.schoolModel.findById(globalStudent.school_id);
     if (!school) {
       this.logger.warn(`School not found for student: ${userId}`);
-      throw new NotFoundException('School not found');
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'SCHOOL',
+          'NOT_FOUND',
+          DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     // Get tenant connection for the school
@@ -1177,7 +1489,13 @@ export class StudentService {
     const student = await StudentModel.findById(userId).select('+password');
     if (!student) {
       this.logger.warn(`Student not found in tenant DB: ${userId}`);
-      throw new NotFoundException('Student not found');
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'STUDENT',
+          'NOT_FOUND',
+          DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     // Validate old password
@@ -1188,7 +1506,13 @@ export class StudentService {
 
     if (!isPasswordValid) {
       this.logger.warn(`Invalid old password for student: ${userId}`);
-      throw new BadRequestException('Invalid old password');
+      throw new BadRequestException(
+        this.errorMessageService.getMessageWithLanguage(
+          'AUTH',
+          'INVALID_OLD_PASSWORD',
+          DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     // Hash the new password
@@ -1205,7 +1529,11 @@ export class StudentService {
       );
 
       return {
-        message: 'Password updated successfully',
+        message: this.errorMessageService.getSuccessMessageWithLanguage(
+          'STUDENT',
+          'PASSWORD_UPDATED_SUCCESSFULLY',
+          DEFAULT_LANGUAGE,
+        ),
         data: {
           id: updatedStudent._id,
           email: updatedStudent.email,
@@ -1218,7 +1546,13 @@ export class StudentService {
       };
     } catch (error) {
       this.logger.error('Error updating student password:', error);
-      throw new BadRequestException('Failed to update password');
+      throw new BadRequestException(
+        this.errorMessageService.getMessageWithLanguage(
+          'STUDENT',
+          'PASSWORD_UPDATE_FAILED',
+          DEFAULT_LANGUAGE,
+        ),
+      );
     }
   }
 }

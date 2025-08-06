@@ -5,6 +5,8 @@ import {
   Param,
   UseGuards,
   Query,
+  Post,
+  Body,
 } from '@nestjs/common';
 import { ParseObjectIdPipe } from '@nestjs/mongoose';
 import {
@@ -25,6 +27,7 @@ import { JWTUserPayload } from 'src/common/types/jwr-user.type';
 import { NotificationsService } from './notifications.service';
 import { PaginationDto } from 'src/common/dto/pagination.dto';
 import { RecipientTypeEnum } from 'src/database/schemas/tenant/notification.schema';
+import { CreateMultiLanguageNotificationDto } from './dto/create-multi-language-notification.dto';
 
 @ApiTags('Notifications')
 @ApiBearerAuth()
@@ -32,6 +35,34 @@ import { RecipientTypeEnum } from 'src/database/schemas/tenant/notification.sche
 @UseGuards(JwtAuthGuard, RoleGuard)
 export class NotificationsController {
   constructor(private readonly notificationsService: NotificationsService) {}
+
+  @Post('multi-language')
+  @Roles(RoleEnum.SUPER_ADMIN, RoleEnum.SCHOOL_ADMIN, RoleEnum.PROFESSOR)
+  @ApiOperation({ summary: 'Create multi-language notification' })
+  @ApiResponse({
+    status: 201,
+    description: 'Multi-language notification created successfully',
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Bad request - Invalid data provided',
+  })
+  async createMultiLanguageNotification(
+    @Body()
+    createMultiLanguageNotificationDto: CreateMultiLanguageNotificationDto,
+  ) {
+    return this.notificationsService.createMultiLanguageNotification(
+      createMultiLanguageNotificationDto.recipient_id,
+      createMultiLanguageNotificationDto.recipient_type,
+      createMultiLanguageNotificationDto.title_en,
+      createMultiLanguageNotificationDto.title_fr,
+      createMultiLanguageNotificationDto.message_en,
+      createMultiLanguageNotificationDto.message_fr,
+      createMultiLanguageNotificationDto.type,
+      createMultiLanguageNotificationDto.metadata || {},
+      createMultiLanguageNotificationDto.school_id,
+    );
+  }
 
   @Get()
   @Roles(

@@ -35,6 +35,8 @@ import { UpdateQuizGroupDto } from './dto/update-quiz-group.dto';
 import { UpdateQuizDto } from './dto/update-quiz.dto';
 import { ProgressService } from '../progress/progress.service';
 import { RoleEnum } from 'src/common/constants/roles.constant';
+import { ErrorMessageService } from 'src/common/services/error-message.service';
+import { DEFAULT_LANGUAGE } from 'src/common/constants/language.constant';
 
 @Injectable()
 export class QuizService {
@@ -47,6 +49,7 @@ export class QuizService {
     private readonly schoolModel: Model<School>,
     private readonly tenantConnectionService: TenantConnectionService,
     private readonly progressService: ProgressService,
+    private readonly errorMessageService: ErrorMessageService,
   ) {}
 
   // ========== QUIZ GROUP OPERATIONS ==========
@@ -58,7 +61,13 @@ export class QuizService {
     // Validate school exists
     const school = await this.schoolModel.findById(user.school_id);
     if (!school) {
-      throw new NotFoundException('School not found');
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'QUIZ',
+          'SCHOOL_NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
     const connection = await this.tenantConnectionService.getTenantConnection(
       school.db_name,
@@ -81,12 +90,20 @@ export class QuizService {
     // Validate that module_id or chapter_id is provided based on type
     if (type === QuizTypeEnum.MODULE && !module_id) {
       throw new BadRequestException(
-        'Module ID is required when type is MODULE',
+        this.errorMessageService.getMessageWithLanguage(
+          'QUIZ',
+          'MODULE_ID_REQUIRED_WHEN_TYPE_IS_MODULE',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
       );
     }
     if (type === QuizTypeEnum.CHAPTER && !chapter_id) {
       throw new BadRequestException(
-        'Chapter ID is required when type is CHAPTER',
+        this.errorMessageService.getMessageWithLanguage(
+          'QUIZ',
+          'CHAPTER_ID_REQUIRED_WHEN_TYPE_IS_CHAPTER',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
       );
     }
 
@@ -97,7 +114,13 @@ export class QuizService {
         deleted_at: null,
       });
       if (!moduleExists) {
-        throw new NotFoundException('Module not found');
+        throw new NotFoundException(
+          this.errorMessageService.getMessageWithLanguage(
+            'QUIZ',
+            'MODULE_NOT_FOUND',
+            user?.preferred_language || DEFAULT_LANGUAGE,
+          ),
+        );
       }
     }
 
@@ -107,7 +130,13 @@ export class QuizService {
         deleted_at: null,
       });
       if (!chapterExists) {
-        throw new NotFoundException('Chapter not found');
+        throw new NotFoundException(
+          this.errorMessageService.getMessageWithLanguage(
+            'QUIZ',
+            'CHAPTER_NOT_FOUND',
+            user?.preferred_language || DEFAULT_LANGUAGE,
+          ),
+        );
       }
     }
 
@@ -145,7 +174,13 @@ export class QuizService {
     // Validate school exists
     const school = await this.schoolModel.findById(user.school_id);
     if (!school) {
-      throw new NotFoundException('School not found');
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'QUIZ',
+          'SCHOOL_NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
     const connection = await this.tenantConnectionService.getTenantConnection(
       school.db_name,
@@ -180,7 +215,13 @@ export class QuizService {
     const quizGroups = await QuizGroupModel.findOne(filter).lean();
 
     if (!quizGroups?._id) {
-      throw new NotFoundException('Quiz group not found');
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'QUIZ',
+          'QUIZ_GROUP_NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     // // Check if student can access this quiz (validate sequence)
@@ -193,7 +234,13 @@ export class QuizService {
       });
 
       if (!quizGroup) {
-        throw new NotFoundException('Quiz group not found');
+        throw new NotFoundException(
+          this.errorMessageService.getMessageWithLanguage(
+            'QUIZ',
+            'QUIZ_GROUP_NOT_FOUND',
+            user?.preferred_language || DEFAULT_LANGUAGE,
+          ),
+        );
       }
 
       // Validate access to this quiz (chapter-based validation)
@@ -202,6 +249,7 @@ export class QuizService {
           user.id,
           quizGroup,
           connection,
+          user,
         );
       }
     }
@@ -223,7 +271,13 @@ export class QuizService {
     // Validate school exists
     const school = await this.schoolModel.findById(user.school_id);
     if (!school) {
-      throw new NotFoundException('School not found');
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'QUIZ',
+          'SCHOOL_NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
     const connection = await this.tenantConnectionService.getTenantConnection(
       school.db_name,
@@ -242,7 +296,13 @@ export class QuizService {
       .exec();
 
     if (!quizGroup) {
-      throw new NotFoundException('Quiz group not found');
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'QUIZ',
+          'QUIZ_GROUP_NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     return quizGroup;
@@ -256,7 +316,13 @@ export class QuizService {
     // Validate school exists
     const school = await this.schoolModel.findById(user.school_id);
     if (!school) {
-      throw new NotFoundException('School not found');
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'QUIZ',
+          'SCHOOL_NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
     const connection = await this.tenantConnectionService.getTenantConnection(
       school.db_name,
@@ -271,7 +337,13 @@ export class QuizService {
     });
 
     if (!quizGroup) {
-      throw new NotFoundException('Quiz group not found');
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'QUIZ',
+          'QUIZ_GROUP_NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     // Validate module/chapter if being updated
@@ -284,7 +356,13 @@ export class QuizService {
         deleted_at: null,
       });
       if (!moduleExists) {
-        throw new NotFoundException('Module not found');
+        throw new NotFoundException(
+          this.errorMessageService.getMessageWithLanguage(
+            'QUIZ',
+            'MODULE_NOT_FOUND',
+            user?.preferred_language || DEFAULT_LANGUAGE,
+          ),
+        );
       }
     }
 
@@ -297,7 +375,13 @@ export class QuizService {
         deleted_at: null,
       });
       if (!chapterExists) {
-        throw new NotFoundException('Chapter not found');
+        throw new NotFoundException(
+          this.errorMessageService.getMessageWithLanguage(
+            'QUIZ',
+            'CHAPTER_NOT_FOUND',
+            user?.preferred_language || DEFAULT_LANGUAGE,
+          ),
+        );
       }
     }
 
@@ -313,7 +397,13 @@ export class QuizService {
     // Validate school exists
     const school = await this.schoolModel.findById(user.school_id);
     if (!school) {
-      throw new NotFoundException('School not found');
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'QUIZ',
+          'SCHOOL_NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
     const connection = await this.tenantConnectionService.getTenantConnection(
       school.db_name,
@@ -327,7 +417,13 @@ export class QuizService {
     });
 
     if (!quizGroup) {
-      throw new NotFoundException('Quiz group not found');
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'QUIZ',
+          'QUIZ_GROUP_NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     // Soft delete the quiz group and all associated quizzes
@@ -349,7 +445,13 @@ export class QuizService {
     // Validate school exists
     const school = await this.schoolModel.findById(user.school_id);
     if (!school) {
-      throw new NotFoundException('School not found');
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'QUIZ',
+          'SCHOOL_NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
     const connection = await this.tenantConnectionService.getTenantConnection(
       school.db_name,
@@ -374,7 +476,13 @@ export class QuizService {
       deleted_at: null,
     });
     if (!quizGroup) {
-      throw new NotFoundException('Quiz group not found');
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'QUIZ',
+          'QUIZ_GROUP_NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     // Generate sequence if not provided
@@ -410,7 +518,13 @@ export class QuizService {
     // Validate school exists
     const school = await this.schoolModel.findById(user.school_id);
     if (!school) {
-      throw new NotFoundException('School not found');
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'QUIZ',
+          'SCHOOL_NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
     const connection = await this.tenantConnectionService.getTenantConnection(
       school.db_name,
@@ -458,7 +572,13 @@ export class QuizService {
     // Validate school exists
     const school = await this.schoolModel.findById(user.school_id);
     if (!school) {
-      throw new NotFoundException('School not found');
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'QUIZ',
+          'SCHOOL_NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
     const connection = await this.tenantConnectionService.getTenantConnection(
       school.db_name,
@@ -479,7 +599,13 @@ export class QuizService {
       .exec();
 
     if (!quiz) {
-      throw new NotFoundException('Quiz not found');
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'QUIZ',
+          'QUIZ_NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     return quiz;
@@ -493,7 +619,13 @@ export class QuizService {
     // Validate school exists
     const school = await this.schoolModel.findById(user.school_id);
     if (!school) {
-      throw new NotFoundException('School not found');
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'QUIZ',
+          'SCHOOL_NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
     const connection = await this.tenantConnectionService.getTenantConnection(
       school.db_name,
@@ -506,7 +638,13 @@ export class QuizService {
     });
 
     if (!quiz) {
-      throw new NotFoundException('Quiz not found');
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'QUIZ',
+          'QUIZ_NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     // Validate answers if being updated
@@ -533,7 +671,13 @@ export class QuizService {
     // Validate school exists
     const school = await this.schoolModel.findById(user.school_id);
     if (!school) {
-      throw new NotFoundException('School not found');
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'QUIZ',
+          'SCHOOL_NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     const connection = await this.tenantConnectionService.getTenantConnection(
@@ -547,7 +691,13 @@ export class QuizService {
     });
 
     if (!quiz) {
-      throw new NotFoundException('Quiz not found');
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'QUIZ',
+          'QUIZ_NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     await QuizModel.updateOne({ _id: id }, { deleted_at: new Date() });
@@ -566,7 +716,13 @@ export class QuizService {
     // Validate school exists
     const school = await this.schoolModel.findById(user.school_id);
     if (!school) {
-      throw new NotFoundException('School not found');
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'QUIZ',
+          'SCHOOL_NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
     const connection = await this.tenantConnectionService.getTenantConnection(
       school.db_name,

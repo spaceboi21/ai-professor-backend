@@ -50,11 +50,18 @@ export class UsersController {
   })
   async getAllUsers(
     @Query() paginationDto: PaginationDto,
+    @User() user: JWTUserPayload,
     @Query('search') search?: string,
     @Query('role') role?: string,
     @Query('status') status?: string,
   ) {
-    return this.usersService.getAllUsers(paginationDto, search, role, status);
+    return this.usersService.getAllUsers(
+      paginationDto,
+      search,
+      role,
+      status,
+      user,
+    );
   }
 
   @Get(':id')
@@ -71,8 +78,11 @@ export class UsersController {
     description: 'User retrieved successfully',
   })
   @ApiResponse({ status: 404, description: 'User not found' })
-  async getUserById(@Param('id', ParseObjectIdPipe) id: Types.ObjectId) {
-    return this.usersService.getUserById(id);
+  async getUserById(
+    @Param('id', ParseObjectIdPipe) id: Types.ObjectId,
+    @User() user: JWTUserPayload,
+  ) {
+    return this.usersService.getUserById(id, user);
   }
 
   @Patch(':id/status')
@@ -93,7 +103,8 @@ export class UsersController {
   async updateUserStatus(
     @Param('id', ParseObjectIdPipe) id: Types.ObjectId,
     @Body() updateStatusDto: UpdateStatusDto,
+    @User() user: JWTUserPayload,
   ) {
-    return this.usersService.updateUserStatus(id, updateStatusDto.status);
+    return this.usersService.updateUserStatus(id, updateStatusDto.status, user);
   }
 }

@@ -11,10 +11,17 @@ import {
   School,
   SchoolSchema,
 } from 'src/database/schemas/central/school.schema';
-import { ChatMessage, ChatMessageSchema } from 'src/database/schemas/tenant/chat-message.schema';
-import { Student, StudentSchema } from 'src/database/schemas/tenant/student.schema';
+import {
+  ChatMessage,
+  ChatMessageSchema,
+} from 'src/database/schemas/tenant/chat-message.schema';
+import {
+  Student,
+  StudentSchema,
+} from 'src/database/schemas/tenant/student.schema';
 import { DatabaseModule } from 'src/database/database.module';
 import { NotificationsModule } from 'src/modules/notifications/notifications.module';
+import { UtilsModule } from 'src/common/utils';
 import { JwtService } from '@nestjs/jwt';
 
 @Module({
@@ -27,9 +34,16 @@ import { JwtService } from '@nestjs/jwt';
     ]),
     DatabaseModule,
     NotificationsModule,
+    UtilsModule,
   ],
   controllers: [CommunityController, ChatController],
-  providers: [CommunityService, ChatService, ChatGateway, JwtService, ConfigService],
+  providers: [
+    CommunityService,
+    ChatService,
+    ChatGateway,
+    JwtService,
+    ConfigService,
+  ],
   exports: [CommunityService, ChatService],
 })
 export class CommunityModule {}

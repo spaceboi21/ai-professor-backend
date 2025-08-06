@@ -32,6 +32,8 @@ import { LearningLogReviewResponseDto } from './dto/learning-log-review-response
 import { LearningLogsExportResponseDto } from './dto/learning-logs-export-response.dto';
 import { LearningLogsFilterDto } from './dto/learning-logs-filter.dto';
 import { LearningLogsResponseDto } from './dto/learning-logs-response.dto';
+import { ErrorMessageService } from 'src/common/services/error-message.service';
+import { DEFAULT_LANGUAGE } from 'src/common/constants/language.constant';
 
 @Injectable()
 export class LearningLogsService {
@@ -45,6 +47,7 @@ export class LearningLogsService {
     private readonly tenantConnectionService: TenantConnectionService,
     private readonly notificationsService: NotificationsService,
     private readonly csvUtil: CSVUtil,
+    private readonly errorMessageService: ErrorMessageService,
   ) {}
 
   async getLearningLogs(
@@ -99,7 +102,13 @@ export class LearningLogsService {
     const results = await AIChatFeedbackModel.aggregate(pipeline);
 
     if (results.length === 0) {
-      throw new NotFoundException('Learning log not found');
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'LEARNING_LOGS',
+          'LEARNING_LOG_NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     return results[0];
@@ -143,7 +152,13 @@ export class LearningLogsService {
 
     // Check if user can review (not a student)
     if (user.role.name === RoleEnum.STUDENT) {
-      throw new BadRequestException('Students cannot review learning logs');
+      throw new BadRequestException(
+        this.errorMessageService.getMessageWithLanguage(
+          'LEARNING_LOGS',
+          'STUDENTS_CANNOT_REVIEW_LEARNING_LOGS',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     const { connection, AIChatFeedbackModel, LearningLogReviewModel } =
@@ -152,7 +167,13 @@ export class LearningLogsService {
     // Check if the learning log exists
     const learningLog = await AIChatFeedbackModel.findById(aiFeedbackId);
     if (!learningLog) {
-      throw new NotFoundException('Learning log not found');
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'LEARNING_LOGS',
+          'LEARNING_LOG_NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     // Check if user has already reviewed this learning log
@@ -165,7 +186,11 @@ export class LearningLogsService {
 
     if (existingReview) {
       throw new BadRequestException(
-        'You have already reviewed this learning log',
+        this.errorMessageService.getMessageWithLanguage(
+          'LEARNING_LOGS',
+          'ALREADY_REVIEWED',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
       );
     }
 
@@ -199,7 +224,13 @@ export class LearningLogsService {
     // Get reviewer information
     const reviewer = await this.userModel.findById(user.id);
     if (!reviewer) {
-      throw new NotFoundException('Reviewer not found');
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'LEARNING_LOGS',
+          'REVIEWER_NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
     const reviewerInfo = {
       first_name: reviewer.first_name,
@@ -210,13 +241,21 @@ export class LearningLogsService {
 
     // Create notification for the student
     if (!user.school_id) {
-      throw new BadRequestException('User school ID not found');
+      throw new BadRequestException(
+        this.errorMessageService.getMessageWithLanguage(
+          'LEARNING_LOGS',
+          'USER_SCHOOL_ID_NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
-    await this.notificationsService.createNotification(
+    await this.notificationsService.createMultiLanguageNotification(
       new Types.ObjectId(learningLog.student_id.toString()),
       RecipientTypeEnum.STUDENT,
       'Learning Log Reviewed',
+      "Journal d'Apprentissage Révisé",
       `${reviewerInfo.first_name} ${reviewerInfo.last_name} has reviewed your learning log and given you a ${createReviewDto.rating}-star rating.`,
+      `${reviewerInfo.first_name} ${reviewerInfo.last_name} a révisé votre journal d'apprentissage et vous a donné une note de ${createReviewDto.rating} étoiles.`,
       NotificationTypeEnum.LEARNING_LOG_REVIEWED,
       {
         ai_feedback_id: aiFeedbackId,
@@ -268,7 +307,13 @@ export class LearningLogsService {
     // Get reviewer information
     const reviewer = await this.userModel.findById(user.id);
     if (!reviewer) {
-      throw new NotFoundException('Reviewer not found');
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'LEARNING_LOGS',
+          'REVIEWER_NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
     const reviewerInfo = {
       first_name: reviewer.first_name,
@@ -309,9 +354,7 @@ export class LearningLogsService {
     // Build aggregation pipeline without pagination for export
     const pipeline = this.buildAggregationPipeline(user, filterDto);
 
-    this.logger.log(
-      `Export pipeline stages: ${pipeline.length}`,
-    );
+    this.logger.log(`Export pipeline stages: ${pipeline.length}`);
 
     // Execute aggregation to get all data
     const results = await AIChatFeedbackModel.aggregate(pipeline);
@@ -320,7 +363,13 @@ export class LearningLogsService {
 
     // Handle case where no results are returned
     if (!results || results.length === 0) {
-      throw new NotFoundException('No learning logs found for export');
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'LEARNING_LOGS',
+          'NO_LEARNING_LOGS_FOUND_FOR_EXPORT',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     // For export (without pagination), results is a direct array of documents
@@ -339,46 +388,98 @@ export class LearningLogsService {
       this.logger.warn(
         'Aggregation returned non-array data, defaulting to empty array',
       );
-      throw new NotFoundException('No learning logs found for export');
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'LEARNING_LOGS',
+          'NO_LEARNING_LOGS_FOUND_FOR_EXPORT',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     // Transform data for CSV export - removing IDs and technical fields
     const csvData = data.map((log: any) => ({
-      'Student Name': log.student ? `${log.student.first_name} ${log.student.last_name}`.trim() : 'N/A',
+      'Student Name': log.student
+        ? `${log.student.first_name} ${log.student.last_name}`.trim()
+        : 'N/A',
       'Student Email': log.student?.email || 'N/A',
       'Module Title': log.module?.title || 'N/A',
       'Module Subject': log.module?.subject || 'N/A',
       'Module Difficulty': log.module?.difficulty || 'N/A',
       'Session Status': log.session?.status || 'N/A',
-      'Session Start Date': log.session?.started_at ? new Date(log.session.started_at).toISOString() : 'N/A',
-      'Session End Date': log.session?.ended_at ? new Date(log.session.ended_at).toISOString() : 'N/A',
-      'Primary Skill Gap': Array.isArray(log.skill_gaps) && log.skill_gaps.length > 0 ? log.skill_gaps[0] : 'N/A',
-      'Skill Gaps': Array.isArray(log.skill_gaps) ? log.skill_gaps.join('; ') : 'N/A',
-      'Strengths': Array.isArray(log.strengths) ? log.strengths.join('; ') : 'N/A',
-      'Areas for Improvement': Array.isArray(log.areas_for_improvement) ? log.areas_for_improvement.join('; ') : 'N/A',
-      'Missed Opportunities': Array.isArray(log.missed_opportunities) ? log.missed_opportunities.join('; ') : 'N/A',
-      'Suggestions': Array.isArray(log.suggestions) ? log.suggestions.join('; ') : 'N/A',
-      'Keywords for Learning': Array.isArray(log.keywords_for_learning) ? log.keywords_for_learning.join('; ') : 'N/A',
+      'Session Start Date': log.session?.started_at
+        ? new Date(log.session.started_at).toISOString()
+        : 'N/A',
+      'Session End Date': log.session?.ended_at
+        ? new Date(log.session.ended_at).toISOString()
+        : 'N/A',
+      'Primary Skill Gap':
+        Array.isArray(log.skill_gaps) && log.skill_gaps.length > 0
+          ? log.skill_gaps[0]
+          : 'N/A',
+      'Skill Gaps': Array.isArray(log.skill_gaps)
+        ? log.skill_gaps.join('; ')
+        : 'N/A',
+      Strengths: Array.isArray(log.strengths)
+        ? log.strengths.join('; ')
+        : 'N/A',
+      'Areas for Improvement': Array.isArray(log.areas_for_improvement)
+        ? log.areas_for_improvement.join('; ')
+        : 'N/A',
+      'Missed Opportunities': Array.isArray(log.missed_opportunities)
+        ? log.missed_opportunities.join('; ')
+        : 'N/A',
+      Suggestions: Array.isArray(log.suggestions)
+        ? log.suggestions.join('; ')
+        : 'N/A',
+      'Keywords for Learning': Array.isArray(log.keywords_for_learning)
+        ? log.keywords_for_learning.join('; ')
+        : 'N/A',
       'Overall Rating': log.rating?.overall_score || 'N/A',
       'Communication Rating': log.rating?.communication_score || 'N/A',
       'Professionalism Rating': log.rating?.professionalism_score || 'N/A',
-      'Status': log.status || 'N/A',
-      'Feedback Created At': log.created_at ? new Date(log.created_at).toISOString() : 'N/A',
-      'Feedback Updated At': log.updated_at ? new Date(log.updated_at).toISOString() : 'N/A',
+      Status: log.status || 'N/A',
+      'Feedback Created At': log.created_at
+        ? new Date(log.created_at).toISOString()
+        : 'N/A',
+      'Feedback Updated At': log.updated_at
+        ? new Date(log.updated_at).toISOString()
+        : 'N/A',
       'Review Rating': log.user_review?.[0]?.rating || 'N/A',
       'Review Feedback': log.user_review?.[0]?.feedback || 'N/A',
       'Reviewer Role': log.user_review?.[0]?.reviewer_role || 'N/A',
-      'Review Created At': log.user_review?.[0]?.created_at ? new Date(log.user_review[0].created_at).toISOString() : 'N/A',
+      'Review Created At': log.user_review?.[0]?.created_at
+        ? new Date(log.user_review[0].created_at).toISOString()
+        : 'N/A',
     }));
 
     // Define CSV headers - removing IDs and technical fields
     const headers = [
-      'Student Name', 'Student Email', 'Module Title', 'Module Subject', 'Module Difficulty',
-      'Session Status', 'Session Start Date', 'Session End Date', 'Primary Skill Gap', 'Skill Gaps',
-      'Strengths', 'Areas for Improvement', 'Missed Opportunities', 'Suggestions',
-      'Keywords for Learning', 'Overall Rating', 'Communication Rating', 
-      'Professionalism Rating', 'Status', 'Feedback Created At', 
-      'Feedback Updated At', 'Review Rating', 'Review Feedback', 'Reviewer Role', 'Review Created At'
+      'Student Name',
+      'Student Email',
+      'Module Title',
+      'Module Subject',
+      'Module Difficulty',
+      'Session Status',
+      'Session Start Date',
+      'Session End Date',
+      'Primary Skill Gap',
+      'Skill Gaps',
+      'Strengths',
+      'Areas for Improvement',
+      'Missed Opportunities',
+      'Suggestions',
+      'Keywords for Learning',
+      'Overall Rating',
+      'Communication Rating',
+      'Professionalism Rating',
+      'Status',
+      'Feedback Created At',
+      'Feedback Updated At',
+      'Review Rating',
+      'Review Feedback',
+      'Reviewer Role',
+      'Review Created At',
     ];
 
     // Generate CSV file using storage service
@@ -394,7 +495,9 @@ export class LearningLogsService {
     const fileSize = this.csvUtil.getFileSize(filePath);
     const downloadUrl = await this.csvUtil.generateDownloadUrl(filename);
 
-    this.logger.log(`CSV export completed: ${filePath}, Size: ${fileSize} bytes, Records: ${csvData.length}`);
+    this.logger.log(
+      `CSV export completed: ${filePath}, Size: ${fileSize} bytes, Records: ${csvData.length}`,
+    );
 
     return {
       filename,
@@ -404,20 +507,24 @@ export class LearningLogsService {
       exported_at: new Date(),
       storage_type: process.env.NODE_ENV === 'production' ? 's3' : 'local',
       download_url: downloadUrl,
-      applied_filters: filterDto ? {
-        text: filterDto.text,
-        module_id: filterDto.module_id,
-        skill_gap: filterDto.skill_gap,
-        start_date: filterDto.start_date,
-        end_date: filterDto.end_date,
-      } : undefined,
+      applied_filters: filterDto
+        ? {
+            text: filterDto.text,
+            module_id: filterDto.module_id,
+            skill_gap: filterDto.skill_gap,
+            start_date: filterDto.start_date,
+            end_date: filterDto.end_date,
+          }
+        : undefined,
     };
   }
 
   /**
    * Get CSV file content for download
    */
-  async getCSVFileContent(filename: string): Promise<{ content: Buffer; contentType: string }> {
+  async getCSVFileContent(
+    filename: string,
+  ): Promise<{ content: Buffer; contentType: string }> {
     return this.csvUtil.getFileContent(filename);
   }
 
@@ -425,7 +532,13 @@ export class LearningLogsService {
   private async getConnectionAndModel(user: JWTUserPayload) {
     const school = await this.schoolModel.findById(user.school_id);
     if (!school) {
-      throw new NotFoundException('School not found');
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'LEARNING_LOGS',
+          'SCHOOL_NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     const connection = await this.tenantConnectionService.getTenantConnection(
@@ -443,7 +556,13 @@ export class LearningLogsService {
   private async getConnectionAndModels(user: JWTUserPayload) {
     const school = await this.schoolModel.findById(user.school_id);
     if (!school) {
-      throw new NotFoundException('School not found');
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'LEARNING_LOGS',
+          'SCHOOL_NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     const connection = await this.tenantConnectionService.getTenantConnection(
@@ -805,17 +924,19 @@ export class LearningLogsService {
         },
       },
 
-      ...(paginationOptions ? [
-        {
-          $facet: {
-            data: [
-              { $skip: paginationOptions.skip },
-              { $limit: paginationOptions.limit },
-            ],
-            totalCount: [{ $count: 'total' }],
-          },
-        },
-      ] : []),
+      ...(paginationOptions
+        ? [
+            {
+              $facet: {
+                data: [
+                  { $skip: paginationOptions.skip },
+                  { $limit: paginationOptions.limit },
+                ],
+                totalCount: [{ $count: 'total' }],
+              },
+            },
+          ]
+        : []),
     ];
 
     this.logger.log(

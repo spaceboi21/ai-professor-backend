@@ -17,6 +17,8 @@ import {
   createPaginationResult,
 } from 'src/common/utils/pagination.util';
 import { User } from 'src/database/schemas/central/user.schema';
+import { ErrorMessageService } from 'src/common/services/error-message.service';
+import { DEFAULT_LANGUAGE } from 'src/common/constants/language.constant';
 
 @Injectable()
 export class SchoolsService {
@@ -27,12 +29,14 @@ export class SchoolsService {
     private readonly schoolModel: Model<School>,
     @InjectModel(User.name)
     private readonly userModel: Model<User>,
+    private readonly errorMessageService: ErrorMessageService,
   ) {}
 
   async getAllSchools(
     paginationDto: PaginationDto,
     search?: string,
     status?: string,
+    user?: JWTUserPayload,
   ) {
     this.logger.log('Getting all schools with filters');
 
@@ -69,7 +73,11 @@ export class SchoolsService {
     });
 
     return {
-      message: 'Schools retrieved successfully',
+      message: this.errorMessageService.getSuccessMessageWithLanguage(
+        'SCHOOL',
+        'SCHOOLS_RETRIEVED_SUCCESSFULLY',
+        user?.preferred_language || DEFAULT_LANGUAGE,
+      ),
       ...pagination,
     };
   }
@@ -84,13 +92,25 @@ export class SchoolsService {
 
     if (!school) {
       this.logger.warn(`School not found: ${id}`);
-      throw new NotFoundException('School not found');
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'SCHOOL',
+          'NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     // School admin can only access their own school
     if (user.role.name === RoleEnum.SCHOOL_ADMIN) {
       if (school._id.toString() !== user.school_id?.toString()) {
-        throw new BadRequestException('You can only access your own school');
+        throw new BadRequestException(
+          this.errorMessageService.getMessageWithLanguage(
+            'SCHOOL',
+            'ACCESS_OWN_ONLY',
+            user?.preferred_language || DEFAULT_LANGUAGE,
+          ),
+        );
       }
     }
 
@@ -112,7 +132,11 @@ export class SchoolsService {
     );
 
     return {
-      message: 'School retrieved successfully',
+      message: this.errorMessageService.getSuccessMessageWithLanguage(
+        'SCHOOL',
+        'RETRIEVED_SUCCESSFULLY',
+        user?.preferred_language || DEFAULT_LANGUAGE,
+      ),
       data: {
         ...school,
         super_admin: superAdmin,
@@ -120,13 +144,23 @@ export class SchoolsService {
     };
   }
 
-  async updateSchoolStatus(id: Types.ObjectId, status: StatusEnum) {
+  async updateSchoolStatus(
+    id: Types.ObjectId,
+    status: StatusEnum,
+    user?: JWTUserPayload,
+  ) {
     this.logger.log(`Updating school status: ${id} to ${status}`);
 
     const school = await this.schoolModel.findById(id);
     if (!school) {
       this.logger.warn(`School not found: ${id}`);
-      throw new NotFoundException('School not found');
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'SCHOOL',
+          'NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     const updatedSchool = await this.schoolModel.findByIdAndUpdate(
@@ -136,12 +170,22 @@ export class SchoolsService {
     );
 
     if (!updatedSchool) {
-      throw new NotFoundException('School not found after update');
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'SCHOOL',
+          'NOT_FOUND_AFTER_UPDATE',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     this.logger.log(`School status updated successfully: ${id} to ${status}`);
     return {
-      message: 'School status updated successfully',
+      message: this.errorMessageService.getSuccessMessageWithLanguage(
+        'SCHOOL',
+        'STATUS_UPDATED_SUCCESSFULLY',
+        user?.preferred_language || DEFAULT_LANGUAGE,
+      ),
       data: {
         id: updatedSchool._id,
         name: updatedSchool.name,
@@ -160,14 +204,24 @@ export class SchoolsService {
 
     const school = await this.schoolModel.findById(id);
     if (!school) {
-      throw new NotFoundException('School not found');
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'SCHOOL',
+          'NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     // Authorization check - School admin can only update their own school
     if (user.role.name === RoleEnum.SCHOOL_ADMIN) {
       if (school._id.toString() !== user.school_id) {
         throw new BadRequestException(
-          'You are not authorized to update this school',
+          this.errorMessageService.getMessageWithLanguage(
+            'SCHOOL',
+            'UNAUTHORIZED_UPDATE',
+            user?.preferred_language || DEFAULT_LANGUAGE,
+          ),
         );
       }
     }
@@ -215,7 +269,11 @@ export class SchoolsService {
     try {
       const updatedSchool = await school.save();
       return {
-        message: 'School details updated successfully',
+        message: this.errorMessageService.getSuccessMessageWithLanguage(
+          'SCHOOL',
+          'DETAILS_UPDATED_SUCCESSFULLY',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
         data: {
           _id: updatedSchool._id,
           school_name: updatedSchool.name,
@@ -231,7 +289,13 @@ export class SchoolsService {
         `Error updating school details for school ID: ${id}`,
         error?.stack || error,
       );
-      throw new BadRequestException('Failed to update school details');
+      throw new BadRequestException(
+        this.errorMessageService.getMessageWithLanguage(
+          'SCHOOL',
+          'UPDATE_FAILED',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
   }
 }

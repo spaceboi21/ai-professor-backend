@@ -11,6 +11,12 @@ export enum RecipientTypeEnum {
   PROFESSOR = 'PROFESSOR',
 }
 
+// Multi-language content interface
+export interface MultiLanguageContent {
+  en: string;
+  fr: string;
+}
+
 @Schema({
   collection: 'notifications',
   timestamps: {
@@ -34,11 +40,38 @@ export class Notification extends Document {
   })
   recipient_id: Types.ObjectId;
 
-  @Prop({ type: String, required: true })
-  title: string;
+  @Prop({
+    type: Object,
+    required: true,
+    validate: {
+      validator: function (content: MultiLanguageContent) {
+        return (
+          content &&
+          typeof content.en === 'string' &&
+          typeof content.fr === 'string'
+        );
+      },
+      message: 'Title must contain both English (en) and French (fr) versions',
+    },
+  })
+  title: MultiLanguageContent;
 
-  @Prop({ type: String, required: true })
-  message: string;
+  @Prop({
+    type: Object,
+    required: true,
+    validate: {
+      validator: function (content: MultiLanguageContent) {
+        return (
+          content &&
+          typeof content.en === 'string' &&
+          typeof content.fr === 'string'
+        );
+      },
+      message:
+        'Message must contain both English (en) and French (fr) versions',
+    },
+  })
+  message: MultiLanguageContent;
 
   @Prop({ type: String, required: true, enum: NotificationTypeEnum })
   type: NotificationTypeEnum;

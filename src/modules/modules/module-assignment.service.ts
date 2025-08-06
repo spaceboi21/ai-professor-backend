@@ -1118,8 +1118,10 @@ export class ModuleAssignmentService {
           ? new Types.ObjectId(professorId)
           : professorId;
 
-      let title: string;
-      let message: string;
+      let titleEn = '';
+      let titleFr = '';
+      let messageEn = '';
+      let messageFr = '';
       let notificationType: NotificationTypeEnum;
 
       // Get module details for better context
@@ -1145,23 +1147,31 @@ export class ModuleAssignmentService {
 
       switch (type) {
         case 'assignment_created':
-          title = 'New Module Assignment';
-          message = `You have been assigned to the module "${moduleTitle}" by ${assignedByName}. You now have full access to view, edit, and manage this module.`;
+          titleEn = 'New Module Assignment';
+          titleFr = 'Nouvelle Attribution de Module';
+          messageEn = `You have been assigned to the module "${moduleTitle}" by ${assignedByName}. You now have full access to view, edit, and manage this module.`;
+          messageFr = `Vous avez été assigné au module "${moduleTitle}" par ${assignedByName}. Vous avez maintenant un accès complet pour voir, modifier et gérer ce module.`;
           notificationType = NotificationTypeEnum.PROFESSOR_ASSIGNED;
           break;
         case 'assignment_updated':
-          title = 'Module Assignment Updated';
-          message = `Your assignment to the module "${moduleTitle}" has been updated by ${assignedByName}.`;
+          titleEn = 'Module Assignment Updated';
+          titleFr = 'Attribution de Module Mise à Jour';
+          messageEn = `Your assignment to the module "${moduleTitle}" has been updated by ${assignedByName}.`;
+          messageFr = `Votre attribution au module "${moduleTitle}" a été mise à jour par ${assignedByName}.`;
           notificationType = NotificationTypeEnum.PROFESSOR_ASSIGNED;
           break;
         case 'assignment_removed':
-          title = 'Module Assignment Removed';
-          message = `You have been unassigned from the module "${moduleTitle}" by ${assignedByName}. You no longer have access to this module.`;
+          titleEn = 'Module Assignment Removed';
+          titleFr = 'Attribution de Module Supprimée';
+          messageEn = `You have been unassigned from the module "${moduleTitle}" by ${assignedByName}. You no longer have access to this module.`;
+          messageFr = `Vous avez été désassigné du module "${moduleTitle}" par ${assignedByName}. Vous n'avez plus accès à ce module.`;
           notificationType = NotificationTypeEnum.PROFESSOR_UNASSIGNED;
           break;
         default:
-          title = 'Module Assignment Notification';
-          message = `There has been a change to your module assignment for "${moduleTitle}" by ${assignedByName}.`;
+          titleEn = 'Module Assignment Notification';
+          titleFr = "Notification d'Attribution de Module";
+          messageEn = `There has been a change to your module assignment for "${moduleTitle}" by ${assignedByName}.`;
+          messageFr = `Il y a eu un changement dans votre attribution de module pour "${moduleTitle}" par ${assignedByName}.`;
           notificationType = NotificationTypeEnum.GENERAL;
       }
 
@@ -1200,11 +1210,13 @@ export class ModuleAssignmentService {
       };
 
       // Use the universal notification service
-      await this.notificationsService.createNotification(
+      await this.notificationsService.createMultiLanguageNotification(
         professorObjectId,
         RecipientTypeEnum.PROFESSOR,
-        title,
-        message,
+        titleEn,
+        titleFr,
+        messageEn,
+        messageFr,
         notificationType,
         metadata,
         schoolId,

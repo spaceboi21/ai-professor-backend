@@ -5,6 +5,10 @@ import {
   StatusEnum,
   DEFAULT_STATUS,
 } from 'src/common/constants/status.constant';
+import {
+  LanguageEnum,
+  DEFAULT_LANGUAGE,
+} from 'src/common/constants/language.constant';
 
 @Schema({
   timestamps: {
@@ -62,6 +66,13 @@ export class Student extends Document {
 
   @Prop({ type: Boolean, default: false })
   is_csv_upload: boolean;
+
+  @Prop({
+    enum: LanguageEnum,
+    default: DEFAULT_LANGUAGE,
+    required: true,
+  })
+  preferred_language: LanguageEnum;
 
   readonly created_at?: Date;
   readonly updated_at?: Date;

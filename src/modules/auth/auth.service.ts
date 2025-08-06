@@ -28,6 +28,11 @@ import { MailService } from 'src/mail/mail.service';
 import { ConfigService } from '@nestjs/config';
 import { Request } from 'express';
 import { TokenPair, TokenUtil } from 'src/common/utils/token.util';
+import { UpdatePreferredLanguageDto } from './dto/update-preferred-language.dto';
+import { LanguageEnum } from 'src/common/constants/language.constant';
+import { JWTUserPayload } from 'src/common/types/jwr-user.type';
+import { DEFAULT_LANGUAGE } from 'src/common/constants/language.constant';
+import { ErrorMessageService } from 'src/common/services/error-message.service';
 
 @Injectable()
 export class AuthService {
@@ -48,10 +53,11 @@ export class AuthService {
     private readonly tenantConnectionService: TenantConnectionService,
     private readonly mailService: MailService,
     private readonly configService: ConfigService,
+    private readonly errorMessageService: ErrorMessageService,
   ) {}
 
   async superAdminLogin(loginData: LoginSuperAdminDto, req: Request) {
-    const { email, password, rememberMe } = loginData;
+    const { email, password, rememberMe, preferred_language } = loginData;
     this.logger.log(`SuperAdmin login attempt: ${email}`);
 
     const isSuperAdminExists = (await this.userModel
@@ -67,15 +73,27 @@ export class AuthService {
 
     if (!isSuperAdminExists) {
       this.logger.warn(`Super Admin not found: ${email}`);
-      throw new NotFoundException('Super Admin does not exist');
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'USER',
+          'NOT_FOUND',
+          DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     // Check user status
     if (isSuperAdminExists.status === StatusEnum.INACTIVE) {
       this.logger.warn(`Super Admin account is inactive: ${email}`);
-      throw new BadRequestException(
-        'Your account has been deactivated. Please contact support for assistance.',
-      );
+      throw new BadRequestException({
+        message: this.errorMessageService.getMessageWithLanguage(
+          'USER',
+          'ACCOUNT_DEACTIVATED',
+          isSuperAdminExists.preferred_language,
+        ),
+        error: 'Account Deactivated',
+        statusCode: 400,
+      });
     }
 
     const isPasswordMatch = await this.bcryptUtil.comparePassword(
@@ -85,7 +103,29 @@ export class AuthService {
 
     if (!isPasswordMatch) {
       this.logger.warn(`Invalid email or password for Super Admin: ${email}`);
-      throw new BadRequestException('Invalid email or password');
+      throw new BadRequestException({
+        message: this.errorMessageService.getMessageWithLanguage(
+          'AUTH',
+          'INVALID_EMAIL_PASSWORD',
+          preferred_language || DEFAULT_LANGUAGE,
+        ),
+      });
+    }
+
+    // Update preferred language if provided
+    let updatedPreferredLanguage = isSuperAdminExists.preferred_language;
+    if (
+      preferred_language &&
+      preferred_language !== isSuperAdminExists.preferred_language
+    ) {
+      await this.userModel.findByIdAndUpdate(isSuperAdminExists._id, {
+        preferred_language,
+        updated_at: new Date(),
+      });
+      updatedPreferredLanguage = preferred_language;
+      this.logger.log(
+        `Updated preferred language for Super Admin ${email} to ${preferred_language}`,
+      );
     }
 
     const tokenPair = this.tokenUtil.generateTokenPair({
@@ -102,7 +142,11 @@ export class AuthService {
 
     this.logger.log(`SuperAdmin login successful: ${email}`);
     return {
-      message: 'Login successful',
+      message: this.errorMessageService.getSuccessMessageWithLanguage(
+        'AUTH',
+        'LOGIN_SUCCESSFUL',
+        updatedPreferredLanguage || DEFAULT_LANGUAGE,
+      ),
       ...tokenPair,
       user: {
         email: isSuperAdminExists.email,
@@ -110,6 +154,7 @@ export class AuthService {
         last_name: isSuperAdminExists.last_name,
         role: isSuperAdminExists.role.toString(),
         _id: isSuperAdminExists._id.toString(),
+        preferred_language: updatedPreferredLanguage || DEFAULT_LANGUAGE,
       },
     };
   }
@@ -118,7 +163,8 @@ export class AuthService {
     loginSchoolAdminDto: LoginSchoolAdminDto,
     req: Request,
   ) {
-    const { email, password, rememberMe } = loginSchoolAdminDto;
+    const { email, password, rememberMe, preferred_language } =
+      loginSchoolAdminDto;
     this.logger.log(`SchoolAdmin login attempt: ${email}`);
 
     const user = (await this.userModel
@@ -139,14 +185,24 @@ export class AuthService {
 
     if (!user) {
       this.logger.warn(`School Admin not found: ${email}`);
-      throw new NotFoundException('User not found with this email');
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'USER',
+          'NOT_FOUND_WITH_EMAIL',
+          DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     // Check user status
     if (user.status === StatusEnum.INACTIVE) {
       this.logger.warn(`School Admin account is inactive: ${email}`);
       throw new BadRequestException(
-        'Your account has been deactivated. Please contact support for assistance.',
+        this.errorMessageService.getMessageWithLanguage(
+          'USER',
+          'ACCOUNT_DEACTIVATED',
+          user.preferred_language || DEFAULT_LANGUAGE,
+        ),
       );
     }
 
@@ -157,20 +213,49 @@ export class AuthService {
 
     if (!isPasswordValid) {
       this.logger.warn(`Invalid email or password for School Admin: ${email}`);
-      throw new BadRequestException('Invalid email or password');
+      throw new BadRequestException(
+        this.errorMessageService.getMessageWithLanguage(
+          'AUTH',
+          'INVALID_EMAIL_PASSWORD',
+          user.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     const school = await this.schoolModel.findById(user.school_id);
     if (!school) {
       this.logger.warn(`School not found for School Admin: ${email}`);
-      throw new NotFoundException('School not found for this user');
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'SCHOOL',
+          'NOT_FOUND_FOR_USER',
+          user.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     // Check school status
     if (school.status === StatusEnum.INACTIVE) {
       this.logger.warn(`School is inactive for School Admin: ${email}`);
       throw new BadRequestException(
-        'Your school has been deactivated. Please contact support for assistance.',
+        this.errorMessageService.getMessageWithLanguage(
+          'SCHOOL',
+          'ACCOUNT_DEACTIVATED',
+          preferred_language || user.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
+    }
+
+    // Update preferred language if provided
+    let updatedPreferredLanguage = user.preferred_language;
+    if (preferred_language && preferred_language !== user.preferred_language) {
+      await this.userModel.findByIdAndUpdate(user._id, {
+        preferred_language,
+        updated_at: new Date(),
+      });
+      updatedPreferredLanguage = preferred_language;
+      this.logger.log(
+        `Updated preferred language for School Admin ${email} to ${preferred_language}`,
       );
     }
 
@@ -188,7 +273,11 @@ export class AuthService {
 
     this.logger.log(`SchoolAdmin login successful: ${email}`);
     return {
-      message: 'Login successful',
+      message: this.errorMessageService.getSuccessMessageWithLanguage(
+        'AUTH',
+        'LOGIN_SUCCESSFUL',
+        updatedPreferredLanguage || DEFAULT_LANGUAGE,
+      ),
       ...tokenPair,
       user: {
         id: user._id.toString(),
@@ -198,12 +287,13 @@ export class AuthService {
         school_id: school._id.toString(),
         role: user.role._id.toString(),
         role_name: user.role.name as RoleEnum,
+        preferred_language: updatedPreferredLanguage || DEFAULT_LANGUAGE,
       },
     };
   }
 
   async studentLogin(loginStudentDto: LoginStudentDto, req: Request) {
-    const { email, password, rememberMe } = loginStudentDto;
+    const { email, password, rememberMe, preferred_language } = loginStudentDto;
     this.logger.log(`Student login attempt: ${email}`);
 
     // First, find the student in the global students collection
@@ -211,21 +301,37 @@ export class AuthService {
 
     if (!globalStudent) {
       this.logger.warn(`Global student not found: ${email}`);
-      throw new NotFoundException('Student not found with this email');
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'STUDENT',
+          'NOT_FOUND_WITH_EMAIL',
+          DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     // Get the school information
     const school = await this.schoolModel.findById(globalStudent.school_id);
     if (!school) {
       this.logger.warn(`School not found for student: ${email}`);
-      throw new NotFoundException('School not found for this student');
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'SCHOOL',
+          'NOT_FOUND_FOR_STUDENT',
+          DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     // Check school status
     if (school.status === StatusEnum.INACTIVE) {
       this.logger.warn(`School is inactive for student: ${email}`);
       throw new BadRequestException(
-        'Your school has been deactivated. Please contact support for assistance.',
+        this.errorMessageService.getMessageWithLanguage(
+          'SCHOOL',
+          'ACCOUNT_DEACTIVATED',
+          DEFAULT_LANGUAGE,
+        ),
       );
     }
 
@@ -242,14 +348,24 @@ export class AuthService {
 
     if (!student) {
       this.logger.warn(`Student not found in school DB: ${email}`);
-      throw new NotFoundException('Student not found in school database');
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'STUDENT',
+          'NOT_FOUND_IN_SCHOOL',
+          DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     // Check student status
     if (student.status === StatusEnum.INACTIVE) {
       this.logger.warn(`Student account is inactive: ${email}`);
       throw new BadRequestException(
-        'Your account has been deactivated. Please contact support for assistance.',
+        this.errorMessageService.getMessageWithLanguage(
+          'STUDENT',
+          'ACCOUNT_DEACTIVATED',
+          student.preferred_language || DEFAULT_LANGUAGE,
+        ),
       );
     }
 
@@ -261,7 +377,29 @@ export class AuthService {
 
     if (!isPasswordValid) {
       this.logger.warn(`Invalid email or password for Student: ${email}`);
-      throw new BadRequestException('Invalid email or password');
+      throw new BadRequestException(
+        this.errorMessageService.getMessageWithLanguage(
+          'AUTH',
+          'INVALID_EMAIL_PASSWORD',
+          preferred_language || student.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
+    }
+
+    // Update preferred language if provided
+    let updatedPreferredLanguage = student.preferred_language;
+    if (
+      preferred_language &&
+      preferred_language !== student.preferred_language
+    ) {
+      await StudentModel.findByIdAndUpdate(student._id, {
+        preferred_language,
+        updated_at: new Date(),
+      });
+      updatedPreferredLanguage = preferred_language;
+      this.logger.log(
+        `Updated preferred language for Student ${email} to ${preferred_language}`,
+      );
     }
 
     const tokenPair = this.tokenUtil.generateTokenPair({
@@ -276,9 +414,16 @@ export class AuthService {
       last_logged_in: new Date(),
     });
 
+    // Get preferred language from student data
+    const finalPreferredLanguage = updatedPreferredLanguage || DEFAULT_LANGUAGE;
+
     this.logger.log(`Student login successful: ${email}`);
     return {
-      message: 'Login successful',
+      message: this.errorMessageService.getSuccessMessageWithLanguage(
+        'AUTH',
+        'LOGIN_SUCCESSFUL',
+        finalPreferredLanguage,
+      ),
       ...tokenPair,
       user: {
         id: student._id,
@@ -288,6 +433,7 @@ export class AuthService {
         student_code: student.student_code,
         school_id: school._id.toString(),
         role: ROLE_IDS.STUDENT,
+        preferred_language: finalPreferredLanguage,
       },
     };
   }
@@ -311,12 +457,22 @@ export class AuthService {
       );
 
       return {
-        message: 'Token refreshed successfully',
+        message: this.errorMessageService.getSuccessMessageWithLanguage(
+          'AUTH',
+          'TOKEN_REFRESHED_SUCCESSFULLY',
+          DEFAULT_LANGUAGE,
+        ),
         ...newTokenPair,
       };
     } catch (error) {
       this.logger.warn(`Token refresh failed: ${error.message}`);
-      throw new UnauthorizedException('Invalid refresh token');
+      throw new UnauthorizedException(
+        this.errorMessageService.getMessageWithLanguage(
+          'AUTH',
+          'INVALID_REFRESH_TOKEN',
+          DEFAULT_LANGUAGE,
+        ),
+      );
     }
   }
 
@@ -330,7 +486,13 @@ export class AuthService {
       const school = await this.schoolModel.findById(user.school_id);
       if (!school) {
         this.logger.warn(`School not found for student getMe: ${user.id}`);
-        throw new NotFoundException('School not found');
+        throw new NotFoundException(
+          this.errorMessageService.getMessageWithLanguage(
+            'SCHOOL',
+            'NOT_FOUND',
+            DEFAULT_LANGUAGE,
+          ),
+        );
       }
 
       const tenantConnection =
@@ -345,12 +507,19 @@ export class AuthService {
 
       if (!student) {
         this.logger.warn(`Student not found in getMe: ${user.id}`);
-        throw new NotFoundException('Student not found');
+        throw new NotFoundException(
+          this.errorMessageService.getMessageWithLanguage(
+            'STUDENT',
+            'NOT_FOUND',
+            DEFAULT_LANGUAGE,
+          ),
+        );
       }
 
       return {
         ...student,
         role: user.role, // role from JWT (already populated)
+        preferred_language: student.preferred_language || DEFAULT_LANGUAGE,
       };
     } else {
       // For other roles, get from central userModel
@@ -364,12 +533,19 @@ export class AuthService {
 
       if (!userData) {
         this.logger.warn(`User not found in getMe: ${user.id}`);
-        throw new NotFoundException('User not found');
+        throw new NotFoundException(
+          this.errorMessageService.getMessageWithLanguage(
+            'USER',
+            'NOT_FOUND',
+            DEFAULT_LANGUAGE,
+          ),
+        );
       }
 
       return {
         ...userData,
         role: user.role, // role from JWT (already populated)
+        preferred_language: userData.preferred_language || DEFAULT_LANGUAGE,
       };
     }
   }
@@ -403,21 +579,37 @@ export class AuthService {
     const globalStudent = await this.globalStudentModel.findOne({ email });
     if (!globalStudent) {
       this.logger.warn(`User not found for forgot password: ${email}`);
-      throw new NotFoundException('User not found with this email');
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'USER',
+          'NOT_FOUND_WITH_EMAIL',
+          DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     // Get the school information for the student
     const school = await this.schoolModel.findById(globalStudent.school_id);
     if (!school) {
       this.logger.warn(`School not found for student: ${email}`);
-      throw new NotFoundException('School not found for this student');
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'SCHOOL',
+          'NOT_FOUND_FOR_STUDENT',
+          DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     // Check school status
     if (school.status === StatusEnum.INACTIVE) {
       this.logger.warn(`School is inactive for student: ${email}`);
       throw new BadRequestException(
-        'Your school has been deactivated. Please contact support for assistance.',
+        this.errorMessageService.getMessageWithLanguage(
+          'SCHOOL',
+          'ACCOUNT_DEACTIVATED',
+          DEFAULT_LANGUAGE,
+        ),
       );
     }
 
@@ -434,14 +626,24 @@ export class AuthService {
 
     if (!student) {
       this.logger.warn(`Student not found in school DB: ${email}`);
-      throw new NotFoundException('Student not found in school database');
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'STUDENT',
+          'NOT_FOUND_IN_SCHOOL',
+          DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     // Check student status
     if (student.status === StatusEnum.INACTIVE) {
       this.logger.warn(`Student account is inactive: ${email}`);
       throw new BadRequestException(
-        'Your account has been deactivated. Please contact support for assistance.',
+        this.errorMessageService.getMessageWithLanguage(
+          'STUDENT',
+          'ACCOUNT_DEACTIVATED',
+          student.preferred_language || DEFAULT_LANGUAGE,
+        ),
       );
     }
 
@@ -456,7 +658,11 @@ export class AuthService {
         `User account is inactive for forgot password: ${user.email}`,
       );
       throw new BadRequestException(
-        'Your account has been deactivated. Please contact support for assistance.',
+        this.errorMessageService.getMessageWithLanguage(
+          'USER',
+          'ACCOUNT_DEACTIVATED',
+          user.preferred_language || DEFAULT_LANGUAGE,
+        ),
       );
     }
 
@@ -493,7 +699,11 @@ export class AuthService {
     }
 
     return {
-      message: 'Password reset link has been sent to your email',
+      message: this.errorMessageService.getSuccessMessageWithLanguage(
+        'AUTH',
+        'PASSWORD_RESET_LINK_SENT',
+        user.preferred_language || DEFAULT_LANGUAGE,
+      ),
     };
   }
 
@@ -529,7 +739,11 @@ export class AuthService {
     }
 
     return {
-      message: 'Password reset link has been sent to your email',
+      message: this.errorMessageService.getSuccessMessageWithLanguage(
+        'AUTH',
+        'PASSWORD_RESET_LINK_SENT',
+        student.preferred_language || DEFAULT_LANGUAGE,
+      ),
     };
   }
 
@@ -555,7 +769,13 @@ export class AuthService {
         throw error;
       }
       this.logger.error('Error setting new password:', error);
-      throw new BadRequestException('Invalid or expired reset token');
+      throw new BadRequestException(
+        this.errorMessageService.getMessageWithLanguage(
+          'AUTH',
+          'INVALID_OR_EXPIRED_RESET_TOKEN',
+          DEFAULT_LANGUAGE,
+        ),
+      );
     }
   }
 
@@ -569,7 +789,13 @@ export class AuthService {
       this.logger.warn(
         `School user not found for password reset: ${payload.id}`,
       );
-      throw new NotFoundException('Invalid reset token');
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'AUTH',
+          'INVALID_RESET_TOKEN',
+          DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     // Check if user is school admin or professor
@@ -579,7 +805,13 @@ export class AuthService {
       userRoleId !== ROLE_IDS.PROFESSOR
     ) {
       this.logger.warn(`Invalid user role for password reset: ${user.role}`);
-      throw new BadRequestException('Invalid user type for password reset');
+      throw new BadRequestException(
+        this.errorMessageService.getMessageWithLanguage(
+          'AUTH',
+          'INVALID_USER_TYPE_RESET',
+          user.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     // Check user status
@@ -588,7 +820,11 @@ export class AuthService {
         `User account is inactive for password reset: ${user.email}`,
       );
       throw new BadRequestException(
-        'Your account has been deactivated. Please contact support for assistance.',
+        this.errorMessageService.getMessageWithLanguage(
+          'USER',
+          'ACCOUNT_DEACTIVATED',
+          user.preferred_language || DEFAULT_LANGUAGE,
+        ),
       );
     }
 
@@ -606,7 +842,11 @@ export class AuthService {
     );
 
     return {
-      message: 'Password updated successfully',
+      message: this.errorMessageService.getSuccessMessageWithLanguage(
+        'AUTH',
+        'PASSWORD_UPDATED_SUCCESSFULLY',
+        user?.preferred_language || DEFAULT_LANGUAGE,
+      ),
       data: {
         id: user._id,
         email: user.email,
@@ -623,7 +863,13 @@ export class AuthService {
       this.logger.warn(
         `School not found for student password reset: ${payload.school_id}`,
       );
-      throw new NotFoundException('School not found');
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'SCHOOL',
+          'NOT_FOUND',
+          DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     // Get tenant connection for the school
@@ -635,7 +881,13 @@ export class AuthService {
     const student = await StudentModel.findById(payload.id).select('+password');
     if (!student) {
       this.logger.warn(`Student not found for password reset: ${payload.id}`);
-      throw new NotFoundException('Invalid reset token');
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'STUDENT',
+          'INVALID_RESET_TOKEN',
+          DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     // Check student status
@@ -644,7 +896,11 @@ export class AuthService {
         `Student account is inactive for password reset: ${student.email}`,
       );
       throw new BadRequestException(
-        'Your account has been deactivated. Please contact support for assistance.',
+        this.errorMessageService.getMessageWithLanguage(
+          'STUDENT',
+          'ACCOUNT_DEACTIVATED',
+          student.preferred_language || DEFAULT_LANGUAGE,
+        ),
       );
     }
 
@@ -662,7 +918,11 @@ export class AuthService {
     );
 
     return {
-      message: 'Password updated successfully',
+      message: this.errorMessageService.getSuccessMessageWithLanguage(
+        'AUTH',
+        'PASSWORD_UPDATED_SUCCESSFULLY',
+        student?.preferred_language || DEFAULT_LANGUAGE,
+      ),
       data: {
         id: student._id,
         email: student.email,
@@ -671,5 +931,112 @@ export class AuthService {
         student_code: student.student_code,
       },
     };
+  }
+
+  async updatePreferredLanguage(
+    user: JWTUserPayload,
+    updatePreferredLanguageDto: UpdatePreferredLanguageDto,
+  ) {
+    this.logger.log(
+      `Update preferred language called for user id: ${user.id}, role: ${user.role.name}`,
+    );
+
+    if (user.role.name === RoleEnum.STUDENT) {
+      // Handle student preferred language update in tenant database
+      const school = await this.schoolModel.findById(user.school_id);
+      if (!school) {
+        this.logger.warn(`School not found for student: ${user.id}`);
+        throw new NotFoundException(
+          this.errorMessageService.getMessageWithLanguage(
+            'SCHOOL',
+            'NOT_FOUND',
+            user.preferred_language ||
+              updatePreferredLanguageDto.preferred_language ||
+              DEFAULT_LANGUAGE,
+          ),
+        );
+      }
+
+      const tenantConnection =
+        await this.tenantConnectionService.getTenantConnection(school.db_name);
+
+      const StudentModel = tenantConnection.model(Student.name, StudentSchema);
+
+      // Update the student's preferred language in tenant database
+      const updatedStudent = await StudentModel.findByIdAndUpdate(
+        user.id,
+        {
+          preferred_language: updatePreferredLanguageDto.preferred_language,
+          updated_at: new Date(),
+        },
+        { new: true },
+      ).lean();
+
+      if (!updatedStudent) {
+        this.logger.warn(
+          `Student not found for update in tenant DB: ${user.id}`,
+        );
+        throw new NotFoundException(
+          this.errorMessageService.getMessageWithLanguage(
+            'STUDENT',
+            'NOT_FOUND',
+            DEFAULT_LANGUAGE,
+          ),
+        );
+      }
+
+      this.logger.log(
+        `Preferred language updated for student ${user.id} to ${updatePreferredLanguageDto.preferred_language}`,
+      );
+
+      return {
+        message: this.errorMessageService.getSuccessMessageWithLanguage(
+          'AUTH',
+          'PREFERRED_LANGUAGE_UPDATED_SUCCESSFULLY',
+          updatedStudent?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+        data: {
+          user_id: updatedStudent._id,
+          preferred_language: updatedStudent.preferred_language,
+          updated_at: updatedStudent.updated_at,
+        },
+      };
+    } else {
+      // Handle other user types (Super Admin, School Admin, Professor) in central database
+      const updatedUser = await this.userModel
+        .findByIdAndUpdate(
+          user.id,
+          {
+            preferred_language: updatePreferredLanguageDto.preferred_language,
+            updated_at: new Date(),
+          },
+          { new: true },
+        )
+        .lean();
+
+      if (!updatedUser) {
+        this.logger.warn(`User not found for update in central DB: ${user.id}`);
+        throw new NotFoundException(
+          this.errorMessageService.getMessageWithLanguage(
+            'USER',
+            'NOT_FOUND',
+            DEFAULT_LANGUAGE,
+          ),
+        );
+      }
+
+      this.logger.log(
+        `Preferred language updated for user ${user.id} to ${updatePreferredLanguageDto.preferred_language}`,
+      );
+
+      return {
+        message: 'Preferred language updated successfully',
+        data: {
+          user_id: updatedUser._id,
+          preferred_language: updatedUser.preferred_language,
+          updated_at: updatedUser.updated_at,
+        },
+      };
+    }
   }
 }

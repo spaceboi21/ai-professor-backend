@@ -81,6 +81,11 @@ import {
   formatMentionsInContent,
   MentionInfo,
 } from 'src/common/utils/mention.util';
+import { ErrorMessageService } from 'src/common/services/error-message.service';
+import { DEFAULT_LANGUAGE } from 'src/common/constants/language.constant';
+import { CSVUtil } from 'src/common/utils/csv.util';
+import { ExportDiscussionsDto } from './dto/export-discussions.dto';
+import { ExportDiscussionsResponseDto } from './dto/export-discussions-response.dto';
 
 @Injectable()
 export class CommunityService {
@@ -93,6 +98,8 @@ export class CommunityService {
     private readonly schoolModel: Model<School>,
     private readonly tenantConnectionService: TenantConnectionService,
     private readonly notificationsService: NotificationsService,
+    private readonly errorMessageService: ErrorMessageService,
+    private readonly csvUtil: CSVUtil,
   ) {}
 
   /**
@@ -105,13 +112,23 @@ export class CommunityService {
     if (user.role.name === RoleEnum.SUPER_ADMIN) {
       if (!bodySchoolId) {
         throw new BadRequestException(
-          'School ID is required in request body for super admin',
+          this.errorMessageService.getMessageWithLanguage(
+            'COMMUNITY',
+            'SUPER_ADMIN_SCHOOL_ID_REQUIRED',
+            user?.preferred_language || DEFAULT_LANGUAGE,
+          ),
         );
       }
       return bodySchoolId.toString();
     } else {
       if (!user.school_id) {
-        throw new BadRequestException('User school ID not found');
+        throw new BadRequestException(
+          this.errorMessageService.getMessageWithLanguage(
+            'SCHOOL',
+            'USER_SCHOOL_ID_NOT_FOUND',
+            user?.preferred_language || DEFAULT_LANGUAGE,
+          ),
+        );
       }
       return user.school_id.toString();
     }
@@ -148,7 +165,11 @@ export class CommunityService {
         ].includes(user.role.name as RoleEnum)
       ) {
         throw new ForbiddenException(
-          'Only professors and admins can create meeting discussions',
+          this.errorMessageService.getMessageWithLanguage(
+            'COMMUNITY',
+            'ONLY_PROFESSORS_ADMINS_CAN_CREATE_MEETING',
+            user?.preferred_language || DEFAULT_LANGUAGE,
+          ),
         );
       }
     }
@@ -158,7 +179,13 @@ export class CommunityService {
     // Validate school exists
     const school = await this.schoolModel.findById(resolvedSchoolId);
     if (!school) {
-      throw new NotFoundException('School not found');
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'SCHOOL',
+          'NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     // Get tenant connection
@@ -174,7 +201,11 @@ export class CommunityService {
       if (type === DiscussionTypeEnum.MEETING) {
         if (!meeting_link || !meeting_platform || !meeting_scheduled_at) {
           throw new BadRequestException(
-            'Meeting link, platform, and scheduled time are required for meeting type discussions',
+            this.errorMessageService.getMessageWithLanguage(
+              'COMMUNITY',
+              'MEETING_FIELDS_REQUIRED',
+              user?.preferred_language || DEFAULT_LANGUAGE,
+            ),
           );
         }
       }
@@ -221,7 +252,11 @@ export class CommunityService {
       this.logger.log(`Discussion created: ${savedDiscussion._id}`);
 
       return {
-        message: 'Discussion created successfully',
+        message: this.errorMessageService.getSuccessMessageWithLanguage(
+          'COMMUNITY',
+          'DISCUSSION_CREATED_SUCCESSFULLY',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
         data: discussionWithUser,
       };
     } catch (error) {
@@ -233,7 +268,13 @@ export class CommunityService {
       ) {
         throw error;
       }
-      throw new BadRequestException('Failed to create discussion');
+      throw new BadRequestException(
+        this.errorMessageService.getMessageWithLanguage(
+          'COMMUNITY',
+          'CREATE_DISCUSSION_FAILED',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
   }
 
@@ -253,7 +294,13 @@ export class CommunityService {
       // Validate school exists
       const school = await this.schoolModel.findById(resolvedSchoolId);
       if (!school) {
-        throw new NotFoundException('School not found');
+        throw new NotFoundException(
+          this.errorMessageService.getMessageWithLanguage(
+            'SCHOOL',
+            'NOT_FOUND',
+            user?.preferred_language || DEFAULT_LANGUAGE,
+          ),
+        );
       }
 
       // Get tenant connection
@@ -552,12 +599,22 @@ export class CommunityService {
       const result = createPaginationResult(discussions, total, options);
 
       return {
-        message: 'Discussions retrieved successfully',
+        message: this.errorMessageService.getSuccessMessageWithLanguage(
+          'COMMUNITY',
+          'DISCUSSIONS_RETRIEVED_SUCCESSFULLY',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
         ...result,
       };
     } catch (error) {
       this.logger.error('Error finding discussions', error?.stack || error);
-      throw new BadRequestException('Failed to retrieve discussions');
+      throw new BadRequestException(
+        this.errorMessageService.getMessageWithLanguage(
+          'COMMUNITY',
+          'RETRIEVE_DISCUSSIONS_FAILED',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
   }
 
@@ -572,7 +629,13 @@ export class CommunityService {
     // Validate school exists
     const school = await this.schoolModel.findById(resolvedSchoolId);
     if (!school) {
-      throw new NotFoundException('School not found');
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'SCHOOL',
+          'NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     // Get tenant connection
@@ -590,7 +653,13 @@ export class CommunityService {
       }).lean();
 
       if (!discussion) {
-        throw new NotFoundException('Discussion not found');
+        throw new NotFoundException(
+          this.errorMessageService.getMessageWithLanguage(
+            'COMMUNITY',
+            'DISCUSSION_NOT_FOUND',
+            user?.preferred_language || DEFAULT_LANGUAGE,
+          ),
+        );
       }
 
       // Increment view count
@@ -618,7 +687,11 @@ export class CommunityService {
       };
 
       return {
-        message: 'Discussion retrieved successfully',
+        message: this.errorMessageService.getSuccessMessageWithLanguage(
+          'COMMUNITY',
+          'DISCUSSION_RETRIEVED_SUCCESSFULLY',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
         data: discussionWithUser,
       };
     } catch (error) {
@@ -626,7 +699,13 @@ export class CommunityService {
       if (error instanceof NotFoundException) {
         throw error;
       }
-      throw new BadRequestException('Failed to retrieve discussion');
+      throw new BadRequestException(
+        this.errorMessageService.getMessageWithLanguage(
+          'COMMUNITY',
+          'RETRIEVE_DISCUSSION_FAILED',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
   }
 
@@ -646,7 +725,13 @@ export class CommunityService {
     // Validate school exists
     const school = await this.schoolModel.findById(resolvedSchoolId);
     if (!school) {
-      throw new NotFoundException('School not found');
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'SCHOOL',
+          'NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     // Get tenant connection
@@ -674,7 +759,13 @@ export class CommunityService {
       });
 
       if (!discussion) {
-        throw new NotFoundException('Discussion not found or not active');
+        throw new NotFoundException(
+          this.errorMessageService.getMessageWithLanguage(
+            'COMMUNITY',
+            'DISCUSSION_NOT_FOUND_OR_NOT_ACTIVE',
+            user?.preferred_language || DEFAULT_LANGUAGE,
+          ),
+        );
       }
 
       // Validate parent reply if provided
@@ -687,7 +778,13 @@ export class CommunityService {
         });
 
         if (!parentReply) {
-          throw new NotFoundException('Parent reply not found or not active');
+          throw new NotFoundException(
+            this.errorMessageService.getMessageWithLanguage(
+              'COMMUNITY',
+              'PARENT_REPLY_NOT_FOUND_OR_NOT_ACTIVE',
+              user?.preferred_language || DEFAULT_LANGUAGE,
+            ),
+          );
         }
       }
 
@@ -818,7 +915,11 @@ export class CommunityService {
       this.logger.log(`Reply created: ${savedReply._id}`);
 
       return {
-        message: 'Reply created successfully',
+        message: this.errorMessageService.getSuccessMessageWithLanguage(
+          'COMMUNITY',
+          'REPLY_CREATED_SUCCESSFULLY',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
         data: replyWithUser,
       };
     } catch (error) {
@@ -829,7 +930,13 @@ export class CommunityService {
       ) {
         throw error;
       }
-      throw new BadRequestException('Failed to create reply');
+      throw new BadRequestException(
+        this.errorMessageService.getMessageWithLanguage(
+          'COMMUNITY',
+          'CREATE_REPLY_FAILED',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
   }
 
@@ -848,7 +955,13 @@ export class CommunityService {
     // Validate school exists
     const school = await this.schoolModel.findById(resolvedSchoolId);
     if (!school) {
-      throw new NotFoundException('School not found');
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'SCHOOL',
+          'NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     // Get tenant connection
@@ -875,7 +988,13 @@ export class CommunityService {
       });
 
       if (!discussion) {
-        throw new NotFoundException('Discussion not found');
+        throw new NotFoundException(
+          this.errorMessageService.getMessageWithLanguage(
+            'COMMUNITY',
+            'DISCUSSION_NOT_FOUND',
+            user?.preferred_language || DEFAULT_LANGUAGE,
+          ),
+        );
       }
 
       const options = getPaginationOptions(paginationDto || {});
@@ -1087,7 +1206,11 @@ export class CommunityService {
       const result = createPaginationResult(replies, total, options);
 
       return {
-        message: 'Replies retrieved successfully',
+        message: this.errorMessageService.getSuccessMessageWithLanguage(
+          'COMMUNITY',
+          'REPLIES_RETRIEVED_SUCCESSFULLY',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
         ...result,
       };
     } catch (error) {
@@ -1095,7 +1218,13 @@ export class CommunityService {
       if (error instanceof NotFoundException) {
         throw error;
       }
-      throw new BadRequestException('Failed to retrieve replies');
+      throw new BadRequestException(
+        this.errorMessageService.getMessageWithLanguage(
+          'COMMUNITY',
+          'RETRIEVE_REPLIES_FAILED',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
   }
 
@@ -1114,7 +1243,13 @@ export class CommunityService {
     // Validate school exists
     const school = await this.schoolModel.findById(resolvedSchoolId);
     if (!school) {
-      throw new NotFoundException('School not found');
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'SCHOOL',
+          'NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     // Get tenant connection
@@ -1138,7 +1273,13 @@ export class CommunityService {
       });
 
       if (!parentReply) {
-        throw new NotFoundException('Parent reply not found or not active');
+        throw new NotFoundException(
+          this.errorMessageService.getMessageWithLanguage(
+            'COMMUNITY',
+            'PARENT_REPLY_NOT_FOUND_OR_NOT_ACTIVE',
+            user?.preferred_language || DEFAULT_LANGUAGE,
+          ),
+        );
       }
 
       const options = getPaginationOptions(paginationDto || {});
@@ -1298,9 +1439,12 @@ export class CommunityService {
       this.logger.debug(`Found ${subReplies.length} sub-replies`);
 
       const result = createPaginationResult(subReplies, total, options);
-
       return {
-        message: 'Sub-replies retrieved successfully',
+        message: this.errorMessageService.getSuccessMessageWithLanguage(
+          'COMMUNITY',
+          'SUB_REPLIES_RETRIEVED_SUCCESSFULLY',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
         ...result,
       };
     } catch (error) {
@@ -1308,7 +1452,13 @@ export class CommunityService {
       if (error instanceof NotFoundException) {
         throw error;
       }
-      throw new BadRequestException('Failed to retrieve sub-replies');
+      throw new BadRequestException(
+        this.errorMessageService.getMessageWithLanguage(
+          'COMMUNITY',
+          'RETRIEVE_SUBREPLIES_FAILED',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
   }
 
@@ -1329,7 +1479,13 @@ export class CommunityService {
     // Validate school exists
     const school = await this.schoolModel.findById(resolvedSchoolId);
     if (!school) {
-      throw new NotFoundException('School not found');
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'SCHOOL',
+          'NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     // Get tenant connection
@@ -1358,7 +1514,11 @@ export class CommunityService {
         );
 
         return {
-          message: 'Like removed successfully',
+          message: this.errorMessageService.getSuccessMessageWithLanguage(
+            'COMMUNITY',
+            'UNLIKED_SUCCESSFULLY',
+            user?.preferred_language || DEFAULT_LANGUAGE,
+          ),
           liked: false,
           liked_by_user: userDetails || null,
         };
@@ -1432,14 +1592,24 @@ export class CommunityService {
         );
 
         return {
-          message: 'Like added successfully',
+          message: this.errorMessageService.getSuccessMessageWithLanguage(
+            'COMMUNITY',
+            'LIKED_SUCCESSFULLY',
+            user?.preferred_language || DEFAULT_LANGUAGE,
+          ),
           liked: true,
           liked_by_user: userDetails || null,
         };
       }
     } catch (error) {
       this.logger.error('Error toggling like', error?.stack || error);
-      throw new BadRequestException('Failed to toggle like');
+      throw new BadRequestException(
+        this.errorMessageService.getMessageWithLanguage(
+          'COMMUNITY',
+          'TOGGLE_LIKE_FAILED',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
   }
 
@@ -1492,7 +1662,13 @@ export class CommunityService {
     // Validate school exists
     const school = await this.schoolModel.findById(resolvedSchoolId);
     if (!school) {
-      throw new NotFoundException('School not found');
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'SCHOOL',
+          'NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     // Get tenant connection
@@ -1513,7 +1689,13 @@ export class CommunityService {
       });
 
       if (existingReport) {
-        throw new ConflictException('You have already reported this content');
+        throw new ConflictException(
+          this.errorMessageService.getMessageWithLanguage(
+            'COMMUNITY',
+            'ALREADY_REPORTED',
+            user?.preferred_language || DEFAULT_LANGUAGE,
+          ),
+        );
       }
 
       // Create report
@@ -1598,7 +1780,11 @@ export class CommunityService {
       this.logger.log(`Report created: ${savedReport._id}`);
 
       return {
-        message: 'Content reported successfully',
+        message: this.errorMessageService.getSuccessMessageWithLanguage(
+          'COMMUNITY',
+          'CONTENT_REPORTED_SUCCESSFULLY',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
         data: reportWithUser,
       };
     } catch (error) {
@@ -1609,7 +1795,13 @@ export class CommunityService {
       ) {
         throw error;
       }
-      throw new BadRequestException('Failed to report content');
+      throw new BadRequestException(
+        this.errorMessageService.getMessageWithLanguage(
+          'COMMUNITY',
+          'REPORT_CONTENT_FAILED',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
   }
 
@@ -1652,7 +1844,13 @@ export class CommunityService {
         user.role.name as RoleEnum,
       )
     ) {
-      throw new ForbiddenException('Access denied');
+      throw new ForbiddenException(
+        this.errorMessageService.getMessageWithLanguage(
+          'COMMUNITY',
+          'ACCESS_DENIED',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     this.logger.log(`Getting reports for user: ${user.id}`);
@@ -1662,7 +1860,13 @@ export class CommunityService {
     // Validate school exists
     const school = await this.schoolModel.findById(resolvedSchoolId);
     if (!school) {
-      throw new NotFoundException('School not found');
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'SCHOOL',
+          'NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     // Get tenant connection
@@ -1742,12 +1946,22 @@ export class CommunityService {
       const result = createPaginationResult(reportsWithUsers, total, options);
 
       return {
-        message: 'Reports retrieved successfully',
+        message: this.errorMessageService.getSuccessMessageWithLanguage(
+          'COMMUNITY',
+          'REPORTS_RETRIEVED_SUCCESSFULLY',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
         ...result,
       };
     } catch (error) {
       this.logger.error('Error getting reports', error?.stack || error);
-      throw new BadRequestException('Failed to retrieve reports');
+      throw new BadRequestException(
+        this.errorMessageService.getMessageWithLanguage(
+          'COMMUNITY',
+          'GET_REPORTS_FAILED',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
   }
 
@@ -1761,7 +1975,13 @@ export class CommunityService {
         user.role.name as RoleEnum,
       )
     ) {
-      throw new ForbiddenException('Access denied');
+      throw new ForbiddenException(
+        this.errorMessageService.getMessageWithLanguage(
+          'COMMUNITY',
+          'ACCESS_DENIED',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     this.logger.log(
@@ -1773,7 +1993,13 @@ export class CommunityService {
     // Validate school exists
     const school = await this.schoolModel.findById(resolvedSchoolId);
     if (!school) {
-      throw new NotFoundException('School not found');
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'SCHOOL',
+          'NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     // Get tenant connection
@@ -1791,7 +2017,13 @@ export class CommunityService {
       });
 
       if (!discussion) {
-        throw new NotFoundException('Discussion not found');
+        throw new NotFoundException(
+          this.errorMessageService.getMessageWithLanguage(
+            'COMMUNITY',
+            'DISCUSSION_NOT_FOUND',
+            user?.preferred_language || DEFAULT_LANGUAGE,
+          ),
+        );
       }
 
       await DiscussionModel.updateOne(
@@ -1804,14 +2036,24 @@ export class CommunityService {
       );
 
       return {
-        message: 'Discussion archived successfully',
+        message: this.errorMessageService.getSuccessMessageWithLanguage(
+          'COMMUNITY',
+          'DISCUSSION_ARCHIVED_SUCCESSFULLY',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
       };
     } catch (error) {
       this.logger.error('Error archiving discussion', error?.stack || error);
       if (error instanceof NotFoundException) {
         throw error;
       }
-      throw new BadRequestException('Failed to archive discussion');
+      throw new BadRequestException(
+        this.errorMessageService.getMessageWithLanguage(
+          'COMMUNITY',
+          'ARCHIVE_DISCUSSION_FAILED',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
   }
 
@@ -1916,18 +2158,22 @@ export class CommunityService {
   private async createForumNotification(
     recipientId: Types.ObjectId,
     recipientType: RecipientTypeEnum,
-    title: string,
-    message: string,
+    titleEn: string,
+    titleFr: string,
+    messageEn: string,
+    messageFr: string,
     type: NotificationTypeEnum,
     metadata: Record<string, any> = {},
     schoolId: string,
   ) {
     try {
-      await this.notificationsService.createNotification(
+      await this.notificationsService.createMultiLanguageNotification(
         recipientId,
         recipientType,
-        title,
-        message,
+        titleEn,
+        titleFr,
+        messageEn,
+        messageFr,
         type,
         metadata,
         new Types.ObjectId(schoolId),
@@ -1963,8 +2209,10 @@ export class CommunityService {
         })
         .lean();
 
-      const title = 'New Forum Discussion';
-      const message = `${creator.first_name} ${creator.last_name} started a new discussion: "${discussion.title}"`;
+      const titleEn = 'New Forum Discussion';
+      const titleFr = 'Nouvelle Discussion sur le Forum';
+      const messageEn = `${creator.first_name} ${creator.last_name} started a new discussion: "${discussion.title}"`;
+      const messageFr = `${creator.first_name} ${creator.last_name} a commencé une nouvelle discussion: "${discussion.title}"`;
       const metadata = {
         discussion_id: discussion._id,
         discussion_title: discussion.title,
@@ -1979,8 +2227,10 @@ export class CommunityService {
           await this.createForumNotification(
             student._id,
             RecipientTypeEnum.STUDENT,
-            title,
-            message,
+            titleEn,
+            titleFr,
+            messageEn,
+            messageFr,
             NotificationTypeEnum.FORUM_NEW_DISCUSSION,
             metadata,
             schoolId,
@@ -1994,8 +2244,10 @@ export class CommunityService {
           await this.createForumNotification(
             professor._id,
             RecipientTypeEnum.PROFESSOR,
-            title,
-            message,
+            titleEn,
+            titleFr,
+            messageEn,
+            messageFr,
             NotificationTypeEnum.FORUM_NEW_DISCUSSION,
             metadata,
             schoolId,
@@ -2023,8 +2275,10 @@ export class CommunityService {
         return;
       }
 
-      const title = 'New Reply to Your Discussion';
-      const message = `${replyCreator.first_name} ${replyCreator.last_name} replied to your discussion: "${discussion.title}"`;
+      const titleEn = 'New Reply to Your Discussion';
+      const titleFr = 'Nouvelle Réponse à Votre Discussion';
+      const messageEn = `${replyCreator.first_name} ${replyCreator.last_name} replied to your discussion: "${discussion.title}"`;
+      const messageFr = `${replyCreator.first_name} ${replyCreator.last_name} a répondu à votre discussion: "${discussion.title}"`;
       const metadata = {
         discussion_id: discussion._id,
         discussion_title: discussion.title,
@@ -2042,8 +2296,10 @@ export class CommunityService {
       await this.createForumNotification(
         new Types.ObjectId(discussion.created_by),
         recipientType,
-        title,
-        message,
+        titleEn,
+        titleFr,
+        messageEn,
+        messageFr,
         NotificationTypeEnum.FORUM_NEW_REPLY,
         metadata,
         schoolId,
@@ -2072,8 +2328,10 @@ export class CommunityService {
         return;
       }
 
-      const title = 'New Reply to Your Comment';
-      const message = `${subReplyCreator.first_name} ${subReplyCreator.last_name} replied to your comment in: "${discussion.title}"`;
+      const titleEn = 'New Reply to Your Comment';
+      const titleFr = 'Nouvelle Réponse à Votre Commentaire';
+      const messageEn = `${subReplyCreator.first_name} ${subReplyCreator.last_name} replied to your comment in: "${discussion.title}"`;
+      const messageFr = `${subReplyCreator.first_name} ${subReplyCreator.last_name} a répondu à votre commentaire dans: "${discussion.title}"`;
       const metadata = {
         discussion_id: discussion._id,
         discussion_title: discussion.title,
@@ -2092,8 +2350,10 @@ export class CommunityService {
       await this.createForumNotification(
         new Types.ObjectId(parentReply.created_by),
         recipientType,
-        title,
-        message,
+        titleEn,
+        titleFr,
+        messageEn,
+        messageFr,
         NotificationTypeEnum.FORUM_NEW_SUB_REPLY,
         metadata,
         schoolId,
@@ -2122,8 +2382,10 @@ export class CommunityService {
 
       const entityTitle =
         entityType === 'discussion' ? entity.title : 'your comment';
-      const title = 'New Like on Your Content';
-      const message = `${liker.first_name} ${liker.last_name} liked your ${entityType}: "${entityTitle}"`;
+      const titleEn = 'New Like on Your Content';
+      const titleFr = 'Nouveau Like sur Votre Contenu';
+      const messageEn = `${liker.first_name} ${liker.last_name} liked your ${entityType}: "${entityTitle}"`;
+      const messageFr = `${liker.first_name} ${liker.last_name} a aimé votre ${entityType}: "${entityTitle}"`;
       const metadata = {
         entity_type: entityType,
         entity_id: entity._id,
@@ -2141,8 +2403,10 @@ export class CommunityService {
       await this.createForumNotification(
         new Types.ObjectId(entity.created_by),
         recipientType,
-        title,
-        message,
+        titleEn,
+        titleFr,
+        messageEn,
+        messageFr,
         NotificationTypeEnum.FORUM_LIKE,
         metadata,
         schoolId,
@@ -2172,8 +2436,10 @@ export class CommunityService {
         })
         .lean();
 
-      const title = 'New Content Report';
-      const message = `${reporter.first_name} ${reporter.last_name} reported ${report.entity_type} by ${reportedContentCreator.first_name} ${reportedContentCreator.last_name}`;
+      const titleEn = 'New Content Report';
+      const titleFr = 'Nouveau Rapport de Contenu';
+      const messageEn = `${reporter.first_name} ${reporter.last_name} reported ${report.entity_type} by ${reportedContentCreator.first_name} ${reportedContentCreator.last_name}`;
+      const messageFr = `${reporter.first_name} ${reporter.last_name} a signalé ${report.entity_type} par ${reportedContentCreator.first_name} ${reportedContentCreator.last_name}`;
       const metadata = {
         report_id: report._id,
         entity_type: report.entity_type,
@@ -2192,8 +2458,10 @@ export class CommunityService {
         await this.createForumNotification(
           admin._id,
           RecipientTypeEnum.PROFESSOR, // Admins are treated as professors for notifications
-          title,
-          message,
+          titleEn,
+          titleFr,
+          messageEn,
+          messageFr,
           NotificationTypeEnum.FORUM_REPORT,
           metadata,
           schoolId,
@@ -2231,8 +2499,10 @@ export class CommunityService {
           );
 
           if (mentionedUser) {
-            const title = `New Mention in Discussion`;
-            const message = `${replyCreator.first_name} ${replyCreator.last_name} mentioned you in "${discussion.title}": "${mention.mentionText}"`;
+            const titleEn = 'New Mention in Discussion';
+            const titleFr = 'Nouvelle Mention dans la Discussion';
+            const messageEn = `${replyCreator.first_name} ${replyCreator.last_name} mentioned you in "${discussion.title}": "${mention.mentionText}"`;
+            const messageFr = `${replyCreator.first_name} ${replyCreator.last_name} vous a mentionné dans "${discussion.title}": "${mention.mentionText}"`;
             const metadata = {
               discussion_id: discussion._id,
               discussion_title: discussion.title,
@@ -2251,8 +2521,10 @@ export class CommunityService {
             await this.createForumNotification(
               new Types.ObjectId(mention.userId),
               recipientType,
-              title,
-              message,
+              titleEn,
+              titleFr,
+              messageEn,
+              messageFr,
               NotificationTypeEnum.FORUM_MENTION,
               metadata,
               schoolId,
@@ -2423,7 +2695,13 @@ export class CommunityService {
     // Validate school exists
     const school = await this.schoolModel.findById(resolvedSchoolId);
     if (!school) {
-      throw new NotFoundException('School not found');
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'SCHOOL',
+          'NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     // Get tenant connection
@@ -2443,7 +2721,11 @@ export class CommunityService {
       ]);
 
       return {
-        message: 'Unread counts retrieved successfully',
+        message: this.errorMessageService.getSuccessMessageWithLanguage(
+          'COMMUNITY',
+          'UNREAD_COUNTS_RETRIEVED_SUCCESSFULLY',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
         data: {
           unread_discussions: unreadDiscussions,
           unread_replies: unreadReplies,
@@ -2452,7 +2734,13 @@ export class CommunityService {
       };
     } catch (error) {
       this.logger.error('Error getting unread counts', error?.stack || error);
-      throw new BadRequestException('Failed to retrieve unread counts');
+      throw new BadRequestException(
+        this.errorMessageService.getMessageWithLanguage(
+          'COMMUNITY',
+          'RETRIEVE_UNREAD_COUNTS_FAILED',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
   }
 
@@ -2471,7 +2759,13 @@ export class CommunityService {
     // Validate school exists
     const school = await this.schoolModel.findById(resolvedSchoolId);
     if (!school) {
-      throw new NotFoundException('School not found');
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'SCHOOL',
+          'NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     // Get tenant connection
@@ -2492,7 +2786,13 @@ export class CommunityService {
       }).lean();
 
       if (!discussion) {
-        throw new NotFoundException('Discussion not found or not accessible');
+        throw new NotFoundException(
+          this.errorMessageService.getMessageWithLanguage(
+            'COMMUNITY',
+            'DISCUSSION_NOT_FOUND',
+            user?.preferred_language || DEFAULT_LANGUAGE,
+          ),
+        );
       }
 
       // Check if already pinned
@@ -2506,13 +2806,12 @@ export class CommunityService {
         await PinModel.deleteOne({ _id: existingPin._id });
 
         return {
-          message: 'Discussion unpinned successfully',
-          data: {
-            discussion_id,
-            is_pinned: false,
-            action: 'unpinned',
-            unpinned_at: new Date(),
-          },
+          message: this.errorMessageService.getSuccessMessageWithLanguage(
+            'COMMUNITY',
+            'UNPINNED_SUCCESSFULLY',
+            user?.preferred_language || DEFAULT_LANGUAGE,
+          ),
+          data: { pinned: false },
         };
       } else {
         // Pin the discussion
@@ -2522,9 +2821,13 @@ export class CommunityService {
         });
 
         await newPin.save();
-
+        this.logger.log(`Pinned discussion: ${discussion_id}`);
         return {
-          message: 'Discussion pinned successfully',
+          message: this.errorMessageService.getSuccessMessageWithLanguage(
+            'COMMUNITY',
+            'PINNED_SUCCESSFULLY',
+            user?.preferred_language || DEFAULT_LANGUAGE,
+          ),
           data: {
             discussion_id,
             is_pinned: true,
@@ -2538,7 +2841,13 @@ export class CommunityService {
       if (error instanceof NotFoundException) {
         throw error;
       }
-      throw new BadRequestException('Failed to toggle pin');
+      throw new BadRequestException(
+        this.errorMessageService.getMessageWithLanguage(
+          'COMMUNITY',
+          'TOGGLE_PIN_FAILED',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
   }
 
@@ -2556,7 +2865,13 @@ export class CommunityService {
     // Validate school exists
     const school = await this.schoolModel.findById(resolvedSchoolId);
     if (!school) {
-      throw new NotFoundException('School not found');
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'SCHOOL',
+          'NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     // Get tenant connection
@@ -2685,7 +3000,13 @@ export class CommunityService {
         'Error getting pinned discussions',
         error?.stack || error,
       );
-      throw new BadRequestException('Failed to retrieve pinned discussions');
+      throw new BadRequestException(
+        this.errorMessageService.getMessageWithLanguage(
+          'COMMUNITY',
+          'GET_PINNED_DISCUSSIONS_FAILED',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
   }
 
@@ -2698,7 +3019,13 @@ export class CommunityService {
     // Validate school exists
     const school = await this.schoolModel.findById(resolvedSchoolId);
     if (!school) {
-      throw new NotFoundException('School not found');
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'SCHOOL',
+          'NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     // Get tenant connection
@@ -2722,7 +3049,11 @@ export class CommunityService {
       const isPinned = !!pin;
 
       return {
-        message: 'Pin status retrieved successfully',
+        message: this.errorMessageService.getSuccessMessageWithLanguage(
+          'COMMUNITY',
+          'PIN_STATUS_RETRIEVED_SUCCESSFULLY',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
         data: {
           discussion_id: discussionId,
           is_pinned: isPinned,
@@ -2731,7 +3062,13 @@ export class CommunityService {
       };
     } catch (error) {
       this.logger.error('Error checking pin status', error?.stack || error);
-      throw new BadRequestException('Failed to check pin status');
+      throw new BadRequestException(
+        this.errorMessageService.getMessageWithLanguage(
+          'COMMUNITY',
+          'CHECK_PIN_STATUS_FAILED',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
   }
 
@@ -2746,7 +3083,13 @@ export class CommunityService {
     // Validate school exists
     const school = await this.schoolModel.findById(resolvedSchoolId);
     if (!school) {
-      throw new NotFoundException('School not found');
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'SCHOOL',
+          'NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     // Get tenant connection
@@ -2889,7 +3232,13 @@ export class CommunityService {
       return createPaginationResult(mentions, total, options);
     } catch (error) {
       this.logger.error('Error getting mentions', error?.stack || error);
-      throw new BadRequestException('Failed to retrieve mentions');
+      throw new BadRequestException(
+        this.errorMessageService.getMessageWithLanguage(
+          'COMMUNITY',
+          'GET_MENTIONS_FAILED',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
   }
 
@@ -2907,7 +3256,13 @@ export class CommunityService {
     // Validate school exists
     const school = await this.schoolModel.findById(resolvedSchoolId);
     if (!school) {
-      throw new NotFoundException('School not found');
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'SCHOOL',
+          'NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     // Get tenant connection
@@ -2953,7 +3308,11 @@ export class CommunityService {
             filterDto,
           );
           return {
-            message: 'School members retrieved successfully',
+            message: this.errorMessageService.getSuccessMessageWithLanguage(
+              'COMMUNITY',
+              'SCHOOL_MEMBERS_RETRIEVED_SUCCESSFULLY',
+              user?.preferred_language || DEFAULT_LANGUAGE,
+            ),
             data: {
               members: students,
               total: students.length,
@@ -2968,7 +3327,11 @@ export class CommunityService {
             filterDto,
           );
           return {
-            message: 'School members retrieved successfully',
+            message: this.errorMessageService.getSuccessMessageWithLanguage(
+              'COMMUNITY',
+              'SCHOOL_MEMBERS_RETRIEVED_SUCCESSFULLY',
+              user?.preferred_language || DEFAULT_LANGUAGE,
+            ),
             data: {
               members: professors,
               total: professors.length,
@@ -3002,7 +3365,11 @@ export class CommunityService {
       const limitedMembers = allMembers.slice(0, Math.min(limit, 100));
 
       return {
-        message: 'School members retrieved successfully',
+        message: this.errorMessageService.getSuccessMessageWithLanguage(
+          'COMMUNITY',
+          'SCHOOL_MEMBERS_RETRIEVED_SUCCESSFULLY',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
         data: {
           members: limitedMembers,
           total: allMembers.length,
@@ -3012,7 +3379,13 @@ export class CommunityService {
       };
     } catch (error) {
       this.logger.error('Error getting school members', error?.stack || error);
-      throw new BadRequestException('Failed to retrieve school members');
+      throw new BadRequestException(
+        this.errorMessageService.getMessageWithLanguage(
+          'COMMUNITY',
+          'GET_SCHOOL_MEMBERS_FAILED',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
   }
 
@@ -3069,5 +3442,599 @@ export class CommunityService {
       search_text:
         `${professor.first_name || ''} ${professor.last_name || ''} ${professor.email || ''}`.toLowerCase(),
     }));
+  }
+
+  /**
+   * Export discussions to CSV format
+   * Students cannot access this functionality
+   */
+  async exportDiscussions(
+    user: JWTUserPayload,
+    exportDto: ExportDiscussionsDto,
+  ): Promise<ExportDiscussionsResponseDto> {
+    this.logger.log(`Exporting discussions for user: ${user.id} in CSV format`);
+
+    // Check if user is a student - students cannot export discussions
+    if (user.role.name === RoleEnum.STUDENT) {
+      throw new ForbiddenException(
+        this.errorMessageService.getMessageWithLanguage(
+          'COMMUNITY',
+          'STUDENTS_CANNOT_EXPORT_DISCUSSIONS',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
+    }
+
+    try {
+      const resolvedSchoolId = this.resolveSchoolId(user);
+
+      // Validate school exists
+      const school = await this.schoolModel.findById(resolvedSchoolId);
+      if (!school) {
+        throw new NotFoundException(
+          this.errorMessageService.getMessageWithLanguage(
+            'SCHOOL',
+            'NOT_FOUND',
+            user?.preferred_language || DEFAULT_LANGUAGE,
+          ),
+        );
+      }
+
+      // Get tenant connection
+      const tenantConnection =
+        await this.tenantConnectionService.getTenantConnection(school.db_name);
+      const DiscussionModel = tenantConnection.model(
+        ForumDiscussion.name,
+        ForumDiscussionSchema,
+      );
+
+      // Build filter based on role and export options
+      const filter: any = {
+        deleted_at: null,
+      };
+
+      // Role-based filtering
+      if (user.role.name === RoleEnum.PROFESSOR) {
+        filter.status = {
+          $in: [DiscussionStatusEnum.ACTIVE, DiscussionStatusEnum.ARCHIVED],
+        };
+      }
+      // Admins can see all content
+
+      // Apply export filters
+      if (exportDto.type) {
+        filter.type = exportDto.type;
+      }
+
+      if (
+        exportDto.status &&
+        [RoleEnum.SCHOOL_ADMIN, RoleEnum.SUPER_ADMIN].includes(
+          user.role.name as RoleEnum,
+        )
+      ) {
+        filter.status = exportDto.status;
+      }
+
+      if (exportDto.search) {
+        filter.$or = [
+          { title: { $regex: exportDto.search, $options: 'i' } },
+          { content: { $regex: exportDto.search, $options: 'i' } },
+        ];
+      }
+
+      if (exportDto.tags && exportDto.tags.length > 0) {
+        filter.tags = { $in: exportDto.tags };
+      }
+
+      if (exportDto.author_id) {
+        filter.created_by = new Types.ObjectId(exportDto.author_id);
+      }
+
+      if (exportDto.start_date || exportDto.end_date) {
+        filter.created_at = {};
+        if (exportDto.start_date) {
+          filter.created_at.$gte = new Date(exportDto.start_date);
+        }
+        if (exportDto.end_date) {
+          filter.created_at.$lte = new Date(
+            exportDto.end_date + 'T23:59:59.999Z',
+          );
+        }
+      }
+
+      // Get discussions with user details
+      const discussions = await DiscussionModel.find(filter)
+        .populate('created_by', 'first_name last_name email profile_pic')
+        .sort({ created_at: -1 })
+        .lean();
+
+      if (discussions.length === 0) {
+        throw new NotFoundException(
+          this.errorMessageService.getMessageWithLanguage(
+            'COMMUNITY',
+            'NO_DISCUSSIONS_FOUND_FOR_EXPORT',
+            user?.preferred_language || DEFAULT_LANGUAGE,
+          ),
+        );
+      }
+
+      return this.exportToCSV(discussions, exportDto);
+    } catch (error) {
+      this.logger.error('Error exporting discussions', error?.stack || error);
+      throw error;
+    }
+  }
+
+  /**
+   * Export discussions to CSV format
+   */
+  private async exportToCSV(
+    discussions: any[],
+    exportDto: ExportDiscussionsDto,
+  ): Promise<ExportDiscussionsResponseDto> {
+    // Transform data for CSV export
+    const csvData = discussions.map((discussion: any) => ({
+      'Discussion ID': discussion._id?.toString() || 'N/A',
+      Title: discussion.title || 'N/A',
+      Content: discussion.content || 'N/A',
+      Type: discussion.type || 'N/A',
+      Tags: Array.isArray(discussion.tags) ? discussion.tags.join('; ') : 'N/A',
+      'Author Name': discussion.created_by
+        ? `${discussion.created_by.first_name || ''} ${discussion.created_by.last_name || ''}`.trim()
+        : 'N/A',
+      'Author Email': discussion.created_by?.email || 'N/A',
+      'Author Role': discussion.created_by_role || 'N/A',
+      'Reply Count': discussion.reply_count || 0,
+      'View Count': discussion.view_count || 0,
+      'Like Count': discussion.like_count || 0,
+      Status: discussion.status || 'N/A',
+      'Meeting Link': discussion.meeting_link || 'N/A',
+      'Meeting Platform': discussion.meeting_platform || 'N/A',
+      'Meeting Scheduled At': discussion.meeting_scheduled_at
+        ? new Date(discussion.meeting_scheduled_at).toISOString()
+        : 'N/A',
+      'Meeting Duration (minutes)':
+        discussion.meeting_duration_minutes || 'N/A',
+      'Created At': discussion.created_at
+        ? new Date(discussion.created_at).toISOString()
+        : 'N/A',
+      'Updated At': discussion.updated_at
+        ? new Date(discussion.updated_at).toISOString()
+        : 'N/A',
+      'Archived At': discussion.archived_at
+        ? new Date(discussion.archived_at).toISOString()
+        : 'N/A',
+    }));
+
+    // Define CSV headers
+    const headers = [
+      'Discussion ID',
+      'Title',
+      'Content',
+      'Type',
+      'Tags',
+      'Author Name',
+      'Author Email',
+      'Author Role',
+      'Reply Count',
+      'View Count',
+      'Like Count',
+      'Status',
+      'Meeting Link',
+      'Meeting Platform',
+      'Meeting Scheduled At',
+      'Meeting Duration (minutes)',
+      'Created At',
+      'Updated At',
+      'Archived At',
+    ];
+
+    // Generate CSV file with timestamp
+    const filePath = await this.csvUtil.generateCSVFile({
+      filename: 'discussions-export',
+      headers,
+      data: csvData,
+      includeTimestamp: true,
+    });
+
+    // Get file info
+    const filename = filePath.split('/').pop() || 'discussions-export.csv';
+    const fileSize = this.csvUtil.getFileSize(filePath);
+    const downloadUrl = `/api/community/download/${filename}`;
+
+    this.logger.log(
+      `CSV export completed: ${filePath}, Size: ${fileSize} bytes, Records: ${csvData.length}`,
+    );
+
+    return {
+      filename,
+      file_path: filePath,
+      file_size: fileSize,
+      record_count: csvData.length,
+      exported_at: new Date(),
+      storage_type: process.env.NODE_ENV === 'production' ? 's3' : 'local',
+      download_url: downloadUrl,
+      applied_filters: {
+        type: exportDto.type,
+        status: exportDto.status,
+        search: exportDto.search,
+        tags: exportDto.tags,
+        author_id: exportDto.author_id,
+        start_date: exportDto.start_date,
+        end_date: exportDto.end_date,
+      },
+    };
+  }
+
+  /**
+   * Export discussions to CSV format and return as stream
+   * Students cannot access this functionality
+   */
+  async exportDiscussionsDirect(
+    user: JWTUserPayload,
+    exportDto: ExportDiscussionsDto,
+  ): Promise<{ content: string; filename: string; contentType: string }> {
+    this.logger.log(
+      `Exporting discussions for user: ${user.id} in CSV format (direct download)`,
+    );
+
+    // Check if user is a student - students cannot export discussions
+    if (user.role.name === RoleEnum.STUDENT) {
+      throw new ForbiddenException(
+        this.errorMessageService.getMessageWithLanguage(
+          'COMMUNITY',
+          'STUDENTS_CANNOT_EXPORT_DISCUSSIONS',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
+    }
+
+    try {
+      const resolvedSchoolId = this.resolveSchoolId(user);
+
+      // Validate school exists
+      const school = await this.schoolModel.findById(resolvedSchoolId);
+      if (!school) {
+        throw new NotFoundException(
+          this.errorMessageService.getMessageWithLanguage(
+            'SCHOOL',
+            'NOT_FOUND',
+            user?.preferred_language || DEFAULT_LANGUAGE,
+          ),
+        );
+      }
+
+      // Get tenant connection
+      const tenantConnection =
+        await this.tenantConnectionService.getTenantConnection(school.db_name);
+      const DiscussionModel = tenantConnection.model(
+        ForumDiscussion.name,
+        ForumDiscussionSchema,
+      );
+
+      // Build filter based on role and export options
+      const filter: any = {
+        deleted_at: null,
+      };
+
+      // Role-based filtering
+      if (user.role.name === RoleEnum.PROFESSOR) {
+        filter.status = {
+          $in: [DiscussionStatusEnum.ACTIVE, DiscussionStatusEnum.ARCHIVED],
+        };
+      }
+      // Admins can see all content
+
+      // Apply export filters
+      if (exportDto.type) {
+        filter.type = exportDto.type;
+      }
+
+      if (
+        exportDto.status &&
+        [RoleEnum.SCHOOL_ADMIN, RoleEnum.SUPER_ADMIN].includes(
+          user.role.name as RoleEnum,
+        )
+      ) {
+        filter.status = exportDto.status;
+      }
+
+      if (exportDto.search) {
+        filter.$or = [
+          { title: { $regex: exportDto.search, $options: 'i' } },
+          { content: { $regex: exportDto.search, $options: 'i' } },
+        ];
+      }
+
+      if (exportDto.tags && exportDto.tags.length > 0) {
+        filter.tags = { $in: exportDto.tags };
+      }
+
+      if (exportDto.author_id) {
+        filter.created_by = new Types.ObjectId(exportDto.author_id);
+      }
+
+      if (exportDto.start_date || exportDto.end_date) {
+        filter.created_at = {};
+        if (exportDto.start_date) {
+          filter.created_at.$gte = new Date(exportDto.start_date);
+        }
+        if (exportDto.end_date) {
+          filter.created_at.$lte = new Date(
+            exportDto.end_date + 'T23:59:59.999Z',
+          );
+        }
+      }
+
+      // Get discussions with user details
+      const discussions = await DiscussionModel.find(filter)
+        .populate('created_by', 'first_name last_name email profile_pic')
+        .sort({ created_at: -1 })
+        .lean();
+
+      if (discussions.length === 0) {
+        throw new NotFoundException(
+          this.errorMessageService.getMessageWithLanguage(
+            'COMMUNITY',
+            'NO_DISCUSSIONS_FOUND_FOR_EXPORT',
+            user?.preferred_language || DEFAULT_LANGUAGE,
+          ),
+        );
+      }
+
+      return this.generateCSVContent(discussions, exportDto);
+    } catch (error) {
+      this.logger.error('Error exporting discussions', error?.stack || error);
+      throw error;
+    }
+  }
+
+  /**
+   * Generate CSV content without saving to file
+   */
+  private generateCSVContent(
+    discussions: any[],
+    exportDto: ExportDiscussionsDto,
+  ): { content: string; filename: string; contentType: string } {
+    // Transform data for CSV export
+    const csvData = discussions.map((discussion: any) => ({
+      'Discussion ID': discussion._id?.toString() || 'N/A',
+      Title: discussion.title || 'N/A',
+      Content: discussion.content || 'N/A',
+      Type: discussion.type || 'N/A',
+      Tags: Array.isArray(discussion.tags) ? discussion.tags.join('; ') : 'N/A',
+      'Author Name': discussion.created_by
+        ? `${discussion.created_by.first_name || ''} ${discussion.created_by.last_name || ''}`.trim()
+        : 'N/A',
+      'Author Email': discussion.created_by?.email || 'N/A',
+      'Author Role': discussion.created_by_role || 'N/A',
+      'Reply Count': discussion.reply_count || 0,
+      'View Count': discussion.view_count || 0,
+      'Like Count': discussion.like_count || 0,
+      Status: discussion.status || 'N/A',
+      'Meeting Link': discussion.meeting_link || 'N/A',
+      'Meeting Platform': discussion.meeting_platform || 'N/A',
+      'Meeting Scheduled At': discussion.meeting_scheduled_at
+        ? new Date(discussion.meeting_scheduled_at).toISOString()
+        : 'N/A',
+      'Meeting Duration (minutes)':
+        discussion.meeting_duration_minutes || 'N/A',
+      'Created At': discussion.created_at
+        ? new Date(discussion.created_at).toISOString()
+        : 'N/A',
+      'Updated At': discussion.updated_at
+        ? new Date(discussion.updated_at).toISOString()
+        : 'N/A',
+      'Archived At': discussion.archived_at
+        ? new Date(discussion.archived_at).toISOString()
+        : 'N/A',
+    }));
+
+    // Define CSV headers
+    const headers = [
+      'Discussion ID',
+      'Title',
+      'Content',
+      'Type',
+      'Tags',
+      'Author Name',
+      'Author Email',
+      'Author Role',
+      'Reply Count',
+      'View Count',
+      'Like Count',
+      'Status',
+      'Meeting Link',
+      'Meeting Platform',
+      'Meeting Scheduled At',
+      'Meeting Duration (minutes)',
+      'Created At',
+      'Updated At',
+      'Archived At',
+    ];
+
+    // Generate CSV content
+    const csvContent = this.convertToCSV(csvData, headers);
+
+    // Generate filename with timestamp
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const filename = `discussions-export_${timestamp}.csv`;
+
+    this.logger.log(
+      `CSV content generated: ${csvContent.length} bytes, Records: ${csvData.length}`,
+    );
+
+    return {
+      content: csvContent,
+      filename,
+      contentType: 'text/csv',
+    };
+  }
+
+  /**
+   * Convert data to CSV format
+   */
+  private convertToCSV(data: Record<string, any>[], headers: string[]): string {
+    // Escape and format CSV values
+    const escapeCSV = (value: any): string => {
+      if (value === null || value === undefined) {
+        return '';
+      }
+
+      const stringValue = String(value);
+
+      // If the value contains comma, quote, or newline, wrap it in quotes
+      if (
+        stringValue.includes(',') ||
+        stringValue.includes('"') ||
+        stringValue.includes('\n')
+      ) {
+        return `"${stringValue.replace(/"/g, '""')}"`;
+      }
+
+      return stringValue;
+    };
+
+    // Create CSV header row
+    const headerRow = headers.map((header) => escapeCSV(header)).join(',');
+
+    // Create CSV data rows
+    const dataRows = data.map((row) => {
+      return headers.map((header) => escapeCSV(row[header])).join(',');
+    });
+
+    return [headerRow, ...dataRows].join('\n');
+  }
+
+  /**
+   * Export discussions to CSV format and return as base64 encoded string
+   * Students cannot access this functionality
+   */
+  async exportDiscussionsBase64(
+    user: JWTUserPayload,
+    exportDto: ExportDiscussionsDto,
+  ): Promise<{ base64Content: string; filename: string; recordCount: number }> {
+    this.logger.log(
+      `Exporting discussions for user: ${user.id} in CSV format (base64)`,
+    );
+
+    // Check if user is a student - students cannot export discussions
+    if (user.role.name === RoleEnum.STUDENT) {
+      throw new ForbiddenException(
+        this.errorMessageService.getMessageWithLanguage(
+          'COMMUNITY',
+          'STUDENTS_CANNOT_EXPORT_DISCUSSIONS',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
+    }
+
+    try {
+      const resolvedSchoolId = this.resolveSchoolId(user);
+
+      // Validate school exists
+      const school = await this.schoolModel.findById(resolvedSchoolId);
+      if (!school) {
+        throw new NotFoundException(
+          this.errorMessageService.getMessageWithLanguage(
+            'SCHOOL',
+            'NOT_FOUND',
+            user?.preferred_language || DEFAULT_LANGUAGE,
+          ),
+        );
+      }
+
+      // Get tenant connection
+      const tenantConnection =
+        await this.tenantConnectionService.getTenantConnection(school.db_name);
+      const DiscussionModel = tenantConnection.model(
+        ForumDiscussion.name,
+        ForumDiscussionSchema,
+      );
+
+      // Build filter based on role and export options
+      const filter: any = {
+        deleted_at: null,
+      };
+
+      // Role-based filtering
+      if (user.role.name === RoleEnum.PROFESSOR) {
+        filter.status = {
+          $in: [DiscussionStatusEnum.ACTIVE, DiscussionStatusEnum.ARCHIVED],
+        };
+      }
+      // Admins can see all content
+
+      // Apply export filters
+      if (exportDto.type) {
+        filter.type = exportDto.type;
+      }
+
+      if (
+        exportDto.status &&
+        [RoleEnum.SCHOOL_ADMIN, RoleEnum.SUPER_ADMIN].includes(
+          user.role.name as RoleEnum,
+        )
+      ) {
+        filter.status = exportDto.status;
+      }
+
+      if (exportDto.search) {
+        filter.$or = [
+          { title: { $regex: exportDto.search, $options: 'i' } },
+          { content: { $regex: exportDto.search, $options: 'i' } },
+        ];
+      }
+
+      if (exportDto.tags && exportDto.tags.length > 0) {
+        filter.tags = { $in: exportDto.tags };
+      }
+
+      if (exportDto.author_id) {
+        filter.created_by = new Types.ObjectId(exportDto.author_id);
+      }
+
+      if (exportDto.start_date || exportDto.end_date) {
+        filter.created_at = {};
+        if (exportDto.start_date) {
+          filter.created_at.$gte = new Date(exportDto.start_date);
+        }
+        if (exportDto.end_date) {
+          filter.created_at.$lte = new Date(
+            exportDto.end_date + 'T23:59:59.999Z',
+          );
+        }
+      }
+
+      // Get discussions with user details
+      const discussions = await DiscussionModel.find(filter)
+        .populate('created_by', 'first_name last_name email profile_pic')
+        .sort({ created_at: -1 })
+        .lean();
+
+      if (discussions.length === 0) {
+        throw new NotFoundException(
+          this.errorMessageService.getMessageWithLanguage(
+            'COMMUNITY',
+            'NO_DISCUSSIONS_FOUND_FOR_EXPORT',
+            user?.preferred_language || DEFAULT_LANGUAGE,
+          ),
+        );
+      }
+
+      const csvData = this.generateCSVContent(discussions, exportDto);
+      const base64Content = Buffer.from(csvData.content, 'utf-8').toString(
+        'base64',
+      );
+
+      return {
+        base64Content,
+        filename: csvData.filename,
+        recordCount: discussions.length,
+      };
+    } catch (error) {
+      this.logger.error('Error exporting discussions', error?.stack || error);
+      throw error;
+    }
   }
 }

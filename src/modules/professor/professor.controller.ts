@@ -71,8 +71,9 @@ export class ProfessorController {
   async updateProfessor(
     @Param('id', ParseObjectIdPipe) id: Types.ObjectId,
     @Body() updateDto: UpdateProfessorDto,
+    @User() user: JWTUserPayload,
   ) {
-    return this.professorService.updateProfessor(id, updateDto);
+    return this.professorService.updateProfessor(id, updateDto, user);
   }
 
   @Patch('/password/:id')
@@ -90,8 +91,9 @@ export class ProfessorController {
   async updateProfessorPassword(
     @Param('id', ParseObjectIdPipe) id: Types.ObjectId,
     @Body() updateDto: UpdateProfessorPasswordDto,
+    @User() user: JWTUserPayload,
   ) {
-    return this.professorService.updateProfessorPassword(id, updateDto);
+    return this.professorService.updateProfessorPassword(id, updateDto, user);
   }
 
   @Get()
@@ -254,7 +256,10 @@ export class ProfessorController {
   })
   @ApiResponse({ status: 200, description: 'Professor deleted successfully' })
   @ApiResponse({ status: 404, description: 'Professor not found' })
-  @ApiResponse({ status: 400, description: 'Cannot delete professor with assigned modules' })
+  @ApiResponse({
+    status: 400,
+    description: 'Cannot delete professor with assigned modules',
+  })
   async deleteProfessor(
     @Param('id', ParseObjectIdPipe) id: Types.ObjectId,
     @User() user: JWTUserPayload,

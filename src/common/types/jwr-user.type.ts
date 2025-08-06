@@ -1,5 +1,6 @@
 import { Types } from 'mongoose';
 import { RoleEnum } from '../constants/roles.constant';
+import { LanguageEnum } from '../constants/language.constant';
 
 export interface JWTUserPayload {
   id: string | Types.ObjectId;
@@ -9,4 +10,5 @@ export interface JWTUserPayload {
     id: string | Types.ObjectId;
     name: RoleEnum;
   };
+  preferred_language: LanguageEnum;
 }

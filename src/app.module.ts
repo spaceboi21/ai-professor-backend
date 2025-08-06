@@ -35,6 +35,7 @@ import { AIChatModule } from './modules/ai-chat/ai-chat.module';
 import { LearningLogsModule } from './modules/learning-logs/learning-logs.module';
 import { ActivityLogModule } from './modules/activity-log/activity-log.module';
 import { CommunityModule } from './modules/community/community.module';
+import { CommonModule } from './common/common.module';
 
 @Module({
   imports: [
@@ -101,6 +102,7 @@ import { CommunityModule } from './modules/community/community.module';
       inject: [ConfigService],
     }),
     PassportModule,
+    CommonModule,
     CentralModule,
     DatabaseModule,
     RoleModule,

@@ -16,6 +16,7 @@ import {
   Notification,
   NotificationSchema,
   RecipientTypeEnum,
+  MultiLanguageContent,
 } from 'src/database/schemas/tenant/notification.schema';
 import {
   NotificationTypeEnum,
@@ -28,6 +29,7 @@ import {
   getPaginationOptions,
   createPaginationResult,
 } from 'src/common/utils/pagination.util';
+import { createMultiLanguageContent } from 'src/common/utils/notification.utils';
 
 @Injectable()
 export class NotificationsService {
@@ -106,6 +108,81 @@ export class NotificationsService {
     }
   }
 
+  async createMultiLanguageNotification(
+    recipientId: Types.ObjectId,
+    recipientType: RecipientTypeEnum,
+    titleEn: string,
+    titleFr: string,
+    messageEn: string,
+    messageFr: string,
+    type: NotificationTypeEnum,
+    metadata: Record<string, any> = {},
+    schoolId?: Types.ObjectId,
+  ) {
+    this.logger.log(
+      `Creating multi-language notification for ${recipientType}: ${recipientId}`,
+    );
+
+    if (!schoolId) {
+      throw new BadRequestException(
+        'School ID is required for notification creation',
+      );
+    }
+
+    // Validate school exists
+    const school = await this.schoolModel.findById(schoolId);
+    if (!school) {
+      throw new NotFoundException('School not found');
+    }
+
+    // Get tenant connection for the school
+    const tenantConnection =
+      await this.tenantConnectionService.getTenantConnection(school.db_name);
+    const NotificationModel = tenantConnection.model(
+      Notification.name,
+      NotificationSchema,
+    );
+
+    try {
+      const multiLanguageTitle = createMultiLanguageContent(titleEn, titleFr);
+      const multiLanguageMessage = createMultiLanguageContent(
+        messageEn,
+        messageFr,
+      );
+
+      const notification = new NotificationModel({
+        recipient_type: recipientType,
+        recipient_id: recipientId,
+        title: multiLanguageTitle,
+        message: multiLanguageMessage,
+        type,
+        metadata,
+        status: NotificationStatusEnum.UNREAD,
+        created_at: new Date(),
+        updated_at: new Date(),
+      });
+
+      await notification.save();
+
+      this.logger.log(
+        `Multi-language notification created successfully for ${recipientType}: ${recipientId}`,
+      );
+
+      return {
+        message: 'Multi-language notification created successfully',
+        data: notification,
+      };
+    } catch (error) {
+      this.logger.error(
+        `Error creating multi-language notification for ${recipientType} ${recipientId}:`,
+        error?.stack || error,
+      );
+      throw new BadRequestException(
+        'Failed to create multi-language notification',
+      );
+    }
+  }
+
   async createModulePublishedNotification(
     schoolId: Types.ObjectId,
     moduleTitle: string,
@@ -155,19 +232,27 @@ export class NotificationsService {
         };
       }
 
-      const title = 'New Module Available!';
-      const message = `A new module "${moduleTitle}" has been published and is now available for you to study.`;
+      const titleEn = 'New Module Available!';
+      const titleFr = 'Nouveau Module Disponible !';
+      const messageEn = `A new module "${moduleTitle}" has been published and is now available for you to study.`;
+      const messageFr = `Un nouveau module "${moduleTitle}" a été publié et est maintenant disponible pour vos études.`;
       const metadata = {
         module_id: moduleId,
         module_title: moduleTitle,
       };
 
-      // Prepare bulk notification documents
+      // Prepare bulk notification documents with multi-language content
       const notificationDocuments = students.map((student) => ({
         recipient_type: RecipientTypeEnum.STUDENT,
         recipient_id: new Types.ObjectId(student._id),
-        title,
-        message,
+        title: {
+          en: titleEn,
+          fr: titleFr,
+        },
+        message: {
+          en: messageEn,
+          fr: messageFr,
+        },
         type: NotificationTypeEnum.MODULE_PUBLISHED,
         metadata,
         status: NotificationStatusEnum.UNREAD,
@@ -249,19 +334,27 @@ export class NotificationsService {
         };
       }
 
-      const title = 'Module Unavailable';
-      const message = `The module "${moduleTitle}" has been unpublished and is no longer available.`;
+      const titleEn = 'Module Unavailable';
+      const titleFr = 'Module Indisponible';
+      const messageEn = `The module "${moduleTitle}" has been unpublished and is no longer available.`;
+      const messageFr = `Le module "${moduleTitle}" a été dépublié et n'est plus disponible.`;
       const metadata = {
         module_id: moduleId,
         module_title: moduleTitle,
       };
 
-      // Prepare bulk notification documents
+      // Prepare bulk notification documents with multi-language content
       const notificationDocuments = students.map((student) => ({
         recipient_type: RecipientTypeEnum.STUDENT,
         recipient_id: student._id,
-        title,
-        message,
+        title: {
+          en: titleEn,
+          fr: titleFr,
+        },
+        message: {
+          en: messageEn,
+          fr: messageFr,
+        },
         type: NotificationTypeEnum.MODULE_UNPUBLISHED,
         metadata,
         status: NotificationStatusEnum.UNREAD,

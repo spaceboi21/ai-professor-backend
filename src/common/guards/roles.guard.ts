@@ -7,12 +7,17 @@ import {
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { ROLE_KEY } from '../decorators/roles.decorator';
+import { ErrorMessageService } from '../services/error-message.service';
+import { DEFAULT_LANGUAGE } from '../constants/language.constant';
 
 @Injectable()
 export class RoleGuard implements CanActivate {
   private readonly logger = new Logger(RoleGuard.name);
 
-  constructor(private reflector: Reflector) {}
+  constructor(
+    private reflector: Reflector,
+    private readonly errorMessageService: ErrorMessageService,
+  ) {}
 
   canActivate(context: ExecutionContext): boolean {
     const requiredRoles = this.reflector.get<string[]>(
@@ -29,7 +34,13 @@ export class RoleGuard implements CanActivate {
 
     if (!user || !user.role?.name) {
       this.logger.warn('Access denied: User not authenticated or missing role');
-      throw new UnauthorizedException('User not authenticated or missing role');
+      throw new UnauthorizedException(
+        this.errorMessageService.getMessageWithLanguage(
+          'AUTH',
+          'USER_NOT_AUTHENTICATED',
+          DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     if (!requiredRoles.includes(user.role.name)) {
@@ -37,7 +48,11 @@ export class RoleGuard implements CanActivate {
         `Access denied: User with role '${user.role.name}' tried to access endpoint requiring roles: ${requiredRoles.join(', ')}`,
       );
       throw new UnauthorizedException(
-        'Access denied. Insufficient permissions.',
+        this.errorMessageService.getMessageWithLanguage(
+          'AUTH',
+          'ACCESS_DENIED',
+          DEFAULT_LANGUAGE,
+        ),
       );
     }
 

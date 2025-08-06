@@ -2,6 +2,8 @@ import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { RoleEnum } from '../constants/roles.constant';
+import { LanguageEnum, DEFAULT_LANGUAGE } from '../constants/language.constant';
+import { ErrorMessageService } from '../services/error-message.service';
 
 export interface AccessTokenPayload {
   id: string;
@@ -35,6 +37,7 @@ export class TokenUtil {
   constructor(
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
+    private readonly errorMessageService: ErrorMessageService,
   ) {}
 
   generateAccessToken(
@@ -110,12 +113,25 @@ export class TokenUtil {
       });
 
       if (payload.token_type !== 'access') {
-        throw new UnauthorizedException('Invalid token type');
+        throw new UnauthorizedException(
+          this.errorMessageService.getMessageWithLanguage(
+            'AUTH',
+            'INVALID_TOKEN_TYPE',
+            DEFAULT_LANGUAGE,
+          ),
+        );
       }
 
       return payload;
     } catch (error) {
-      throw new UnauthorizedException(`Invalid access token: ${error.message}`);
+      throw new UnauthorizedException(
+        this.errorMessageService.getMessageWithParamsAndLanguage(
+          'AUTH',
+          'INVALID_ACCESS_TOKEN',
+          { error: error.message },
+          DEFAULT_LANGUAGE,
+        ),
+      );
     }
   }
 
@@ -131,13 +147,24 @@ export class TokenUtil {
       });
 
       if (payload.token_type !== 'refresh') {
-        throw new UnauthorizedException('Invalid token type');
+        throw new UnauthorizedException(
+          this.errorMessageService.getMessageWithLanguage(
+            'AUTH',
+            'INVALID_TOKEN_TYPE',
+            DEFAULT_LANGUAGE,
+          ),
+        );
       }
 
       return payload;
     } catch (error) {
       throw new UnauthorizedException(
-        `Invalid refresh token: ${error.message}`,
+        this.errorMessageService.getMessageWithParamsAndLanguage(
+          'AUTH',
+          'INVALID_REFRESH_TOKEN',
+          { error: error.message },
+          DEFAULT_LANGUAGE,
+        ),
       );
     }
   }

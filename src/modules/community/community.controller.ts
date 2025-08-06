@@ -8,6 +8,8 @@ import {
   UseGuards,
   Request,
   HttpStatus,
+  Res,
+  NotFoundException,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -31,6 +33,9 @@ import { LikeEntityTypeEnum } from 'src/database/schemas/tenant/forum-like.schem
 import { JWTUserPayload } from 'src/common/types/jwr-user.type';
 import { PinDiscussionDto } from './dto/pin-discussion.dto';
 import { SchoolMembersFilterDto } from './dto/school-members-filter.dto';
+import { ExportDiscussionsDto } from './dto/export-discussions.dto';
+import { ExportDiscussionsResponseDto } from './dto/export-discussions-response.dto';
+import { Response } from 'express';
 
 @ApiTags('Community')
 @Controller('community')
@@ -487,5 +492,189 @@ export class CommunityController {
       req.user as JWTUserPayload,
       filterDto,
     );
+  }
+
+  @Post('discussions/export')
+  @Roles(RoleEnum.PROFESSOR, RoleEnum.SCHOOL_ADMIN, RoleEnum.SUPER_ADMIN)
+  @ApiOperation({
+    summary: 'Export discussions to CSV format',
+    description:
+      'Export discussions with filters to CSV format. Students cannot access this functionality.',
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Discussions exported successfully',
+    type: ExportDiscussionsResponseDto,
+  })
+  @ApiResponse({
+    status: HttpStatus.FORBIDDEN,
+    description: 'Access denied - Students cannot export discussions',
+  })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'No discussions found for export',
+  })
+  async exportDiscussions(
+    @Body() exportDto: ExportDiscussionsDto,
+    @Request() req: any,
+  ) {
+    return this.communityService.exportDiscussions(
+      req.user as JWTUserPayload,
+      exportDto,
+    );
+  }
+
+  @Post('discussions/export-direct')
+  @Roles(RoleEnum.PROFESSOR, RoleEnum.SCHOOL_ADMIN, RoleEnum.SUPER_ADMIN)
+  @ApiOperation({
+    summary: 'Export discussions to CSV format (direct download)',
+    description:
+      'Export discussions with filters to CSV format and download directly without saving to server. Students cannot access this functionality.',
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'CSV file downloaded successfully',
+    headers: {
+      'Content-Type': {
+        description: 'Content type of the exported file',
+        example: 'text/csv',
+      },
+      'Content-Disposition': {
+        description: 'File attachment header with filename',
+        example:
+          'attachment; filename="discussions-export_2024-01-15T10-30-00-000Z.csv"',
+      },
+    },
+  })
+  @ApiResponse({
+    status: HttpStatus.FORBIDDEN,
+    description: 'Access denied - Students cannot export discussions',
+  })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'No discussions found for export',
+  })
+  async exportDiscussionsDirect(
+    @Body() exportDto: ExportDiscussionsDto,
+    @Res() res: Response,
+    @Request() req: any,
+  ) {
+    const exportData = await this.communityService.exportDiscussionsDirect(
+      req.user as JWTUserPayload,
+      exportDto,
+    );
+
+    res.setHeader('Content-Type', exportData.contentType);
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="${exportData.filename}"`,
+    );
+    res.setHeader('Content-Length', exportData.content.length.toString());
+
+    res.send(exportData.content);
+  }
+
+  @Post('discussions/export-base64')
+  @Roles(RoleEnum.PROFESSOR, RoleEnum.SCHOOL_ADMIN, RoleEnum.SUPER_ADMIN)
+  @ApiOperation({
+    summary: 'Export discussions to CSV format (base64 encoded)',
+    description:
+      'Export discussions with filters to CSV format and return as base64 encoded string. Students cannot access this functionality.',
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'CSV data returned as base64 encoded string',
+    schema: {
+      type: 'object',
+      properties: {
+        base64Content: {
+          type: 'string',
+          description: 'Base64 encoded CSV content',
+        },
+        filename: {
+          type: 'string',
+          description: 'Generated filename',
+        },
+        recordCount: {
+          type: 'number',
+          description: 'Number of records exported',
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: HttpStatus.FORBIDDEN,
+    description: 'Access denied - Students cannot export discussions',
+  })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'No discussions found for export',
+  })
+  async exportDiscussionsBase64(
+    @Body() exportDto: ExportDiscussionsDto,
+    @Request() req: any,
+  ) {
+    return this.communityService.exportDiscussionsBase64(
+      req.user as JWTUserPayload,
+      exportDto,
+    );
+  }
+
+  @Get('download/:filename')
+  @Roles(RoleEnum.PROFESSOR, RoleEnum.SCHOOL_ADMIN, RoleEnum.SUPER_ADMIN)
+  @ApiOperation({
+    summary: 'Download exported CSV file',
+    description: 'Download a previously exported CSV file by filename.',
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'File downloaded successfully',
+  })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'File not found',
+  })
+  @ApiParam({
+    name: 'filename',
+    description: 'CSV filename to download',
+    example: 'discussions-export_2024-01-15T10-30-00-000Z.csv',
+  })
+  async downloadExportedFile(
+    @Param('filename') filename: string,
+    @Res() res: Response,
+    @Request() req: any,
+  ) {
+    // Validate filename to prevent directory traversal
+    if (
+      !filename.endsWith('.csv') ||
+      filename.includes('..') ||
+      filename.includes('/') ||
+      !filename.includes('discussions-export')
+    ) {
+      throw new NotFoundException('Invalid filename');
+    }
+
+    try {
+      const fs = require('fs');
+      const path = require('path');
+      const filePath = `/tmp/ai-professor-exports/${filename}`;
+
+      if (!fs.existsSync(filePath)) {
+        throw new NotFoundException('File not found');
+      }
+
+      const fileContent = fs.readFileSync(filePath);
+
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader(
+        'Content-Disposition',
+        `attachment; filename="${filename}"`,
+      );
+      res.setHeader('Content-Length', fileContent.length.toString());
+
+      res.send(fileContent);
+    } catch (error) {
+      throw new NotFoundException('File not found or could not be downloaded');
+    }
   }
 }

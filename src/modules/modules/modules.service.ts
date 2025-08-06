@@ -58,6 +58,8 @@ import {
 } from 'src/database/schemas/tenant/module-professor-assignment.schema';
 import { QuizTypeEnum } from 'src/common/constants/quiz.constant';
 import { PythonService, ModuleValidationResponse } from './python.service';
+import { ErrorMessageService } from 'src/common/services/error-message.service';
+import { DEFAULT_LANGUAGE } from 'src/common/constants/language.constant';
 
 @Injectable()
 export class ModulesService {
@@ -72,6 +74,7 @@ export class ModulesService {
     private readonly notificationsService: NotificationsService,
     private readonly moduleAssignmentService: ModuleAssignmentService,
     private readonly pythonService: PythonService,
+    private readonly errorMessageService: ErrorMessageService,
   ) {}
 
   /**
@@ -86,14 +89,24 @@ export class ModulesService {
     if (user.role.name === RoleEnum.SUPER_ADMIN) {
       if (!bodySchoolId) {
         throw new BadRequestException(
-          'School ID is required in request body for super admin',
+          this.errorMessageService.getMessageWithLanguage(
+            'MODULE',
+            'SUPER_ADMIN_SCHOOL_ID_REQUIRED',
+            user?.preferred_language || DEFAULT_LANGUAGE,
+          ),
         );
       }
       return bodySchoolId.toString();
     } else {
       // For other roles, use school_id from user context
       if (!user.school_id) {
-        throw new BadRequestException('User school ID not found');
+        throw new BadRequestException(
+          this.errorMessageService.getMessageWithLanguage(
+            'SCHOOL',
+            'USER_SCHOOL_ID_NOT_FOUND',
+            user?.preferred_language || DEFAULT_LANGUAGE,
+          ),
+        );
       }
       return user.school_id.toString();
     }
@@ -116,10 +129,16 @@ export class ModulesService {
     // Resolve school_id based on user role
     const resolvedSchoolId = this.resolveSchoolId(user, school_id);
 
-    // Validate school exists and user has access
+    // Validate school exists
     const school = await this.schoolModel.findById(resolvedSchoolId);
     if (!school) {
-      throw new NotFoundException('School not found');
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'SCHOOL',
+          'NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     // Validate module against knowledge base if enabled
@@ -146,7 +165,11 @@ export class ModulesService {
       } catch (error) {
         this.logger.error('Module validation failed', error?.stack || error);
         throw new BadRequestException(
-          'Module validation failed. Please try again or contact support.',
+          this.errorMessageService.getMessageWithLanguage(
+            'MODULE',
+            'VALIDATION_FAILED',
+            user?.preferred_language || DEFAULT_LANGUAGE,
+          ),
         );
       }
     }
@@ -198,7 +221,11 @@ export class ModulesService {
       this.logger.log(`Module created in tenant DB: ${savedModule._id}`);
 
       return {
-        message: 'Module created successfully',
+        message: this.errorMessageService.getSuccessMessageWithLanguage(
+          'MODULE',
+          'CREATED_SUCCESSFULLY',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
         data: {
           id: savedModule._id,
           title: savedModule.title,
@@ -221,7 +248,13 @@ export class ModulesService {
       };
     } catch (error) {
       this.logger.error('Error creating module', error?.stack || error);
-      throw new BadRequestException('Failed to create module');
+      throw new BadRequestException(
+        this.errorMessageService.getMessageWithLanguage(
+          'MODULE',
+          'CREATE_FAILED',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
   }
 
@@ -256,7 +289,13 @@ export class ModulesService {
     // Validate school exists
     const school = await this.schoolModel.findById(user.school_id);
     if (!school) {
-      throw new NotFoundException('School not found');
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'SCHOOL',
+          'NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     // Get tenant connection for the school
@@ -300,7 +339,11 @@ export class ModulesService {
         if (assignedModuleIds.length === 0) {
           // Professor has no assigned modules, return empty result
           return {
-            message: 'Modules retrieved successfully',
+            message: this.errorMessageService.getMessageWithLanguage(
+              'MODULE',
+              'NO_ASSIGNED_MODULES',
+              user?.preferred_language || DEFAULT_LANGUAGE,
+            ),
             data: [],
             pagination_data: {
               page: paginationOptions.page,
@@ -593,13 +636,23 @@ export class ModulesService {
       const result = createPaginationResult(modules, total, paginationOptions);
 
       return {
-        message: 'Modules retrieved successfully',
+        message: this.errorMessageService.getMessageWithLanguage(
+          'MODULE',
+          'MODULES_RETRIEVED_SUCCESSFULLY',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
         data: result.data,
         pagination_data: result.pagination_data,
       };
     } catch (error) {
       this.logger.error('Error finding modules', error?.stack || error);
-      throw new BadRequestException('Failed to retrieve modules');
+      throw new BadRequestException(
+        this.errorMessageService.getMessageWithLanguage(
+          'MODULE',
+          'RETRIEVE_MODULES_FAILED',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
   }
 
@@ -609,7 +662,13 @@ export class ModulesService {
     // Validate school exists
     const school = await this.schoolModel.findById(user.school_id);
     if (!school) {
-      throw new NotFoundException('School not found');
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'SCHOOL',
+          'NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     // Get tenant connection for the school
@@ -679,7 +738,13 @@ export class ModulesService {
       const modules = await ModuleModel.aggregate(pipeline);
 
       if (modules.length === 0) {
-        throw new NotFoundException('Module not found');
+        throw new NotFoundException(
+          this.errorMessageService.getMessageWithLanguage(
+            'MODULE',
+            'NOT_FOUND',
+            user?.preferred_language || DEFAULT_LANGUAGE,
+          ),
+        );
       }
 
       const module = modules[0];
@@ -694,7 +759,13 @@ export class ModulesService {
           );
 
         if (!accessCheck.has_access) {
-          throw new NotFoundException('Module not found or access denied');
+          throw new NotFoundException(
+            this.errorMessageService.getMessageWithLanguage(
+              'MODULE',
+              'NOT_FOUND_OR_ACCESS_DENIED',
+              user?.preferred_language || DEFAULT_LANGUAGE,
+            ),
+          );
         }
       }
 
@@ -705,7 +776,11 @@ export class ModulesService {
       );
 
       return {
-        message: 'Module retrieved successfully',
+        message: this.errorMessageService.getMessageWithLanguage(
+          'MODULE',
+          'MODULE_RETRIEVED_SUCCESSFULLY',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
         data: moduleWithUser,
       };
     } catch (error) {
@@ -713,7 +788,13 @@ export class ModulesService {
       if (error instanceof NotFoundException) {
         throw error;
       }
-      throw new BadRequestException('Failed to retrieve module');
+      throw new BadRequestException(
+        this.errorMessageService.getMessageWithLanguage(
+          'MODULE',
+          'RETRIEVE_FAILED',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
   }
 
@@ -732,7 +813,13 @@ export class ModulesService {
     // Validate school exists
     const school = await this.schoolModel.findById(resolvedSchoolId);
     if (!school) {
-      throw new NotFoundException('School not found');
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'SCHOOL',
+          'NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     // Get tenant connection for the school
@@ -751,7 +838,13 @@ export class ModulesService {
           );
 
         if (!accessCheck.has_access) {
-          throw new NotFoundException('Module not found or access denied');
+          throw new NotFoundException(
+            this.errorMessageService.getMessageWithLanguage(
+              'MODULE',
+              'NOT_FOUND_OR_ACCESS_DENIED',
+              user?.preferred_language || DEFAULT_LANGUAGE,
+            ),
+          );
         }
       }
 
@@ -762,7 +855,13 @@ export class ModulesService {
       ).lean();
 
       if (!updatedModule) {
-        throw new NotFoundException('Module not found');
+        throw new NotFoundException(
+          this.errorMessageService.getMessageWithLanguage(
+            'MODULE',
+            'NOT_FOUND',
+            user?.preferred_language || DEFAULT_LANGUAGE,
+          ),
+        );
       }
 
       // Attach user details to module
@@ -772,7 +871,11 @@ export class ModulesService {
       );
 
       return {
-        message: 'Module updated successfully',
+        message: this.errorMessageService.getSuccessMessageWithLanguage(
+          'MODULE',
+          'UPDATED_SUCCESSFULLY',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
         data: moduleWithUser,
       };
     } catch (error) {
@@ -780,7 +883,13 @@ export class ModulesService {
       if (error instanceof NotFoundException) {
         throw error;
       }
-      throw new BadRequestException('Failed to update module');
+      throw new BadRequestException(
+        this.errorMessageService.getMessageWithLanguage(
+          'MODULE',
+          'UPDATE_FAILED',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
   }
 
@@ -797,7 +906,13 @@ export class ModulesService {
     // Validate school exists
     const school = await this.schoolModel.findById(resolvedSchoolId);
     if (!school) {
-      throw new NotFoundException('School not found');
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'SCHOOL',
+          'NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     // Get tenant connection for the school
@@ -820,7 +935,13 @@ export class ModulesService {
           );
 
         if (!accessCheck.has_access) {
-          throw new NotFoundException('Module not found or access denied');
+          throw new NotFoundException(
+            this.errorMessageService.getMessageWithLanguage(
+              'MODULE',
+              'NOT_FOUND_OR_ACCESS_DENIED',
+              user?.preferred_language || DEFAULT_LANGUAGE,
+            ),
+          );
         }
       }
 
@@ -831,7 +952,13 @@ export class ModulesService {
       });
 
       if (!moduleToDelete) {
-        throw new NotFoundException('Module not found');
+        throw new NotFoundException(
+          this.errorMessageService.getMessageWithLanguage(
+            'MODULE',
+            'NOT_FOUND',
+            user?.preferred_language || DEFAULT_LANGUAGE,
+          ),
+        );
       }
 
       // Deactivate all module assignments for this module
@@ -859,11 +986,21 @@ export class ModulesService {
       );
 
       if (!deletedModule) {
-        throw new NotFoundException('Module not found');
+        throw new NotFoundException(
+          this.errorMessageService.getMessageWithLanguage(
+            'MODULE',
+            'NOT_FOUND',
+            user?.preferred_language || DEFAULT_LANGUAGE,
+          ),
+        );
       }
 
       return {
-        message: 'Module deleted successfully',
+        message: this.errorMessageService.getSuccessMessageWithLanguage(
+          'MODULE',
+          'DELETED_SUCCESSFULLY',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
         data: {
           id: deletedModule._id,
           deactivated_assignments: assignmentUpdateResult.modifiedCount,
@@ -874,7 +1011,13 @@ export class ModulesService {
       if (error instanceof NotFoundException) {
         throw error;
       }
-      throw new BadRequestException('Failed to delete module');
+      throw new BadRequestException(
+        this.errorMessageService.getMessageWithLanguage(
+          'MODULE',
+          'DELETE_FAILED',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
   }
 
@@ -892,7 +1035,13 @@ export class ModulesService {
     // Validate school exists
     const school = await this.schoolModel.findById(resolvedSchoolId);
     if (!school) {
-      throw new NotFoundException('School not found');
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'SCHOOL',
+          'NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     // Get tenant connection for the school
@@ -913,7 +1062,13 @@ export class ModulesService {
       }).lean();
 
       if (!module) {
-        throw new NotFoundException('Module not found');
+        throw new NotFoundException(
+          this.errorMessageService.getMessageWithLanguage(
+            'MODULE',
+            'NOT_FOUND',
+            user?.preferred_language || DEFAULT_LANGUAGE,
+          ),
+        );
       }
 
       // Check professor access if user is a professor
@@ -926,14 +1081,26 @@ export class ModulesService {
           );
 
         if (!accessCheck.has_access) {
-          throw new NotFoundException('Module not found or access denied');
+          throw new NotFoundException(
+            this.errorMessageService.getMessageWithLanguage(
+              'MODULE',
+              'NOT_FOUND_OR_ACCESS_DENIED',
+              user?.preferred_language || DEFAULT_LANGUAGE,
+            ),
+          );
         }
       }
 
       if (action === ModuleVisibilityActionEnum.PUBLISH) {
         // Check if module is already published
         if (module.published) {
-          throw new BadRequestException('Module is already published');
+          throw new BadRequestException(
+            this.errorMessageService.getMessageWithLanguage(
+              'MODULE',
+              'MODULE_ALREADY_PUBLISHED',
+              user?.preferred_language || DEFAULT_LANGUAGE,
+            ),
+          );
         }
 
         // Check if module has at least one chapter
@@ -944,7 +1111,11 @@ export class ModulesService {
 
         if (chapters.length < MODULE_CONSTANTS.MIN_CHAPTERS_REQUIRED) {
           throw new BadRequestException(
-            `Module must have at least ${MODULE_CONSTANTS.MIN_CHAPTERS_REQUIRED} chapter to be published.`,
+            this.errorMessageService.getMessageWithLanguage(
+              'MODULE',
+              'MODULE_MIN_CHAPTERS_REQUIRED',
+              user?.preferred_language || DEFAULT_LANGUAGE,
+            ),
           );
         }
 
@@ -957,7 +1128,11 @@ export class ModulesService {
 
         if (quizGroups.length < MODULE_CONSTANTS.MIN_QUIZ_GROUPS_REQUIRED) {
           throw new BadRequestException(
-            `Module must have at least ${MODULE_CONSTANTS.MIN_QUIZ_GROUPS_REQUIRED} quiz group to be published.`,
+            this.errorMessageService.getMessageWithLanguage(
+              'MODULE',
+              'MODULE_MIN_QUIZ_GROUPS_REQUIRED',
+              user?.preferred_language || DEFAULT_LANGUAGE,
+            ),
           );
         }
 
@@ -973,7 +1148,13 @@ export class ModulesService {
         ).lean();
 
         if (!updatedModule) {
-          throw new NotFoundException('Module not found');
+          throw new NotFoundException(
+            this.errorMessageService.getMessageWithLanguage(
+              'MODULE',
+              'NOT_FOUND',
+              user?.preferred_language || DEFAULT_LANGUAGE,
+            ),
+          );
         }
 
         // Send in-app notifications to students
@@ -1001,7 +1182,11 @@ export class ModulesService {
         }
 
         return {
-          message: 'Module published successfully',
+          message: this.errorMessageService.getSuccessMessageWithLanguage(
+            'MODULE',
+            'PUBLISHED_SUCCESSFULLY',
+            user?.preferred_language || DEFAULT_LANGUAGE,
+          ),
           data: {
             id: updatedModule._id,
             title: updatedModule.title,
@@ -1015,7 +1200,13 @@ export class ModulesService {
       } else if (action === ModuleVisibilityActionEnum.UNPUBLISH) {
         // Check if module is already unpublished
         if (!module.published) {
-          throw new BadRequestException('Module is already unpublished');
+          throw new BadRequestException(
+            this.errorMessageService.getMessageWithLanguage(
+              'MODULE',
+              'MODULE_ALREADY_UNPUBLISHED',
+              user?.preferred_language || DEFAULT_LANGUAGE,
+            ),
+          );
         }
 
         // Update module status to unpublished
@@ -1030,7 +1221,13 @@ export class ModulesService {
         ).lean();
 
         if (!updatedModule) {
-          throw new NotFoundException('Module not found');
+          throw new NotFoundException(
+            this.errorMessageService.getMessageWithLanguage(
+              'MODULE',
+              'NOT_FOUND',
+              user?.preferred_language || DEFAULT_LANGUAGE,
+            ),
+          );
         }
 
         // Send in-app notifications to students about unpublishing
@@ -1058,7 +1255,11 @@ export class ModulesService {
         }
 
         return {
-          message: 'Module unpublished successfully',
+          message: this.errorMessageService.getSuccessMessageWithLanguage(
+            'MODULE',
+            'UNPUBLISHED_SUCCESSFULLY',
+            user?.preferred_language || DEFAULT_LANGUAGE,
+          ),
           data: {
             id: updatedModule._id,
             title: updatedModule.title,
@@ -1069,7 +1270,11 @@ export class ModulesService {
         };
       } else {
         throw new BadRequestException(
-          'Invalid action. Must be PUBLISH or UNPUBLISH',
+          this.errorMessageService.getMessageWithLanguage(
+            'MODULE',
+            'INVALID_ACTION_FOR_MODULE_VISIBILITY',
+            user?.preferred_language || DEFAULT_LANGUAGE,
+          ),
         );
       }
     } catch (error) {
@@ -1083,7 +1288,13 @@ export class ModulesService {
       ) {
         throw error;
       }
-      throw new BadRequestException(`Failed to ${action.toLowerCase()} module`);
+      throw new BadRequestException(
+        this.errorMessageService.getMessageWithLanguage(
+          'MODULE',
+          'TOGGLE_MODULE_VISIBILITY_FAILED',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
   }
 
@@ -1093,7 +1304,13 @@ export class ModulesService {
     // Validate school exists
     const school = await this.schoolModel.findById(user.school_id);
     if (!school) {
-      throw new NotFoundException('School not found');
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'SCHOOL',
+          'NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     // Get tenant connection for the school
@@ -1271,7 +1488,11 @@ export class ModulesService {
       if (result.length === 0) {
         // No modules found, return empty overview
         return {
-          message: 'Module overview retrieved successfully',
+          message: this.errorMessageService.getMessageWithLanguage(
+            'MODULE',
+            'MODULE_OVERVIEW_RETRIEVED_SUCCESSFULLY',
+            user?.preferred_language || DEFAULT_LANGUAGE,
+          ),
           data: {
             total_modules: 0,
             completed_modules: 0,
@@ -1284,12 +1505,22 @@ export class ModulesService {
       }
 
       return {
-        message: 'Module overview retrieved successfully',
+        message: this.errorMessageService.getMessageWithLanguage(
+          'MODULE',
+          'MODULE_OVERVIEW_RETRIEVED_SUCCESSFULLY',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
         data: result[0],
       };
     } catch (error) {
       this.logger.error('Error getting module overview', error?.stack || error);
-      throw new BadRequestException('Failed to retrieve module overview');
+      throw new BadRequestException(
+        this.errorMessageService.getMessageWithLanguage(
+          'MODULE',
+          'RETRIEVE_MODULE_OVERVIEW_FAILED',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
   }
 }
