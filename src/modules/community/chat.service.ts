@@ -15,7 +15,8 @@ import { User } from 'src/database/schemas/central/user.schema';
 import { CreateChatMessageDto } from './dto/create-chat-message.dto';
 import { ChatConversationFilterDto } from './dto/chat-conversation-filter.dto';
 import { ChatMessageResponseDto } from './dto/chat-message-response.dto';
-import { RoleEnum } from 'src/common/constants/roles.constant';
+import { SearchUsersDto } from './dto/search-users.dto';
+import { RoleEnum, ROLE_IDS } from 'src/common/constants/roles.constant';
 import { JWTUserPayload } from 'src/common/types/jwr-user.type';
 import { TenantConnectionService } from 'src/database/tenant-connection.service';
 import {
@@ -77,7 +78,7 @@ export class ChatService {
     );
 
     // Validate communication rules
-      // TODO: commented for communicate with student to any other role
+    // TODO: commented for communicate with student to any other role
     // this.validateCommunicationRules(
     //   currentUser.role.name,
     //   createChatMessageDto.receiver_role,
@@ -494,40 +495,51 @@ export class ChatService {
   }
 
   // Method to fetch user details from the correct database
-  async getUserDetails(userId: string, userRole: string, schoolId?: string): Promise<any> {
+  async getUserDetails(
+    userId: string,
+    userRole: string,
+    schoolId?: string,
+  ): Promise<any> {
     if (userRole === RoleEnum.STUDENT) {
       // Students are in tenant database
       if (!schoolId) {
-        throw new BadRequestException('School ID required to fetch student details');
+        throw new BadRequestException(
+          'School ID required to fetch student details',
+        );
       }
-      
+
       const connection = await this.getTenantConnection(schoolId);
       const StudentModel = connection.model(Student.name, StudentSchema);
-      
+
       const student = await StudentModel.findById(userId)
         .select('first_name last_name email')
         .lean();
-      
-      return student ? {
-        _id: student._id,
-        first_name: student.first_name,
-        last_name: student.last_name,
-        email: student.email,
-        role: RoleEnum.STUDENT,
-      } : null;
+
+      return student
+        ? {
+            _id: student._id,
+            first_name: student.first_name,
+            last_name: student.last_name,
+            email: student.email,
+            role: RoleEnum.STUDENT,
+          }
+        : null;
     } else {
       // Professors and other roles are in central database
-      const user = await this.userModel.findById(userId)
+      const user = await this.userModel
+        .findById(userId)
         .select('first_name last_name email')
         .lean();
-      
-      return user ? {
-        _id: user._id,
-        first_name: user.first_name,
-        last_name: user.last_name,
-        email: user.email,
-        role: userRole,
-      } : null;
+
+      return user
+        ? {
+            _id: user._id,
+            first_name: user.first_name,
+            last_name: user.last_name,
+            email: user.email,
+            role: userRole,
+          }
+        : null;
     }
   }
 
@@ -536,24 +548,27 @@ export class ChatService {
     currentUser: JWTUserPayload,
     filter: ChatConversationFilterDto,
   ): Promise<{ conversations: any[]; total: number }> {
-    const { conversations, total } = await this.getConversations(currentUser, filter);
-    
+    const { conversations, total } = await this.getConversations(
+      currentUser,
+      filter,
+    );
+
     // Fetch user details for each conversation
     const conversationsWithDetails = await Promise.all(
       conversations.map(async (conv) => {
         const userDetails = await this.getUserDetails(
           conv.conversation_user._id,
           conv.conversation_user_role,
-          currentUser.school_id?.toString()
+          currentUser.school_id?.toString(),
         );
-        
+
         return {
           ...conv,
           conversation_user: userDetails || conv.conversation_user,
         };
-      })
+      }),
     );
-    
+
     return {
       conversations: conversationsWithDetails,
       total,
@@ -609,6 +624,197 @@ export class ChatService {
       read_at: message.read_at,
       created_at: message.created_at,
       updated_at: message.updated_at,
+    };
+  }
+
+  async searchUsers(
+    currentUser: JWTUserPayload,
+    searchParams: SearchUsersDto,
+  ): Promise<{ users: any[]; total: number }> {
+    this.logger.log(`Searching users for school: ${currentUser.school_id}`);
+
+    if (!currentUser?.school_id) {
+      throw new BadRequestException('School ID is required');
+    }
+
+    const { search = '', role, page = 1, limit = 20 } = searchParams;
+
+    // Validate numeric values
+    const numericPage = Number(page);
+    const numericLimit = Number(limit);
+
+    if (isNaN(numericLimit) || numericLimit < 1 || numericLimit > 100) {
+      throw new BadRequestException('Limit must be a number between 1 and 100');
+    }
+
+    if (isNaN(numericPage) || numericPage < 1) {
+      throw new BadRequestException('Page must be a number greater than 0');
+    }
+
+    const skip = (numericPage - 1) * numericLimit;
+
+    // Get tenant connection for students
+    const connection = await this.getTenantConnection(
+      currentUser.school_id.toString(),
+    );
+
+    const StudentModel = connection.model(Student.name, StudentSchema);
+
+    // Build search query for students
+    const studentQuery: any = {
+      deleted_at: null,
+      _id: { $ne: new Types.ObjectId(currentUser.id) }, // Exclude current user
+    };
+
+    if (search) {
+      studentQuery.$or = [
+        { first_name: { $regex: search, $options: 'i' } },
+        { last_name: { $regex: search, $options: 'i' } },
+        { email: { $regex: search, $options: 'i' } },
+      ];
+    }
+
+    // Build search query for professors (central database) - only PROFESSOR role
+    const professorQuery: any = {
+      deleted_at: null,
+      role: new Types.ObjectId(ROLE_IDS.PROFESSOR), // Role is stored as ObjectId
+      _id: { $ne: new Types.ObjectId(currentUser.id) }, // Exclude current user
+    };
+
+
+
+    if (search) {
+      professorQuery.$or = [
+        { first_name: { $regex: search, $options: 'i' } },
+        { last_name: { $regex: search, $options: 'i' } },
+        { email: { $regex: search, $options: 'i' } },
+      ];
+    }
+
+    if (role && role === RoleEnum.STUDENT) {
+      // If role is STUDENT, only search students
+      const [students, totalStudents] = await Promise.all([
+        StudentModel.find(studentQuery)
+          .select('first_name last_name email')
+          .skip(skip)
+          .limit(numericLimit)
+          .lean(),
+        StudentModel.countDocuments(studentQuery),
+      ]);
+
+      const formattedStudents = students.map((student) => ({
+        conversation_user: {
+          _id: student._id,
+          first_name: student.first_name,
+          last_name: student.last_name,
+          email: student.email,
+          role: RoleEnum.STUDENT,
+        },
+        conversation_user_role: RoleEnum.STUDENT,
+      }));
+
+      return {
+        users: formattedStudents,
+        total: totalStudents,
+      };
+    }
+
+    if (role && role === RoleEnum.PROFESSOR) {
+      // If role is PROFESSOR, only search professors
+      const [professors, totalProfessors] = await Promise.all([
+        this.userModel
+          .find(professorQuery)
+          .select('first_name last_name email role')
+          .skip(skip)
+          .limit(numericLimit)
+          .lean(),
+        this.userModel.countDocuments(professorQuery),
+      ]);
+
+
+
+      const formattedProfessors = professors.map((professor) => ({
+        conversation_user: {
+          _id: professor._id,
+          first_name: professor.first_name,
+          last_name: professor.last_name,
+          email: professor.email,
+          role: RoleEnum.PROFESSOR, // Map to PROFESSOR enum
+        },
+        conversation_user_role: RoleEnum.PROFESSOR,
+      }));
+
+      return {
+        users: formattedProfessors,
+        total: totalProfessors,
+      };
+    }
+
+    // If no role specified, search both students and professors with proper pagination
+    // First, get total counts to determine how to split the limit
+    const [totalStudents, totalProfessors] = await Promise.all([
+      StudentModel.countDocuments(studentQuery),
+      this.userModel.countDocuments(professorQuery),
+    ]);
+
+    // Calculate how many to fetch from each database
+    const totalAvailable = totalStudents + totalProfessors;
+    const remainingLimit = numericLimit;
+    
+    // Fetch more than needed from each to ensure we get enough after sorting
+    const fetchLimit = Math.min(remainingLimit * 2, Math.max(totalStudents, totalProfessors));
+    
+    const [students, professors] = await Promise.all([
+      StudentModel.find(studentQuery)
+        .select('first_name last_name email')
+        .limit(fetchLimit)
+        .lean(),
+      this.userModel
+        .find(professorQuery)
+        .select('first_name last_name email role')
+        .limit(fetchLimit)
+        .lean(),
+    ]);
+
+    const formattedStudents = students.map((student) => ({
+      conversation_user: {
+        _id: student._id,
+        first_name: student.first_name,
+        last_name: student.last_name,
+        email: student.email,
+        role: RoleEnum.STUDENT,
+      },
+      conversation_user_role: RoleEnum.STUDENT,
+    }));
+
+    const formattedProfessors = professors.map((professor) => ({
+      conversation_user: {
+        _id: professor._id,
+        first_name: professor.first_name,
+        last_name: professor.last_name,
+        email: professor.email,
+        role: RoleEnum.PROFESSOR, // Map to PROFESSOR enum
+      },
+      conversation_user_role: RoleEnum.PROFESSOR,
+    }));
+
+    // Combine and sort by name
+    const allUsers = [...formattedStudents, ...formattedProfessors].sort(
+      (a, b) => {
+        const nameA =
+          `${a.conversation_user.first_name} ${a.conversation_user.last_name}`.toLowerCase();
+        const nameB =
+          `${b.conversation_user.first_name} ${b.conversation_user.last_name}`.toLowerCase();
+        return nameA.localeCompare(nameB);
+      },
+    );
+
+    // Apply pagination to the combined and sorted results
+    const paginatedUsers = allUsers.slice(skip, skip + numericLimit);
+
+    return {
+      users: paginatedUsers,
+      total: totalAvailable,
     };
   }
 }

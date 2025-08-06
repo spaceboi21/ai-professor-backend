@@ -23,6 +23,7 @@ import { ChatService } from './chat.service';
 import { ChatGateway } from './chat.gateway';
 import { JWTUserPayload } from 'src/common/types/jwr-user.type';
 import { ChatConversationFilterDto } from './dto/chat-conversation-filter.dto';
+import { SearchUsersDto } from './dto/search-users.dto';
 
 @ApiTags('Chat')
 @Controller('chat')
@@ -70,5 +71,48 @@ export class ChatController {
     @Request() req: { user: JWTUserPayload },
   ) {
     return this.chatService.getMessages(req.user, userId, page, limit);
+  }
+
+  @Get('users')
+  @Roles(RoleEnum.PROFESSOR, RoleEnum.STUDENT, RoleEnum.SCHOOL_ADMIN, RoleEnum.SUPER_ADMIN)
+  @ApiOperation({ summary: 'Search professors and students for the current school (only STUDENT and PROFESSOR roles)' })
+  @ApiResponse({
+    status: 200,
+    description: 'Users retrieved successfully',
+    schema: {
+      type: 'object',
+      properties: {
+        users: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              conversation_user: {
+                type: 'object',
+                properties: {
+                  _id: { type: 'string' },
+                  first_name: { type: 'string' },
+                  last_name: { type: 'string' },
+                  email: { type: 'string' },
+                  role: { type: 'string' },
+                },
+              },
+              conversation_user_role: { type: 'string' },
+            },
+          },
+        },
+        total: { type: 'number' },
+      },
+    },
+  })
+  @ApiQuery({ name: 'search', required: false, type: String })
+  @ApiQuery({ name: 'role', required: false, enum: [RoleEnum.STUDENT, RoleEnum.PROFESSOR] })
+  @ApiQuery({ name: 'page', required: false, type: Number })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  async searchUsers(
+    @Query() searchParams: SearchUsersDto,
+    @Request() req: { user: JWTUserPayload },
+  ) {
+    return this.chatService.searchUsers(req.user, searchParams);
   }
 } 
