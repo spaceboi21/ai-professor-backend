@@ -164,6 +164,7 @@ export class SchoolAdminService {
         `${user_first_name}${user_last_name ? ` ${user_last_name}` : ''}`,
         password,
         RoleEnum.SCHOOL_ADMIN,
+        user?.preferred_language,
       );
       this.logger.log(`Credentials email sent to: ${user_email}`);
 

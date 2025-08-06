@@ -253,4 +253,29 @@ export class AnchorTagController {
       filterDto,
     );
   }
+
+  @Post('notifications/send-missed/:bibliographyId')
+  @Roles(RoleEnum.PROFESSOR, RoleEnum.SCHOOL_ADMIN)
+  @ApiOperation({
+    summary: 'Send notifications for missed mandatory anchor tags',
+    description:
+      'Sends notifications to all students who have not completed mandatory anchor tags for a specific bibliography',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Notifications sent successfully',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Not found - School or bibliography not found',
+  })
+  sendMissedAnchorTagNotifications(
+    @Param('bibliographyId') bibliographyId: string,
+    @User() user: JWTUserPayload,
+  ) {
+    return this.anchorTagService.sendMissedAnchorTagNotifications(
+      bibliographyId,
+      user,
+    );
+  }
 }

@@ -50,6 +50,13 @@ import {
   AnchorTagStatusEnum,
   AnchorTagTypeEnum,
 } from 'src/common/constants/anchor-tag.constant';
+import { NotificationsService } from '../notifications/notifications.service';
+import { RecipientTypeEnum } from 'src/database/schemas/tenant/notification.schema';
+import { NotificationTypeEnum } from 'src/common/constants/notification.constant';
+import {
+  Student,
+  StudentSchema,
+} from 'src/database/schemas/tenant/student.schema';
 
 @Injectable()
 export class AnchorTagService {
@@ -62,6 +69,7 @@ export class AnchorTagService {
     private readonly schoolModel: Model<School>,
     private readonly tenantConnectionService: TenantConnectionService,
     private readonly errorMessageService: ErrorMessageService,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   async createAnchorTag(
@@ -688,5 +696,135 @@ export class AnchorTagService {
       .lean();
 
     return lastAnchorTag ? lastAnchorTag.sequence + 1 : 1;
+  }
+
+  async sendMissedAnchorTagNotifications(
+    bibliography_id: string | Types.ObjectId,
+    user: JWTUserPayload,
+  ) {
+    this.logger.log(
+      `Sending missed anchor tag notifications for bibliography: ${bibliography_id}, user: ${user.id}`,
+    );
+
+    const school = await this.schoolModel.findById(user.school_id);
+    if (!school) {
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'ANCHOR_TAG',
+          'SCHOOL_NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
+    }
+
+    const connection = await this.tenantConnectionService.getTenantConnection(
+      school.db_name,
+    );
+
+    const AnchorTagModel = connection.model(AnchorTag.name, AnchorTagSchema);
+    const StudentAnchorTagAttemptModel = connection.model(
+      StudentAnchorTagAttempt.name,
+      StudentAnchorTagAttemptSchema,
+    );
+
+    const mandatoryAnchorTags = await AnchorTagModel.find({
+      bibliography_id: new Types.ObjectId(bibliography_id),
+      is_mandatory: true,
+      status: AnchorTagStatusEnum.ACTIVE,
+      deleted_at: null,
+    }).lean();
+
+    if (mandatoryAnchorTags.length === 0) {
+      return {
+        message: this.errorMessageService.getMessageWithLanguage(
+          'ANCHOR_TAG',
+          'NO_MANDATORY_ANCHOR_TAGS_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+        data: {
+          bibliography_id,
+          notifications_sent: 0,
+          total_mandatory_tags: 0,
+        },
+      };
+    }
+
+    let totalNotificationsSent = 0;
+    const missedAnchorTags: any[] = [];
+
+    for (const anchorTag of mandatoryAnchorTags) {
+      const attempt = await StudentAnchorTagAttemptModel.findOne({
+        student_id: user.id,
+        anchor_tag_id: anchorTag._id,
+        status: { $in: ['COMPLETED', 'SKIPPED'] },
+        deleted_at: null,
+      }).lean();
+
+      if (!attempt) {
+        missedAnchorTags.push(anchorTag);
+      }
+    }
+
+    for (const tag of missedAnchorTags) {
+      try {
+        const titleEn = 'Mandatory Anchor Point Pending';
+        const titleFr = "Point d'Ancrage Obligatoire en Attente";
+
+        const messageEn = `You have a pending mandatory anchor point titled "${tag.title}" in this bibliography. Please complete it to continue your learning.`;
+        const messageFr = `Vous avez un point d'ancrage obligatoire en attente intitulé "${tag.title}" dans cette bibliographie. Veuillez le compléter pour poursuivre votre apprentissage.`;
+
+        const metadata = {
+          bibliography_id,
+          anchor_tag_id: tag._id,
+          title: tag.title,
+          description: tag.description,
+          content_type: tag.content_type,
+          sequence: tag.sequence,
+          student_id: user.id,
+          school_id: user.school_id,
+          notification_type: 'MISSED_MANDATORY_ANCHOR_TAG',
+          timestamp: new Date(),
+        };
+        const schoolId = user.school_id
+          ? new Types.ObjectId(user.school_id)
+          : null;
+        await this.notificationsService.createMultiLanguageNotification(
+          user.id as Types.ObjectId,
+          RecipientTypeEnum.STUDENT,
+          titleEn,
+          titleFr,
+          messageEn,
+          messageFr,
+          NotificationTypeEnum.ANCHOR_TAG_MISSED,
+          metadata,
+          schoolId as Types.ObjectId,
+        );
+
+        this.logger.log(
+          `Notification sent to student ${user.id} for missed anchor tag: ${tag._id}`,
+        );
+
+        totalNotificationsSent++;
+      } catch (error) {
+        this.logger.error(
+          `Error sending notification for anchor tag ${tag._id} to student ${user.id}:`,
+          error,
+        );
+      }
+    }
+
+    return {
+      message: this.errorMessageService.getMessageWithLanguage(
+        'ANCHOR_TAG',
+        'MISSED_ANCHOR_TAG_NOTIFICATIONS_PROCESSED',
+        user?.preferred_language || DEFAULT_LANGUAGE,
+      ),
+      data: {
+        bibliography_id,
+        student_id: user.id,
+        missed_anchor_tags: missedAnchorTags.length,
+        total_notifications_sent: totalNotificationsSent,
+      },
+    };
   }
 }

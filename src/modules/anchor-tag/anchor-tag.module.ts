@@ -24,6 +24,7 @@ import { ProgressModule } from '../progress/progress.module';
 import { ErrorMessageService } from 'src/common/services/error-message.service';
 import { ActivityLogService } from '../activity-log/activity-log.service';
 import { AnchorTagController } from './anchor-tag.controller';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
   imports: [
@@ -33,6 +34,7 @@ import { AnchorTagController } from './anchor-tag.controller';
       { name: ActivityLog.name, schema: ActivityLogSchema },
     ]),
     ProgressModule,
+    NotificationsModule,
   ],
   controllers: [AnchorTagController],
   providers: [

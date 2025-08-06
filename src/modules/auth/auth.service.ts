@@ -686,6 +686,7 @@ export class AuthService {
         user.email,
         `${user.first_name}${user.last_name ? ` ${user.last_name}` : ''}`,
         resetPasswordLink,
+        user.preferred_language,
       );
       this.logger.log(
         `Password reset email sent to school user: ${user.email}`,
@@ -728,6 +729,7 @@ export class AuthService {
         student.email,
         `${student.first_name}${student.last_name ? ` ${student.last_name}` : ''}`,
         resetPasswordLink,
+        student.preferred_language,
       );
       this.logger.log(`Password reset email sent to student: ${student.email}`);
     } catch (error) {
