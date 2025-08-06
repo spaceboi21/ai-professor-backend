@@ -33,6 +33,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   server: Server;
 
   private connectedUsers = new Map<string, string>(); // userId -> socketId
+  private userRooms = new Map<string, string>(); // userId -> roomName (school)
   private readonly logger = new Logger(ChatGateway.name);
 
   constructor(
@@ -63,8 +64,13 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       // Store connection
       this.connectedUsers.set(client.user.id.toString(), client.id);
 
+      // Join school room for proper broadcasting
+      const roomName = `school_${client.user.school_id}`;
+      client.join(roomName);
+      this.userRooms.set(client.user.id.toString(), roomName);
+
       this.logger.log(
-        `✅ User authenticated: ${client.user.id} (${client.user.email})`,
+        `✅ User authenticated: ${client.user.id} (${client.user.email}) - Joined room: ${roomName}`,
       );
 
       // Emit connection success
@@ -74,8 +80,8 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
         role: client.user.role.name,
       });
 
-      // Broadcast online status
-      this.broadcastOnlineStatus(client.user.id.toString(), true);
+      // Broadcast online status to school room only
+      this.broadcastOnlineStatus(client.user.id.toString(), true, roomName);
     } catch (error) {
       this.logger.error(`❌ Connection error: ${error.message}`);
       this.handleAuthError(client, error.message);
@@ -84,9 +90,17 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   handleDisconnect(client: AuthenticatedSocket) {
     if (client.user) {
-      this.connectedUsers.delete(client.user.id.toString());
-      this.logger.log(`🔌 User disconnected: ${client.user.id}`);
-      this.broadcastOnlineStatus(client.user.id.toString(), false);
+      const userId = client.user.id.toString();
+      const roomName = this.userRooms.get(userId);
+      
+      this.connectedUsers.delete(userId);
+      this.userRooms.delete(userId);
+      
+      this.logger.log(`🔌 User disconnected: ${client.user.id} from room: ${roomName}`);
+      
+      if (roomName) {
+        this.broadcastOnlineStatus(userId, false, roomName);
+      }
     }
   }
 
@@ -237,9 +251,38 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     });
   }
 
+  @SubscribeMessage('GET_ONLINE_STATUS')
+  async handleGetOnlineStatus(
+    @ConnectedSocket() client: AuthenticatedSocket,
+    @MessageBody() data: { user_ids: string[] },
+  ) {
+    this.logger.log(`👥 GET_ONLINE_STATUS from user: ${client.user?.id}`);
+
+    if (!this.validateUser(client)) return { error: 'Unauthorized' };
+
+    const onlineStatus = this.getOnlineStatusForUsers(data.user_ids);
+    
+    client.emit('ONLINE_STATUS_RESPONSE', {
+      online_status: onlineStatus,
+      timestamp: new Date().toISOString(),
+    });
+
+    return { online_status: onlineStatus };
+  }
+
   // Public utility methods
   getOnlineUsers(): string[] {
     return Array.from(this.connectedUsers.keys());
+  }
+
+  getOnlineUsersForSchool(schoolId: string): string[] {
+    const onlineUsers: string[] = [];
+    for (const [userId, roomName] of this.userRooms.entries()) {
+      if (roomName === `school_${schoolId}`) {
+        onlineUsers.push(userId);
+      }
+    }
+    return onlineUsers;
   }
 
   isUserOnline(userId: string): boolean {
@@ -256,12 +299,13 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   getConnectionDetails(): {
     totalConnected: number;
-    connectedUsers: Array<{ userId: string; socketId: string }>;
+    connectedUsers: Array<{ userId: string; socketId: string; room: string }>;
   } {
     const connectedUsers = Array.from(this.connectedUsers.entries()).map(
       ([userId, socketId]) => ({
         userId,
         socketId,
+        room: this.userRooms.get(userId) || 'unknown',
       }),
     );
 
@@ -381,9 +425,18 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
   }
 
-  private broadcastOnlineStatus(userId: string, isOnline: boolean) {
+  private broadcastOnlineStatus(userId: string, isOnline: boolean, roomName?: string) {
     const event = isOnline ? 'USER_ONLINE' : 'USER_OFFLINE';
-    this.server.emit(event, { user_id: userId });
-    this.logger.log(`📢 ${event}: ${userId}`);
+    const data = { user_id: userId };
+    
+    if (roomName) {
+      // Broadcast to specific school room
+      this.server.to(roomName).emit(event, data);
+      this.logger.log(`📢 ${event}: ${userId} in room: ${roomName}`);
+    } else {
+      // Fallback to global broadcast
+      this.server.emit(event, data);
+      this.logger.log(`📢 ${event}: ${userId} (global)`);
+    }
   }
 }
