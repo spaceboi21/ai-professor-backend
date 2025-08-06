@@ -83,6 +83,9 @@ import {
 } from 'src/common/utils/mention.util';
 import { ErrorMessageService } from 'src/common/services/error-message.service';
 import { DEFAULT_LANGUAGE } from 'src/common/constants/language.constant';
+import { CSVUtil } from 'src/common/utils/csv.util';
+import { ExportDiscussionsDto } from './dto/export-discussions.dto';
+import { ExportDiscussionsResponseDto } from './dto/export-discussions-response.dto';
 
 @Injectable()
 export class CommunityService {
@@ -96,6 +99,7 @@ export class CommunityService {
     private readonly tenantConnectionService: TenantConnectionService,
     private readonly notificationsService: NotificationsService,
     private readonly errorMessageService: ErrorMessageService,
+    private readonly csvUtil: CSVUtil,
   ) {}
 
   /**
@@ -3438,5 +3442,599 @@ export class CommunityService {
       search_text:
         `${professor.first_name || ''} ${professor.last_name || ''} ${professor.email || ''}`.toLowerCase(),
     }));
+  }
+
+  /**
+   * Export discussions to CSV format
+   * Students cannot access this functionality
+   */
+  async exportDiscussions(
+    user: JWTUserPayload,
+    exportDto: ExportDiscussionsDto,
+  ): Promise<ExportDiscussionsResponseDto> {
+    this.logger.log(`Exporting discussions for user: ${user.id} in CSV format`);
+
+    // Check if user is a student - students cannot export discussions
+    if (user.role.name === RoleEnum.STUDENT) {
+      throw new ForbiddenException(
+        this.errorMessageService.getMessageWithLanguage(
+          'COMMUNITY',
+          'STUDENTS_CANNOT_EXPORT_DISCUSSIONS',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
+    }
+
+    try {
+      const resolvedSchoolId = this.resolveSchoolId(user);
+
+      // Validate school exists
+      const school = await this.schoolModel.findById(resolvedSchoolId);
+      if (!school) {
+        throw new NotFoundException(
+          this.errorMessageService.getMessageWithLanguage(
+            'SCHOOL',
+            'NOT_FOUND',
+            user?.preferred_language || DEFAULT_LANGUAGE,
+          ),
+        );
+      }
+
+      // Get tenant connection
+      const tenantConnection =
+        await this.tenantConnectionService.getTenantConnection(school.db_name);
+      const DiscussionModel = tenantConnection.model(
+        ForumDiscussion.name,
+        ForumDiscussionSchema,
+      );
+
+      // Build filter based on role and export options
+      const filter: any = {
+        deleted_at: null,
+      };
+
+      // Role-based filtering
+      if (user.role.name === RoleEnum.PROFESSOR) {
+        filter.status = {
+          $in: [DiscussionStatusEnum.ACTIVE, DiscussionStatusEnum.ARCHIVED],
+        };
+      }
+      // Admins can see all content
+
+      // Apply export filters
+      if (exportDto.type) {
+        filter.type = exportDto.type;
+      }
+
+      if (
+        exportDto.status &&
+        [RoleEnum.SCHOOL_ADMIN, RoleEnum.SUPER_ADMIN].includes(
+          user.role.name as RoleEnum,
+        )
+      ) {
+        filter.status = exportDto.status;
+      }
+
+      if (exportDto.search) {
+        filter.$or = [
+          { title: { $regex: exportDto.search, $options: 'i' } },
+          { content: { $regex: exportDto.search, $options: 'i' } },
+        ];
+      }
+
+      if (exportDto.tags && exportDto.tags.length > 0) {
+        filter.tags = { $in: exportDto.tags };
+      }
+
+      if (exportDto.author_id) {
+        filter.created_by = new Types.ObjectId(exportDto.author_id);
+      }
+
+      if (exportDto.start_date || exportDto.end_date) {
+        filter.created_at = {};
+        if (exportDto.start_date) {
+          filter.created_at.$gte = new Date(exportDto.start_date);
+        }
+        if (exportDto.end_date) {
+          filter.created_at.$lte = new Date(
+            exportDto.end_date + 'T23:59:59.999Z',
+          );
+        }
+      }
+
+      // Get discussions with user details
+      const discussions = await DiscussionModel.find(filter)
+        .populate('created_by', 'first_name last_name email profile_pic')
+        .sort({ created_at: -1 })
+        .lean();
+
+      if (discussions.length === 0) {
+        throw new NotFoundException(
+          this.errorMessageService.getMessageWithLanguage(
+            'COMMUNITY',
+            'NO_DISCUSSIONS_FOUND_FOR_EXPORT',
+            user?.preferred_language || DEFAULT_LANGUAGE,
+          ),
+        );
+      }
+
+      return this.exportToCSV(discussions, exportDto);
+    } catch (error) {
+      this.logger.error('Error exporting discussions', error?.stack || error);
+      throw error;
+    }
+  }
+
+  /**
+   * Export discussions to CSV format
+   */
+  private async exportToCSV(
+    discussions: any[],
+    exportDto: ExportDiscussionsDto,
+  ): Promise<ExportDiscussionsResponseDto> {
+    // Transform data for CSV export
+    const csvData = discussions.map((discussion: any) => ({
+      'Discussion ID': discussion._id?.toString() || 'N/A',
+      Title: discussion.title || 'N/A',
+      Content: discussion.content || 'N/A',
+      Type: discussion.type || 'N/A',
+      Tags: Array.isArray(discussion.tags) ? discussion.tags.join('; ') : 'N/A',
+      'Author Name': discussion.created_by
+        ? `${discussion.created_by.first_name || ''} ${discussion.created_by.last_name || ''}`.trim()
+        : 'N/A',
+      'Author Email': discussion.created_by?.email || 'N/A',
+      'Author Role': discussion.created_by_role || 'N/A',
+      'Reply Count': discussion.reply_count || 0,
+      'View Count': discussion.view_count || 0,
+      'Like Count': discussion.like_count || 0,
+      Status: discussion.status || 'N/A',
+      'Meeting Link': discussion.meeting_link || 'N/A',
+      'Meeting Platform': discussion.meeting_platform || 'N/A',
+      'Meeting Scheduled At': discussion.meeting_scheduled_at
+        ? new Date(discussion.meeting_scheduled_at).toISOString()
+        : 'N/A',
+      'Meeting Duration (minutes)':
+        discussion.meeting_duration_minutes || 'N/A',
+      'Created At': discussion.created_at
+        ? new Date(discussion.created_at).toISOString()
+        : 'N/A',
+      'Updated At': discussion.updated_at
+        ? new Date(discussion.updated_at).toISOString()
+        : 'N/A',
+      'Archived At': discussion.archived_at
+        ? new Date(discussion.archived_at).toISOString()
+        : 'N/A',
+    }));
+
+    // Define CSV headers
+    const headers = [
+      'Discussion ID',
+      'Title',
+      'Content',
+      'Type',
+      'Tags',
+      'Author Name',
+      'Author Email',
+      'Author Role',
+      'Reply Count',
+      'View Count',
+      'Like Count',
+      'Status',
+      'Meeting Link',
+      'Meeting Platform',
+      'Meeting Scheduled At',
+      'Meeting Duration (minutes)',
+      'Created At',
+      'Updated At',
+      'Archived At',
+    ];
+
+    // Generate CSV file with timestamp
+    const filePath = await this.csvUtil.generateCSVFile({
+      filename: 'discussions-export',
+      headers,
+      data: csvData,
+      includeTimestamp: true,
+    });
+
+    // Get file info
+    const filename = filePath.split('/').pop() || 'discussions-export.csv';
+    const fileSize = this.csvUtil.getFileSize(filePath);
+    const downloadUrl = `/api/community/download/${filename}`;
+
+    this.logger.log(
+      `CSV export completed: ${filePath}, Size: ${fileSize} bytes, Records: ${csvData.length}`,
+    );
+
+    return {
+      filename,
+      file_path: filePath,
+      file_size: fileSize,
+      record_count: csvData.length,
+      exported_at: new Date(),
+      storage_type: process.env.NODE_ENV === 'production' ? 's3' : 'local',
+      download_url: downloadUrl,
+      applied_filters: {
+        type: exportDto.type,
+        status: exportDto.status,
+        search: exportDto.search,
+        tags: exportDto.tags,
+        author_id: exportDto.author_id,
+        start_date: exportDto.start_date,
+        end_date: exportDto.end_date,
+      },
+    };
+  }
+
+  /**
+   * Export discussions to CSV format and return as stream
+   * Students cannot access this functionality
+   */
+  async exportDiscussionsDirect(
+    user: JWTUserPayload,
+    exportDto: ExportDiscussionsDto,
+  ): Promise<{ content: string; filename: string; contentType: string }> {
+    this.logger.log(
+      `Exporting discussions for user: ${user.id} in CSV format (direct download)`,
+    );
+
+    // Check if user is a student - students cannot export discussions
+    if (user.role.name === RoleEnum.STUDENT) {
+      throw new ForbiddenException(
+        this.errorMessageService.getMessageWithLanguage(
+          'COMMUNITY',
+          'STUDENTS_CANNOT_EXPORT_DISCUSSIONS',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
+    }
+
+    try {
+      const resolvedSchoolId = this.resolveSchoolId(user);
+
+      // Validate school exists
+      const school = await this.schoolModel.findById(resolvedSchoolId);
+      if (!school) {
+        throw new NotFoundException(
+          this.errorMessageService.getMessageWithLanguage(
+            'SCHOOL',
+            'NOT_FOUND',
+            user?.preferred_language || DEFAULT_LANGUAGE,
+          ),
+        );
+      }
+
+      // Get tenant connection
+      const tenantConnection =
+        await this.tenantConnectionService.getTenantConnection(school.db_name);
+      const DiscussionModel = tenantConnection.model(
+        ForumDiscussion.name,
+        ForumDiscussionSchema,
+      );
+
+      // Build filter based on role and export options
+      const filter: any = {
+        deleted_at: null,
+      };
+
+      // Role-based filtering
+      if (user.role.name === RoleEnum.PROFESSOR) {
+        filter.status = {
+          $in: [DiscussionStatusEnum.ACTIVE, DiscussionStatusEnum.ARCHIVED],
+        };
+      }
+      // Admins can see all content
+
+      // Apply export filters
+      if (exportDto.type) {
+        filter.type = exportDto.type;
+      }
+
+      if (
+        exportDto.status &&
+        [RoleEnum.SCHOOL_ADMIN, RoleEnum.SUPER_ADMIN].includes(
+          user.role.name as RoleEnum,
+        )
+      ) {
+        filter.status = exportDto.status;
+      }
+
+      if (exportDto.search) {
+        filter.$or = [
+          { title: { $regex: exportDto.search, $options: 'i' } },
+          { content: { $regex: exportDto.search, $options: 'i' } },
+        ];
+      }
+
+      if (exportDto.tags && exportDto.tags.length > 0) {
+        filter.tags = { $in: exportDto.tags };
+      }
+
+      if (exportDto.author_id) {
+        filter.created_by = new Types.ObjectId(exportDto.author_id);
+      }
+
+      if (exportDto.start_date || exportDto.end_date) {
+        filter.created_at = {};
+        if (exportDto.start_date) {
+          filter.created_at.$gte = new Date(exportDto.start_date);
+        }
+        if (exportDto.end_date) {
+          filter.created_at.$lte = new Date(
+            exportDto.end_date + 'T23:59:59.999Z',
+          );
+        }
+      }
+
+      // Get discussions with user details
+      const discussions = await DiscussionModel.find(filter)
+        .populate('created_by', 'first_name last_name email profile_pic')
+        .sort({ created_at: -1 })
+        .lean();
+
+      if (discussions.length === 0) {
+        throw new NotFoundException(
+          this.errorMessageService.getMessageWithLanguage(
+            'COMMUNITY',
+            'NO_DISCUSSIONS_FOUND_FOR_EXPORT',
+            user?.preferred_language || DEFAULT_LANGUAGE,
+          ),
+        );
+      }
+
+      return this.generateCSVContent(discussions, exportDto);
+    } catch (error) {
+      this.logger.error('Error exporting discussions', error?.stack || error);
+      throw error;
+    }
+  }
+
+  /**
+   * Generate CSV content without saving to file
+   */
+  private generateCSVContent(
+    discussions: any[],
+    exportDto: ExportDiscussionsDto,
+  ): { content: string; filename: string; contentType: string } {
+    // Transform data for CSV export
+    const csvData = discussions.map((discussion: any) => ({
+      'Discussion ID': discussion._id?.toString() || 'N/A',
+      Title: discussion.title || 'N/A',
+      Content: discussion.content || 'N/A',
+      Type: discussion.type || 'N/A',
+      Tags: Array.isArray(discussion.tags) ? discussion.tags.join('; ') : 'N/A',
+      'Author Name': discussion.created_by
+        ? `${discussion.created_by.first_name || ''} ${discussion.created_by.last_name || ''}`.trim()
+        : 'N/A',
+      'Author Email': discussion.created_by?.email || 'N/A',
+      'Author Role': discussion.created_by_role || 'N/A',
+      'Reply Count': discussion.reply_count || 0,
+      'View Count': discussion.view_count || 0,
+      'Like Count': discussion.like_count || 0,
+      Status: discussion.status || 'N/A',
+      'Meeting Link': discussion.meeting_link || 'N/A',
+      'Meeting Platform': discussion.meeting_platform || 'N/A',
+      'Meeting Scheduled At': discussion.meeting_scheduled_at
+        ? new Date(discussion.meeting_scheduled_at).toISOString()
+        : 'N/A',
+      'Meeting Duration (minutes)':
+        discussion.meeting_duration_minutes || 'N/A',
+      'Created At': discussion.created_at
+        ? new Date(discussion.created_at).toISOString()
+        : 'N/A',
+      'Updated At': discussion.updated_at
+        ? new Date(discussion.updated_at).toISOString()
+        : 'N/A',
+      'Archived At': discussion.archived_at
+        ? new Date(discussion.archived_at).toISOString()
+        : 'N/A',
+    }));
+
+    // Define CSV headers
+    const headers = [
+      'Discussion ID',
+      'Title',
+      'Content',
+      'Type',
+      'Tags',
+      'Author Name',
+      'Author Email',
+      'Author Role',
+      'Reply Count',
+      'View Count',
+      'Like Count',
+      'Status',
+      'Meeting Link',
+      'Meeting Platform',
+      'Meeting Scheduled At',
+      'Meeting Duration (minutes)',
+      'Created At',
+      'Updated At',
+      'Archived At',
+    ];
+
+    // Generate CSV content
+    const csvContent = this.convertToCSV(csvData, headers);
+
+    // Generate filename with timestamp
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const filename = `discussions-export_${timestamp}.csv`;
+
+    this.logger.log(
+      `CSV content generated: ${csvContent.length} bytes, Records: ${csvData.length}`,
+    );
+
+    return {
+      content: csvContent,
+      filename,
+      contentType: 'text/csv',
+    };
+  }
+
+  /**
+   * Convert data to CSV format
+   */
+  private convertToCSV(data: Record<string, any>[], headers: string[]): string {
+    // Escape and format CSV values
+    const escapeCSV = (value: any): string => {
+      if (value === null || value === undefined) {
+        return '';
+      }
+
+      const stringValue = String(value);
+
+      // If the value contains comma, quote, or newline, wrap it in quotes
+      if (
+        stringValue.includes(',') ||
+        stringValue.includes('"') ||
+        stringValue.includes('\n')
+      ) {
+        return `"${stringValue.replace(/"/g, '""')}"`;
+      }
+
+      return stringValue;
+    };
+
+    // Create CSV header row
+    const headerRow = headers.map((header) => escapeCSV(header)).join(',');
+
+    // Create CSV data rows
+    const dataRows = data.map((row) => {
+      return headers.map((header) => escapeCSV(row[header])).join(',');
+    });
+
+    return [headerRow, ...dataRows].join('\n');
+  }
+
+  /**
+   * Export discussions to CSV format and return as base64 encoded string
+   * Students cannot access this functionality
+   */
+  async exportDiscussionsBase64(
+    user: JWTUserPayload,
+    exportDto: ExportDiscussionsDto,
+  ): Promise<{ base64Content: string; filename: string; recordCount: number }> {
+    this.logger.log(
+      `Exporting discussions for user: ${user.id} in CSV format (base64)`,
+    );
+
+    // Check if user is a student - students cannot export discussions
+    if (user.role.name === RoleEnum.STUDENT) {
+      throw new ForbiddenException(
+        this.errorMessageService.getMessageWithLanguage(
+          'COMMUNITY',
+          'STUDENTS_CANNOT_EXPORT_DISCUSSIONS',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
+    }
+
+    try {
+      const resolvedSchoolId = this.resolveSchoolId(user);
+
+      // Validate school exists
+      const school = await this.schoolModel.findById(resolvedSchoolId);
+      if (!school) {
+        throw new NotFoundException(
+          this.errorMessageService.getMessageWithLanguage(
+            'SCHOOL',
+            'NOT_FOUND',
+            user?.preferred_language || DEFAULT_LANGUAGE,
+          ),
+        );
+      }
+
+      // Get tenant connection
+      const tenantConnection =
+        await this.tenantConnectionService.getTenantConnection(school.db_name);
+      const DiscussionModel = tenantConnection.model(
+        ForumDiscussion.name,
+        ForumDiscussionSchema,
+      );
+
+      // Build filter based on role and export options
+      const filter: any = {
+        deleted_at: null,
+      };
+
+      // Role-based filtering
+      if (user.role.name === RoleEnum.PROFESSOR) {
+        filter.status = {
+          $in: [DiscussionStatusEnum.ACTIVE, DiscussionStatusEnum.ARCHIVED],
+        };
+      }
+      // Admins can see all content
+
+      // Apply export filters
+      if (exportDto.type) {
+        filter.type = exportDto.type;
+      }
+
+      if (
+        exportDto.status &&
+        [RoleEnum.SCHOOL_ADMIN, RoleEnum.SUPER_ADMIN].includes(
+          user.role.name as RoleEnum,
+        )
+      ) {
+        filter.status = exportDto.status;
+      }
+
+      if (exportDto.search) {
+        filter.$or = [
+          { title: { $regex: exportDto.search, $options: 'i' } },
+          { content: { $regex: exportDto.search, $options: 'i' } },
+        ];
+      }
+
+      if (exportDto.tags && exportDto.tags.length > 0) {
+        filter.tags = { $in: exportDto.tags };
+      }
+
+      if (exportDto.author_id) {
+        filter.created_by = new Types.ObjectId(exportDto.author_id);
+      }
+
+      if (exportDto.start_date || exportDto.end_date) {
+        filter.created_at = {};
+        if (exportDto.start_date) {
+          filter.created_at.$gte = new Date(exportDto.start_date);
+        }
+        if (exportDto.end_date) {
+          filter.created_at.$lte = new Date(
+            exportDto.end_date + 'T23:59:59.999Z',
+          );
+        }
+      }
+
+      // Get discussions with user details
+      const discussions = await DiscussionModel.find(filter)
+        .populate('created_by', 'first_name last_name email profile_pic')
+        .sort({ created_at: -1 })
+        .lean();
+
+      if (discussions.length === 0) {
+        throw new NotFoundException(
+          this.errorMessageService.getMessageWithLanguage(
+            'COMMUNITY',
+            'NO_DISCUSSIONS_FOUND_FOR_EXPORT',
+            user?.preferred_language || DEFAULT_LANGUAGE,
+          ),
+        );
+      }
+
+      const csvData = this.generateCSVContent(discussions, exportDto);
+      const base64Content = Buffer.from(csvData.content, 'utf-8').toString(
+        'base64',
+      );
+
+      return {
+        base64Content,
+        filename: csvData.filename,
+        recordCount: discussions.length,
+      };
+    } catch (error) {
+      this.logger.error('Error exporting discussions', error?.stack || error);
+      throw error;
+    }
   }
 }

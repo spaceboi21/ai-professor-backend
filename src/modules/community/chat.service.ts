@@ -23,6 +23,7 @@ import {
   StudentSchema,
 } from 'src/database/schemas/tenant/student.schema';
 import { School } from 'src/database/schemas/central/school.schema';
+import { ErrorMessageService } from 'src/common/services/error-message.service';
 
 @Injectable()
 export class ChatService {
@@ -51,6 +52,7 @@ export class ChatService {
     @InjectModel(School.name)
     private readonly schoolModel: Model<School>,
     private readonly tenantConnectionService: TenantConnectionService,
+    private readonly errorMessageService: ErrorMessageService,
   ) {}
 
   async createMessage(
@@ -62,7 +64,13 @@ export class ChatService {
     );
 
     if (!currentUser?.school_id) {
-      throw new BadRequestException('School ID is required');
+      throw new BadRequestException(
+        this.errorMessageService.getMessage(
+          'CHAT',
+          'SCHOOL_ID_REQUIRED',
+          currentUser,
+        ),
+      );
     }
 
     // Validate school and get connection
@@ -77,7 +85,7 @@ export class ChatService {
     );
 
     // Validate communication rules
-      // TODO: commented for communicate with student to any other role
+    // TODO: commented for communicate with student to any other role
     // this.validateCommunicationRules(
     //   currentUser.role.name,
     //   createChatMessageDto.receiver_role,
@@ -106,18 +114,36 @@ export class ChatService {
 
     // Validate numeric values
     if (isNaN(numericLimit) || numericLimit < 1 || numericLimit > 100) {
-      throw new BadRequestException('Limit must be a number between 1 and 100');
+      throw new BadRequestException(
+        this.errorMessageService.getMessage(
+          'CHAT',
+          'LIMIT_VALIDATION',
+          currentUser,
+        ),
+      );
     }
 
     if (isNaN(numericPage) || numericPage < 1) {
-      throw new BadRequestException('Page must be a number greater than 0');
+      throw new BadRequestException(
+        this.errorMessageService.getMessage(
+          'CHAT',
+          'PAGE_VALIDATION',
+          currentUser,
+        ),
+      );
     }
 
     const skip = (numericPage - 1) * numericLimit;
     const currentUserId = new Types.ObjectId(currentUser.id);
 
     if (!currentUser?.school_id) {
-      throw new BadRequestException('School ID is required');
+      throw new BadRequestException(
+        this.errorMessageService.getMessage(
+          'CHAT',
+          'SCHOOL_ID_REQUIRED',
+          currentUser,
+        ),
+      );
     }
 
     const connection = await this.getTenantConnection(
@@ -166,17 +192,35 @@ export class ChatService {
 
     // Validate numeric values
     if (isNaN(numericLimit) || numericLimit < 1 || numericLimit > 100) {
-      throw new BadRequestException('Limit must be a number between 1 and 100');
+      throw new BadRequestException(
+        this.errorMessageService.getMessage(
+          'CHAT',
+          'LIMIT_VALIDATION',
+          currentUser,
+        ),
+      );
     }
 
     if (isNaN(numericPage) || numericPage < 1) {
-      throw new BadRequestException('Page must be a number greater than 0');
+      throw new BadRequestException(
+        this.errorMessageService.getMessage(
+          'CHAT',
+          'PAGE_VALIDATION',
+          currentUser,
+        ),
+      );
     }
 
     const skip = (numericPage - 1) * numericLimit;
 
     if (!currentUser?.school_id) {
-      throw new BadRequestException('School ID is required');
+      throw new BadRequestException(
+        this.errorMessageService.getMessage(
+          'CHAT',
+          'SCHOOL_ID_REQUIRED',
+          currentUser,
+        ),
+      );
     }
 
     const connection = await this.getTenantConnection(
@@ -253,7 +297,13 @@ export class ChatService {
     currentUser: JWTUserPayload,
   ): Promise<void> {
     if (!currentUser?.school_id) {
-      throw new BadRequestException('School ID is required');
+      throw new BadRequestException(
+        this.errorMessageService.getMessage(
+          'CHAT',
+          'SCHOOL_ID_REQUIRED',
+          currentUser,
+        ),
+      );
     }
 
     const connection = await this.getTenantConnection(
@@ -267,11 +317,23 @@ export class ChatService {
 
     const message = await chatMessageModel.findById(messageId);
     if (!message) {
-      throw new NotFoundException('Message not found');
+      throw new NotFoundException(
+        this.errorMessageService.getMessage(
+          'CHAT',
+          'MESSAGE_NOT_FOUND',
+          currentUser,
+        ),
+      );
     }
 
     if (message.sender_id.toString() !== currentUser.id) {
-      throw new ForbiddenException('You can only delete your own messages');
+      throw new ForbiddenException(
+        this.errorMessageService.getMessage(
+          'CHAT',
+          'CAN_ONLY_DELETE_OWN',
+          currentUser,
+        ),
+      );
     }
 
     await chatMessageModel.findByIdAndUpdate(messageId, {
@@ -284,7 +346,13 @@ export class ChatService {
   async getTenantConnection(schoolId: string) {
     const school = await this.schoolModel.findById(schoolId);
     if (!school) {
-      throw new NotFoundException('School not found');
+      throw new NotFoundException(
+        this.errorMessageService.getMessage(
+          'SCHOOL',
+          'NOT_FOUND',
+          {} as JWTUserPayload,
+        ),
+      );
     }
     return this.tenantConnectionService.getTenantConnection(school.db_name);
   }
@@ -307,12 +375,23 @@ export class ChatService {
         createChatMessageDto.receiver_id,
       );
     } else {
-      throw new BadRequestException('Invalid receiver role');
+      throw new BadRequestException(
+        this.errorMessageService.getMessage(
+          'CHAT',
+          'INVALID_RECEIVER_ROLE',
+          {} as JWTUserPayload,
+        ),
+      );
     }
 
     if (!receiver) {
       throw new NotFoundException(
-        `${createChatMessageDto.receiver_role} not found`,
+        this.errorMessageService.getMessageWithParams(
+          'CHAT',
+          'RECEIVER_NOT_FOUND',
+          { role: createChatMessageDto.receiver_role },
+          {} as JWTUserPayload,
+        ),
       );
     }
 
@@ -494,40 +573,55 @@ export class ChatService {
   }
 
   // Method to fetch user details from the correct database
-  async getUserDetails(userId: string, userRole: string, schoolId?: string): Promise<any> {
+  async getUserDetails(
+    userId: string,
+    userRole: string,
+    schoolId?: string,
+  ): Promise<any> {
     if (userRole === RoleEnum.STUDENT) {
       // Students are in tenant database
       if (!schoolId) {
-        throw new BadRequestException('School ID required to fetch student details');
+        throw new BadRequestException(
+          this.errorMessageService.getMessage(
+            'CHAT',
+            'SCHOOL_ID_REQUIRED_STUDENT',
+            {} as JWTUserPayload,
+          ),
+        );
       }
-      
+
       const connection = await this.getTenantConnection(schoolId);
       const StudentModel = connection.model(Student.name, StudentSchema);
-      
+
       const student = await StudentModel.findById(userId)
         .select('first_name last_name email')
         .lean();
-      
-      return student ? {
-        _id: student._id,
-        first_name: student.first_name,
-        last_name: student.last_name,
-        email: student.email,
-        role: RoleEnum.STUDENT,
-      } : null;
+
+      return student
+        ? {
+            _id: student._id,
+            first_name: student.first_name,
+            last_name: student.last_name,
+            email: student.email,
+            role: RoleEnum.STUDENT,
+          }
+        : null;
     } else {
       // Professors and other roles are in central database
-      const user = await this.userModel.findById(userId)
+      const user = await this.userModel
+        .findById(userId)
         .select('first_name last_name email')
         .lean();
-      
-      return user ? {
-        _id: user._id,
-        first_name: user.first_name,
-        last_name: user.last_name,
-        email: user.email,
-        role: userRole,
-      } : null;
+
+      return user
+        ? {
+            _id: user._id,
+            first_name: user.first_name,
+            last_name: user.last_name,
+            email: user.email,
+            role: userRole,
+          }
+        : null;
     }
   }
 
@@ -536,24 +630,27 @@ export class ChatService {
     currentUser: JWTUserPayload,
     filter: ChatConversationFilterDto,
   ): Promise<{ conversations: any[]; total: number }> {
-    const { conversations, total } = await this.getConversations(currentUser, filter);
-    
+    const { conversations, total } = await this.getConversations(
+      currentUser,
+      filter,
+    );
+
     // Fetch user details for each conversation
     const conversationsWithDetails = await Promise.all(
       conversations.map(async (conv) => {
         const userDetails = await this.getUserDetails(
           conv.conversation_user._id,
           conv.conversation_user_role,
-          currentUser.school_id?.toString()
+          currentUser.school_id?.toString(),
         );
-        
+
         return {
           ...conv,
           conversation_user: userDetails || conv.conversation_user,
         };
-      })
+      }),
     );
-    
+
     return {
       conversations: conversationsWithDetails,
       total,
@@ -581,7 +678,13 @@ export class ChatService {
     ]);
 
     if (!centralUser && !tenantUser) {
-      throw new NotFoundException('User not found');
+      throw new NotFoundException(
+        this.errorMessageService.getMessage(
+          'CHAT',
+          'USER_NOT_FOUND',
+          {} as JWTUserPayload,
+        ),
+      );
     }
   }
 

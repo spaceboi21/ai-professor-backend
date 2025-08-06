@@ -830,6 +830,81 @@ export const ERROR_MESSAGES: {
       [LanguageEnum.ENGLISH]: 'Page must be a number greater than 0',
       [LanguageEnum.FRENCH]: 'La page doit être un nombre supérieur à 0',
     },
+    STUDENTS_CANNOT_EXPORT_DISCUSSIONS: {
+      [LanguageEnum.ENGLISH]: 'Students cannot export discussions',
+      [LanguageEnum.FRENCH]:
+        'Les étudiants ne peuvent pas exporter les discussions',
+    },
+    NO_DISCUSSIONS_FOUND_FOR_EXPORT: {
+      [LanguageEnum.ENGLISH]: 'No discussions found for export',
+      [LanguageEnum.FRENCH]: "Aucune discussion trouvée pour l'export",
+    },
+    EXPORT_DISCUSSIONS_FAILED: {
+      [LanguageEnum.ENGLISH]: 'Failed to export discussions',
+      [LanguageEnum.FRENCH]: "Échec de l'export des discussions",
+    },
+  },
+
+  // Chat Related
+  CHAT: {
+    SCHOOL_ID_REQUIRED: {
+      [LanguageEnum.ENGLISH]: 'School ID is required',
+      [LanguageEnum.FRENCH]: "L'identifiant de l'école est requis",
+    },
+    MESSAGE_NOT_FOUND: {
+      [LanguageEnum.ENGLISH]: 'Message not found',
+      [LanguageEnum.FRENCH]: 'Message non trouvé',
+    },
+    CAN_ONLY_DELETE_OWN: {
+      [LanguageEnum.ENGLISH]: 'You can only delete your own messages',
+      [LanguageEnum.FRENCH]:
+        'Vous ne pouvez supprimer que vos propres messages',
+    },
+    INVALID_RECEIVER_ROLE: {
+      [LanguageEnum.ENGLISH]: 'Invalid receiver role',
+      [LanguageEnum.FRENCH]: 'Rôle de destinataire invalide',
+    },
+    RECEIVER_NOT_FOUND: {
+      [LanguageEnum.ENGLISH]: '{role} not found',
+      [LanguageEnum.FRENCH]: '{role} non trouvé',
+    },
+    SCHOOL_ID_REQUIRED_STUDENT: {
+      [LanguageEnum.ENGLISH]: 'School ID required to fetch student details',
+      [LanguageEnum.FRENCH]:
+        "Identifiant d'école requis pour récupérer les détails de l'étudiant",
+    },
+    LIMIT_VALIDATION: {
+      [LanguageEnum.ENGLISH]: 'Limit must be a number between 1 and 100',
+      [LanguageEnum.FRENCH]: 'La limite doit être un nombre entre 1 et 100',
+    },
+    PAGE_VALIDATION: {
+      [LanguageEnum.ENGLISH]: 'Page must be a number greater than 0',
+      [LanguageEnum.FRENCH]: 'La page doit être un nombre supérieur à 0',
+    },
+    CREATE_MESSAGE_FAILED: {
+      [LanguageEnum.ENGLISH]: 'Failed to create message',
+      [LanguageEnum.FRENCH]: 'Échec de la création du message',
+    },
+    RETRIEVE_MESSAGES_FAILED: {
+      [LanguageEnum.ENGLISH]: 'Failed to retrieve messages',
+      [LanguageEnum.FRENCH]: 'Échec de la récupération des messages',
+    },
+    RETRIEVE_CONVERSATIONS_FAILED: {
+      [LanguageEnum.ENGLISH]: 'Failed to retrieve conversations',
+      [LanguageEnum.FRENCH]: 'Échec de la récupération des conversations',
+    },
+    MARK_READ_FAILED: {
+      [LanguageEnum.ENGLISH]: 'Failed to mark messages as read',
+      [LanguageEnum.FRENCH]: 'Échec du marquage des messages comme lus',
+    },
+    DELETE_MESSAGE_FAILED: {
+      [LanguageEnum.ENGLISH]: 'Failed to delete message',
+      [LanguageEnum.FRENCH]: 'Échec de la suppression du message',
+    },
+    USER_NOT_FOUND: {
+      [LanguageEnum.ENGLISH]: 'User not found',
+      [LanguageEnum.FRENCH]: 'Utilisateur non trouvé',
+    },
   },
 
   // Learning Logs Related
@@ -1394,6 +1469,34 @@ export const SUCCESS_MESSAGES: {
     PIN_STATUS_RETRIEVED_SUCCESSFULLY: {
       [LanguageEnum.ENGLISH]: 'Pin status retrieved successfully',
       [LanguageEnum.FRENCH]: "Statut d'épinglage récupéré avec succès",
+    },
+  },
+
+  // Chat Related Success Messages
+  CHAT: {
+    MESSAGE_CREATED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'Message created successfully',
+      [LanguageEnum.FRENCH]: 'Message créé avec succès',
+    },
+    MESSAGES_RETRIEVED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'Messages retrieved successfully',
+      [LanguageEnum.FRENCH]: 'Messages récupérés avec succès',
+    },
+    CONVERSATIONS_RETRIEVED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'Conversations retrieved successfully',
+      [LanguageEnum.FRENCH]: 'Conversations récupérées avec succès',
+    },
+    MESSAGES_MARKED_AS_READ_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'Messages marked as read successfully',
+      [LanguageEnum.FRENCH]: 'Messages marqués comme lus avec succès',
+    },
+    MESSAGE_DELETED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'Message deleted successfully',
+      [LanguageEnum.FRENCH]: 'Message supprimé avec succès',
+    },
+    USER_DETAILS_RETRIEVED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'User details retrieved successfully',
+      [LanguageEnum.FRENCH]: 'Détails utilisateur récupérés avec succès',
     },
   },
 
