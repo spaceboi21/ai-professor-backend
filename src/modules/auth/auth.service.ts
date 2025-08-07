@@ -675,10 +675,14 @@ export class AuthService {
       school_id: user.school_id?.toString(),
     });
 
-    // Create reset password link - serve from backend
+    // Create reset password link - serve from backend based on language preference
     const backendUrl =
       this.configService.get<string>('BACKEND_URL') || 'http://localhost:3000';
-    const resetPasswordLink = `${backendUrl}/static/reset-password.html?token=${resetToken}`;
+    const userLanguage = user.preferred_language || DEFAULT_LANGUAGE;
+    const resetPasswordLink =
+      userLanguage === LanguageEnum.FRENCH
+        ? `${backendUrl}/static/reset-password-fr.html?token=${resetToken}`
+        : `${backendUrl}/static/reset-password.html?token=${resetToken}`;
 
     // Send email
     try {
@@ -718,10 +722,14 @@ export class AuthService {
       school_id: school._id.toString(),
     });
 
-    // Create reset password link - serve from backend
+    // Create reset password link - serve from backend based on language preference
     const backendUrl =
       this.configService.get<string>('BACKEND_URL') || 'http://localhost:3000';
-    const resetPasswordLink = `${backendUrl}/static/reset-password.html?token=${resetToken}`;
+    const studentLanguage = student.preferred_language || DEFAULT_LANGUAGE;
+    const resetPasswordLink =
+      studentLanguage === LanguageEnum.FRENCH
+        ? `${backendUrl}/static/reset-password-fr.html?token=${resetToken}`
+        : `${backendUrl}/static/reset-password.html?token=${resetToken}`;
 
     // Send email
     try {

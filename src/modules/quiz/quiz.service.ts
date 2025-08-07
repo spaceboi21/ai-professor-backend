@@ -8,10 +8,6 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { QuizTypeEnum } from 'src/common/constants/quiz.constant';
 import { JWTUserPayload } from 'src/common/types/jwr-user.type';
-import {
-  createPaginationResult,
-  getPaginationOptions,
-} from 'src/common/utils/pagination.util';
 import { School } from 'src/database/schemas/central/school.schema';
 import { User } from 'src/database/schemas/central/user.schema';
 import {
