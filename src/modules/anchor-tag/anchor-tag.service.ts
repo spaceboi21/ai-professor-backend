@@ -187,17 +187,17 @@ export class AnchorTagService {
       chapter_id: new Types.ObjectId(createAnchorTagDto.chapter_id),
       bibliography_id: new Types.ObjectId(createAnchorTagDto.bibliography_id),
       title: createAnchorTagDto.title,
-      description: createAnchorTagDto.description,
+      description: createAnchorTagDto.description ?? null,
       content_type: createAnchorTagDto.content_type,
       content_reference: createAnchorTagDto.content_reference,
-      timestamp_seconds: createAnchorTagDto.timestamp_seconds,
-      page_number: createAnchorTagDto.page_number,
-      slide_number: createAnchorTagDto.slide_number,
-      status: createAnchorTagDto.status || AnchorTagStatusEnum.ACTIVE,
-      is_mandatory: createAnchorTagDto.is_mandatory || false,
+      timestamp_seconds: createAnchorTagDto.timestamp_seconds ?? null,
+      page_number: createAnchorTagDto.page_number ?? null,
+      slide_number: createAnchorTagDto.slide_number ?? null,
+      status: createAnchorTagDto.status ?? AnchorTagStatusEnum.ACTIVE,
+      is_mandatory: createAnchorTagDto.is_mandatory ?? false,
       quiz_group_id: new Types.ObjectId(createAnchorTagDto.quiz_group_id),
       sequence: finalSequence,
-      tags: createAnchorTagDto.tags || [],
+      tags: createAnchorTagDto.tags ?? [],
       created_by: new Types.ObjectId(user.id),
       created_by_role: user.role.name,
     });
@@ -468,14 +468,26 @@ export class AnchorTagService {
 
     // Prepare update data with proper ObjectId conversion
     const updateData: any = {
-      ...updateAnchorTagDto,
       updated_at: new Date(),
     };
 
+    // Always include all fields, converting undefined to null
+    updateData.title = updateAnchorTagDto.title;
+    updateData.description = updateAnchorTagDto.description ?? null;
+    updateData.content_type = updateAnchorTagDto.content_type;
+    updateData.content_reference = updateAnchorTagDto.content_reference;
+    updateData.timestamp_seconds = updateAnchorTagDto.timestamp_seconds ?? null;
+    updateData.page_number = updateAnchorTagDto.page_number ?? null;
+    updateData.slide_number = updateAnchorTagDto.slide_number ?? null;
+    updateData.status = updateAnchorTagDto.status ?? null;
+    updateData.is_mandatory = updateAnchorTagDto.is_mandatory ?? null;
+    updateData.sequence = updateAnchorTagDto.sequence ?? null;
+    updateData.tags = updateAnchorTagDto.tags ?? null;
+
     // Convert ObjectIds if provided
-    if (quiz_group_id) {
-      updateData.quiz_group_id = new Types.ObjectId(quiz_group_id);
-    }
+    updateData.quiz_group_id = quiz_group_id
+      ? new Types.ObjectId(quiz_group_id)
+      : null;
 
     // Update anchor tag
     const updatedAnchorTag = await AnchorTagModel.findByIdAndUpdate(

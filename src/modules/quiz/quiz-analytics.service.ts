@@ -20,9 +20,12 @@ import { TenantConnectionService } from 'src/database/tenant-connection.service'
 import { JWTUserPayload } from 'src/common/types/jwr-user.type';
 import { RoleEnum } from 'src/common/constants/roles.constant';
 import { AttemptStatusEnum } from 'src/common/constants/status.constant';
+import { QuizTypeEnum } from 'src/common/constants/quiz.constant';
 import { StudentQuizAnalyticsFilterDto } from './dto/student-quiz-analytics-filter.dto';
 import { ExportFormatEnum } from 'src/common/constants/export.constant';
 import { QuizAnalyticsFilterDto } from './dto/quiz-analytics-filter.dto';
+import { getErrorMessage } from 'src/common/constants/error-messages.constant';
+import { LanguageEnum } from 'src/common/constants/language.constant';
 
 @Injectable()
 export class QuizAnalyticsService {
@@ -49,13 +52,21 @@ export class QuizAnalyticsService {
       user.role.name !== RoleEnum.SCHOOL_ADMIN &&
       user.role.name !== RoleEnum.PROFESSOR
     ) {
-      throw new BadRequestException('Only admins can access quiz analytics');
+      throw new BadRequestException(
+        getErrorMessage(
+          'QUIZ',
+          'ONLY_ADMINS_CAN_ACCESS_ANALYTICS',
+          LanguageEnum.ENGLISH,
+        ),
+      );
     }
 
     // Get school and tenant connection
     const school = await this.schoolModel.findById(user.school_id);
     if (!school) {
-      throw new NotFoundException('School not found');
+      throw new NotFoundException(
+        getErrorMessage('QUIZ', 'SCHOOL_NOT_FOUND', LanguageEnum.ENGLISH),
+      );
     }
 
     const tenantConnection =
@@ -389,6 +400,20 @@ export class QuizAnalyticsService {
         },
       },
       {
+        $lookup: {
+          from: 'quiz_group',
+          localField: 'quiz_group_id',
+          foreignField: '_id',
+          as: 'quiz_group',
+        },
+      },
+      { $unwind: '$quiz_group' },
+      {
+        $match: {
+          'quiz_group.type': { $ne: QuizTypeEnum.ANCHOR_TAG },
+        },
+      },
+      {
         $group: {
           _id: '$quiz_group_id',
         },
@@ -417,6 +442,11 @@ export class QuizAnalyticsService {
         },
       },
       { $unwind: '$quiz_group' },
+      {
+        $match: {
+          'quiz_group.type': { $ne: QuizTypeEnum.ANCHOR_TAG },
+        },
+      },
       {
         $lookup: {
           from: 'modules',
@@ -550,7 +580,11 @@ export class QuizAnalyticsService {
       // Admins can view any student's data if student_id is provided
       if (!studentId) {
         throw new BadRequestException(
-          'Student ID is required for admin access',
+          getErrorMessage(
+            'QUIZ',
+            'STUDENT_ID_REQUIRED_FOR_ADMIN_ACCESS',
+            LanguageEnum.ENGLISH,
+          ),
         );
       }
       targetStudentId = studentId;
@@ -559,14 +593,20 @@ export class QuizAnalyticsService {
       );
     } else {
       throw new BadRequestException(
-        'Only students, school admins, and professors can access this endpoint',
+        getErrorMessage(
+          'QUIZ',
+          'ONLY_STUDENTS_ADMINS_PROFESSORS_CAN_ACCESS',
+          LanguageEnum.ENGLISH,
+        ),
       );
     }
 
     // Get school and tenant connection
     const school = await this.schoolModel.findById(user.school_id);
     if (!school) {
-      throw new NotFoundException('School not found');
+      throw new NotFoundException(
+        getErrorMessage('QUIZ', 'SCHOOL_NOT_FOUND', LanguageEnum.ENGLISH),
+      );
     }
 
     const tenantConnection =
@@ -790,7 +830,13 @@ export class QuizAnalyticsService {
       return this.exportToJSON(analytics);
     }
 
-    throw new BadRequestException('Unsupported export format');
+    throw new BadRequestException(
+      getErrorMessage(
+        'QUIZ',
+        'UNSUPPORTED_EXPORT_FORMAT',
+        LanguageEnum.ENGLISH,
+      ),
+    );
   }
 
   async exportStudentQuizAnalytics(
@@ -815,7 +861,13 @@ export class QuizAnalyticsService {
       return this.exportStudentToJSON(analytics);
     }
 
-    throw new BadRequestException('Unsupported export format');
+    throw new BadRequestException(
+      getErrorMessage(
+        'QUIZ',
+        'UNSUPPORTED_EXPORT_FORMAT',
+        LanguageEnum.ENGLISH,
+      ),
+    );
   }
 
   private exportToCSV(analytics: any[]) {

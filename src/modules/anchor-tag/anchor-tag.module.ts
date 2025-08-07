@@ -16,6 +16,7 @@ import { NotificationsModule } from '../notifications/notifications.module';
 import { ProgressModule } from '../progress/progress.module';
 import { AnchorTagController } from './anchor-tag.controller';
 import { AnchorTagService } from './anchor-tag.service';
+import { AnchorTagAnalyticsService } from './anchor-tag-analytics.service';
 import { PythonService } from './python.service';
 import { StudentAnchorTagAttemptService } from './student-anchor-tag-attempt.service';
 
@@ -33,11 +34,17 @@ import { StudentAnchorTagAttemptService } from './student-anchor-tag-attempt.ser
   controllers: [AnchorTagController],
   providers: [
     AnchorTagService,
+    AnchorTagAnalyticsService,
     StudentAnchorTagAttemptService,
     PythonService,
     TenantConnectionService,
     ErrorMessageService,
   ],
-  exports: [AnchorTagService, StudentAnchorTagAttemptService, PythonService],
+  exports: [
+    AnchorTagService,
+    AnchorTagAnalyticsService,
+    StudentAnchorTagAttemptService,
+    PythonService,
+  ],
 })
 export class AnchorTagModule {}

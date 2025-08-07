@@ -1194,6 +1194,35 @@ export const ERROR_MESSAGES: {
       [LanguageEnum.ENGLISH]: 'Invalid quiz IDs provided',
       [LanguageEnum.FRENCH]: 'IDs de quiz invalides fournis',
     },
+    // Analytics Related
+    ONLY_ADMINS_CAN_ACCESS_ANALYTICS: {
+      [LanguageEnum.ENGLISH]: 'Only admins can access quiz analytics',
+      [LanguageEnum.FRENCH]:
+        'Seuls les administrateurs peuvent accéder aux analyses de quiz',
+    },
+    STUDENT_ID_REQUIRED_FOR_ADMIN_ACCESS: {
+      [LanguageEnum.ENGLISH]: 'Student ID is required for admin access',
+      [LanguageEnum.FRENCH]:
+        "L'ID de l'étudiant est requis pour l'accès administrateur",
+    },
+    ONLY_STUDENTS_ADMINS_PROFESSORS_CAN_ACCESS: {
+      [LanguageEnum.ENGLISH]:
+        'Only students, school admins, and professors can access this endpoint',
+      [LanguageEnum.FRENCH]:
+        "Seuls les étudiants, administrateurs d'école et professeurs peuvent accéder à ce point de terminaison",
+    },
+    ANALYTICS_RETRIEVED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'Quiz analytics retrieved successfully',
+      [LanguageEnum.FRENCH]: 'Analyses de quiz récupérées avec succès',
+    },
+    ANALYTICS_EXPORTED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'Quiz analytics exported successfully',
+      [LanguageEnum.FRENCH]: 'Analyses de quiz exportées avec succès',
+    },
+    UNSUPPORTED_EXPORT_FORMAT: {
+      [LanguageEnum.ENGLISH]: 'Unsupported export format',
+      [LanguageEnum.FRENCH]: "Format d'exportation non pris en charge",
+    },
   },
 
   // Anchor Tag Related
@@ -1306,6 +1335,41 @@ export const ERROR_MESSAGES: {
     FAILED_TO_SEND_NOTIFICATION: {
       [LanguageEnum.ENGLISH]: 'Failed to send notification',
       [LanguageEnum.FRENCH]: "Échec de l'envoi de la notification",
+    },
+    // Analytics Related
+    ONLY_ADMINS_CAN_ACCESS_ANALYTICS: {
+      [LanguageEnum.ENGLISH]: 'Only admins can access anchor tag analytics',
+      [LanguageEnum.FRENCH]:
+        "Seuls les administrateurs peuvent accéder aux analyses de tags d'ancrage",
+    },
+    STUDENT_ID_REQUIRED_FOR_ADMIN_ACCESS: {
+      [LanguageEnum.ENGLISH]: 'Student ID is required for admin access',
+      [LanguageEnum.FRENCH]:
+        "L'ID de l'étudiant est requis pour l'accès administrateur",
+    },
+    ONLY_STUDENTS_ADMINS_PROFESSORS_CAN_ACCESS: {
+      [LanguageEnum.ENGLISH]:
+        'Only students, school admins, and professors can access this endpoint',
+      [LanguageEnum.FRENCH]:
+        "Seuls les étudiants, administrateurs d'école et professeurs peuvent accéder à ce point de terminaison",
+    },
+    ANALYTICS_RETRIEVED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'Anchor tag analytics retrieved successfully',
+      [LanguageEnum.FRENCH]:
+        "Analyses de tags d'ancrage récupérées avec succès",
+    },
+    ANALYTICS_EXPORTED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'Anchor tag analytics exported successfully',
+      [LanguageEnum.FRENCH]: "Analyses de tags d'ancrage exportées avec succès",
+    },
+    UNSUPPORTED_EXPORT_FORMAT: {
+      [LanguageEnum.ENGLISH]: 'Unsupported export format',
+      [LanguageEnum.FRENCH]: "Format d'exportation non pris en charge",
+    },
+    NO_DATA_AVAILABLE: {
+      [LanguageEnum.ENGLISH]: 'No data available for the specified criteria',
+      [LanguageEnum.FRENCH]:
+        'Aucune donnée disponible pour les critères spécifiés',
     },
   },
 
