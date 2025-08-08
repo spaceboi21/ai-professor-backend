@@ -12,15 +12,7 @@ import {
   StudentAnchorTagAttempt,
   StudentAnchorTagAttemptSchema,
 } from 'src/database/schemas/tenant/student-anchor-tag-attempt.schema';
-import {
-  AnchorTag,
-  AnchorTagSchema,
-} from 'src/database/schemas/tenant/anchor-tag.schema';
-import {
-  QuizGroup,
-  QuizGroupSchema,
-} from 'src/database/schemas/tenant/quiz-group.schema';
-import { Quiz, QuizSchema } from 'src/database/schemas/tenant/quiz.schema';
+
 import { TenantConnectionService } from 'src/database/tenant-connection.service';
 import { JWTUserPayload } from 'src/common/types/jwr-user.type';
 import { RoleEnum } from 'src/common/constants/roles.constant';

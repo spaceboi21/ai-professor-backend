@@ -992,6 +992,7 @@ export class BibliographyService {
       // This ensures we don't conflict with the compound index that includes deleted_at
       const lastBibliography = await BibliographyModel.findOne({
         chapter_id: new Types.ObjectId(chapter_id),
+        deleted_at: null,
       })
         .sort({ sequence: -1 })
         .select('sequence')

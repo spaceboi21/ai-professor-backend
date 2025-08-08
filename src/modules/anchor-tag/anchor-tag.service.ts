@@ -53,10 +53,6 @@ import {
 import { NotificationsService } from '../notifications/notifications.service';
 import { RecipientTypeEnum } from 'src/database/schemas/tenant/notification.schema';
 import { NotificationTypeEnum } from 'src/common/constants/notification.constant';
-import {
-  Student,
-  StudentSchema,
-} from 'src/database/schemas/tenant/student.schema';
 
 @Injectable()
 export class AnchorTagService {

@@ -8,7 +8,6 @@ import {
   Delete,
   Query,
   UseGuards,
-  Request,
   Res,
   ParseEnumPipe,
 } from '@nestjs/common';

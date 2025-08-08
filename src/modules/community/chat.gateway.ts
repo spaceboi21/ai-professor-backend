@@ -92,12 +92,14 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     if (client.user) {
       const userId = client.user.id.toString();
       const roomName = this.userRooms.get(userId);
-      
+
       this.connectedUsers.delete(userId);
       this.userRooms.delete(userId);
-      
-      this.logger.log(`🔌 User disconnected: ${client.user.id} from room: ${roomName}`);
-      
+
+      this.logger.log(
+        `🔌 User disconnected: ${client.user.id} from room: ${roomName}`,
+      );
+
       if (roomName) {
         this.broadcastOnlineStatus(userId, false, roomName);
       }
@@ -261,7 +263,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     if (!this.validateUser(client)) return { error: 'Unauthorized' };
 
     const onlineStatus = this.getOnlineStatusForUsers(data.user_ids);
-    
+
     client.emit('ONLINE_STATUS_RESPONSE', {
       online_status: onlineStatus,
       timestamp: new Date().toISOString(),
@@ -425,10 +427,14 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
   }
 
-  private broadcastOnlineStatus(userId: string, isOnline: boolean, roomName?: string) {
+  private broadcastOnlineStatus(
+    userId: string,
+    isOnline: boolean,
+    roomName?: string,
+  ) {
     const event = isOnline ? 'USER_ONLINE' : 'USER_OFFLINE';
     const data = { user_id: userId };
-    
+
     if (roomName) {
       // Broadcast to specific school room
       this.server.to(roomName).emit(event, data);
