@@ -389,6 +389,15 @@ export class BibliographyService {
         },
       });
 
+      pipeline.push({
+        $lookup: {
+          from: 'anchor_tags',
+          localField: '_id',
+          foreignField: 'bibliography_id',
+          as: 'anchor_points',
+        },
+      });
+
       // Execute aggregation
       const bibliography = await BibliographyModel.aggregate(pipeline);
 
@@ -398,24 +407,10 @@ export class BibliographyService {
         this.userModel,
       );
 
-      // Add anchor points to each bibliography item
-      const bibliographyWithAnchorPoints = await Promise.all(
-        bibliographyWithUsers.map(async (bibliographyItem) => {
-          const anchorPoints =
-            await this.anchorTagService.getAnchorTagsByBibliography(
-              bibliographyItem._id,
-              user,
-            );
-          return {
-            ...bibliographyItem,
-            anchor_points: anchorPoints,
-          } as any;
-        }),
-      );
 
       // Create pagination result
       const result = createPaginationResult(
-        bibliographyWithAnchorPoints,
+        bibliographyWithUsers,
         total,
         paginationOptions,
       );
