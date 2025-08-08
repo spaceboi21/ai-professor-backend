@@ -37,6 +37,7 @@ import { ActivityLogModule } from './modules/activity-log/activity-log.module';
 import { CommunityModule } from './modules/community/community.module';
 import { CommonModule } from './common/common.module';
 import { AnchorTagModule } from './modules/anchor-tag/anchor-tag.module';
+import { EncryptionModule } from './modules/encryption/encryption.module';
 
 @Module({
   imports: [
@@ -129,6 +130,7 @@ import { AnchorTagModule } from './modules/anchor-tag/anchor-tag.module';
     ActivityLogModule,
     CommunityModule,
     AnchorTagModule,
+    EncryptionModule,
     HttpModule,
   ],
   controllers: [AppController],

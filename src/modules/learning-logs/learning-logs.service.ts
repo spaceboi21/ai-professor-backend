@@ -34,6 +34,7 @@ import { LearningLogsFilterDto } from './dto/learning-logs-filter.dto';
 import { LearningLogsResponseDto } from './dto/learning-logs-response.dto';
 import { ErrorMessageService } from 'src/common/services/error-message.service';
 import { DEFAULT_LANGUAGE } from 'src/common/constants/language.constant';
+import { EmailEncryptionService } from 'src/common/services/email-encryption.service';
 
 @Injectable()
 export class LearningLogsService {
@@ -48,6 +49,7 @@ export class LearningLogsService {
     private readonly notificationsService: NotificationsService,
     private readonly csvUtil: CSVUtil,
     private readonly errorMessageService: ErrorMessageService,
+    private readonly emailEncryptionService: EmailEncryptionService,
   ) {}
 
   async getLearningLogs(
@@ -88,7 +90,16 @@ export class LearningLogsService {
       return createPaginationResult([], totalCount, options);
     }
 
-    return createPaginationResult(data, totalCount, options);
+    // Decrypt student emails in the results
+    const decryptedData = data.map(item => {
+      if (item.student && item.student.email) {
+        // Decrypt the student email
+        item.student.email = this.emailEncryptionService.decryptEmail(item.student.email);
+      }
+      return item;
+    });
+
+    return createPaginationResult(decryptedData, totalCount, options);
   }
 
   async getLearningLogById(
@@ -111,7 +122,13 @@ export class LearningLogsService {
       );
     }
 
-    return results[0];
+    // Decrypt student email in the result
+    const result = results[0];
+    if (result.student && result.student.email) {
+      result.student.email = this.emailEncryptionService.decryptEmail(result.student.email);
+    }
+
+    return result;
   }
 
   async getSkillGapStats(user: JWTUserPayload) {
@@ -232,10 +249,16 @@ export class LearningLogsService {
         ),
       );
     }
+    // Decrypt the reviewer email before returning
+    const decryptedReviewer = this.emailEncryptionService.decryptEmailFields(
+      reviewer,
+      ['email'],
+    );
+
     const reviewerInfo = {
       first_name: reviewer.first_name,
       last_name: reviewer.last_name,
-      email: reviewer.email,
+      email: decryptedReviewer.email,
       profile_pic: reviewer.profile_pic,
     };
 
@@ -315,10 +338,16 @@ export class LearningLogsService {
         ),
       );
     }
+    // Decrypt the reviewer email before returning
+    const decryptedReviewer = this.emailEncryptionService.decryptEmailFields(
+      reviewer,
+      ['email'],
+    );
+
     const reviewerInfo = {
       first_name: reviewer.first_name,
       last_name: reviewer.last_name,
-      email: reviewer.email,
+      email: decryptedReviewer.email,
       profile_pic: reviewer.profile_pic,
     };
 
@@ -398,60 +427,72 @@ export class LearningLogsService {
     }
 
     // Transform data for CSV export - removing IDs and technical fields
-    const csvData = data.map((log: any) => ({
-      'Student Name': log.student
-        ? `${log.student.first_name} ${log.student.last_name}`.trim()
-        : 'N/A',
-      'Student Email': log.student?.email || 'N/A',
-      'Module Title': log.module?.title || 'N/A',
-      'Module Subject': log.module?.subject || 'N/A',
-      'Module Difficulty': log.module?.difficulty || 'N/A',
-      'Session Status': log.session?.status || 'N/A',
-      'Session Start Date': log.session?.started_at
-        ? new Date(log.session.started_at).toISOString()
-        : 'N/A',
-      'Session End Date': log.session?.ended_at
-        ? new Date(log.session.ended_at).toISOString()
-        : 'N/A',
-      'Primary Skill Gap':
-        Array.isArray(log.skill_gaps) && log.skill_gaps.length > 0
-          ? log.skill_gaps[0]
+    const csvData = data.map((log: any) => {
+      // Decrypt student email if it exists
+      let decryptedStudentEmail = 'N/A';
+      if (log.student?.email) {
+        const decryptedStudent = this.emailEncryptionService.decryptEmailFields(
+          log.student,
+          ['email'],
+        );
+        decryptedStudentEmail = decryptedStudent.email;
+      }
+
+      return {
+        'Student Name': log.student
+          ? `${log.student.first_name} ${log.student.last_name}`.trim()
           : 'N/A',
-      'Skill Gaps': Array.isArray(log.skill_gaps)
-        ? log.skill_gaps.join('; ')
-        : 'N/A',
-      Strengths: Array.isArray(log.strengths)
-        ? log.strengths.join('; ')
-        : 'N/A',
-      'Areas for Improvement': Array.isArray(log.areas_for_improvement)
-        ? log.areas_for_improvement.join('; ')
-        : 'N/A',
-      'Missed Opportunities': Array.isArray(log.missed_opportunities)
-        ? log.missed_opportunities.join('; ')
-        : 'N/A',
-      Suggestions: Array.isArray(log.suggestions)
-        ? log.suggestions.join('; ')
-        : 'N/A',
-      'Keywords for Learning': Array.isArray(log.keywords_for_learning)
-        ? log.keywords_for_learning.join('; ')
-        : 'N/A',
-      'Overall Rating': log.rating?.overall_score || 'N/A',
-      'Communication Rating': log.rating?.communication_score || 'N/A',
-      'Professionalism Rating': log.rating?.professionalism_score || 'N/A',
-      Status: log.status || 'N/A',
-      'Feedback Created At': log.created_at
-        ? new Date(log.created_at).toISOString()
-        : 'N/A',
-      'Feedback Updated At': log.updated_at
-        ? new Date(log.updated_at).toISOString()
-        : 'N/A',
-      'Review Rating': log.user_review?.[0]?.rating || 'N/A',
-      'Review Feedback': log.user_review?.[0]?.feedback || 'N/A',
-      'Reviewer Role': log.user_review?.[0]?.reviewer_role || 'N/A',
-      'Review Created At': log.user_review?.[0]?.created_at
-        ? new Date(log.user_review[0].created_at).toISOString()
-        : 'N/A',
-    }));
+        'Student Email': decryptedStudentEmail,
+        'Module Title': log.module?.title || 'N/A',
+        'Module Subject': log.module?.subject || 'N/A',
+        'Module Difficulty': log.module?.difficulty || 'N/A',
+        'Session Status': log.session?.status || 'N/A',
+        'Session Start Date': log.session?.started_at
+          ? new Date(log.session.started_at).toISOString()
+          : 'N/A',
+        'Session End Date': log.session?.ended_at
+          ? new Date(log.session.ended_at).toISOString()
+          : 'N/A',
+        'Primary Skill Gap':
+          Array.isArray(log.skill_gaps) && log.skill_gaps.length > 0
+            ? log.skill_gaps[0]
+            : 'N/A',
+        'Skill Gaps': Array.isArray(log.skill_gaps)
+          ? log.skill_gaps.join('; ')
+          : 'N/A',
+        Strengths: Array.isArray(log.strengths)
+          ? log.strengths.join('; ')
+          : 'N/A',
+        'Areas for Improvement': Array.isArray(log.areas_for_improvement)
+          ? log.areas_for_improvement.join('; ')
+          : 'N/A',
+        'Missed Opportunities': Array.isArray(log.missed_opportunities)
+          ? log.missed_opportunities.join('; ')
+          : 'N/A',
+        Suggestions: Array.isArray(log.suggestions)
+          ? log.suggestions.join('; ')
+          : 'N/A',
+        'Keywords for Learning': Array.isArray(log.keywords_for_learning)
+          ? log.keywords_for_learning.join('; ')
+          : 'N/A',
+        'Overall Rating': log.rating?.overall_score || 'N/A',
+        'Communication Rating': log.rating?.communication_score || 'N/A',
+        'Professionalism Rating': log.rating?.professionalism_score || 'N/A',
+        Status: log.status || 'N/A',
+        'Feedback Created At': log.created_at
+          ? new Date(log.created_at).toISOString()
+          : 'N/A',
+        'Feedback Updated At': log.updated_at
+          ? new Date(log.updated_at).toISOString()
+          : 'N/A',
+        'Review Rating': log.user_review?.[0]?.rating || 'N/A',
+        'Review Feedback': log.user_review?.[0]?.feedback || 'N/A',
+        'Reviewer Role': log.user_review?.[0]?.reviewer_role || 'N/A',
+        'Review Created At': log.user_review?.[0]?.created_at
+          ? new Date(log.user_review[0].created_at).toISOString()
+          : 'N/A',
+      };
+    });
 
     // Define CSV headers - removing IDs and technical fields
     const headers = [

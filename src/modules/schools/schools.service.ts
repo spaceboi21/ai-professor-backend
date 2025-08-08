@@ -18,6 +18,7 @@ import {
 } from 'src/common/utils/pagination.util';
 import { User } from 'src/database/schemas/central/user.schema';
 import { ErrorMessageService } from 'src/common/services/error-message.service';
+import { EmailEncryptionService } from 'src/common/services/email-encryption.service';
 import { DEFAULT_LANGUAGE } from 'src/common/constants/language.constant';
 
 @Injectable()
@@ -30,6 +31,7 @@ export class SchoolsService {
     @InjectModel(User.name)
     private readonly userModel: Model<User>,
     private readonly errorMessageService: ErrorMessageService,
+    private readonly emailEncryptionService: EmailEncryptionService,
   ) {}
 
   async getAllSchools(
@@ -66,7 +68,19 @@ export class SchoolsService {
       this.schoolModel.countDocuments(filter),
     ]);
 
-    const pagination = createPaginationResult(schools, total, {
+    // Decrypt school emails
+    const decryptedSchools = schools.map(school => {
+      if (school.email) {
+        school.email = this.emailEncryptionService.decryptEmail(school.email);
+      }
+      // Also decrypt created_by email if it exists and is populated
+      if (school.created_by && typeof school.created_by === 'object' && 'email' in school.created_by) {
+        (school.created_by as any).email = this.emailEncryptionService.decryptEmail((school.created_by as any).email);
+      }
+      return school;
+    });
+
+    const pagination = createPaginationResult(decryptedSchools, total, {
       page,
       limit,
       skip: (page - 1) * limit,
@@ -129,7 +143,26 @@ export class SchoolsService {
         last_logged_in: 1,
         status: 1,
       },
-    );
+    ).lean();
+
+    // Decrypt school email
+    if (school.email) {
+      school.email = this.emailEncryptionService.decryptEmail(school.email);
+    }
+
+    // Decrypt created_by email if it exists and is populated
+    if (school.created_by && typeof school.created_by === 'object' && 'email' in school.created_by) {
+      (school.created_by as any).email = this.emailEncryptionService.decryptEmail((school.created_by as any).email);
+    }
+
+    // Decrypt super admin email if it exists
+    let decryptedSuperAdmin = superAdmin;
+    if (superAdmin && superAdmin.email) {
+      decryptedSuperAdmin = {
+        ...superAdmin,
+        email: this.emailEncryptionService.decryptEmail(superAdmin.email),
+      };
+    }
 
     return {
       message: this.errorMessageService.getSuccessMessageWithLanguage(
@@ -139,7 +172,7 @@ export class SchoolsService {
       ),
       data: {
         ...school,
-        super_admin: superAdmin,
+        super_admin: decryptedSuperAdmin,
       },
     };
   }
