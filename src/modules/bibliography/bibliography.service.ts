@@ -398,31 +398,20 @@ export class BibliographyService {
         this.userModel,
       );
 
-      // Get all anchor points for the chapter and module
-      let allAnchorPoints: any[] = [];
-      try {
-        if (filterDto?.chapter_id && filterDto?.module_id) {
-          this.logger.log(`Fetching anchor points for chapter: ${filterDto.chapter_id} and module: ${filterDto.module_id}`);
-          allAnchorPoints = await this.anchorTagService.getAnchorTagsByChapterAndModule(
-            filterDto.chapter_id,
-            filterDto.module_id,
-            user,
-          );
-          this.logger.log(`Found ${allAnchorPoints.length} anchor points`);
-        } else {
-          this.logger.warn('No chapter_id or module_id provided in filter, skipping anchor points fetch');
-        }
-      } catch (error) {
-        this.logger.warn(`Failed to fetch anchor points for chapter ${filterDto?.chapter_id} and module ${filterDto?.module_id}:`, error);
-      }
-
       // Add anchor points to each bibliography item
-      const bibliographyWithAnchorPoints = bibliographyWithUsers.map((bibliographyItem) => {
-        return {
-          ...bibliographyItem,
-          anchor_points: allAnchorPoints,
-        } as any;
-      });
+      const bibliographyWithAnchorPoints = await Promise.all(
+        bibliographyWithUsers.map(async (bibliographyItem) => {
+          const anchorPoints =
+            await this.anchorTagService.getAnchorTagsByBibliography(
+              bibliographyItem._id,
+              user,
+            );
+          return {
+            ...bibliographyItem,
+            anchor_points: anchorPoints,
+          } as any;
+        }),
+      );
 
       // Create pagination result
       const result = createPaginationResult(
@@ -503,17 +492,21 @@ export class BibliographyService {
       // Add anchor points to the bibliography item
       let bibliographyWithAnchorPoints = bibliographyWithUser;
       try {
-        const anchorPoints = await this.anchorTagService.getAnchorTagsByChapterAndModule(
-          bibliography.chapter_id,
-          bibliography.module_id,
-          user,
-        );
+        const anchorPoints =
+          await this.anchorTagService.getAnchorTagsByChapterAndModule(
+            bibliography.chapter_id,
+            bibliography.module_id,
+            user,
+          );
         bibliographyWithAnchorPoints = {
           ...bibliographyWithUser,
           anchor_points: anchorPoints,
         } as any;
       } catch (error) {
-        this.logger.warn(`Failed to fetch anchor points for chapter ${bibliography.chapter_id} and module ${bibliography.module_id}:`, error);
+        this.logger.warn(
+          `Failed to fetch anchor points for chapter ${bibliography.chapter_id} and module ${bibliography.module_id}:`,
+          error,
+        );
         bibliographyWithAnchorPoints = {
           ...bibliographyWithUser,
           anchor_points: [],
