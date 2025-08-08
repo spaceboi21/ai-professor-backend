@@ -30,6 +30,8 @@ import { PaginationDto } from 'src/common/dto/pagination.dto';
 export interface CreateActivityLogDto {
   activity_type: ActivityTypeEnum;
   description: string;
+  description_en?: string;
+  description_fr?: string;
   performed_by: Types.ObjectId;
   performed_by_role: RoleEnum;
   school_id?: Types.ObjectId;
