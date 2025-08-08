@@ -138,17 +138,6 @@ export class CreateAnchorTagDto {
   })
   quiz_group_id: string | Types.ObjectId;
 
-  @IsNumber({}, { message: 'Sequence must be a number' })
-  @Min(1, { message: 'Sequence must be at least 1' })
-  @IsOptional()
-  @ApiProperty({
-    example: 1,
-    description:
-      'Order of the anchor tag in the bibliography (auto-generated if not provided)',
-    required: false,
-  })
-  sequence?: number;
-
   @IsArray({ message: 'Tags must be an array' })
   @IsString({ each: true, message: 'Each tag must be a string' })
   @IsOptional()

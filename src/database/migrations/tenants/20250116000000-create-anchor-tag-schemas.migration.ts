@@ -14,9 +14,6 @@ export async function up(
   await connection
     .collection('anchor_tags')
     .createIndex({ bibliography_id: 1, content_type: 1, status: 1 });
-  await connection
-    .collection('anchor_tags')
-    .createIndex({ bibliography_id: 1, sequence: 1 });
   await connection.collection('anchor_tags').createIndex({ quiz_group_id: 1 });
   await connection
     .collection('anchor_tags')

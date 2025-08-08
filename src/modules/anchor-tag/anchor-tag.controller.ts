@@ -320,7 +320,6 @@ export class AnchorTagController {
               answer: ['Fully concentrating on what is being said'],
               explanation:
                 'Active listening involves full concentration and understanding.',
-              sequence: 1,
               tags: ['Communication', 'Listening'],
             },
             module: {
@@ -515,7 +514,6 @@ export class AnchorTagController {
               answer: ['Fully concentrating on what is being said'],
               explanation:
                 'Active listening involves full concentration and understanding.',
-              sequence: 1,
               tags: ['Communication', 'Listening'],
             },
             module: {

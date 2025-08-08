@@ -1371,6 +1371,19 @@ export const ERROR_MESSAGES: {
       [LanguageEnum.FRENCH]:
         'Aucune donnée disponible pour les critères spécifiés',
     },
+    REORDERED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'Anchor tags reordered successfully',
+      [LanguageEnum.FRENCH]: "Tags d'ancrage réorganisés avec succès",
+    },
+    REORDER_FAILED: {
+      [LanguageEnum.ENGLISH]: 'Failed to reorder anchor tags',
+      [LanguageEnum.FRENCH]: "Échec de la réorganisation des tags d'ancrage",
+    },
+    DUPLICATE_SEQUENCE_NUMBERS: {
+      [LanguageEnum.ENGLISH]: 'Duplicate sequence numbers are not allowed',
+      [LanguageEnum.FRENCH]:
+        'Les numéros de séquence en double ne sont pas autorisés',
+    },
   },
 
   // School Admin Related

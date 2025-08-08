@@ -241,7 +241,6 @@ export class AnchorTagAnalyticsService {
             options: 1,
             answer: 1,
             explanation: 1,
-            sequence: 1,
             tags: 1,
           },
           module: {

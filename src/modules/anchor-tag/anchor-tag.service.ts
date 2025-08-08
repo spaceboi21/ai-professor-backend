@@ -3,6 +3,7 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  ConflictException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
@@ -107,7 +108,6 @@ export class AnchorTagService {
       timestamp_seconds,
       page_number,
       slide_number,
-      sequence,
     } = createAnchorTagDto;
 
     // Validate module exists
@@ -168,15 +168,6 @@ export class AnchorTagService {
       user,
     );
 
-    // Get next sequence if not provided
-    let finalSequence = sequence;
-    if (!finalSequence) {
-      finalSequence = await this.getNextAnchorTagSequence(
-        bibliography_id,
-        user,
-      );
-    }
-
     // Create anchor tag
     const anchorTag = new AnchorTagModel({
       module_id: new Types.ObjectId(createAnchorTagDto.module_id),
@@ -192,7 +183,6 @@ export class AnchorTagService {
       status: createAnchorTagDto.status ?? AnchorTagStatusEnum.ACTIVE,
       is_mandatory: createAnchorTagDto.is_mandatory ?? false,
       quiz_group_id: new Types.ObjectId(createAnchorTagDto.quiz_group_id),
-      sequence: finalSequence,
       tags: createAnchorTagDto.tags ?? [],
       created_by: new Types.ObjectId(user.id),
       created_by_role: user.role.name,
@@ -270,7 +260,7 @@ export class AnchorTagService {
 
     // Get anchor tags with pagination
     const anchorTags = await AnchorTagModel.find(filterQuery)
-      .sort({ sequence: 1, created_at: -1 })
+      .sort({ created_at: -1 })
       .skip(paginationOptions.skip)
       .limit(paginationOptions.limit)
       .populate('module_id', 'title')
@@ -477,7 +467,6 @@ export class AnchorTagService {
     updateData.slide_number = updateAnchorTagDto.slide_number ?? null;
     updateData.status = updateAnchorTagDto.status ?? null;
     updateData.is_mandatory = updateAnchorTagDto.is_mandatory ?? null;
-    updateData.sequence = updateAnchorTagDto.sequence ?? null;
     updateData.tags = updateAnchorTagDto.tags ?? null;
 
     // Convert ObjectIds if provided
@@ -595,7 +584,7 @@ export class AnchorTagService {
       deleted_at: null,
       status: AnchorTagStatusEnum.ACTIVE,
     })
-      .sort({ sequence: 1 })
+      .sort({ created_at: -1 })
       .populate('quiz_group_id', 'title subject category difficulty')
       .lean();
 
@@ -673,37 +662,6 @@ export class AnchorTagService {
         }
         break;
     }
-  }
-
-  private async getNextAnchorTagSequence(
-    bibliography_id: string | Types.ObjectId,
-    user: JWTUserPayload,
-  ): Promise<number> {
-    const school = await this.schoolModel.findById(user.school_id);
-    if (!school) {
-      throw new NotFoundException(
-        this.errorMessageService.getMessageWithLanguage(
-          'ANCHOR_TAG',
-          'SCHOOL_NOT_FOUND',
-          user?.preferred_language || DEFAULT_LANGUAGE,
-        ),
-      );
-    }
-
-    const connection = await this.tenantConnectionService.getTenantConnection(
-      school.db_name,
-    );
-    const AnchorTagModel = connection.model(AnchorTag.name, AnchorTagSchema);
-
-    const lastAnchorTag = await AnchorTagModel.findOne({
-      bibliography_id: new Types.ObjectId(bibliography_id),
-      deleted_at: null,
-    })
-      .sort({ sequence: -1 })
-      .select('sequence')
-      .lean();
-
-    return lastAnchorTag ? lastAnchorTag.sequence + 1 : 1;
   }
 
   async sendMissedAnchorTagNotifications(
@@ -787,7 +745,6 @@ export class AnchorTagService {
           title: tag.title,
           description: tag.description,
           content_type: tag.content_type,
-          sequence: tag.sequence,
           student_id: user.id,
           school_id: user.school_id,
           notification_type: 'MISSED_MANDATORY_ANCHOR_TAG',
