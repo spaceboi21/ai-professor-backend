@@ -74,9 +74,6 @@ export class AnchorTag extends Document {
   @Prop({ type: Types.ObjectId, ref: QuizGroup.name, required: true })
   quiz_group_id: Types.ObjectId;
 
-  @Prop({ type: Number, required: true, min: 1 })
-  sequence: number;
-
   @Prop({ type: [String], default: [] })
   tags: string[];
 
@@ -98,7 +95,6 @@ export const AnchorTagSchema = SchemaFactory.createForClass(AnchorTag);
 // Create compound indexes for better query performance
 AnchorTagSchema.index({ module_id: 1, chapter_id: 1, bibliography_id: 1 });
 AnchorTagSchema.index({ bibliography_id: 1, content_type: 1, status: 1 });
-AnchorTagSchema.index({ bibliography_id: 1, sequence: 1 });
 AnchorTagSchema.index({ quiz_group_id: 1 });
 AnchorTagSchema.index({ created_by: 1, status: 1 });
 AnchorTagSchema.index({ content_type: 1, content_reference: 1 });

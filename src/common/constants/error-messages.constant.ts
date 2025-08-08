@@ -1371,6 +1371,11 @@ export const ERROR_MESSAGES: {
       [LanguageEnum.FRENCH]:
         'Aucune donnée disponible pour les critères spécifiés',
     },
+    DUPLICATE_SEQUENCE_NUMBERS: {
+      [LanguageEnum.ENGLISH]: 'Duplicate sequence numbers are not allowed',
+      [LanguageEnum.FRENCH]:
+        'Les numéros de séquence en double ne sont pas autorisés',
+    },
   },
 
   // School Admin Related
