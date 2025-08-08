@@ -32,6 +32,7 @@ import {
   ModuleProfessorAssignmentSchema,
 } from 'src/database/schemas/tenant/module-professor-assignment.schema';
 import { ErrorMessageService } from 'src/common/services/error-message.service';
+import { EmailEncryptionService } from 'src/common/services/email-encryption.service';
 import { DEFAULT_LANGUAGE } from 'src/common/constants/language.constant';
 
 @Injectable()
@@ -49,6 +50,7 @@ export class ProfessorService {
     private readonly moduleAssignmentService: ModuleAssignmentService,
     private readonly tenantConnectionService: TenantConnectionService,
     private readonly errorMessageService: ErrorMessageService,
+    private readonly emailEncryptionService: EmailEncryptionService,
   ) {}
 
   async createProfessor(
@@ -95,7 +97,8 @@ export class ProfessorService {
     }
 
     // Check if email already exists in central users
-    const existingUser = await this.userModel.findOne({ email });
+    const encryptedEmail = this.emailEncryptionService.encryptEmail(email);
+    const existingUser = await this.userModel.findOne({ email: encryptedEmail });
     if (existingUser) {
       throw new ConflictException(
         this.errorMessageService.getMessageWithLanguage(
@@ -108,7 +111,7 @@ export class ProfessorService {
 
     // Check if email already exists in global professors
     const existingGlobalStudent = await this.globalStudentModel.findOne({
-      email,
+      email: encryptedEmail,
     });
     if (existingGlobalStudent) {
       throw new ConflictException(
@@ -130,7 +133,7 @@ export class ProfessorService {
       const newStudent = await this.userModel.create({
         first_name,
         last_name,
-        email,
+        email: encryptedEmail,
         password: hashedPassword,
         school_id: new Types.ObjectId(school_id),
         status: status || StatusEnum.ACTIVE, // Use provided status or default to ACTIVE
@@ -435,7 +438,12 @@ export class ProfessorService {
       this.userModel.countDocuments(filter),
     ]);
 
-    const pagination = createPaginationResult(professors, total, {
+    // Decrypt emails in the aggregation results
+    const decryptedProfessors = professors.map(professor => 
+      this.emailEncryptionService.decryptEmailFields(professor, ['email'])
+    );
+
+    const pagination = createPaginationResult(decryptedProfessors, total, {
       page,
       limit,
       skip: (page - 1) * limit,

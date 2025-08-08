@@ -30,6 +30,7 @@ import { StatusEnum } from 'src/common/constants/status.constant';
 import * as csv from 'csv-parser';
 import { Readable } from 'stream';
 import { ErrorMessageService } from 'src/common/services/error-message.service';
+import { EmailEncryptionService } from 'src/common/services/email-encryption.service';
 import {
   DEFAULT_LANGUAGE,
   LanguageEnum,
@@ -50,6 +51,7 @@ export class StudentService {
     private readonly mailService: MailService,
     @InjectConnection() private readonly connection: Connection,
     private readonly errorMessageService: ErrorMessageService,
+    private readonly emailEncryptionService: EmailEncryptionService,
   ) {}
 
   async createStudent(
@@ -134,7 +136,8 @@ export class StudentService {
     }
 
     // Check if email already exists in central users
-    const existingUser = await this.userModel.findOne({ email });
+    const encryptedEmail = this.emailEncryptionService.encryptEmail(email);
+    const existingUser = await this.userModel.findOne({ email: encryptedEmail });
     if (existingUser) {
       throw new ConflictException(
         this.errorMessageService.getMessageWithLanguage(
@@ -147,7 +150,7 @@ export class StudentService {
 
     // Check if email exists in global students (including deleted ones)
     const existingGlobalStudent = await this.globalStudentModel.findOne({
-      email,
+      email: encryptedEmail,
     });
 
     if (existingGlobalStudent) {
@@ -195,7 +198,7 @@ export class StudentService {
 
     try {
       // Double-check email uniqueness in tenant database
-      const existingTenantStudent = await StudentModel.findOne({ email });
+      const existingTenantStudent = await StudentModel.findOne({ email: encryptedEmail });
       if (existingTenantStudent) {
         throw new ConflictException(
           this.errorMessageService.getMessageWithLanguage(
@@ -210,7 +213,7 @@ export class StudentService {
       const newStudent = new StudentModel({
         first_name,
         last_name,
-        email,
+        email: encryptedEmail,
         password: hashedPassword,
         student_code: `${school.name
           .toLowerCase()
@@ -230,7 +233,7 @@ export class StudentService {
       // Create entry in global students collection
       await this.globalStudentModel.create({
         student_id: savedStudent._id,
-        email,
+        email: encryptedEmail,
         school_id: new Types.ObjectId(targetSchoolId),
       });
 
@@ -412,7 +415,12 @@ export class StudentService {
       StudentModel.countDocuments(filter),
     ]);
 
-    const pagination = createPaginationResult(students, total, {
+    // Decrypt emails in the aggregation results
+    const decryptedStudents = students.map(student => 
+      this.emailEncryptionService.decryptEmailFields(student, ['email'])
+    );
+
+    const pagination = createPaginationResult(decryptedStudents, total, {
       page,
       limit,
       skip: (page - 1) * limit,
@@ -605,12 +613,15 @@ export class StudentService {
     const originalEmail = student.email;
     let shouldSendEmail = false;
     let newPassword = '';
+    let encryptedNewEmail: string | undefined;
 
     // If email is being updated, check for conflicts
     if (updateStudentDto.email && updateStudentDto.email !== student.email) {
+      encryptedNewEmail = this.emailEncryptionService.encryptEmail(updateStudentDto.email);
+      
       // Check if email already exists in central users
       const existingUser = await this.userModel.findOne({
-        email: updateStudentDto.email,
+        email: encryptedNewEmail,
         _id: { $ne: new Types.ObjectId(id) },
       });
       if (existingUser) {
@@ -625,7 +636,7 @@ export class StudentService {
 
       // Check if email already exists in global students
       const existingGlobalStudent = await this.globalStudentModel.findOne({
-        email: updateStudentDto.email,
+        email: encryptedNewEmail,
         student_id: { $ne: new Types.ObjectId(id) },
       });
       if (existingGlobalStudent) {
@@ -656,7 +667,7 @@ export class StudentService {
 
             await Promise.all([
               this.globalStudentModel.deleteOne({
-                email: updateStudentDto.email,
+                email: encryptedNewEmail,
               }),
               StudentModel.deleteOne({ _id: existingGlobalStudent.student_id }),
             ]);
@@ -677,7 +688,7 @@ export class StudentService {
         } else {
           // If school doesn't exist, remove the orphaned global entry
           await this.globalStudentModel.deleteOne({
-            email: updateStudentDto.email,
+            email: encryptedNewEmail,
           });
           this.logger.log(
             `Removed orphaned global student entry for email: ${updateStudentDto.email}`,
@@ -687,7 +698,7 @@ export class StudentService {
 
       // Check if email already exists in tenant database
       const existingTenantStudent = await StudentModel.findOne({
-        email: updateStudentDto.email,
+        email: encryptedNewEmail,
         _id: { $ne: new Types.ObjectId(id) },
       });
       if (existingTenantStudent) {
@@ -735,7 +746,7 @@ export class StudentService {
       student.last_name = updateStudentDto.last_name;
     }
     if (updateStudentDto.email !== undefined) {
-      student.email = updateStudentDto.email;
+      student.email = encryptedNewEmail || this.emailEncryptionService.encryptEmail(updateStudentDto.email);
     }
     if (updateStudentDto.status !== undefined) {
       student.status = updateStudentDto.status;
@@ -749,7 +760,7 @@ export class StudentService {
       if (updateStudentDto.email && updateStudentDto.email !== originalEmail) {
         await this.globalStudentModel.updateOne(
           { student_id: new Types.ObjectId(id) },
-          { email: updateStudentDto.email },
+          { email: encryptedNewEmail || this.emailEncryptionService.encryptEmail(updateStudentDto.email) },
         );
       }
 

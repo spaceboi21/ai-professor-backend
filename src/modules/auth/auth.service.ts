@@ -33,6 +33,7 @@ import { LanguageEnum } from 'src/common/constants/language.constant';
 import { JWTUserPayload } from 'src/common/types/jwr-user.type';
 import { DEFAULT_LANGUAGE } from 'src/common/constants/language.constant';
 import { ErrorMessageService } from 'src/common/services/error-message.service';
+import { EmailEncryptionService } from 'src/common/services/email-encryption.service';
 
 @Injectable()
 export class AuthService {
@@ -54,15 +55,17 @@ export class AuthService {
     private readonly mailService: MailService,
     private readonly configService: ConfigService,
     private readonly errorMessageService: ErrorMessageService,
+    private readonly emailEncryptionService: EmailEncryptionService,
   ) {}
 
   async superAdminLogin(loginData: LoginSuperAdminDto, req: Request) {
     const { email, password, rememberMe, preferred_language } = loginData;
     this.logger.log(`SuperAdmin login attempt: ${email}`);
 
+    const encryptedEmail = this.emailEncryptionService.encryptEmail(email);
     const isSuperAdminExists = (await this.userModel
       .findOne({
-        email,
+        email: encryptedEmail,
         role: new Types.ObjectId(ROLE_IDS.SUPER_ADMIN),
       })
       .select('+password')
@@ -129,7 +132,7 @@ export class AuthService {
     }
 
     const tokenPair = this.tokenUtil.generateTokenPair({
-      email: isSuperAdminExists.email,
+      email: email, // Decrypted email
       id: isSuperAdminExists._id.toString(),
       role_id: isSuperAdminExists.role._id.toString(),
       role_name: isSuperAdminExists.role.name as RoleEnum,
@@ -167,9 +170,10 @@ export class AuthService {
       loginSchoolAdminDto;
     this.logger.log(`SchoolAdmin login attempt: ${email}`);
 
+    const encryptedEmail = this.emailEncryptionService.encryptEmail(email);
     const user = (await this.userModel
       .findOne({
-        email,
+        email: encryptedEmail,
         role: {
           $in: [
             new Types.ObjectId(ROLE_IDS.SCHOOL_ADMIN),
@@ -261,7 +265,7 @@ export class AuthService {
 
     const tokenPair = this.tokenUtil.generateTokenPair({
       id: user._id.toString(),
-      email: user.email,
+      email: email, // Decrypted email
       role_id: user.role._id.toString(),
       school_id: school._id.toString(),
       role_name: user.role.name as RoleEnum,
@@ -297,7 +301,8 @@ export class AuthService {
     this.logger.log(`Student login attempt: ${email}`);
 
     // First, find the student in the global students collection
-    const globalStudent = await this.globalStudentModel.findOne({ email });
+    const encryptedEmail = this.emailEncryptionService.encryptEmail(email);
+    const globalStudent = await this.globalStudentModel.findOne({ email: encryptedEmail });
 
     if (!globalStudent) {
       this.logger.warn(`Global student not found: ${email}`);
@@ -342,7 +347,7 @@ export class AuthService {
 
     // Find the student in the tenant database
     const student = await StudentModel.findOne({
-      email,
+      email: encryptedEmail,
       deleted_at: null,
     }).select('+password');
 
@@ -404,7 +409,7 @@ export class AuthService {
 
     const tokenPair = this.tokenUtil.generateTokenPair({
       id: student._id.toString(),
-      email: student.email,
+      email: email, // Decrypted email
       role_id: ROLE_IDS.STUDENT,
       school_id: school._id.toString(),
       role_name: RoleEnum.STUDENT,
@@ -555,9 +560,10 @@ export class AuthService {
     this.logger.log(`Forgot password request for email: ${email}`);
 
     // First, check if email exists in school admin/professor users
+    const encryptedEmail = this.emailEncryptionService.encryptEmail(email);
     const schoolUser = await this.userModel
       .findOne({
-        email,
+        email: encryptedEmail,
         role: {
           $in: [
             new Types.ObjectId(ROLE_IDS.SCHOOL_ADMIN),
@@ -571,12 +577,13 @@ export class AuthService {
       });
 
     if (schoolUser) {
+      schoolUser.email = email; // Decrypted email
       // Handle school admin/professor forgot password
       return this.handleSchoolUserForgotPassword(schoolUser);
     }
 
     // If not found in school users, check if it's a student
-    const globalStudent = await this.globalStudentModel.findOne({ email });
+    const globalStudent = await this.globalStudentModel.findOne({ email: encryptedEmail });
     if (!globalStudent) {
       this.logger.warn(`User not found for forgot password: ${email}`);
       throw new NotFoundException(
@@ -620,7 +627,7 @@ export class AuthService {
 
     // Find the student in the tenant database
     const student = await StudentModel.findOne({
-      email,
+      email: encryptedEmail,
       deleted_at: null,
     });
 
@@ -647,6 +654,7 @@ export class AuthService {
       );
     }
 
+    student.email = email; // Decrypted email
     // Handle student forgot password
     return this.handleStudentForgotPassword(student, school);
   }

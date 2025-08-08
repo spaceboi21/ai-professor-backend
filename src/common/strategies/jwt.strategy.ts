@@ -18,6 +18,7 @@ import { School } from 'src/database/schemas/central/school.schema';
 import { StatusEnum } from '../constants/status.constant';
 import { DEFAULT_LANGUAGE, LanguageEnum } from '../constants/language.constant';
 import { ErrorMessageService } from '../services/error-message.service';
+import { EmailEncryptionService } from '../services/email-encryption.service';
 
 export interface JWTPayload {
   id: string;
@@ -44,6 +45,7 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
     private readonly tenantService: TenantService,
     private readonly tenantConnectionService: TenantConnectionService,
     private readonly errorMessageService: ErrorMessageService,
+    private readonly emailEncryptionService: EmailEncryptionService,
   ) {
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
@@ -135,9 +137,10 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
         };
       } else {
         // For other roles, validate in central userModel
+        const encryptedEmail = this.emailEncryptionService.encryptEmail(payload.email);
         const user = await this.userModel.findOne({
           _id: new Types.ObjectId(payload.id),
-          email: payload.email,
+          email: encryptedEmail,
           role: new Types.ObjectId(payload.role_id),
         });
 
@@ -223,8 +226,9 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
 
       // Find student in tenant database
       const StudentModel = tenantConnection.model(Student.name, StudentSchema);
+      const encryptedEmail = this.emailEncryptionService.encryptEmail(payload.email);
       const student = await StudentModel.findOne({
-        email: payload.email,
+        email: encryptedEmail,
         school_id: new Types.ObjectId(payload.school_id),
       });
       if (!student) {

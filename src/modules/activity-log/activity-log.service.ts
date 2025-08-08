@@ -26,6 +26,7 @@ import {
   createPaginationResult,
 } from 'src/common/utils/pagination.util';
 import { PaginationDto } from 'src/common/dto/pagination.dto';
+import { EmailEncryptionService } from 'src/common/services/email-encryption.service';
 
 export interface CreateActivityLogDto {
   activity_type: ActivityTypeEnum;
@@ -93,6 +94,7 @@ export class ActivityLogService {
     private readonly userModel: Model<User>,
     @InjectModel(School.name)
     private readonly schoolModel: Model<School>,
+    private readonly emailEncryptionService: EmailEncryptionService,
   ) {}
 
   private safeObjectIdConversion(
@@ -126,15 +128,24 @@ export class ActivityLogService {
     createActivityLogDto: CreateActivityLogDto,
   ): Promise<ActivityLog> {
     try {
-      const { activity_type, ...rest } = createActivityLogDto;
+      const { activity_type, target_user_email, ...rest } = createActivityLogDto;
 
       const category = ACTIVITY_CATEGORY_MAPPING[activity_type];
       const level = ACTIVITY_LEVEL_MAPPING[activity_type];
+
+      // Encrypt target_user_email if provided
+      const encryptedTargetUserEmail = target_user_email
+        ? this.emailEncryptionService.encryptEmailFields(
+            { target_user_email },
+            ['target_user_email'],
+          ).target_user_email
+        : undefined;
 
       const activityLog = new this.activityLogModel({
         activity_type,
         category,
         level,
+        target_user_email: encryptedTargetUserEmail,
         ...rest,
       });
 
@@ -255,10 +266,16 @@ export class ActivityLogService {
 
       // Text search
       if (filterDto.search) {
+        // Encrypt the search term for email fields
+        const encryptedSearchTerm = this.emailEncryptionService.encryptEmailFields(
+          { search: filterDto.search },
+          ['search'],
+        ).search;
+
         query.$or = [
           { description: { $regex: filterDto.search, $options: 'i' } },
           { school_name: { $regex: filterDto.search, $options: 'i' } },
-          { target_user_email: { $regex: filterDto.search, $options: 'i' } },
+          { target_user_email: { $regex: encryptedSearchTerm, $options: 'i' } },
           { module_name: { $regex: filterDto.search, $options: 'i' } },
           { chapter_name: { $regex: filterDto.search, $options: 'i' } },
         ];
@@ -282,6 +299,12 @@ export class ActivityLogService {
         const performedBy = log.performed_by as any;
         const school = log.school_id as any;
         const targetUser = log.target_user_id as any;
+
+        // Decrypt target_user_email if it exists
+        const decryptedLog = this.emailEncryptionService.decryptEmailFields(
+          log,
+          ['target_user_email'],
+        );
 
         return {
           id: log._id,
@@ -315,6 +338,7 @@ export class ActivityLogService {
                   role: log.target_user_role,
                 }
               : null,
+          target_user_email: decryptedLog.target_user_email || null,
           module: log.module_id
             ? {
                 id: log.module_id,
@@ -619,10 +643,16 @@ export class ActivityLogService {
     }
 
     if (filterDto.search) {
+      // Encrypt the search term for email fields
+      const encryptedSearchTerm = this.emailEncryptionService.encryptEmailFields(
+        { search: filterDto.search },
+        ['search'],
+      ).search;
+
       query.$or = [
         { description: { $regex: filterDto.search, $options: 'i' } },
         { school_name: { $regex: filterDto.search, $options: 'i' } },
-        { target_user_email: { $regex: filterDto.search, $options: 'i' } },
+        { target_user_email: { $regex: encryptedSearchTerm, $options: 'i' } },
         { module_name: { $regex: filterDto.search, $options: 'i' } },
         { chapter_name: { $regex: filterDto.search, $options: 'i' } },
       ];
@@ -640,6 +670,12 @@ export class ActivityLogService {
       const performedBy = log.performed_by as any;
       const school = log.school_id as any;
       const targetUser = log.target_user_id as any;
+
+      // Decrypt target_user_email if it exists
+      const decryptedLog = this.emailEncryptionService.decryptEmailFields(
+        log,
+        ['target_user_email'],
+      );
 
       return {
         timestamp: log.created_at,
@@ -660,7 +696,7 @@ export class ActivityLogService {
             ? `${targetUser.first_name} ${targetUser.last_name}`.trim()
             : 'N/A',
         target_user_email:
-          targetUser && targetUser.email ? targetUser.email : 'N/A',
+          decryptedLog.target_user_email || (targetUser && targetUser.email ? targetUser.email : 'N/A'),
         target_user_role: log.target_user_role || 'N/A',
         module: log.module_name || 'N/A',
         chapter: log.chapter_name || 'N/A',

@@ -30,6 +30,7 @@ import { ModuleProfessorAssignment } from 'src/database/schemas/tenant/module-pr
 import { ModuleProfessorAssignmentSchema } from 'src/database/schemas/tenant/module-professor-assignment.schema';
 import { ProgressStatusEnum } from 'src/common/constants/status.constant';
 import { ErrorMessageService } from 'src/common/services/error-message.service';
+import { EmailEncryptionService } from 'src/common/services/email-encryption.service';
 import { DEFAULT_LANGUAGE } from 'src/common/constants/language.constant';
 
 @Injectable()
@@ -46,6 +47,7 @@ export class SchoolAdminService {
     private readonly mailService: MailService,
     private readonly tenantConnectionService: TenantConnectionService,
     private readonly errorMessageService: ErrorMessageService,
+    private readonly emailEncryptionService: EmailEncryptionService,
     @InjectConnection() private readonly connection: Connection,
   ) {}
 
@@ -67,12 +69,15 @@ export class SchoolAdminService {
       `Creating school admin: ${user_email} for school: ${school_name}`,
     );
 
+    const encryptedUserEmail = this.emailEncryptionService.encryptEmail(user_email);
+    const encryptedSchoolEmail = this.emailEncryptionService.encryptEmail(school_email);
+    
     const [existingUser, existingSchool, existingGlobalStudent] =
       await Promise.all([
-        this.userModel.exists({ email: user_email }),
-        this.schoolModel.exists({ email: school_email }),
+        this.userModel.exists({ email: encryptedUserEmail }),
+        this.schoolModel.exists({ email: encryptedSchoolEmail }),
         this.globalStudentModel.findOne({
-          email: user_email,
+          email: encryptedUserEmail,
         }),
       ]);
 
@@ -137,7 +142,7 @@ export class SchoolAdminService {
       const [createdSchool] = await this.schoolModel.insertMany([
         {
           name: school_name,
-          email: school_email,
+          email: encryptedSchoolEmail,
           website_url: school_website_url,
           db_name,
           created_by: new Types.ObjectId(user.id),
@@ -148,7 +153,7 @@ export class SchoolAdminService {
 
       await this.userModel.insertMany([
         {
-          email: user_email,
+          email: encryptedUserEmail,
           first_name: user_first_name,
           last_name: user_last_name,
           school_id: createdSchool._id,

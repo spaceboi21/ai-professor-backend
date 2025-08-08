@@ -21,7 +21,8 @@
     "seed": "ts-node -r tsconfig-paths/register src/seeders/seeder.ts",
     "migrate": "ts-node -r tsconfig-paths/register src/database/migration-cli.ts",
     "migrate:tags-all": "ts-node -r tsconfig-paths/register src/database/run-tags-migration-all-tenants.ts",
-    "export-swagger": "ts-node -r tsconfig-paths/register scripts/export-swagger.ts"
+    "export-swagger": "ts-node -r tsconfig-paths/register scripts/export-swagger.ts",
+    "migrate:emails": "ts-node -r tsconfig-paths/register scripts/migrate-emails-to-encrypted.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.842.0",
