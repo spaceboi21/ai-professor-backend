@@ -40,6 +40,7 @@ import {
 import { ChaptersService } from '../chapters/chapters.service';
 import { ErrorMessageService } from 'src/common/services/error-message.service';
 import { DEFAULT_LANGUAGE } from 'src/common/constants/language.constant';
+import { AnchorTagService } from '../anchor-tag/anchor-tag.service';
 
 @Injectable()
 export class BibliographyService {
@@ -53,6 +54,7 @@ export class BibliographyService {
     private readonly tenantConnectionService: TenantConnectionService,
     private readonly chaptersService: ChaptersService,
     private readonly errorMessageService: ErrorMessageService,
+    private readonly anchorTagService: AnchorTagService,
   ) {}
 
   /**
@@ -396,9 +398,35 @@ export class BibliographyService {
         this.userModel,
       );
 
+      // Get all anchor points for the chapter and module
+      let allAnchorPoints: any[] = [];
+      try {
+        if (filterDto?.chapter_id && filterDto?.module_id) {
+          this.logger.log(`Fetching anchor points for chapter: ${filterDto.chapter_id} and module: ${filterDto.module_id}`);
+          allAnchorPoints = await this.anchorTagService.getAnchorTagsByChapterAndModule(
+            filterDto.chapter_id,
+            filterDto.module_id,
+            user,
+          );
+          this.logger.log(`Found ${allAnchorPoints.length} anchor points`);
+        } else {
+          this.logger.warn('No chapter_id or module_id provided in filter, skipping anchor points fetch');
+        }
+      } catch (error) {
+        this.logger.warn(`Failed to fetch anchor points for chapter ${filterDto?.chapter_id} and module ${filterDto?.module_id}:`, error);
+      }
+
+      // Add anchor points to each bibliography item
+      const bibliographyWithAnchorPoints = bibliographyWithUsers.map((bibliographyItem) => {
+        return {
+          ...bibliographyItem,
+          anchor_points: allAnchorPoints,
+        } as any;
+      });
+
       // Create pagination result
       const result = createPaginationResult(
-        bibliographyWithUsers,
+        bibliographyWithAnchorPoints,
         total,
         paginationOptions,
       );
@@ -472,13 +500,33 @@ export class BibliographyService {
         this.userModel,
       );
 
+      // Add anchor points to the bibliography item
+      let bibliographyWithAnchorPoints = bibliographyWithUser;
+      try {
+        const anchorPoints = await this.anchorTagService.getAnchorTagsByChapterAndModule(
+          bibliography.chapter_id,
+          bibliography.module_id,
+          user,
+        );
+        bibliographyWithAnchorPoints = {
+          ...bibliographyWithUser,
+          anchor_points: anchorPoints,
+        } as any;
+      } catch (error) {
+        this.logger.warn(`Failed to fetch anchor points for chapter ${bibliography.chapter_id} and module ${bibliography.module_id}:`, error);
+        bibliographyWithAnchorPoints = {
+          ...bibliographyWithUser,
+          anchor_points: [],
+        } as any;
+      }
+
       return {
         message: this.errorMessageService.getSuccessMessageWithLanguage(
           'BIBLIOGRAPHY',
           'RETRIEVED_SUCCESSFULLY',
           user?.preferred_language || DEFAULT_LANGUAGE,
         ),
-        data: bibliographyWithUser,
+        data: bibliographyWithAnchorPoints,
       };
     } catch (error) {
       this.logger.error('Error finding bibliography', error?.stack || error);
