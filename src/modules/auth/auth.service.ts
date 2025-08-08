@@ -152,7 +152,7 @@ export class AuthService {
       ),
       ...tokenPair,
       user: {
-        email: isSuperAdminExists.email,
+        email: email, // Decrypted email
         first_name: isSuperAdminExists.first_name,
         last_name: isSuperAdminExists.last_name,
         role: isSuperAdminExists.role.toString(),
@@ -285,7 +285,7 @@ export class AuthService {
       ...tokenPair,
       user: {
         id: user._id.toString(),
-        email: user.email,
+        email: email, // // Decrypted email
         first_name: user.first_name,
         last_name: user.last_name,
         school_id: school._id.toString(),
@@ -432,7 +432,7 @@ export class AuthService {
       ...tokenPair,
       user: {
         id: student._id,
-        email: student.email,
+        email: email, // // Decrypted email
         first_name: student.first_name,
         last_name: student.last_name,
         student_code: student.student_code,
@@ -521,8 +521,14 @@ export class AuthService {
         );
       }
 
+      // Decrypt the email before returning
+      const decryptedStudent = this.emailEncryptionService.decryptEmailFields(
+        student,
+        ['email'],
+      );
+
       return {
-        ...student,
+        ...decryptedStudent,
         role: user.role, // role from JWT (already populated)
         preferred_language: student.preferred_language || DEFAULT_LANGUAGE,
       };
@@ -547,8 +553,14 @@ export class AuthService {
         );
       }
 
+      // Decrypt the email before returning
+      const decryptedUserData = this.emailEncryptionService.decryptEmailFields(
+        userData,
+        ['email'],
+      );
+
       return {
-        ...userData,
+        ...decryptedUserData,
         role: user.role, // role from JWT (already populated)
         preferred_language: userData.preferred_language || DEFAULT_LANGUAGE,
       };
@@ -859,6 +871,12 @@ export class AuthService {
       `Password updated successfully for school user: ${user.email}`,
     );
 
+    // Decrypt the email before returning
+    const decryptedUser = this.emailEncryptionService.decryptEmailFields(
+      user,
+      ['email'],
+    );
+
     return {
       message: this.errorMessageService.getSuccessMessageWithLanguage(
         'AUTH',
@@ -867,7 +885,7 @@ export class AuthService {
       ),
       data: {
         id: user._id,
-        email: user.email,
+        email: decryptedUser.email, // Decrypted email
         first_name: user.first_name,
         last_name: user.last_name,
       },
@@ -935,6 +953,12 @@ export class AuthService {
       `Password updated successfully for student: ${student.email}`,
     );
 
+    // Decrypt the email before returning
+    const decryptedStudent = this.emailEncryptionService.decryptEmailFields(
+      student,
+      ['email'],
+    );
+
     return {
       message: this.errorMessageService.getSuccessMessageWithLanguage(
         'AUTH',
@@ -943,7 +967,7 @@ export class AuthService {
       ),
       data: {
         id: student._id,
-        email: student.email,
+        email: decryptedStudent.email, // Decrypted email
         first_name: student.first_name,
         last_name: student.last_name,
         student_code: student.student_code,
