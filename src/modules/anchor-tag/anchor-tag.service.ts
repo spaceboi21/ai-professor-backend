@@ -643,14 +643,16 @@ export class AnchorTagService {
     const QuizGroupModel = connection.model(QuizGroup.name, QuizGroupSchema);
     const QuizModel = connection.model(Quiz.name, QuizSchema);
 
-    this.logger.log(`Searching for anchor tags with chapter_id: ${chapter_id} and module_id: ${module_id}`);
-    
+    this.logger.log(
+      `Searching for anchor tags with chapter_id: ${chapter_id} and module_id: ${module_id}`,
+    );
+
     const anchorTags = await AnchorTagModel.find({
       chapter_id: new Types.ObjectId(chapter_id),
       module_id: new Types.ObjectId(module_id),
       deleted_at: null,
     })
-      .sort({ sequence: 1 })
+      .sort({ created_at: -1 })
       .populate('quiz_group_id', 'title subject category difficulty')
       .lean();
 
