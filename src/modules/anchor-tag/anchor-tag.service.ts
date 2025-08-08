@@ -619,6 +619,74 @@ export class AnchorTagService {
     return anchorTagsWithQuizzes;
   }
 
+  async getAnchorTagsByChapterAndModule(
+    chapter_id: string | Types.ObjectId,
+    module_id: string | Types.ObjectId,
+    user: JWTUserPayload,
+  ) {
+    // Validate school exists
+    const school = await this.schoolModel.findById(user.school_id);
+    if (!school) {
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'ANCHOR_TAG',
+          'SCHOOL_NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
+    }
+
+    const connection = await this.tenantConnectionService.getTenantConnection(
+      school.db_name,
+    );
+    const AnchorTagModel = connection.model(AnchorTag.name, AnchorTagSchema);
+    const QuizGroupModel = connection.model(QuizGroup.name, QuizGroupSchema);
+    const QuizModel = connection.model(Quiz.name, QuizSchema);
+
+    this.logger.log(`Searching for anchor tags with chapter_id: ${chapter_id} and module_id: ${module_id}`);
+    
+    const anchorTags = await AnchorTagModel.find({
+      chapter_id: new Types.ObjectId(chapter_id),
+      module_id: new Types.ObjectId(module_id),
+      deleted_at: null,
+    })
+      .sort({ sequence: 1 })
+      .populate('quiz_group_id', 'title subject category difficulty')
+      .lean();
+
+    this.logger.log(`Found ${anchorTags.length} anchor tags in database`);
+
+    // Fetch quizzes for each anchor tag's quiz group
+    const anchorTagsWithQuizzes = await Promise.all(
+      anchorTags.map(async (anchorTag) => {
+        if (
+          anchorTag.quiz_group_id &&
+          typeof anchorTag.quiz_group_id === 'object' &&
+          '_id' in anchorTag.quiz_group_id
+        ) {
+          const quizzes = await QuizModel.find({
+            quiz_group_id: anchorTag.quiz_group_id._id,
+            deleted_at: null,
+          })
+            .sort({ sequence: 1 })
+            .lean();
+
+          const quizGroupData = anchorTag.quiz_group_id as any;
+          return {
+            ...anchorTag,
+            quiz_group: {
+              ...quizGroupData,
+              quizzes,
+            },
+          };
+        }
+        return anchorTag;
+      }),
+    );
+
+    return anchorTagsWithQuizzes;
+  }
+
   private validateContentSpecificFields(
     content_type: AnchorTagTypeEnum,
     content_reference: string,

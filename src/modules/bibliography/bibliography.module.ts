@@ -9,6 +9,7 @@ import {
 } from 'src/database/schemas/central/school.schema';
 import { TenantConnectionService } from 'src/database/tenant-connection.service';
 import { ChaptersModule } from '../chapters/chapters.module';
+import { AnchorTagModule } from '../anchor-tag/anchor-tag.module';
 
 @Module({
   imports: [
@@ -17,6 +18,7 @@ import { ChaptersModule } from '../chapters/chapters.module';
       { name: School.name, schema: SchoolSchema },
     ]),
     ChaptersModule,
+    AnchorTagModule,
   ],
   controllers: [BibliographyController],
   providers: [BibliographyService, TenantConnectionService],
