@@ -263,10 +263,10 @@ export class QuizService {
       filter.bibliography_id = new Types.ObjectId(filterDto.bibliography_id);
       filter.type = QuizTypeEnum.ANCHOR_TAG;
     }
-
-    const quizGroups = await QuizGroupModel.findOne(filter).lean();
-
-    if (!quizGroups?._id) {
+    console.log(filter);
+    const quizGroups = await QuizGroupModel.find(filter).lean();
+    console.log(quizGroups);
+    if (!quizGroups?.length) {
       throw new NotFoundException(
         this.errorMessageService.getMessageWithLanguage(
           'QUIZ',
@@ -280,7 +280,7 @@ export class QuizService {
     if (user.role.name === RoleEnum.STUDENT) {
       // Validate quiz group exists
       const quizGroup = await QuizGroupModel.findOne({
-        _id: new Types.ObjectId(quizGroups?._id),
+        _id: new Types.ObjectId(quizGroups[0]?._id),
 
         deleted_at: null,
       });
@@ -307,7 +307,7 @@ export class QuizService {
     }
 
     const quiz = await QuizModel.find({
-      quiz_group_id: quizGroups._id,
+      quiz_group_id: { $in: quizGroups.map((qg) => qg._id) },
       deleted_at: null,
     })
       .sort({
@@ -316,7 +316,12 @@ export class QuizService {
       })
       .lean();
 
-    return { ...quizGroups, quiz };
+    return quizGroups.map((quizGroup) => ({
+      ...quizGroup,
+      quiz: quiz.filter(
+        (q) => q.quiz_group_id.toString() === quizGroup._id.toString(),
+      ),
+    }));
   }
 
   async findQuizGroupById(id: string | Types.ObjectId, user: JWTUserPayload) {
