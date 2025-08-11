@@ -267,12 +267,35 @@ export class AnchorTagService {
       .populate('chapter_id', 'title')
       .populate('bibliography_id', 'title type')
       .populate('quiz_group_id', 'title subject category difficulty')
-      .populate('created_by', 'first_name last_name email')
       .lean();
+
+    // Fetch user data for each anchor tag from central database
+    const anchorTagsWithUserData = await Promise.all(
+      anchorTags.map(async (anchorTag) => {
+        let createdByUser: any = null;
+        if (anchorTag.created_by) {
+          try {
+            createdByUser = await this.userModel
+              .findById(anchorTag.created_by)
+              .select('first_name last_name email')
+              .lean();
+          } catch (error) {
+            this.logger.warn(
+              `Failed to fetch user data for created_by ${anchorTag.created_by}:`,
+              error,
+            );
+          }
+        }
+        return {
+          ...anchorTag,
+          created_by: createdByUser,
+        };
+      }),
+    );
 
     // Fetch quizzes for each anchor tag's quiz group
     const anchorTagsWithQuizzes = await Promise.all(
-      anchorTags.map(async (anchorTag) => {
+      anchorTagsWithUserData.map(async (anchorTag) => {
         if (
           anchorTag.quiz_group_id &&
           typeof anchorTag.quiz_group_id === 'object' &&
@@ -333,7 +356,6 @@ export class AnchorTagService {
       .populate('chapter_id', 'title')
       .populate('bibliography_id', 'title type')
       .populate('quiz_group_id', 'title subject category difficulty')
-      .populate('created_by', 'first_name last_name email')
       .lean();
 
     if (!anchorTag) {
@@ -344,6 +366,22 @@ export class AnchorTagService {
           user?.preferred_language || DEFAULT_LANGUAGE,
         ),
       );
+    }
+
+    // Fetch user data from central database
+    let createdByUser: any = null;
+    if (anchorTag.created_by) {
+      try {
+        createdByUser = await this.userModel
+          .findById(anchorTag.created_by)
+          .select('first_name last_name email')
+          .lean();
+      } catch (error) {
+        this.logger.warn(
+          `Failed to fetch user data for created_by ${anchorTag.created_by}:`,
+          error,
+        );
+      }
     }
 
     // Fetch quizzes for the anchor tag's quiz group
@@ -362,6 +400,7 @@ export class AnchorTagService {
       const quizGroupData = anchorTag.quiz_group_id as any;
       return {
         ...anchorTag,
+        created_by: createdByUser,
         quiz_group: {
           ...quizGroupData,
           quizzes,
@@ -369,7 +408,10 @@ export class AnchorTagService {
       };
     }
 
-    return anchorTag;
+    return {
+      ...anchorTag,
+      created_by: createdByUser,
+    };
   }
 
   async updateAnchorTag(
@@ -393,6 +435,12 @@ export class AnchorTagService {
       school.db_name,
     );
     const AnchorTagModel = connection.model(AnchorTag.name, AnchorTagSchema);
+    const ModuleModel = connection.model(Module.name, ModuleSchema);
+    const ChapterModel = connection.model(Chapter.name, ChapterSchema);
+    const BibliographyModel = connection.model(
+      Bibliography.name,
+      BibliographySchema,
+    );
     const QuizGroupModel = connection.model(QuizGroup.name, QuizGroupSchema);
     const QuizModel = connection.model(Quiz.name, QuizSchema);
 
@@ -483,17 +531,7 @@ export class AnchorTagService {
       .populate('module_id', 'title')
       .populate('chapter_id', 'title')
       .populate('bibliography_id', 'title type')
-      .populate('quiz_group_id', 'title')
-      .populate({
-        path: 'quiz_group_id',
-        populate: {
-          path: 'quizzes',
-          model: 'Quiz',
-          match: { deleted_at: null },
-          options: { sort: { sequence: 1 } },
-        },
-      })
-      .populate('created_by', 'first_name last_name email')
+      .populate('quiz_group_id', 'title subject category difficulty')
       .lean();
 
     if (!updatedAnchorTag) {
@@ -506,7 +544,50 @@ export class AnchorTagService {
       );
     }
 
-    return updatedAnchorTag;
+    // Fetch user data from central database
+    let createdByUser: any = null;
+    if (updatedAnchorTag.created_by) {
+      try {
+        createdByUser = await this.userModel
+          .findById(updatedAnchorTag.created_by)
+          .select('first_name last_name email')
+          .lean();
+      } catch (error) {
+        this.logger.warn(
+          `Failed to fetch user data for created_by ${updatedAnchorTag.created_by}:`,
+          error,
+        );
+      }
+    }
+
+    // Fetch quizzes for the anchor tag's quiz group
+    if (
+      updatedAnchorTag.quiz_group_id &&
+      typeof updatedAnchorTag.quiz_group_id === 'object' &&
+      '_id' in updatedAnchorTag.quiz_group_id
+    ) {
+      const quizzes = await QuizModel.find({
+        quiz_group_id: updatedAnchorTag.quiz_group_id._id,
+        deleted_at: null,
+      })
+        .sort({ sequence: 1 })
+        .lean();
+
+      const quizGroupData = updatedAnchorTag.quiz_group_id as any;
+      return {
+        ...updatedAnchorTag,
+        created_by: createdByUser,
+        quiz_group: {
+          ...quizGroupData,
+          quizzes,
+        },
+      };
+    }
+
+    return {
+      ...updatedAnchorTag,
+      created_by: createdByUser,
+    };
   }
 
   async removeAnchorTag(id: string | Types.ObjectId, user: JWTUserPayload) {
