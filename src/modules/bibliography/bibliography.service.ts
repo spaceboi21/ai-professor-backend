@@ -392,11 +392,114 @@ export class BibliographyService {
       pipeline.push({
         $lookup: {
           from: 'anchor_tags',
-          localField: '_id',
-          foreignField: 'bibliography_id',
+          let: { bibliography_id: '$_id' },
+          pipeline: [
+            {
+              $match: {
+                $expr: {
+                  $and: [
+                    { $eq: ['$bibliography_id', '$$bibliography_id'] },
+                    { $eq: ['$deleted_at', null] },
+                    { $eq: ['$status', 'ACTIVE'] },
+                  ],
+                },
+              },
+            },
+          ],
           as: 'anchor_points',
         },
       });
+
+      // Add student attempt status to anchor points if user is a student
+      if (user.role.name === RoleEnum.STUDENT) {
+        pipeline.push({
+          $lookup: {
+            from: 'student_anchor_tag_attempts',
+            let: { bibliography_id: '$_id' },
+            pipeline: [
+              {
+                $match: {
+                  $expr: {
+                    $and: [
+                      { $eq: ['$bibliography_id', '$$bibliography_id'] },
+                      { $eq: ['$student_id', new Types.ObjectId(user.id)] },
+                      { $eq: ['$deleted_at', null] },
+                    ],
+                  },
+                },
+              },
+              {
+                $group: {
+                  _id: '$anchor_tag_id',
+                  latest_attempt: { $last: '$$ROOT' },
+                },
+              },
+              {
+                $project: {
+                  anchor_tag_id: '$_id',
+                  status: '$latest_attempt.status',
+                },
+              },
+            ],
+            as: 'student_attempts',
+          },
+        });
+
+        // Add student attempt status to each anchor point
+        pipeline.push({
+          $addFields: {
+            anchor_points: {
+              $map: {
+                input: '$anchor_points',
+                as: 'anchor_point',
+                in: {
+                  $mergeObjects: [
+                    '$$anchor_point',
+                    {
+                      student_attempt_status: {
+                        $let: {
+                          vars: {
+                            matching_attempt: {
+                              $arrayElemAt: [
+                                {
+                                  $filter: {
+                                    input: '$student_attempts',
+                                    as: 'attempt',
+                                    cond: {
+                                      $eq: [
+                                        '$$attempt.anchor_tag_id',
+                                        '$$anchor_point._id',
+                                      ],
+                                    },
+                                  },
+                                },
+                                0,
+                              ],
+                            },
+                          },
+                          in: {
+                            $ifNull: [
+                              '$$matching_attempt.status',
+                              'NOT_STARTED',
+                            ],
+                          },
+                        },
+                      },
+                    },
+                  ],
+                },
+              },
+            },
+          },
+        });
+
+        // Remove the temporary student_attempts field
+        pipeline.push({
+          $project: {
+            student_attempts: 0,
+          },
+        });
+      }
 
       // Execute aggregation
       const bibliography = await BibliographyModel.aggregate(pipeline);
@@ -406,7 +509,6 @@ export class BibliographyService {
         bibliography,
         this.userModel,
       );
-
 
       // Create pagination result
       const result = createPaginationResult(

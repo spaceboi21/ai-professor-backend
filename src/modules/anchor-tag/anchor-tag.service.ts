@@ -578,6 +578,10 @@ export class AnchorTagService {
     const AnchorTagModel = connection.model(AnchorTag.name, AnchorTagSchema);
     const QuizGroupModel = connection.model(QuizGroup.name, QuizGroupSchema);
     const QuizModel = connection.model(Quiz.name, QuizSchema);
+    const StudentAnchorTagAttemptModel = connection.model(
+      StudentAnchorTagAttempt.name,
+      StudentAnchorTagAttemptSchema,
+    );
 
     const anchorTags = await AnchorTagModel.find({
       bibliography_id: new Types.ObjectId(bibliography_id),
@@ -588,9 +592,12 @@ export class AnchorTagService {
       .populate('quiz_group_id', 'title subject category difficulty')
       .lean();
 
-    // Fetch quizzes for each anchor tag's quiz group
+    // Fetch quizzes for each anchor tag's quiz group and student attempt status
     const anchorTagsWithQuizzes = await Promise.all(
       anchorTags.map(async (anchorTag) => {
+        let anchorTagWithData: any = { ...anchorTag };
+
+        // Add quiz group and quizzes
         if (
           anchorTag.quiz_group_id &&
           typeof anchorTag.quiz_group_id === 'object' &&
@@ -604,15 +611,46 @@ export class AnchorTagService {
             .lean();
 
           const quizGroupData = anchorTag.quiz_group_id as any;
-          return {
-            ...anchorTag,
+          anchorTagWithData = {
+            ...anchorTagWithData,
             quiz_group: {
               ...quizGroupData,
               quizzes,
             },
           };
         }
-        return anchorTag;
+
+        // Add student attempt status if user is a student
+        if (user.role.name === 'STUDENT') {
+          try {
+            const studentAttempt = await StudentAnchorTagAttemptModel.findOne({
+              student_id: new Types.ObjectId(user.id),
+              anchor_tag_id: anchorTag._id,
+              deleted_at: null,
+            })
+              .sort({ attempt_number: -1 })
+              .select('status')
+              .lean();
+
+            anchorTagWithData = {
+              ...anchorTagWithData,
+              student_attempt_status: studentAttempt
+                ? studentAttempt.status
+                : 'NOT_STARTED',
+            };
+          } catch (error) {
+            this.logger.warn(
+              `Failed to fetch student attempt status for anchor tag ${anchorTag._id}:`,
+              error,
+            );
+            anchorTagWithData = {
+              ...anchorTagWithData,
+              student_attempt_status: 'NOT_STARTED',
+            };
+          }
+        }
+
+        return anchorTagWithData;
       }),
     );
 
@@ -642,6 +680,10 @@ export class AnchorTagService {
     const AnchorTagModel = connection.model(AnchorTag.name, AnchorTagSchema);
     const QuizGroupModel = connection.model(QuizGroup.name, QuizGroupSchema);
     const QuizModel = connection.model(Quiz.name, QuizSchema);
+    const StudentAnchorTagAttemptModel = connection.model(
+      StudentAnchorTagAttempt.name,
+      StudentAnchorTagAttemptSchema,
+    );
 
     this.logger.log(
       `Searching for anchor tags with chapter_id: ${chapter_id} and module_id: ${module_id}`,
@@ -658,9 +700,12 @@ export class AnchorTagService {
 
     this.logger.log(`Found ${anchorTags.length} anchor tags in database`);
 
-    // Fetch quizzes for each anchor tag's quiz group
+    // Fetch quizzes for each anchor tag's quiz group and student attempt status
     const anchorTagsWithQuizzes = await Promise.all(
       anchorTags.map(async (anchorTag) => {
+        let anchorTagWithData: any = { ...anchorTag };
+
+        // Add quiz group and quizzes
         if (
           anchorTag.quiz_group_id &&
           typeof anchorTag.quiz_group_id === 'object' &&
@@ -674,15 +719,46 @@ export class AnchorTagService {
             .lean();
 
           const quizGroupData = anchorTag.quiz_group_id as any;
-          return {
-            ...anchorTag,
+          anchorTagWithData = {
+            ...anchorTagWithData,
             quiz_group: {
               ...quizGroupData,
               quizzes,
             },
           };
         }
-        return anchorTag;
+
+        // Add student attempt status if user is a student
+        if (user.role.name === RoleEnum.STUDENT) {
+          try {
+            const studentAttempt = await StudentAnchorTagAttemptModel.findOne({
+              student_id: new Types.ObjectId(user.id),
+              anchor_tag_id: anchorTag._id,
+              deleted_at: null,
+            })
+              .sort({ attempt_number: -1 })
+              .select('status')
+              .lean();
+
+            anchorTagWithData = {
+              ...anchorTagWithData,
+              student_attempt_status: studentAttempt
+                ? studentAttempt.status
+                : 'NOT_STARTED',
+            };
+          } catch (error) {
+            this.logger.warn(
+              `Failed to fetch student attempt status for anchor tag ${anchorTag._id}:`,
+              error,
+            );
+            anchorTagWithData = {
+              ...anchorTagWithData,
+              student_attempt_status: 'NOT_STARTED',
+            };
+          }
+        }
+
+        return anchorTagWithData;
       }),
     );
 
