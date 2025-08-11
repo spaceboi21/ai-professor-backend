@@ -868,6 +868,40 @@ export const ERROR_MESSAGES: {
       [LanguageEnum.ENGLISH]: 'Failed to export discussions',
       [LanguageEnum.FRENCH]: "Échec de l'export des discussions",
     },
+    // Forum Attachment Related Error Messages
+    FORUM_ATTACHMENT_NOT_FOUND: {
+      [LanguageEnum.ENGLISH]: 'Forum attachment not found',
+      [LanguageEnum.FRENCH]: 'Pièce jointe du forum non trouvée',
+    },
+    CREATE_FORUM_ATTACHMENT_FAILED: {
+      [LanguageEnum.ENGLISH]: 'Failed to create forum attachment',
+      [LanguageEnum.FRENCH]: 'Échec de la création de la pièce jointe du forum',
+    },
+    GET_FORUM_ATTACHMENTS_FAILED: {
+      [LanguageEnum.ENGLISH]: 'Failed to retrieve forum attachments',
+      [LanguageEnum.FRENCH]:
+        'Échec de la récupération des pièces jointes du forum',
+    },
+    DELETE_FORUM_ATTACHMENT_FAILED: {
+      [LanguageEnum.ENGLISH]: 'Failed to delete forum attachment',
+      [LanguageEnum.FRENCH]:
+        'Échec de la suppression de la pièce jointe du forum',
+    },
+    CANNOT_DELETE_FORUM_ATTACHMENT: {
+      [LanguageEnum.ENGLISH]: 'You cannot delete this forum attachment',
+      [LanguageEnum.FRENCH]:
+        'Vous ne pouvez pas supprimer cette pièce jointe du forum',
+    },
+    GET_USER_ATTACHMENTS_FAILED: {
+      [LanguageEnum.ENGLISH]: 'Failed to retrieve user attachments',
+      [LanguageEnum.FRENCH]:
+        "Échec de la récupération des pièces jointes de l'utilisateur",
+    },
+    GET_ATTACHMENT_STATS_FAILED: {
+      [LanguageEnum.ENGLISH]: 'Failed to retrieve attachment statistics',
+      [LanguageEnum.FRENCH]:
+        'Échec de la récupération des statistiques des pièces jointes',
+    },
   },
 
   // Chat Related
@@ -1711,6 +1745,29 @@ export const SUCCESS_MESSAGES: {
     PIN_STATUS_RETRIEVED_SUCCESSFULLY: {
       [LanguageEnum.ENGLISH]: 'Pin status retrieved successfully',
       [LanguageEnum.FRENCH]: "Statut d'épinglage récupéré avec succès",
+    },
+    // Forum Attachment Related Success Messages
+    FORUM_ATTACHMENT_CREATED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'Forum attachment created successfully',
+      [LanguageEnum.FRENCH]: 'Pièce jointe du forum créée avec succès',
+    },
+    FORUM_ATTACHMENTS_RETRIEVED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'Forum attachments retrieved successfully',
+      [LanguageEnum.FRENCH]: 'Pièces jointes du forum récupérées avec succès',
+    },
+    FORUM_ATTACHMENT_DELETED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'Forum attachment deleted successfully',
+      [LanguageEnum.FRENCH]: 'Pièce jointe du forum supprimée avec succès',
+    },
+    USER_ATTACHMENTS_RETRIEVED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'User attachments retrieved successfully',
+      [LanguageEnum.FRENCH]:
+        "Pièces jointes de l'utilisateur récupérées avec succès",
+    },
+    ATTACHMENT_STATS_RETRIEVED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'Attachment statistics retrieved successfully',
+      [LanguageEnum.FRENCH]:
+        'Statistiques des pièces jointes récupérées avec succès',
     },
   },
 

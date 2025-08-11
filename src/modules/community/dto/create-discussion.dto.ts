@@ -9,12 +9,15 @@ import {
   IsNumber,
   IsDateString,
   ValidateIf,
+  ValidateNested,
 } from 'class-validator';
+import { Type } from 'class-transformer';
 import { Types } from 'mongoose';
 import {
   DiscussionTypeEnum,
   VideoPlatformEnum,
 } from 'src/database/schemas/tenant/forum-discussion.schema';
+import { CreateForumAttachmentDto } from './forum-attachment.dto';
 
 export class CreateDiscussionDto {
   @IsOptional()
@@ -65,6 +68,27 @@ export class CreateDiscussionDto {
     type: [String],
   })
   tags?: string[];
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => CreateForumAttachmentDto)
+  @ApiProperty({
+    example: [
+      {
+        original_filename: 'document.pdf',
+        stored_filename: '1234567890-uuid-document.pdf',
+        file_url:
+          'https://bucket.s3.amazonaws.com/forum-attachments/1234567890-uuid-document.pdf',
+        mime_type: 'application/pdf',
+        file_size: 1024000,
+      },
+    ],
+    description: 'Array of attachments for the discussion',
+    required: false,
+    type: [CreateForumAttachmentDto],
+  })
+  attachments?: CreateForumAttachmentDto[];
 
   // Meeting fields (required only when type is MEETING)
   @ValidateIf((o) => o.type === DiscussionTypeEnum.MEETING)

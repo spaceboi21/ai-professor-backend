@@ -5,8 +5,11 @@ import {
   IsOptional,
   IsMongoId,
   IsArray,
+  ValidateNested,
 } from 'class-validator';
+import { Type } from 'class-transformer';
 import { Types } from 'mongoose';
+import { CreateForumAttachmentDto } from './forum-attachment.dto';
 
 export class CreateReplyDto {
   @IsOptional()
@@ -55,4 +58,25 @@ export class CreateReplyDto {
     required: false,
   })
   mentions?: string[];
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => CreateForumAttachmentDto)
+  @ApiProperty({
+    example: [
+      {
+        original_filename: 'document.pdf',
+        stored_filename: '1234567890-uuid-document.pdf',
+        file_url:
+          'https://bucket.s3.amazonaws.com/forum-attachments/1234567890-uuid-document.pdf',
+        mime_type: 'application/pdf',
+        file_size: 1024000,
+      },
+    ],
+    description: 'Array of attachments for the reply',
+    required: false,
+    type: [CreateForumAttachmentDto],
+  })
+  attachments?: CreateForumAttachmentDto[];
 }

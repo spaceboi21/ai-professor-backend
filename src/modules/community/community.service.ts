@@ -38,6 +38,12 @@ import {
   ForumMention,
   ForumMentionSchema,
 } from 'src/database/schemas/tenant/forum-mention.schema';
+import {
+  ForumAttachment,
+  ForumAttachmentSchema,
+  AttachmentEntityTypeEnum,
+  AttachmentStatusEnum,
+} from 'src/database/schemas/tenant/forum-attachment.schema';
 import { PinDiscussionDto } from './dto/pin-discussion.dto';
 
 import {
@@ -49,6 +55,8 @@ import { CreateDiscussionDto } from './dto/create-discussion.dto';
 import { CreateReplyDto } from './dto/create-reply.dto';
 import { ReportContentDto } from './dto/report-content.dto';
 import { DiscussionFilterDto } from './dto/discussion-filter.dto';
+import { CreateForumAttachmentDto } from './dto/forum-attachment.dto';
+import { DeleteForumAttachmentDto } from './dto/delete-forum-attachment.dto';
 import { PaginationDto } from 'src/common/dto/pagination.dto';
 import {
   getPaginationOptions,
@@ -138,7 +146,7 @@ export class CommunityService {
    * Create a new forum discussion
    */
   async createDiscussion(
-    createDiscussionDto: CreateDiscussionDto,
+    createDiscussionDto: CreateDiscussionDto | any, // Allow both DTOs
     user: JWTUserPayload,
   ) {
     const {
@@ -147,6 +155,7 @@ export class CommunityService {
       content,
       type,
       tags,
+      attachments,
       meeting_link,
       meeting_platform,
       meeting_scheduled_at,
@@ -229,6 +238,25 @@ export class CommunityService {
       });
 
       const savedDiscussion = await newDiscussion.save();
+
+      // If there are attachments, create them
+      if (attachments && attachments.length > 0) {
+        const AttachmentModel = tenantConnection.model(
+          ForumAttachment.name,
+          ForumAttachmentSchema,
+        );
+
+        for (const attachment of attachments) {
+          await this.createForumAttachment(
+            {
+              ...attachment,
+              discussion_id: savedDiscussion._id,
+              entity_type: AttachmentEntityTypeEnum.DISCUSSION,
+            },
+            user,
+          );
+        }
+      }
 
       // Send notifications to all school members about new discussion
       await this.notifyNewDiscussion(
@@ -681,9 +709,59 @@ export class CommunityService {
         discussion.created_by_role,
         tenantConnection,
       );
+
+      // Get attachments for this discussion
+      const AttachmentModel = tenantConnection.model(
+        ForumAttachment.name,
+        ForumAttachmentSchema,
+      );
+      const attachments = await AttachmentModel.find({
+        discussion_id: new Types.ObjectId(discussionId),
+        reply_id: null, // Only discussion attachments
+        status: AttachmentStatusEnum.ACTIVE,
+        deleted_at: null,
+      })
+        .populate('uploaded_by', 'first_name last_name email role profile_pic')
+        .sort({ created_at: 1 })
+        .lean();
+
+      // Format attachment user details
+      const formattedAttachments = attachments.map((attachment) => {
+        if (attachment.uploaded_by) {
+          const user = attachment.uploaded_by as any;
+          if (user.role === RoleEnum.STUDENT) {
+            return {
+              ...attachment,
+              uploaded_by_user: {
+                _id: user._id,
+                first_name: user.first_name,
+                last_name: user.last_name,
+                email: user.email,
+                role: RoleEnum.STUDENT,
+                image: user.image,
+              },
+            };
+          } else {
+            return {
+              ...attachment,
+              uploaded_by_user: {
+                _id: user._id,
+                first_name: user.first_name,
+                last_name: user.last_name,
+                email: user.email,
+                role: user.role,
+                image: user.profile_pic,
+              },
+            };
+          }
+        }
+        return attachment;
+      });
+
       const discussionWithUser = {
-        ...discussion,
+        ...discussion.toObject(),
         created_by_user: userDetails || null,
+        attachments: formattedAttachments,
       };
 
       return {
@@ -712,9 +790,18 @@ export class CommunityService {
   /**
    * Create a reply to a discussion
    */
-  async createReply(createReplyDto: CreateReplyDto, user: JWTUserPayload) {
-    const { school_id, discussion_id, content, parent_reply_id, mentions } =
-      createReplyDto;
+  async createReply(
+    createReplyDto: CreateReplyDto | any,
+    user: JWTUserPayload,
+  ) {
+    const {
+      school_id,
+      discussion_id,
+      content,
+      parent_reply_id,
+      mentions,
+      attachments,
+    } = createReplyDto;
 
     this.logger.log(
       `Creating reply to discussion: ${discussion_id} by user: ${user.id}`,
@@ -816,6 +903,21 @@ export class CommunityService {
       });
 
       const savedReply = await newReply.save();
+
+      // If there are attachments, create them
+      if (attachments && attachments.length > 0) {
+        for (const attachment of attachments) {
+          await this.createForumAttachment(
+            {
+              ...attachment,
+              discussion_id,
+              reply_id: savedReply._id,
+              entity_type: AttachmentEntityTypeEnum.REPLY,
+            },
+            user,
+          );
+        }
+      }
 
       // Create mention records
       const mentionPromises = resolvedMentions.map(async (mention) => {
@@ -1196,6 +1298,61 @@ export class CommunityService {
 
       this.logger.debug(`Found ${replies.length} replies`);
 
+      // Get attachments for each reply
+      const AttachmentModel = tenantConnection.model(
+        ForumAttachment.name,
+        ForumAttachmentSchema,
+      );
+
+      for (const reply of replies) {
+        const attachments = await AttachmentModel.find({
+          reply_id: reply._id,
+          status: AttachmentStatusEnum.ACTIVE,
+          deleted_at: null,
+        })
+          .populate(
+            'uploaded_by',
+            'first_name last_name email role profile_pic',
+          )
+          .sort({ created_at: 1 })
+          .lean();
+
+        // Format attachment user details
+        const formattedAttachments = attachments.map((attachment) => {
+          if (attachment.uploaded_by) {
+            const user = attachment.uploaded_by as any;
+            if (user.role === RoleEnum.STUDENT) {
+              return {
+                ...attachment,
+                uploaded_by_user: {
+                  _id: user._id,
+                  first_name: user.first_name,
+                  last_name: user.last_name,
+                  email: user.email,
+                  role: RoleEnum.STUDENT,
+                  image: user.image,
+                },
+              };
+            } else {
+              return {
+                ...attachment,
+                uploaded_by_user: {
+                  _id: user._id,
+                  first_name: user.first_name,
+                  last_name: user.last_name,
+                  email: user.email,
+                  role: user.role,
+                  image: user.profile_pic,
+                },
+              };
+            }
+          }
+          return attachment;
+        });
+
+        reply.attachments = formattedAttachments;
+      }
+
       // Mark forum as viewed by this user
       await this.markContentAsViewed(
         new Types.ObjectId(user.id),
@@ -1437,6 +1594,61 @@ export class CommunityService {
       ]);
 
       this.logger.debug(`Found ${subReplies.length} sub-replies`);
+
+      // Get attachments for each sub-reply
+      const AttachmentModel = tenantConnection.model(
+        ForumAttachment.name,
+        ForumAttachmentSchema,
+      );
+
+      for (const subReply of subReplies) {
+        const attachments = await AttachmentModel.find({
+          reply_id: subReply._id,
+          status: AttachmentStatusEnum.ACTIVE,
+          deleted_at: null,
+        })
+          .populate(
+            'uploaded_by',
+            'first_name last_name email role profile_pic',
+          )
+          .sort({ created_at: 1 })
+          .lean();
+
+        // Format attachment user details
+        const formattedAttachments = attachments.map((attachment) => {
+          if (attachment.uploaded_by) {
+            const user = attachment.uploaded_by as any;
+            if (user.role === RoleEnum.STUDENT) {
+              return {
+                ...attachment,
+                uploaded_by_user: {
+                  _id: user._id,
+                  first_name: user.first_name,
+                  last_name: user.last_name,
+                  email: user.email,
+                  role: RoleEnum.STUDENT,
+                  image: user.image,
+                },
+              };
+            } else {
+              return {
+                ...attachment,
+                uploaded_by_user: {
+                  _id: user._id,
+                  first_name: user.first_name,
+                  last_name: user.last_name,
+                  email: user.email,
+                  role: user.role,
+                  image: user.profile_pic,
+                },
+              };
+            }
+          }
+          return attachment;
+        });
+
+        subReply.attachments = formattedAttachments;
+      }
 
       const result = createPaginationResult(subReplies, total, options);
       return {
@@ -4035,6 +4247,455 @@ export class CommunityService {
     } catch (error) {
       this.logger.error('Error exporting discussions', error?.stack || error);
       throw error;
+    }
+  }
+
+  /**
+   * Create a forum attachment
+   */
+  async createForumAttachment(
+    createAttachmentDto: CreateForumAttachmentDto,
+    user: JWTUserPayload,
+  ) {
+    const {
+      discussion_id,
+      reply_id,
+      entity_type,
+      original_filename,
+      stored_filename,
+      file_url,
+      mime_type,
+      file_size,
+    } = createAttachmentDto;
+
+    this.logger.log(
+      `Creating forum attachment: ${original_filename} by user: ${user.id}`,
+    );
+
+    const resolvedSchoolId = this.resolveSchoolId(user);
+
+    // Validate school exists
+    const school = await this.schoolModel.findById(resolvedSchoolId);
+    if (!school) {
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'SCHOOL',
+          'NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
+    }
+
+    // Get tenant connection
+    const tenantConnection =
+      await this.tenantConnectionService.getTenantConnection(school.db_name);
+    const DiscussionModel = tenantConnection.model(
+      ForumDiscussion.name,
+      ForumDiscussionSchema,
+    );
+    const ReplyModel = tenantConnection.model(
+      ForumReply.name,
+      ForumReplySchema,
+    );
+    const AttachmentModel = tenantConnection.model(
+      ForumAttachment.name,
+      ForumAttachmentSchema,
+    );
+
+    try {
+      // Validate discussion exists
+      const discussion = await DiscussionModel.findOne({
+        _id: discussion_id,
+        deleted_at: null,
+        status: DiscussionStatusEnum.ACTIVE,
+      });
+
+      if (!discussion) {
+        throw new NotFoundException(
+          this.errorMessageService.getMessageWithLanguage(
+            'COMMUNITY',
+            'DISCUSSION_NOT_FOUND_OR_NOT_ACTIVE',
+            user?.preferred_language || DEFAULT_LANGUAGE,
+          ),
+        );
+      }
+
+      // Validate reply if provided
+      if (reply_id && entity_type === AttachmentEntityTypeEnum.REPLY) {
+        const reply = await ReplyModel.findOne({
+          _id: reply_id,
+          discussion_id: new Types.ObjectId(discussion_id),
+          deleted_at: null,
+          status: ReplyStatusEnum.ACTIVE,
+        });
+
+        if (!reply) {
+          throw new NotFoundException(
+            this.errorMessageService.getMessageWithLanguage(
+              'COMMUNITY',
+              'REPLY_NOT_FOUND_OR_NOT_ACTIVE',
+              user?.preferred_language || DEFAULT_LANGUAGE,
+            ),
+          );
+        }
+      }
+
+      // Create attachment
+      const newAttachment = new AttachmentModel({
+        discussion_id: new Types.ObjectId(discussion_id),
+        reply_id: reply_id ? new Types.ObjectId(reply_id) : null,
+        entity_type,
+        original_filename,
+        stored_filename,
+        file_url,
+        mime_type,
+        file_size,
+        uploaded_by: new Types.ObjectId(user.id),
+        uploaded_by_role: user.role.name as RoleEnum,
+      });
+
+      const savedAttachment = await newAttachment.save();
+
+      // Attach user details to the response
+      const userDetails = await this.getUserDetails(
+        user.id.toString(),
+        user.role.name,
+        tenantConnection,
+      );
+      const attachmentWithUser = {
+        ...savedAttachment.toObject(),
+        uploaded_by_user: userDetails || null,
+      };
+
+      this.logger.log(`Forum attachment created: ${savedAttachment._id}`);
+
+      return {
+        message: this.errorMessageService.getSuccessMessageWithLanguage(
+          'COMMUNITY',
+          'FORUM_ATTACHMENT_CREATED_SUCCESSFULLY',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+        data: attachmentWithUser,
+      };
+    } catch (error) {
+      this.logger.error(
+        'Error creating forum attachment',
+        error?.stack || error,
+      );
+      if (
+        error instanceof NotFoundException ||
+        error instanceof BadRequestException
+      ) {
+        throw error;
+      }
+      throw new BadRequestException(
+        this.errorMessageService.getMessageWithLanguage(
+          'COMMUNITY',
+          'CREATE_FORUM_ATTACHMENT_FAILED',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
+    }
+  }
+
+  /**
+   * Get attachments for a discussion
+   */
+  async getDiscussionAttachments(discussionId: string, user: JWTUserPayload) {
+    this.logger.log(`Getting attachments for discussion: ${discussionId}`);
+
+    const resolvedSchoolId = this.resolveSchoolId(user);
+
+    // Validate school exists
+    const school = await this.schoolModel.findById(resolvedSchoolId);
+    if (!school) {
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'SCHOOL',
+          'NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
+    }
+
+    // Get tenant connection
+    const tenantConnection =
+      await this.tenantConnectionService.getTenantConnection(school.db_name);
+    const AttachmentModel = tenantConnection.model(
+      ForumAttachment.name,
+      ForumAttachmentSchema,
+    );
+
+    try {
+      const attachments = await AttachmentModel.find({
+        discussion_id: new Types.ObjectId(discussionId),
+        status: AttachmentStatusEnum.ACTIVE,
+        deleted_at: null,
+      })
+        .populate('uploaded_by', 'first_name last_name email role profile_pic')
+        .sort({ created_at: 1 })
+        .lean();
+
+      // Format user details
+      const formattedAttachments = attachments.map((attachment) => {
+        if (attachment.uploaded_by) {
+          const user = attachment.uploaded_by as any;
+          if (user.role === RoleEnum.STUDENT) {
+            // Get student details
+            return {
+              ...attachment,
+              uploaded_by_user: {
+                _id: user._id,
+                first_name: user.first_name,
+                last_name: user.last_name,
+                email: user.email,
+                role: RoleEnum.STUDENT,
+                image: user.image,
+              },
+            };
+          } else {
+            // Get professor/admin details
+            return {
+              ...attachment,
+              uploaded_by_user: {
+                _id: user._id,
+                first_name: user.first_name,
+                last_name: user.last_name,
+                email: user.email,
+                role: user.role,
+                image: user.profile_pic,
+              },
+            };
+          }
+        }
+        return attachment;
+      });
+
+      return {
+        message: this.errorMessageService.getSuccessMessageWithLanguage(
+          'COMMUNITY',
+          'FORUM_ATTACHMENTS_RETRIEVED_SUCCESSFULLY',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+        data: formattedAttachments,
+      };
+    } catch (error) {
+      this.logger.error(
+        'Error getting discussion attachments',
+        error?.stack || error,
+      );
+      throw new BadRequestException(
+        this.errorMessageService.getMessageWithLanguage(
+          'COMMUNITY',
+          'GET_FORUM_ATTACHMENTS_FAILED',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
+    }
+  }
+
+  /**
+   * Get attachments for a reply
+   */
+  async getReplyAttachments(replyId: string, user: JWTUserPayload) {
+    this.logger.log(`Getting attachments for reply: ${replyId}`);
+
+    const resolvedSchoolId = this.resolveSchoolId(user);
+
+    // Validate school exists
+    const school = await this.schoolModel.findById(resolvedSchoolId);
+    if (!school) {
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'SCHOOL',
+          'NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
+    }
+
+    // Get tenant connection
+    const tenantConnection =
+      await this.tenantConnectionService.getTenantConnection(school.db_name);
+    const AttachmentModel = tenantConnection.model(
+      ForumAttachment.name,
+      ForumAttachmentSchema,
+    );
+
+    try {
+      const attachments = await AttachmentModel.find({
+        reply_id: new Types.ObjectId(replyId),
+        status: AttachmentStatusEnum.ACTIVE,
+        deleted_at: null,
+      })
+        .populate('uploaded_by', 'first_name last_name email role profile_pic')
+        .sort({ created_at: 1 })
+        .lean();
+
+      // Format user details
+      const formattedAttachments = attachments.map((attachment) => {
+        if (attachment.uploaded_by) {
+          const user = attachment.uploaded_by as any;
+          if (user.role === RoleEnum.STUDENT) {
+            // Get student details
+            return {
+              ...attachment,
+              uploaded_by_user: {
+                _id: user._id,
+                first_name: user.first_name,
+                last_name: user.last_name,
+                email: user.email,
+                role: RoleEnum.STUDENT,
+                image: user.image,
+              },
+            };
+          } else {
+            // Get professor/admin details
+            return {
+              ...attachment,
+              uploaded_by_user: {
+                _id: user._id,
+                first_name: user.first_name,
+                last_name: user.last_name,
+                email: user.email,
+                role: user.role,
+                image: user.profile_pic,
+              },
+            };
+          }
+        }
+        return attachment;
+      });
+
+      return {
+        message: this.errorMessageService.getSuccessMessageWithLanguage(
+          'COMMUNITY',
+          'FORUM_ATTACHMENTS_RETRIEVED_SUCCESSFULLY',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+        data: formattedAttachments,
+      };
+    } catch (error) {
+      this.logger.error(
+        'Error getting reply attachments',
+        error?.stack || error,
+      );
+      throw new BadRequestException(
+        this.errorMessageService.getMessageWithLanguage(
+          'COMMUNITY',
+          'GET_FORUM_ATTACHMENTS_FAILED',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
+    }
+  }
+
+  /**
+   * Delete a forum attachment
+   */
+  async deleteForumAttachment(
+    deleteAttachmentDto: DeleteForumAttachmentDto,
+    user: JWTUserPayload,
+  ) {
+    const { attachment_id } = deleteAttachmentDto;
+
+    this.logger.log(
+      `Deleting forum attachment: ${attachment_id} by user: ${user.id}`,
+    );
+
+    const resolvedSchoolId = this.resolveSchoolId(user);
+
+    // Validate school exists
+    const school = await this.schoolModel.findById(resolvedSchoolId);
+    if (!school) {
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'SCHOOL',
+          'NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
+    }
+
+    // Get tenant connection
+    const tenantConnection =
+      await this.tenantConnectionService.getTenantConnection(school.db_name);
+    const AttachmentModel = tenantConnection.model(
+      ForumAttachment.name,
+      ForumAttachmentSchema,
+    );
+
+    try {
+      // Find attachment
+      const attachment = await AttachmentModel.findOne({
+        _id: attachment_id,
+        deleted_at: null,
+        status: AttachmentStatusEnum.ACTIVE,
+      });
+
+      if (!attachment) {
+        throw new NotFoundException(
+          this.errorMessageService.getMessageWithLanguage(
+            'COMMUNITY',
+            'FORUM_ATTACHMENT_NOT_FOUND',
+            user?.preferred_language || DEFAULT_LANGUAGE,
+          ),
+        );
+      }
+
+      // Check if user can delete this attachment (only uploader or admin)
+      if (
+        attachment.uploaded_by.toString() !== user.id &&
+        ![RoleEnum.SCHOOL_ADMIN, RoleEnum.SUPER_ADMIN].includes(
+          user.role.name as RoleEnum,
+        )
+      ) {
+        throw new ForbiddenException(
+          this.errorMessageService.getMessageWithLanguage(
+            'COMMUNITY',
+            'CANNOT_DELETE_FORUM_ATTACHMENT',
+            user?.preferred_language || DEFAULT_LANGUAGE,
+          ),
+        );
+      }
+
+      // Soft delete attachment
+      await AttachmentModel.updateOne(
+        { _id: attachment_id },
+        {
+          status: AttachmentStatusEnum.DELETED,
+          deleted_at: new Date(),
+          deleted_by: new Types.ObjectId(user.id),
+        },
+      );
+
+      this.logger.log(`Forum attachment deleted: ${attachment_id}`);
+
+      return {
+        message: this.errorMessageService.getSuccessMessageWithLanguage(
+          'COMMUNITY',
+          'FORUM_ATTACHMENT_DELETED_SUCCESSFULLY',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      };
+    } catch (error) {
+      this.logger.error(
+        'Error deleting forum attachment',
+        error?.stack || error,
+      );
+      if (
+        error instanceof NotFoundException ||
+        error instanceof ForbiddenException
+      ) {
+        throw error;
+      }
+      throw new BadRequestException(
+        this.errorMessageService.getMessageWithLanguage(
+          'COMMUNITY',
+          'DELETE_FORUM_ATTACHMENT_FAILED',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
   }
 }

@@ -274,6 +274,127 @@ export class UploadController {
   }
 
   @ApiOperation({
+    summary: 'Get upload URL for forum attachments',
+    description:
+      'Generate presigned S3 upload URL for forum attachments (PDFs, documents, images)',
+  })
+  @Post('forum-attachment-url')
+  async getForumAttachmentUploadUrl(@Body() body: any) {
+    return this.uploadService.generateS3UploadUrl(
+      'forum-attachments',
+      body.fileName,
+      body.mimeType,
+    );
+  }
+
+  @ApiOperation({
+    summary: 'Upload forum attachment via PUT with raw binary body',
+    description: `Send raw file buffer (e.g., PDF, DOC, DOCX, images) in the request body with the appropriate Content-Type header. Must use Postman, curl, or frontend — Swagger UI doesn't support raw binary upload.`,
+  })
+  @ApiConsumes(
+    'application/pdf',
+    'application/msword',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'application/vnd.ms-excel',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    'application/vnd.ms-powerpoint',
+    'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    'image/jpeg',
+    'image/png',
+    'image/webp',
+    'image/gif',
+    'text/plain',
+    'text/csv',
+    'application/octet-stream',
+  )
+  @ApiQuery({ name: 'filename', required: true })
+  @ApiResponse({
+    status: 201,
+    description: 'Forum attachment uploaded successfully',
+  })
+  @ApiResponse({ status: 400, description: 'Invalid file' })
+  @Put('forum-attachment')
+  async uploadForumAttachment(
+    @Req() req: Request,
+    @Res() res: Response,
+    @Query('filename') filename: string,
+  ) {
+    if (!filename) {
+      throw new BadRequestException('Filename is required in query');
+    }
+
+    const contentType = req.headers['content-type'];
+    const allowedTypes = [
+      'application/pdf',
+      'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'application/vnd.ms-excel',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'application/vnd.ms-powerpoint',
+      'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+      'image/jpeg',
+      'image/png',
+      'image/webp',
+      'image/gif',
+      'text/plain',
+      'text/csv',
+    ];
+
+    if (
+      !contentType ||
+      !this.uploadService.validateContentType(contentType, allowedTypes)
+    ) {
+      throw new BadRequestException(
+        `Invalid or unsupported Content-Type. Allowed types: ${allowedTypes.join(', ')}`,
+      );
+    }
+
+    const ext = extname(filename) || `.${contentType.split('/')[1]}`;
+    const id = `${Date.now()}-${uuid()}${ext}`;
+    const dir = './uploads/forum-attachments';
+
+    if (!existsSync(dir)) {
+      mkdirSync(dir, { recursive: true });
+    }
+
+    const filePath = `${dir}/${id}`;
+
+    try {
+      // Use the improved file processing method
+      const { buffer, size } = await this.uploadService.processFileBuffer(
+        req as any,
+        filePath,
+        (this.configService.get<number>('MAXIMUM_FORUM_ATTACHMENT_FILE_SIZE') ??
+          10) *
+          1024 *
+          1024, // Use env variable for forum attachments (default 10MB)
+      );
+
+      // Write the file
+      writeFileSync(filePath, buffer);
+
+      const fileUrl = `${this.configService.get('BACKEND_API_URL')}/uploads/forum-attachments/${id}`;
+
+      res.status(201).json({
+        fileUrl,
+        key: `uploads/forum-attachments/${id}`,
+        originalName: filename,
+        size: size,
+        mimeType: contentType,
+        message: 'Forum attachment uploaded successfully',
+      });
+    } catch (error) {
+      if (error instanceof BadRequestException) {
+        res.status(400).json({ error: error.message });
+      } else {
+        res
+          .status(500)
+          .json({ error: 'Upload failed', details: error.message });
+      }
+    }
+  }
+
+  @ApiOperation({
     summary: 'Upload file via PUT with raw binary body',
     description: `Send raw file buffer (e.g., PDF, MP4, PPT, PPTX) in the request body with the appropriate Content-Type header. Must use Postman, curl, or frontend — Swagger UI doesn't support raw binary upload.`,
   })

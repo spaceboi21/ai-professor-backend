@@ -33,6 +33,24 @@ export class UploadService {
     'application/vnd.openxmlformats-officedocument.presentationml.presentation',
   ];
 
+  // Forum attachment file types
+  private readonly FORUM_ATTACHMENT_ALLOWED_MIME_TYPES = [
+    'application/pdf',
+    'application/msword',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'application/vnd.ms-excel',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    'application/vnd.ms-powerpoint',
+    'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    'image/jpeg',
+    'image/jpg',
+    'image/png',
+    'image/webp',
+    'image/gif',
+    'text/plain',
+    'text/csv',
+  ];
+
   constructor(private readonly configService: ConfigService) {
     if (this.configService.get('NODE_ENV') === 'production') {
       this.s3Client = new S3Client({
@@ -55,6 +73,12 @@ export class UploadService {
       if (!this.BIBLIOGRAPHY_ALLOWED_MIME_TYPES.includes(mimeType)) {
         throw new BadRequestException(
           `Invalid bibliography file type. Allowed types: ${this.BIBLIOGRAPHY_ALLOWED_MIME_TYPES.join(', ')}`,
+        );
+      }
+    } else if (folder === 'forum-attachments') {
+      if (!this.FORUM_ATTACHMENT_ALLOWED_MIME_TYPES.includes(mimeType)) {
+        throw new BadRequestException(
+          `Invalid forum attachment file type. Allowed types: ${this.FORUM_ATTACHMENT_ALLOWED_MIME_TYPES.join(', ')}`,
         );
       }
     } else {

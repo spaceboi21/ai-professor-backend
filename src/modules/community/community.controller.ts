@@ -10,6 +10,7 @@ import {
   HttpStatus,
   Res,
   NotFoundException,
+  Delete,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -28,8 +29,11 @@ import { CreateDiscussionDto } from './dto/create-discussion.dto';
 import { CreateReplyDto } from './dto/create-reply.dto';
 import { ReportContentDto } from './dto/report-content.dto';
 import { DiscussionFilterDto } from './dto/discussion-filter.dto';
+import { CreateForumAttachmentDto } from './dto/forum-attachment.dto';
+import { DeleteForumAttachmentDto } from './dto/delete-forum-attachment.dto';
 import { PaginationDto } from 'src/common/dto/pagination.dto';
 import { LikeEntityTypeEnum } from 'src/database/schemas/tenant/forum-like.schema';
+import { AttachmentEntityTypeEnum } from 'src/database/schemas/tenant/forum-attachment.schema';
 import { JWTUserPayload } from 'src/common/types/jwr-user.type';
 import { PinDiscussionDto } from './dto/pin-discussion.dto';
 import { SchoolMembersFilterDto } from './dto/school-members-filter.dto';
@@ -676,5 +680,137 @@ export class CommunityController {
     } catch (error) {
       throw new NotFoundException('File not found or could not be downloaded');
     }
+  }
+
+  // Forum Attachment Endpoints
+
+  @Post('discussions/:id/attachments')
+  @Roles(
+    RoleEnum.STUDENT,
+    RoleEnum.PROFESSOR,
+    RoleEnum.SCHOOL_ADMIN,
+    RoleEnum.SUPER_ADMIN,
+  )
+  @ApiOperation({ summary: 'Create a forum attachment for a discussion' })
+  @ApiResponse({
+    status: HttpStatus.CREATED,
+    description: 'Attachment created successfully',
+  })
+  @ApiResponse({
+    status: HttpStatus.BAD_REQUEST,
+    description: 'Invalid input data',
+  })
+  @ApiParam({ name: 'id', description: 'Discussion ID' })
+  async createDiscussionAttachment(
+    @Param('id') discussionId: string,
+    @Body() createAttachmentDto: CreateForumAttachmentDto,
+    @Request() req: any,
+  ) {
+    // Set the discussion_id from the URL parameter
+    createAttachmentDto.discussion_id = discussionId;
+    createAttachmentDto.entity_type = AttachmentEntityTypeEnum.DISCUSSION;
+
+    return this.communityService.createForumAttachment(
+      createAttachmentDto,
+      req.user as JWTUserPayload,
+    );
+  }
+
+  @Post('replies/:id/attachments')
+  @Roles(
+    RoleEnum.STUDENT,
+    RoleEnum.PROFESSOR,
+    RoleEnum.SCHOOL_ADMIN,
+    RoleEnum.SUPER_ADMIN,
+  )
+  @ApiOperation({ summary: 'Create a forum attachment for a reply' })
+  @ApiResponse({
+    status: HttpStatus.CREATED,
+    description: 'Attachment created successfully',
+  })
+  @ApiResponse({
+    status: HttpStatus.BAD_REQUEST,
+    description: 'Invalid input data',
+  })
+  @ApiParam({ name: 'id', description: 'Reply ID' })
+  async createReplyAttachment(
+    @Param('id') replyId: string,
+    @Body() createAttachmentDto: CreateForumAttachmentDto,
+    @Request() req: any,
+  ) {
+    // Set the reply_id from the URL parameter
+    createAttachmentDto.reply_id = replyId;
+    createAttachmentDto.entity_type = AttachmentEntityTypeEnum.REPLY;
+
+    return this.communityService.createForumAttachment(
+      createAttachmentDto,
+      req.user as JWTUserPayload,
+    );
+  }
+
+  @Get('discussions/:id/attachments')
+  @Roles(
+    RoleEnum.STUDENT,
+    RoleEnum.PROFESSOR,
+    RoleEnum.SCHOOL_ADMIN,
+    RoleEnum.SUPER_ADMIN,
+  )
+  @ApiOperation({ summary: 'Get attachments for a discussion' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Attachments retrieved successfully',
+  })
+  @ApiParam({ name: 'id', description: 'Discussion ID' })
+  async getDiscussionAttachments(
+    @Param('id') discussionId: string,
+    @Request() req: any,
+  ) {
+    return this.communityService.getDiscussionAttachments(
+      discussionId,
+      req.user as JWTUserPayload,
+    );
+  }
+
+  @Get('replies/:id/attachments')
+  @Roles(
+    RoleEnum.STUDENT,
+    RoleEnum.PROFESSOR,
+    RoleEnum.SCHOOL_ADMIN,
+    RoleEnum.SUPER_ADMIN,
+  )
+  @ApiOperation({ summary: 'Get attachments for a reply' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Attachments retrieved successfully',
+  })
+  @ApiParam({ name: 'id', description: 'Reply ID' })
+  async getReplyAttachments(@Param('id') replyId: string, @Request() req: any) {
+    return this.communityService.getReplyAttachments(
+      replyId,
+      req.user as JWTUserPayload,
+    );
+  }
+
+  @Delete('attachments/:id')
+  @Roles(
+    RoleEnum.STUDENT,
+    RoleEnum.PROFESSOR,
+    RoleEnum.SCHOOL_ADMIN,
+    RoleEnum.SUPER_ADMIN,
+  )
+  @ApiOperation({ summary: 'Delete a forum attachment' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Attachment deleted successfully',
+  })
+  @ApiParam({ name: 'id', description: 'Attachment ID' })
+  async deleteAttachment(
+    @Param('id') attachmentId: string,
+    @Request() req: any,
+  ) {
+    return this.communityService.deleteForumAttachment(
+      { attachment_id: attachmentId },
+      req.user as JWTUserPayload,
+    );
   }
 }
