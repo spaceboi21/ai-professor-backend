@@ -94,6 +94,7 @@ import { DEFAULT_LANGUAGE } from 'src/common/constants/language.constant';
 import { CSVUtil } from 'src/common/utils/csv.util';
 import { ExportDiscussionsDto } from './dto/export-discussions.dto';
 import { ExportDiscussionsResponseDto } from './dto/export-discussions-response.dto';
+import { EmailEncryptionService } from 'src/common/services/email-encryption.service';
 
 @Injectable()
 export class CommunityService {
@@ -108,6 +109,7 @@ export class CommunityService {
     private readonly notificationsService: NotificationsService,
     private readonly errorMessageService: ErrorMessageService,
     private readonly csvUtil: CSVUtil,
+    private readonly emailEncryptionService: EmailEncryptionService,
   ) {}
 
   /**
@@ -696,6 +698,25 @@ export class CommunityService {
 
       this.logger.debug(`Found ${discussions.length} discussions`);
 
+      // Decrypt emails in the aggregation results
+      for (const discussion of discussions) {
+        // Decrypt email in created_by_user
+        if (discussion.created_by_user && discussion.created_by_user.email) {
+          discussion.created_by_user.email =
+            this.emailEncryptionService.decryptEmail(
+              discussion.created_by_user.email,
+            );
+        }
+
+        // Decrypt email in last_reply_user if it exists
+        if (discussion.last_reply_user && discussion.last_reply_user.email) {
+          discussion.last_reply_user.email =
+            this.emailEncryptionService.decryptEmail(
+              discussion.last_reply_user.email,
+            );
+        }
+      }
+
       const result = createPaginationResult(discussions, total, options);
 
       return {
@@ -834,7 +855,9 @@ export class CommunityService {
                 _id: mentionedUser._id,
                 first_name: mentionedUser.first_name,
                 last_name: mentionedUser.last_name,
-                email: mentionedUser.email,
+                email: this.emailEncryptionService.decryptEmail(
+                  mentionedUser.email,
+                ),
                 role: mentionedUser.role,
                 image:
                   mentionedUser.role === RoleEnum.STUDENT
@@ -847,7 +870,9 @@ export class CommunityService {
                 _id: mentionedBy._id,
                 first_name: mentionedBy.first_name,
                 last_name: mentionedBy.last_name,
-                email: mentionedBy.email,
+                email: this.emailEncryptionService.decryptEmail(
+                  mentionedBy.email,
+                ),
                 role: mentionedBy.role,
                 image:
                   mentionedBy.role === RoleEnum.STUDENT
@@ -871,7 +896,7 @@ export class CommunityService {
                 _id: user._id,
                 first_name: user.first_name,
                 last_name: user.last_name,
-                email: user.email,
+                email: this.emailEncryptionService.decryptEmail(user.email),
                 role: RoleEnum.STUDENT,
                 image: user.image,
               },
@@ -884,7 +909,7 @@ export class CommunityService {
                 _id: user._id,
                 first_name: user.first_name,
                 last_name: user.last_name,
-                email: user.email,
+                email: this.emailEncryptionService.decryptEmail(user.email),
                 role: user.role,
                 image: user.profile_pic,
               },
@@ -1470,6 +1495,32 @@ export class CommunityService {
 
       this.logger.debug(`Found ${replies.length} replies`);
 
+      // Decrypt emails in the aggregation results
+      for (const reply of replies) {
+        // Decrypt email in created_by_user
+        if (reply.created_by_user && reply.created_by_user.email) {
+          reply.created_by_user.email =
+            this.emailEncryptionService.decryptEmail(
+              reply.created_by_user.email,
+            );
+        }
+
+        // Decrypt emails in mentions
+        if (reply.mentions && Array.isArray(reply.mentions)) {
+          for (const mention of reply.mentions) {
+            if (
+              mention.mentioned_user_details &&
+              mention.mentioned_user_details.email
+            ) {
+              mention.mentioned_user_details.email =
+                this.emailEncryptionService.decryptEmail(
+                  mention.mentioned_user_details.email,
+                );
+            }
+          }
+        }
+      }
+
       // Get attachments for each reply
       const AttachmentModel = tenantConnection.model(
         ForumAttachment.name,
@@ -1500,7 +1551,7 @@ export class CommunityService {
                   _id: user._id,
                   first_name: user.first_name,
                   last_name: user.last_name,
-                  email: user.email,
+                  email: this.emailEncryptionService.decryptEmail(user.email),
                   role: RoleEnum.STUDENT,
                   image: user.image,
                 },
@@ -1512,7 +1563,7 @@ export class CommunityService {
                   _id: user._id,
                   first_name: user.first_name,
                   last_name: user.last_name,
-                  email: user.email,
+                  email: this.emailEncryptionService.decryptEmail(user.email),
                   role: user.role,
                   image: user.profile_pic,
                 },
@@ -1800,6 +1851,32 @@ export class CommunityService {
 
       this.logger.debug(`Found ${subReplies.length} sub-replies`);
 
+      // Decrypt emails in the aggregation results
+      for (const subReply of subReplies) {
+        // Decrypt email in created_by_user
+        if (subReply.created_by_user && subReply.created_by_user.email) {
+          subReply.created_by_user.email =
+            this.emailEncryptionService.decryptEmail(
+              subReply.created_by_user.email,
+            );
+        }
+
+        // Decrypt emails in mentions
+        if (subReply.mentions && Array.isArray(subReply.mentions)) {
+          for (const mention of subReply.mentions) {
+            if (
+              mention.mentioned_user_details &&
+              mention.mentioned_user_details.email
+            ) {
+              mention.mentioned_user_details.email =
+                this.emailEncryptionService.decryptEmail(
+                  mention.mentioned_user_details.email,
+                );
+            }
+          }
+        }
+      }
+
       // Get attachments for each sub-reply
       const AttachmentModel = tenantConnection.model(
         ForumAttachment.name,
@@ -1830,7 +1907,7 @@ export class CommunityService {
                   _id: user._id,
                   first_name: user.first_name,
                   last_name: user.last_name,
-                  email: user.email,
+                  email: this.emailEncryptionService.decryptEmail(user.email),
                   role: RoleEnum.STUDENT,
                   image: user.image,
                 },
@@ -1842,7 +1919,7 @@ export class CommunityService {
                   _id: user._id,
                   first_name: user.first_name,
                   last_name: user.last_name,
-                  email: user.email,
+                  email: this.emailEncryptionService.decryptEmail(user.email),
                   role: user.role,
                   image: user.profile_pic,
                 },
@@ -2748,7 +2825,7 @@ export class CommunityService {
             _id: student._id,
             first_name: student.first_name,
             last_name: student.last_name,
-            email: student.email,
+            email: this.emailEncryptionService.decryptEmail(student.email),
             image: student.image || null,
             role: RoleEnum.STUDENT,
           };
@@ -2765,7 +2842,7 @@ export class CommunityService {
             _id: user._id,
             first_name: user.first_name,
             last_name: user.last_name,
-            email: user.email,
+            email: this.emailEncryptionService.decryptEmail(user.email),
             image: user.profile_pic || null,
             role: user.role,
           };
@@ -3686,6 +3763,20 @@ export class CommunityService {
         }),
       ]);
 
+      // Decrypt emails in the aggregation results
+      for (const discussion of discussions) {
+        // Decrypt email in created_by_details
+        if (
+          discussion.created_by_details &&
+          discussion.created_by_details.email
+        ) {
+          discussion.created_by_details.email =
+            this.emailEncryptionService.decryptEmail(
+              discussion.created_by_details.email,
+            );
+        }
+      }
+
       return createPaginationResult(discussions, total, options);
     } catch (error) {
       this.logger.error(
@@ -3921,6 +4012,17 @@ export class CommunityService {
         }),
       ]);
 
+      // Decrypt emails in the aggregation results
+      for (const mention of mentions) {
+        // Decrypt email in mentioned_by_user
+        if (mention.mentioned_by_user && mention.mentioned_by_user.email) {
+          mention.mentioned_by_user.email =
+            this.emailEncryptionService.decryptEmail(
+              mention.mentioned_by_user.email,
+            );
+        }
+      }
+
       return createPaginationResult(mentions, total, options);
     } catch (error) {
       this.logger.error('Error getting mentions', error?.stack || error);
@@ -4095,18 +4197,25 @@ export class CommunityService {
       .select('first_name last_name email image')
       .lean();
 
-    return students.map((student: any) => ({
-      id: student._id?.toString() || '',
-      name: `${student.first_name || ''} ${student.last_name || ''}`.trim(),
-      email: student.email || '',
-      image: student.image || null,
-      role: 'STUDENT',
-      mention_text: `@${student.email || ''}`,
-      display_name:
-        `${student.first_name || ''} ${student.last_name || ''} (@${student.email || ''})`.trim(),
-      search_text:
-        `${student.first_name || ''} ${student.last_name || ''} ${student.email || ''}`.toLowerCase(),
-    }));
+    return students.map((student: any) => {
+      // Decrypt the email before returning
+      const decryptedEmail = this.emailEncryptionService.decryptEmail(
+        student.email || '',
+      );
+
+      return {
+        id: student._id?.toString() || '',
+        name: `${student.first_name || ''} ${student.last_name || ''}`.trim(),
+        email: decryptedEmail,
+        image: student.image || null,
+        role: 'STUDENT',
+        mention_text: `@${decryptedEmail}`,
+        display_name:
+          `${student.first_name || ''} ${student.last_name || ''} (@${decryptedEmail})`.trim(),
+        search_text:
+          `${student.first_name || ''} ${student.last_name || ''} ${decryptedEmail}`.toLowerCase(),
+      };
+    });
   }
 
   /**
@@ -4122,18 +4231,25 @@ export class CommunityService {
       .select('first_name last_name email profile_pic role')
       .lean();
 
-    return professors.map((professor: any) => ({
-      id: professor._id?.toString() || '',
-      name: `${professor.first_name || ''} ${professor.last_name || ''}`.trim(),
-      email: professor.email || '',
-      image: professor.profile_pic || null,
-      role: professor.role || 'PROFESSOR',
-      mention_text: `@${professor.email || ''}`,
-      display_name:
-        `${professor.first_name || ''} ${professor.last_name || ''} (@${professor.email || ''})`.trim(),
-      search_text:
-        `${professor.first_name || ''} ${professor.last_name || ''} ${professor.email || ''}`.toLowerCase(),
-    }));
+    return professors.map((professor: any) => {
+      // Decrypt the email before returning
+      const decryptedEmail = this.emailEncryptionService.decryptEmail(
+        professor.email || '',
+      );
+
+      return {
+        id: professor._id?.toString() || '',
+        name: `${professor.first_name || ''} ${professor.last_name || ''}`.trim(),
+        email: decryptedEmail,
+        image: professor.profile_pic || null,
+        role: professor.role || 'PROFESSOR',
+        mention_text: `@${decryptedEmail}`,
+        display_name:
+          `${professor.first_name || ''} ${professor.last_name || ''} (@${decryptedEmail})`.trim(),
+        search_text:
+          `${professor.first_name || ''} ${professor.last_name || ''} ${decryptedEmail}`.toLowerCase(),
+      };
+    });
   }
 
   /**
@@ -4928,7 +5044,7 @@ export class CommunityService {
                 _id: user._id,
                 first_name: user.first_name,
                 last_name: user.last_name,
-                email: user.email,
+                email: this.emailEncryptionService.decryptEmail(user.email),
                 role: RoleEnum.STUDENT,
                 image: user.image,
               },
@@ -4941,7 +5057,7 @@ export class CommunityService {
                 _id: user._id,
                 first_name: user.first_name,
                 last_name: user.last_name,
-                email: user.email,
+                email: this.emailEncryptionService.decryptEmail(user.email),
                 role: user.role,
                 image: user.profile_pic,
               },
@@ -5024,7 +5140,7 @@ export class CommunityService {
                 _id: user._id,
                 first_name: user.first_name,
                 last_name: user.last_name,
-                email: user.email,
+                email: this.emailEncryptionService.decryptEmail(user.email),
                 role: RoleEnum.STUDENT,
                 image: user.image,
               },
@@ -5037,7 +5153,7 @@ export class CommunityService {
                 _id: user._id,
                 first_name: user.first_name,
                 last_name: user.last_name,
-                email: user.email,
+                email: this.emailEncryptionService.decryptEmail(user.email),
                 role: user.role,
                 image: user.profile_pic,
               },
@@ -5353,6 +5469,16 @@ export class CommunityService {
           entity_id: new Types.ObjectId(entityId),
         }),
       ]);
+
+      // Decrypt emails in the aggregation results
+      for (const like of likes) {
+        // Decrypt email in liked_by_user
+        if (like.liked_by_user && like.liked_by_user.email) {
+          like.liked_by_user.email = this.emailEncryptionService.decryptEmail(
+            like.liked_by_user.email,
+          );
+        }
+      }
 
       const result = createPaginationResult(likes, total, options);
 

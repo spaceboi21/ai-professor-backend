@@ -72,12 +72,9 @@ export class PythonService {
     },
     keywords: string[],
   ) {
-    console.log('keywords', keywords);
-    console.log('module_title', module_title);
-    console.log('feedback', feedback);
     return this._post('/chat/professor/resources', {
       keywords,
-      module_context: module_title,
+      module_title: module_title,
       feedback,
     });
   }

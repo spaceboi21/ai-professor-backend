@@ -22,6 +22,7 @@ import {
 import { DatabaseModule } from 'src/database/database.module';
 import { NotificationsModule } from 'src/modules/notifications/notifications.module';
 import { UtilsModule } from 'src/common/utils';
+import { CommonModule } from 'src/common/common.module';
 import { JwtService } from '@nestjs/jwt';
 
 @Module({
@@ -35,6 +36,7 @@ import { JwtService } from '@nestjs/jwt';
     DatabaseModule,
     NotificationsModule,
     UtilsModule,
+    CommonModule,
   ],
   controllers: [CommunityController, ChatController],
   providers: [
