@@ -6,6 +6,8 @@ export interface UserDetails {
   first_name: string;
   last_name: string;
   email: string;
+  image?: string | null;
+  profile_pic?: string | null;
 }
 
 export interface EntityWithUser {
@@ -34,13 +36,20 @@ export async function attachUserDetails<T extends EntityWithUser>(
   // Fetch user details
   const users = await userModel
     .find({ _id: { $in: userIds } })
-    .select('first_name last_name email')
+    .select('first_name last_name email profile_pic')
     .lean();
 
   // Create a map for quick lookup
   const userMap = users.reduce(
     (map, user) => {
-      map[user._id.toString()] = user;
+      map[user._id.toString()] = {
+        _id: user._id,
+        first_name: user.first_name,
+        last_name: user.last_name,
+        email: user.email,
+        image: user.profile_pic || null,
+        profile_pic: user.profile_pic || null,
+      };
       return map;
     },
     {} as Record<string, UserDetails>,
@@ -69,11 +78,20 @@ export async function attachUserDetailsToEntity<T extends EntityWithUser>(
 
   const user = await userModel
     .findById(entity.created_by)
-    .select('first_name last_name email')
+    .select('first_name last_name email profile_pic')
     .lean();
 
   return {
     ...entity,
-    created_by_user: user || null,
+    created_by_user: user
+      ? {
+          _id: user._id,
+          first_name: user.first_name,
+          last_name: user.last_name,
+          email: user.email,
+          image: user.profile_pic || null,
+          profile_pic: user.profile_pic || null,
+        }
+      : null,
   };
 }

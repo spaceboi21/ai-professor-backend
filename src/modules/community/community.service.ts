@@ -586,6 +586,9 @@ export class CommunityService {
                   },
                   email: { $arrayElemAt: ['$createdByStudent.email', 0] },
                   image: { $arrayElemAt: ['$createdByStudent.image', 0] },
+                  profile_pic: {
+                    $arrayElemAt: ['$createdByStudent.profile_pic', 0],
+                  },
                   role: 'STUDENT',
                 },
                 else: {
@@ -596,6 +599,9 @@ export class CommunityService {
                   last_name: { $arrayElemAt: ['$createdByUser.last_name', 0] },
                   email: { $arrayElemAt: ['$createdByUser.email', 0] },
                   image: { $arrayElemAt: ['$createdByUser.profile_pic', 0] },
+                  profile_pic: {
+                    $arrayElemAt: ['$createdByUser.profile_pic', 0],
+                  },
                   role: { $arrayElemAt: ['$createdByUser.role', 0] },
                 },
               },
@@ -1379,6 +1385,9 @@ export class CommunityService {
                   },
                   email: { $arrayElemAt: ['$createdByStudent.email', 0] },
                   image: { $arrayElemAt: ['$createdByStudent.image', 0] },
+                  profile_pic: {
+                    $arrayElemAt: ['$createdByStudent.profile_pic', 0],
+                  },
                   role: 'STUDENT',
                 },
                 else: {
@@ -1389,6 +1398,9 @@ export class CommunityService {
                   last_name: { $arrayElemAt: ['$createdByUser.last_name', 0] },
                   email: { $arrayElemAt: ['$createdByUser.email', 0] },
                   image: { $arrayElemAt: ['$createdByUser.profile_pic', 0] },
+                  profile_pic: {
+                    $arrayElemAt: ['$createdByUser.profile_pic', 0],
+                  },
                   role: { $arrayElemAt: ['$createdByUser.role', 0] },
                 },
               },
@@ -1777,6 +1789,9 @@ export class CommunityService {
                   },
                   email: { $arrayElemAt: ['$createdByStudent.email', 0] },
                   image: { $arrayElemAt: ['$createdByStudent.image', 0] },
+                  profile_pic: {
+                    $arrayElemAt: ['$createdByStudent.profile_pic', 0],
+                  },
                   role: 'STUDENT',
                 },
                 else: {
@@ -1787,6 +1802,9 @@ export class CommunityService {
                   last_name: { $arrayElemAt: ['$createdByUser.last_name', 0] },
                   email: { $arrayElemAt: ['$createdByUser.email', 0] },
                   image: { $arrayElemAt: ['$createdByUser.profile_pic', 0] },
+                  profile_pic: {
+                    $arrayElemAt: ['$createdByUser.profile_pic', 0],
+                  },
                   role: { $arrayElemAt: ['$createdByUser.role', 0] },
                 },
               },
@@ -2817,7 +2835,7 @@ export class CommunityService {
           StudentSchema,
         );
         const student = await StudentModel.findById(userId)
-          .select('first_name last_name email image')
+          .select('first_name last_name email image profile_pic')
           .lean();
 
         if (student) {
@@ -2826,7 +2844,8 @@ export class CommunityService {
             first_name: student.first_name,
             last_name: student.last_name,
             email: this.emailEncryptionService.decryptEmail(student.email),
-            image: student.image || null,
+            image: student.image || student.profile_pic || null,
+            profile_pic: student.profile_pic || student.image || null,
             role: RoleEnum.STUDENT,
           };
         }
@@ -2844,6 +2863,7 @@ export class CommunityService {
             last_name: user.last_name,
             email: this.emailEncryptionService.decryptEmail(user.email),
             image: user.profile_pic || null,
+            profile_pic: user.profile_pic || null,
             role: user.role,
           };
         }
