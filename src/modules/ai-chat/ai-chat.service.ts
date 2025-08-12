@@ -712,6 +712,8 @@ export class AIChatService {
         supervisorAnalysisFeedback[0].keywords_for_learning,
       );
 
+    console.log('professorResources', professorResources);
+
     const resourceData = {
       session_id: new Types.ObjectId(session_id),
       module_id: new Types.ObjectId(session.module_id),
