@@ -158,6 +158,7 @@ export class AuthService {
         role: isSuperAdminExists.role.toString(),
         _id: isSuperAdminExists._id.toString(),
         preferred_language: updatedPreferredLanguage || DEFAULT_LANGUAGE,
+        profile_pic: isSuperAdminExists.profile_pic,
       },
     };
   }
@@ -292,6 +293,7 @@ export class AuthService {
         role: user.role._id.toString(),
         role_name: user.role.name as RoleEnum,
         preferred_language: updatedPreferredLanguage || DEFAULT_LANGUAGE,
+        profile_pic: user.profile_pic,
       },
     };
   }
@@ -302,7 +304,9 @@ export class AuthService {
 
     // First, find the student in the global students collection
     const encryptedEmail = this.emailEncryptionService.encryptEmail(email);
-    const globalStudent = await this.globalStudentModel.findOne({ email: encryptedEmail });
+    const globalStudent = await this.globalStudentModel.findOne({
+      email: encryptedEmail,
+    });
 
     if (!globalStudent) {
       this.logger.warn(`Global student not found: ${email}`);
@@ -439,6 +443,7 @@ export class AuthService {
         school_id: school._id.toString(),
         role: ROLE_IDS.STUDENT,
         preferred_language: finalPreferredLanguage,
+        profile_pic: student.profile_pic,
       },
     };
   }
@@ -563,6 +568,7 @@ export class AuthService {
         ...decryptedUserData,
         role: user.role, // role from JWT (already populated)
         preferred_language: userData.preferred_language || DEFAULT_LANGUAGE,
+        profile_pic: userData.profile_pic,
       };
     }
   }
@@ -595,7 +601,9 @@ export class AuthService {
     }
 
     // If not found in school users, check if it's a student
-    const globalStudent = await this.globalStudentModel.findOne({ email: encryptedEmail });
+    const globalStudent = await this.globalStudentModel.findOne({
+      email: encryptedEmail,
+    });
     if (!globalStudent) {
       this.logger.warn(`User not found for forgot password: ${email}`);
       throw new NotFoundException(
@@ -872,10 +880,9 @@ export class AuthService {
     );
 
     // Decrypt the email before returning
-    const decryptedUser = this.emailEncryptionService.decryptEmailFields(
-      user,
-      ['email'],
-    );
+    const decryptedUser = this.emailEncryptionService.decryptEmailFields(user, [
+      'email',
+    ]);
 
     return {
       message: this.errorMessageService.getSuccessMessageWithLanguage(
