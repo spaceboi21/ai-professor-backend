@@ -350,6 +350,29 @@ export class CommunityController {
     );
   }
 
+  @Delete('discussions/:id')
+  @Roles(RoleEnum.SCHOOL_ADMIN, RoleEnum.SUPER_ADMIN)
+  @ApiOperation({ summary: 'Delete a discussion (admin only)' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Discussion deleted successfully',
+  })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'Discussion not found',
+  })
+  @ApiResponse({
+    status: HttpStatus.FORBIDDEN,
+    description: 'Access denied - admin only',
+  })
+  @ApiParam({ name: 'id', description: 'Discussion ID' })
+  async deleteDiscussion(@Param('id') id: string, @Request() req: any) {
+    return this.communityService.deleteDiscussion(
+      id,
+      req.user as JWTUserPayload,
+    );
+  }
+
   @Get('unread-counts')
   @Roles(
     RoleEnum.STUDENT,

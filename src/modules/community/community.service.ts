@@ -759,7 +759,7 @@ export class CommunityService {
       });
 
       const discussionWithUser = {
-        ...discussion.toObject(),
+        ...discussion,
         created_by_user: userDetails || null,
         attachments: formattedAttachments,
       };
@@ -2263,6 +2263,167 @@ export class CommunityService {
         this.errorMessageService.getMessageWithLanguage(
           'COMMUNITY',
           'ARCHIVE_DISCUSSION_FAILED',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
+    }
+  }
+
+  /**
+   * Delete discussion (admin only)
+   */
+  async deleteDiscussion(discussionId: string, user: JWTUserPayload) {
+    // Only school admins and super admins can delete discussions
+    if (
+      ![RoleEnum.SCHOOL_ADMIN, RoleEnum.SUPER_ADMIN].includes(
+        user.role.name as RoleEnum,
+      )
+    ) {
+      throw new ForbiddenException(
+        this.errorMessageService.getMessageWithLanguage(
+          'COMMUNITY',
+          'ACCESS_DENIED',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
+    }
+
+    this.logger.log(`Deleting discussion: ${discussionId} by user: ${user.id}`);
+
+    const resolvedSchoolId = this.resolveSchoolId(user);
+
+    // Validate school exists
+    const school = await this.schoolModel.findById(resolvedSchoolId);
+    if (!school) {
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'SCHOOL',
+          'NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
+    }
+
+    // Get tenant connection
+    const tenantConnection =
+      await this.tenantConnectionService.getTenantConnection(school.db_name);
+    const DiscussionModel = tenantConnection.model(
+      ForumDiscussion.name,
+      ForumDiscussionSchema,
+    );
+    const ReplyModel = tenantConnection.model(
+      ForumReply.name,
+      ForumReplySchema,
+    );
+    const LikeModel = tenantConnection.model(ForumLike.name, ForumLikeSchema);
+    const PinModel = tenantConnection.model(ForumPin.name, ForumPinSchema);
+    const MentionModel = tenantConnection.model(
+      ForumMention.name,
+      ForumMentionSchema,
+    );
+    const AttachmentModel = tenantConnection.model(
+      ForumAttachment.name,
+      ForumAttachmentSchema,
+    );
+    const ReportModel = tenantConnection.model(
+      ForumReport.name,
+      ForumReportSchema,
+    );
+    const ViewModel = tenantConnection.model(ForumView.name, ForumViewSchema);
+
+    try {
+      const discussion = await DiscussionModel.findOne({
+        _id: discussionId,
+        deleted_at: null,
+      });
+
+      if (!discussion) {
+        throw new NotFoundException(
+          this.errorMessageService.getMessageWithLanguage(
+            'COMMUNITY',
+            'DISCUSSION_NOT_FOUND',
+            user?.preferred_language || DEFAULT_LANGUAGE,
+          ),
+        );
+      }
+
+      // Soft delete the discussion
+      await DiscussionModel.updateOne(
+        { _id: discussionId },
+        {
+          deleted_at: new Date(),
+          deleted_by: new Types.ObjectId(user.id),
+        },
+      );
+
+      // Soft delete all related replies
+      await ReplyModel.updateMany(
+        { discussion_id: new Types.ObjectId(discussionId) },
+        {
+          deleted_at: new Date(),
+          deleted_by: new Types.ObjectId(user.id),
+        },
+      );
+
+      // Delete all related likes
+      await LikeModel.deleteMany({
+        entity_type: LikeEntityTypeEnum.DISCUSSION,
+        entity_id: new Types.ObjectId(discussionId),
+      });
+
+      // Delete all related pins
+      await PinModel.deleteMany({
+        discussion_id: new Types.ObjectId(discussionId),
+      });
+
+      // Delete all related mentions
+      await MentionModel.deleteMany({
+        discussion_id: new Types.ObjectId(discussionId),
+      });
+
+      // Soft delete all related attachments
+      await AttachmentModel.updateMany(
+        { discussion_id: new Types.ObjectId(discussionId) },
+        {
+          deleted_at: new Date(),
+          deleted_by: new Types.ObjectId(user.id),
+        },
+      );
+
+      // Delete all related reports
+      await ReportModel.deleteMany({
+        entity_type: ReportEntityTypeEnum.DISCUSSION,
+        entity_id: new Types.ObjectId(discussionId),
+      });
+
+      // Delete all related views
+      await ViewModel.deleteMany({
+        discussion_id: new Types.ObjectId(discussionId),
+      });
+
+      this.logger.log(`Discussion deleted: ${discussionId}`);
+
+      return {
+        message: this.errorMessageService.getSuccessMessageWithLanguage(
+          'COMMUNITY',
+          'DISCUSSION_DELETED_SUCCESSFULLY',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+        data: {
+          discussion_id: discussionId,
+          deleted_at: new Date(),
+          deleted_by: user.id,
+        },
+      };
+    } catch (error) {
+      this.logger.error('Error deleting discussion', error?.stack || error);
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
+      throw new BadRequestException(
+        this.errorMessageService.getMessageWithLanguage(
+          'COMMUNITY',
+          'DELETE_DISCUSSION_FAILED',
           user?.preferred_language || DEFAULT_LANGUAGE,
         ),
       );
