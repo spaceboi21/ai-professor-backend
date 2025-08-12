@@ -1444,6 +1444,54 @@ export const ERROR_MESSAGES: {
       [LanguageEnum.ENGLISH]: 'Password updated successfully',
       [LanguageEnum.FRENCH]: 'Mot de passe mis à jour avec succès',
     },
+    INVALID_USER_TYPE_FOR_UPDATE: {
+      [LanguageEnum.ENGLISH]: 'Invalid user type for update',
+      [LanguageEnum.FRENCH]: "Type d'utilisateur invalide pour la mise à jour",
+    },
+    INVALID_USER_TYPE: {
+      [LanguageEnum.ENGLISH]: 'Invalid user type',
+      [LanguageEnum.FRENCH]: "Type d'utilisateur invalide",
+    },
+    UNAUTHORIZED_UPDATE: {
+      [LanguageEnum.ENGLISH]: 'Unauthorized to update this school admin',
+      [LanguageEnum.FRENCH]:
+        "Non autorisé à mettre à jour cet administrateur d'école",
+    },
+    UNAUTHORIZED_ACCESS: {
+      [LanguageEnum.ENGLISH]: 'Unauthorized access',
+      [LanguageEnum.FRENCH]: 'Accès non autorisé',
+    },
+    CANNOT_UPDATE_STATUS_OR_SCHOOL: {
+      [LanguageEnum.ENGLISH]: 'Cannot update status or school assignment',
+      [LanguageEnum.FRENCH]:
+        "Impossible de mettre à jour le statut ou l'affectation d'école",
+    },
+    NOT_FOUND_AFTER_UPDATE: {
+      [LanguageEnum.ENGLISH]: 'School admin not found after update',
+      [LanguageEnum.FRENCH]:
+        "Administrateur d'école non trouvé après la mise à jour",
+    },
+    UPDATED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'School admin updated successfully',
+      [LanguageEnum.FRENCH]: "Administrateur d'école mis à jour avec succès",
+    },
+    RETRIEVED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'School admin retrieved successfully',
+      [LanguageEnum.FRENCH]: "Administrateur d'école récupéré avec succès",
+    },
+    NO_SCHOOL_ADMINS_FOUND: {
+      [LanguageEnum.ENGLISH]: 'No school admins found',
+      [LanguageEnum.FRENCH]: "Aucun administrateur d'école trouvé",
+    },
+    SCHOOL_ADMINS_RETRIEVED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'School admins retrieved successfully',
+      [LanguageEnum.FRENCH]: "Administrateurs d'école récupérés avec succès",
+    },
+    ALL_RETRIEVED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'All school admins retrieved successfully',
+      [LanguageEnum.FRENCH]:
+        "Tous les administrateurs d'école récupérés avec succès",
+    },
   },
 };
 
@@ -1912,6 +1960,27 @@ export const SUCCESS_MESSAGES: {
     PASSWORD_UPDATED_SUCCESSFULLY: {
       [LanguageEnum.ENGLISH]: 'Password updated successfully',
       [LanguageEnum.FRENCH]: 'Mot de passe mis à jour avec succès',
+    },
+    UPDATED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'School admin updated successfully',
+      [LanguageEnum.FRENCH]: "Administrateur d'école mis à jour avec succès",
+    },
+    RETRIEVED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'School admin retrieved successfully',
+      [LanguageEnum.FRENCH]: "Administrateur d'école récupéré avec succès",
+    },
+    NO_SCHOOL_ADMINS_FOUND: {
+      [LanguageEnum.ENGLISH]: 'No school admins found',
+      [LanguageEnum.FRENCH]: "Aucun administrateur d'école trouvé",
+    },
+    SCHOOL_ADMINS_RETRIEVED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'School admins retrieved successfully',
+      [LanguageEnum.FRENCH]: "Administrateurs d'école récupérés avec succès",
+    },
+    ALL_RETRIEVED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'All school admins retrieved successfully',
+      [LanguageEnum.FRENCH]:
+        "Tous les administrateurs d'école récupérés avec succès",
     },
   },
 };

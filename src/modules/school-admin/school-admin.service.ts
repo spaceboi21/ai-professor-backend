@@ -28,10 +28,14 @@ import { AIChatFeedback } from 'src/database/schemas/tenant/ai-chat-feedback.sch
 import { AIChatFeedbackSchema } from 'src/database/schemas/tenant/ai-chat-feedback.schema';
 import { ModuleProfessorAssignment } from 'src/database/schemas/tenant/module-professor-assignment.schema';
 import { ModuleProfessorAssignmentSchema } from 'src/database/schemas/tenant/module-professor-assignment.schema';
-import { ProgressStatusEnum } from 'src/common/constants/status.constant';
+import {
+  ProgressStatusEnum,
+  StatusEnum,
+} from 'src/common/constants/status.constant';
 import { ErrorMessageService } from 'src/common/services/error-message.service';
 import { EmailEncryptionService } from 'src/common/services/email-encryption.service';
 import { DEFAULT_LANGUAGE } from 'src/common/constants/language.constant';
+import { UpdateSchoolAdminDto } from './dto/update-school-admin.dto';
 
 @Injectable()
 export class SchoolAdminService {
@@ -69,9 +73,11 @@ export class SchoolAdminService {
       `Creating school admin: ${user_email} for school: ${school_name}`,
     );
 
-    const encryptedUserEmail = this.emailEncryptionService.encryptEmail(user_email);
-    const encryptedSchoolEmail = this.emailEncryptionService.encryptEmail(school_email);
-    
+    const encryptedUserEmail =
+      this.emailEncryptionService.encryptEmail(user_email);
+    const encryptedSchoolEmail =
+      this.emailEncryptionService.encryptEmail(school_email);
+
     const [existingUser, existingSchool, existingGlobalStudent] =
       await Promise.all([
         this.userModel.exists({ email: encryptedUserEmail }),
@@ -754,6 +760,297 @@ export class SchoolAdminService {
         school_id: updatedUser.school_id,
         created_at: updatedUser.created_at,
       },
+    };
+  }
+
+  async updateSchoolAdmin(
+    id: Types.ObjectId,
+    updateSchoolAdminDto: UpdateSchoolAdminDto,
+    user: JWTUserPayload,
+  ) {
+    this.logger.log(`Updating school admin: ${id}`);
+
+    // Find the school admin by ID
+    const schoolAdmin = await this.userModel.findById(id);
+    if (!schoolAdmin) {
+      this.logger.warn(`School admin not found: ${id}`);
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'SCHOOL_ADMIN',
+          'USER_NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
+    }
+
+    // Check if user is school admin
+    const userRoleId = schoolAdmin.role.toString();
+    if (userRoleId !== ROLE_IDS.SCHOOL_ADMIN) {
+      this.logger.warn(`Invalid user role for update: ${schoolAdmin.role}`);
+      throw new BadRequestException(
+        this.errorMessageService.getMessageWithLanguage(
+          'SCHOOL_ADMIN',
+          'INVALID_USER_TYPE_FOR_UPDATE',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
+    }
+
+    // Authorization check
+    if (user.role.name === RoleEnum.SCHOOL_ADMIN) {
+      // School admin can only update their own profile and cannot update status or school_id
+      if (schoolAdmin._id.toString() !== user.id) {
+        throw new BadRequestException(
+          this.errorMessageService.getMessageWithLanguage(
+            'SCHOOL_ADMIN',
+            'UNAUTHORIZED_UPDATE',
+            user?.preferred_language || DEFAULT_LANGUAGE,
+          ),
+        );
+      }
+      // School admin cannot update status or school_id
+      if (updateSchoolAdminDto.status || updateSchoolAdminDto.school_id) {
+        throw new BadRequestException(
+          this.errorMessageService.getMessageWithLanguage(
+            'SCHOOL_ADMIN',
+            'CANNOT_UPDATE_STATUS_OR_SCHOOL',
+            user?.preferred_language || DEFAULT_LANGUAGE,
+          ),
+        );
+      }
+    } else if (user.role.name !== RoleEnum.SUPER_ADMIN) {
+      throw new BadRequestException(
+        this.errorMessageService.getMessageWithLanguage(
+          'SCHOOL_ADMIN',
+          'UNAUTHORIZED_ACCESS',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
+    }
+
+    // Validate school_id if being updated by super admin
+    if (
+      updateSchoolAdminDto.school_id &&
+      user.role.name === RoleEnum.SUPER_ADMIN
+    ) {
+      const schoolExists = await this.schoolModel.findById(
+        updateSchoolAdminDto.school_id,
+      );
+      if (!schoolExists) {
+        throw new NotFoundException(
+          this.errorMessageService.getMessageWithLanguage(
+            'SCHOOL',
+            'NOT_FOUND',
+            user?.preferred_language || DEFAULT_LANGUAGE,
+          ),
+        );
+      }
+    }
+
+    // Prepare update data
+    const updateData: any = {};
+
+    if (updateSchoolAdminDto.first_name) {
+      updateData.first_name = updateSchoolAdminDto.first_name;
+    }
+    if (updateSchoolAdminDto.last_name) {
+      updateData.last_name = updateSchoolAdminDto.last_name;
+    }
+    if (updateSchoolAdminDto.profile_pic) {
+      updateData.profile_pic = updateSchoolAdminDto.profile_pic;
+    }
+    if (updateSchoolAdminDto.phone) {
+      updateData.phone = updateSchoolAdminDto.phone;
+    }
+    if (updateSchoolAdminDto.country_code) {
+      updateData.country_code = updateSchoolAdminDto.country_code;
+    }
+    if (updateSchoolAdminDto.preferred_language) {
+      updateData.preferred_language = updateSchoolAdminDto.preferred_language;
+    }
+    if (
+      updateSchoolAdminDto.status &&
+      user.role.name === RoleEnum.SUPER_ADMIN
+    ) {
+      updateData.status = updateSchoolAdminDto.status;
+    }
+    if (
+      updateSchoolAdminDto.school_id &&
+      user.role.name === RoleEnum.SUPER_ADMIN
+    ) {
+      updateData.school_id = new Types.ObjectId(updateSchoolAdminDto.school_id);
+    }
+
+    // Update the school admin
+    const updatedSchoolAdmin = await this.userModel
+      .findByIdAndUpdate(id, updateData, { new: true })
+      .populate('role', 'name')
+      .populate('school_id', 'name');
+
+    if (!updatedSchoolAdmin) {
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'SCHOOL_ADMIN',
+          'NOT_FOUND_AFTER_UPDATE',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
+    }
+
+    this.logger.log(`School admin updated successfully: ${id}`);
+
+    return {
+      message: this.errorMessageService.getMessageWithLanguage(
+        'SCHOOL_ADMIN',
+        'UPDATED_SUCCESSFULLY',
+        user?.preferred_language || DEFAULT_LANGUAGE,
+      ),
+      data: {
+        id: updatedSchoolAdmin._id,
+        email: this.emailEncryptionService.decryptEmail(
+          updatedSchoolAdmin.email,
+        ),
+        first_name: updatedSchoolAdmin.first_name,
+        last_name: updatedSchoolAdmin.last_name,
+        profile_pic: updatedSchoolAdmin.profile_pic,
+        phone: updatedSchoolAdmin.phone,
+        country_code: updatedSchoolAdmin.country_code,
+        preferred_language: updatedSchoolAdmin.preferred_language,
+        status: updatedSchoolAdmin.status,
+        school_id: updatedSchoolAdmin.school_id,
+        role: updatedSchoolAdmin.role,
+        created_at: updatedSchoolAdmin.created_at,
+        updated_at: updatedSchoolAdmin.updated_at,
+      },
+    };
+  }
+
+  async getSchoolAdminById(id: Types.ObjectId, user: JWTUserPayload) {
+    this.logger.log(`Getting school admin by ID: ${id}`);
+
+    const schoolAdmin = await this.userModel
+      .findById(id)
+      .populate('role', 'name')
+      .populate('school_id', 'name')
+      .lean();
+
+    if (!schoolAdmin) {
+      this.logger.warn(`School admin not found: ${id}`);
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'SCHOOL_ADMIN',
+          'USER_NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
+    }
+
+    // Check if user is school admin
+    const userRoleId = schoolAdmin.role._id.toString();
+    if (userRoleId !== ROLE_IDS.SCHOOL_ADMIN) {
+      this.logger.warn(`Invalid user role: ${(schoolAdmin.role as any).name}`);
+      throw new BadRequestException(
+        this.errorMessageService.getMessageWithLanguage(
+          'SCHOOL_ADMIN',
+          'INVALID_USER_TYPE',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
+    }
+
+    // Authorization check
+    if (user.role.name === RoleEnum.SCHOOL_ADMIN) {
+      // School admin can only view their own profile
+      if (schoolAdmin._id.toString() !== user.id) {
+        throw new BadRequestException(
+          this.errorMessageService.getMessageWithLanguage(
+            'SCHOOL_ADMIN',
+            'UNAUTHORIZED_ACCESS',
+            user?.preferred_language || DEFAULT_LANGUAGE,
+          ),
+        );
+      }
+    } else if (user.role.name !== RoleEnum.SUPER_ADMIN) {
+      throw new BadRequestException(
+        this.errorMessageService.getMessageWithLanguage(
+          'SCHOOL_ADMIN',
+          'UNAUTHORIZED_ACCESS',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
+    }
+
+    return {
+      message: this.errorMessageService.getMessageWithLanguage(
+        'SCHOOL_ADMIN',
+        'RETRIEVED_SUCCESSFULLY',
+        user?.preferred_language || DEFAULT_LANGUAGE,
+      ),
+      data: {
+        id: schoolAdmin._id,
+        email: this.emailEncryptionService.decryptEmail(schoolAdmin.email),
+        first_name: schoolAdmin.first_name,
+        last_name: schoolAdmin.last_name,
+        profile_pic: schoolAdmin.profile_pic,
+        phone: schoolAdmin.phone,
+        country_code: schoolAdmin.country_code,
+        preferred_language: schoolAdmin.preferred_language,
+        school_id: schoolAdmin.school_id,
+        role: schoolAdmin.role,
+        status: schoolAdmin.status,
+        created_at: schoolAdmin.created_at,
+        updated_at: schoolAdmin.updated_at,
+      },
+    };
+  }
+
+  async getAllSchoolAdmins(user: JWTUserPayload) {
+    this.logger.log(`Getting all school admins for user: ${user.id}`);
+
+    // Only super admin can get all school admins
+    if (user.role.name !== RoleEnum.SUPER_ADMIN) {
+      throw new BadRequestException(
+        this.errorMessageService.getMessageWithLanguage(
+          'SCHOOL_ADMIN',
+          'UNAUTHORIZED_ACCESS',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
+    }
+
+    const schoolAdmins = await this.userModel
+      .find({ role: ROLE_IDS.SCHOOL_ADMIN, deleted_at: null })
+      .populate('role', 'name')
+      .populate('school_id', 'name')
+      .lean();
+
+    if (schoolAdmins.length === 0) {
+      return {
+        message: this.errorMessageService.getMessageWithLanguage(
+          'SCHOOL_ADMIN',
+          'NO_SCHOOL_ADMINS_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+        data: [],
+      };
+    }
+
+    return {
+      message: this.errorMessageService.getMessageWithLanguage(
+        'SCHOOL_ADMIN',
+        'SCHOOL_ADMINS_RETRIEVED_SUCCESSFULLY',
+        user?.preferred_language || DEFAULT_LANGUAGE,
+      ),
+      data: schoolAdmins.map((admin) => ({
+        id: admin._id,
+        email: this.emailEncryptionService.decryptEmail(admin.email),
+        first_name: admin.first_name,
+        last_name: admin.last_name,
+        status: admin.status,
+        role: admin.role,
+        school_id: admin.school_id,
+        created_at: admin.created_at,
+      })),
     };
   }
 }

@@ -1,4 +1,13 @@
-import { Body, Controller, Post, Get, UseGuards, Query } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Post,
+  Get,
+  UseGuards,
+  Query,
+  Patch,
+  Param,
+} from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiBody,
@@ -17,7 +26,11 @@ import { JWTUserPayload } from 'src/common/types/jwr-user.type';
 import { CreateSchoolAdminDto } from './dto/create-school-admin.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { DashboardFilterDto } from './dto/dashboard-filter.dto';
+import { UpdateSchoolAdminDto } from './dto/update-school-admin.dto';
 import { SchoolAdminService } from './school-admin.service';
+import { ParseObjectIdPipe } from '@nestjs/mongoose';
+import { Types } from 'mongoose';
+
 @ApiTags('School Admin')
 @ApiBearerAuth()
 @Controller('school-admin')
@@ -45,9 +58,11 @@ export class SchoolAdminController {
   // Get enhanced dashboard statistics for school admin and professor
   @Get('dashboard')
   @Roles(RoleEnum.SCHOOL_ADMIN, RoleEnum.PROFESSOR)
-  @ApiOperation({ 
-    summary: 'Get comprehensive dashboard statistics for school admin and professor',
-    description: 'Provides detailed analytics including active students, module completion, AI feedback errors, and engagement metrics. Professors only see data for their assigned modules.'
+  @ApiOperation({
+    summary:
+      'Get comprehensive dashboard statistics for school admin and professor',
+    description:
+      'Provides detailed analytics including active students, module completion, AI feedback errors, and engagement metrics. Professors only see data for their assigned modules.',
   })
   @ApiQuery({
     name: 'from_date',
@@ -98,7 +113,7 @@ export class SchoolAdminController {
               completion_percentage: 85,
               active_students: 12,
               average_time_spent: 120,
-            }
+            },
           ],
           ai_feedback_errors: [
             {
@@ -107,7 +122,7 @@ export class SchoolAdminController {
               percentage: 15.3,
               affected_students: 8,
               affected_modules: 3,
-            }
+            },
           ],
           engagement_metrics: {
             total_views: 1250,
@@ -142,6 +157,168 @@ export class SchoolAdminController {
     return this.schoolAdminService.resetPassword(
       user.id.toString(),
       resetPasswordDto,
+    );
+  }
+
+  // Get all school admins (Super Admin only)
+  @Get('all')
+  @Roles(RoleEnum.SUPER_ADMIN)
+  @ApiOperation({
+    summary: 'Get all school admins',
+    description: 'Super admin only - retrieves all school admin accounts',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'All school admins retrieved successfully',
+    schema: {
+      example: {
+        message: 'All school admins retrieved successfully',
+        data: [
+          {
+            id: '507f1f77bcf86cd799439011',
+            email: 'admin@school1.edu',
+            first_name: 'John',
+            last_name: 'Doe',
+            profile_pic: '/uploads/profile1.jpg',
+            phone: 1234567890,
+            country_code: 1,
+            preferred_language: 'en',
+            school_id: {
+              _id: '507f1f77bcf86cd799439012',
+              name: 'Springfield High',
+            },
+            role: {
+              _id: '507f1f77bcf86cd799439013',
+              name: 'SCHOOL_ADMIN',
+            },
+            status: 'ACTIVE',
+            created_at: '2024-01-01T00:00:00.000Z',
+            updated_at: '2024-01-01T00:00:00.000Z',
+          },
+        ],
+      },
+    },
+  })
+  @ApiResponse({ status: 400, description: 'Unauthorized access' })
+  async getAllSchoolAdmins(@User() user: JWTUserPayload) {
+    return this.schoolAdminService.getAllSchoolAdmins(user);
+  }
+
+  // Get school admin details by ID
+  @Get(':id')
+  @Roles(RoleEnum.SUPER_ADMIN, RoleEnum.SCHOOL_ADMIN)
+  @ApiOperation({
+    summary: 'Get school admin details by ID',
+    description:
+      'Super admin can view any school admin, school admin can only view their own profile',
+  })
+  @ApiParam({
+    name: 'id',
+    type: String,
+    description: 'School Admin ID',
+    example: '507f1f77bcf86cd799439011',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'School admin details retrieved successfully',
+    schema: {
+      example: {
+        message: 'School admin details retrieved successfully',
+        data: {
+          id: '507f1f77bcf86cd799439011',
+          email: 'admin@school.edu',
+          first_name: 'John',
+          last_name: 'Doe',
+          profile_pic: '/uploads/profile.jpg',
+          phone: 1234567890,
+          country_code: 1,
+          preferred_language: 'en',
+          school_id: {
+            _id: '507f1f77bcf86cd799439012',
+            name: 'Springfield High',
+          },
+          role: {
+            _id: '507f1f77bcf86cd799439013',
+            name: 'SCHOOL_ADMIN',
+          },
+          status: 'ACTIVE',
+          created_at: '2024-01-01T00:00:00.000Z',
+          updated_at: '2024-01-01T00:00:00.000Z',
+        },
+      },
+    },
+  })
+  @ApiResponse({ status: 404, description: 'School admin not found' })
+  @ApiResponse({
+    status: 400,
+    description: 'Invalid user type or unauthorized access',
+  })
+  async getSchoolAdminById(
+    @Param('id', ParseObjectIdPipe) id: Types.ObjectId,
+    @User() user: JWTUserPayload,
+  ) {
+    return this.schoolAdminService.getSchoolAdminById(id, user);
+  }
+
+  // Update school admin details
+  @Patch(':id')
+  @Roles(RoleEnum.SUPER_ADMIN, RoleEnum.SCHOOL_ADMIN)
+  @ApiOperation({
+    summary: 'Update school admin details',
+    description:
+      'Super admin can update any school admin including status and school_id, school admin can only update their own profile',
+  })
+  @ApiParam({
+    name: 'id',
+    type: String,
+    description: 'School Admin ID',
+    example: '507f1f77bcf86cd799439011',
+  })
+  @ApiBody({ type: UpdateSchoolAdminDto })
+  @ApiResponse({
+    status: 200,
+    description: 'School admin updated successfully',
+    schema: {
+      example: {
+        message: 'School admin updated successfully',
+        data: {
+          id: '507f1f77bcf86cd799439011',
+          email: 'admin@school.edu',
+          first_name: 'John',
+          last_name: 'Doe',
+          profile_pic: '/uploads/profile.jpg',
+          phone: 1234567890,
+          country_code: 1,
+          preferred_language: 'en',
+          status: 'ACTIVE',
+          school_id: {
+            _id: '507f1f77bcf86cd799439012',
+            name: 'Springfield High',
+          },
+          role: {
+            _id: '507f1f77bcf86cd799439013',
+            name: 'SCHOOL_ADMIN',
+          },
+          created_at: '2024-01-01T00:00:00.000Z',
+          updated_at: '2024-01-01T00:00:00.000Z',
+        },
+      },
+    },
+  })
+  @ApiResponse({ status: 404, description: 'School admin not found' })
+  @ApiResponse({
+    status: 400,
+    description: 'Invalid data or unauthorized access',
+  })
+  async updateSchoolAdmin(
+    @Param('id', ParseObjectIdPipe) id: Types.ObjectId,
+    @Body() updateSchoolAdminDto: UpdateSchoolAdminDto,
+    @User() user: JWTUserPayload,
+  ) {
+    return this.schoolAdminService.updateSchoolAdmin(
+      id,
+      updateSchoolAdminDto,
+      user,
     );
   }
 }
