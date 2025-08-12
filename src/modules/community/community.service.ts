@@ -156,6 +156,7 @@ export class CommunityService {
       type,
       tags,
       attachments,
+      mentions,
       meeting_link,
       meeting_platform,
       meeting_scheduled_at,
@@ -219,10 +220,26 @@ export class CommunityService {
         }
       }
 
+      // Extract mentions from content if not provided
+      const extractedMentions = mentions || extractMentions(content);
+
+      // Resolve mentions to user IDs
+      const resolvedMentions = await resolveMentions(
+        extractedMentions,
+        tenantConnection,
+        this.userModel,
+      );
+
+      // Format content with mention links
+      const formattedContent = formatMentionsInContent(
+        content,
+        resolvedMentions,
+      );
+
       // Create discussion
       const newDiscussion = new DiscussionModel({
         title,
-        content,
+        content: formattedContent,
         type,
         tags: tags || [],
         created_by: new Types.ObjectId(user.id),
@@ -258,12 +275,40 @@ export class CommunityService {
         }
       }
 
+      // Create mention records
+      const MentionModel = tenantConnection.model(
+        ForumMention.name,
+        ForumMentionSchema,
+      );
+
+      const mentionPromises = resolvedMentions.map(async (mention) => {
+        if (mention.userId) {
+          const mentionRecord = new MentionModel({
+            discussion_id: savedDiscussion._id,
+            mentioned_by: new Types.ObjectId(user.id),
+            mentioned_user: mention.userId,
+            mention_text: mention.mentionText,
+          });
+          return mentionRecord.save();
+        }
+      });
+
+      await Promise.all(mentionPromises.filter(Boolean));
+
       // Send notifications to all school members about new discussion
       await this.notifyNewDiscussion(
         savedDiscussion,
         user,
         resolvedSchoolId,
         tenantConnection,
+      );
+
+      // Send notifications to mentioned users
+      await this.notifyMentionedUsersInDiscussion(
+        savedDiscussion,
+        user,
+        resolvedMentions,
+        resolvedSchoolId,
       );
 
       // Attach user details to the response
@@ -275,6 +320,7 @@ export class CommunityService {
       const discussionWithUser = {
         ...savedDiscussion.toObject(),
         created_by_user: userDetails || null,
+        mentions: resolvedMentions,
       };
 
       this.logger.log(`Discussion created: ${savedDiscussion._id}`);
@@ -759,11 +805,66 @@ export class CommunityService {
         .sort({ created_at: 1 })
         .lean();
 
-      // Format attachment user details
+      // Get mentions for this discussion
+      const MentionModel = tenantConnection.model(
+        ForumMention.name,
+        ForumMentionSchema,
+      );
+      const mentions = await MentionModel.find({
+        discussion_id: new Types.ObjectId(discussionId),
+        reply_id: null, // Only discussion-level mentions
+      })
+        .populate(
+          'mentioned_user',
+          'first_name last_name email role profile_pic',
+        )
+        .populate('mentioned_by', 'first_name last_name email role profile_pic')
+        .sort({ created_at: 1 })
+        .lean();
+
+      // Format mentions
+      const formattedMentions = mentions.map((mention) => {
+        const mentionedUser = mention.mentioned_user as any;
+        const mentionedBy = mention.mentioned_by as any;
+
+        return {
+          _id: mention._id,
+          mentioned_user: mentionedUser
+            ? {
+                _id: mentionedUser._id,
+                first_name: mentionedUser.first_name,
+                last_name: mentionedUser.last_name,
+                email: mentionedUser.email,
+                role: mentionedUser.role,
+                image:
+                  mentionedUser.role === RoleEnum.STUDENT
+                    ? mentionedUser.image
+                    : mentionedUser.profile_pic,
+              }
+            : null,
+          mentioned_by: mentionedBy
+            ? {
+                _id: mentionedBy._id,
+                first_name: mentionedBy.first_name,
+                last_name: mentionedBy.last_name,
+                email: mentionedBy.email,
+                role: mentionedBy.role,
+                image:
+                  mentionedBy.role === RoleEnum.STUDENT
+                    ? mentionedBy.image
+                    : mentionedBy.profile_pic,
+              }
+            : null,
+          mention_text: mention.mention_text,
+          created_at: mention.created_at,
+        };
+      });
+
       const formattedAttachments = attachments.map((attachment) => {
         if (attachment.uploaded_by) {
           const user = attachment.uploaded_by as any;
           if (user.role === RoleEnum.STUDENT) {
+            // Get student details
             return {
               ...attachment,
               uploaded_by_user: {
@@ -776,6 +877,7 @@ export class CommunityService {
               },
             };
           } else {
+            // Get professor/admin details
             return {
               ...attachment,
               uploaded_by_user: {
@@ -796,6 +898,7 @@ export class CommunityService {
         ...discussion,
         created_by_user: userDetails || null,
         attachments: formattedAttachments,
+        mentions: formattedMentions,
         has_liked: !!userLike,
         liked_at: userLike?.created_at || null,
       };
@@ -2997,7 +3100,7 @@ export class CommunityService {
   }
 
   /**
-   * Helper method to notify mentioned users about new reply
+   * Notify users mentioned in a reply
    */
   private async notifyMentionedUsers(
     reply: any,
@@ -3060,6 +3163,71 @@ export class CommunityService {
       await Promise.all(mentionPromises);
     } catch (error) {
       this.logger.error('Error notifying mentioned users', error);
+    }
+  }
+
+  /**
+   * Notify users mentioned in a discussion
+   */
+  private async notifyMentionedUsersInDiscussion(
+    discussion: any,
+    discussionCreator: any,
+    mentionedUsers: MentionInfo[],
+    schoolId: string,
+  ) {
+    try {
+      const tenantConnection =
+        await this.tenantConnectionService.getTenantConnection(schoolId);
+      const MentionModel = tenantConnection.model(
+        ForumMention.name,
+        ForumMentionSchema,
+      );
+
+      const mentionPromises = mentionedUsers.map(async (mention) => {
+        if (mention.userId) {
+          const mentionedUser = await this.getUserDetails(
+            mention.userId.toString(),
+            mention.userRole || 'STUDENT',
+            tenantConnection,
+          );
+
+          if (mentionedUser) {
+            const titleEn = 'New Mention in Discussion';
+            const titleFr = 'Nouvelle Mention dans la Discussion';
+            const messageEn = `${discussionCreator.first_name} ${discussionCreator.last_name} mentioned you in "${discussion.title}": "${mention.mentionText}"`;
+            const messageFr = `${discussionCreator.first_name} ${discussionCreator.last_name} vous a mentionné dans "${discussion.title}": "${mention.mentionText}"`;
+            const metadata = {
+              discussion_id: discussion._id,
+              discussion_title: discussion.title,
+              discussion_creator_id: discussion.created_by,
+              discussion_creator_name: `${discussionCreator.first_name} ${discussionCreator.last_name}`,
+              discussion_creator_role: discussion.created_by_role,
+              mention_text: mention.mentionText,
+            };
+
+            const recipientType =
+              mention.userRole === 'STUDENT'
+                ? RecipientTypeEnum.STUDENT
+                : RecipientTypeEnum.PROFESSOR;
+
+            await this.createForumNotification(
+              new Types.ObjectId(mention.userId),
+              recipientType,
+              titleEn,
+              titleFr,
+              messageEn,
+              messageFr,
+              NotificationTypeEnum.FORUM_MENTION,
+              metadata,
+              schoolId,
+            );
+          }
+        }
+      });
+
+      await Promise.all(mentionPromises);
+    } catch (error) {
+      this.logger.error('Error notifying mentioned users in discussion', error);
     }
   }
 

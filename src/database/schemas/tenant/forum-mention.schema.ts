@@ -15,9 +15,9 @@ export class ForumMention extends Document {
   @Prop({
     type: Types.ObjectId,
     ref: 'ForumReply',
-    required: true,
+    required: false,
   })
-  reply_id: Types.ObjectId;
+  reply_id?: Types.ObjectId;
 
   @Prop({
     type: Types.ObjectId,

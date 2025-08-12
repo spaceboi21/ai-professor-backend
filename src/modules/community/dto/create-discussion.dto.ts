@@ -90,6 +90,17 @@ export class CreateDiscussionDto {
   })
   attachments?: CreateForumAttachmentDto[];
 
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  @ApiProperty({
+    example: ['@john.doe', '@jane.smith'],
+    description: 'Array of usernames to mention (without @ symbol)',
+    type: [String],
+    required: false,
+  })
+  mentions?: string[];
+
   // Meeting fields (required only when type is MEETING)
   @ValidateIf((o) => o.type === DiscussionTypeEnum.MEETING)
   @IsString({ message: 'Meeting link must be a string' })
