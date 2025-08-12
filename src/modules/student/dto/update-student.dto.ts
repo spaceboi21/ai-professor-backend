@@ -21,7 +21,6 @@ export class UpdateStudentDto {
   email?: string;
 
   @IsString({ message: 'Profile picture must be a string' })
-  @IsUrl({}, { message: 'Profile picture must be a valid URL' })
   @IsOptional()
   @ApiProperty({
     example: 'https://example.com/profile.jpg',
