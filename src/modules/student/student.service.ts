@@ -62,6 +62,7 @@ export class StudentService {
       first_name,
       last_name,
       email,
+      profile_pic,
       school_id,
       status,
       preferred_language,
@@ -137,7 +138,9 @@ export class StudentService {
 
     // Check if email already exists in central users
     const encryptedEmail = this.emailEncryptionService.encryptEmail(email);
-    const existingUser = await this.userModel.findOne({ email: encryptedEmail });
+    const existingUser = await this.userModel.findOne({
+      email: encryptedEmail,
+    });
     if (existingUser) {
       throw new ConflictException(
         this.errorMessageService.getMessageWithLanguage(
@@ -198,7 +201,9 @@ export class StudentService {
 
     try {
       // Double-check email uniqueness in tenant database
-      const existingTenantStudent = await StudentModel.findOne({ email: encryptedEmail });
+      const existingTenantStudent = await StudentModel.findOne({
+        email: encryptedEmail,
+      });
       if (existingTenantStudent) {
         throw new ConflictException(
           this.errorMessageService.getMessageWithLanguage(
@@ -214,6 +219,7 @@ export class StudentService {
         first_name,
         last_name,
         email: encryptedEmail,
+        profile_pic,
         password: hashedPassword,
         student_code: `${school.name
           .toLowerCase()
@@ -263,6 +269,7 @@ export class StudentService {
           email: savedStudent.email,
           student_code: savedStudent.student_code,
           school_id: savedStudent.school_id,
+          profile_pic: savedStudent.profile_pic,
           status: savedStudent.status,
           created_at: savedStudent.created_at,
         },
@@ -416,8 +423,8 @@ export class StudentService {
     ]);
 
     // Decrypt emails in the aggregation results
-    const decryptedStudents = students.map(student => 
-      this.emailEncryptionService.decryptEmailFields(student, ['email'])
+    const decryptedStudents = students.map((student) =>
+      this.emailEncryptionService.decryptEmailFields(student, ['email']),
     );
 
     const pagination = createPaginationResult(decryptedStudents, total, {
@@ -539,7 +546,28 @@ export class StudentService {
     let targetSchoolId: string;
     let school: any;
 
-    if (user.role.name === RoleEnum.SCHOOL_ADMIN) {
+    if (user.role.name === RoleEnum.STUDENT) {
+      // Students can only update their own profile
+      if (user.id.toString() !== id.toString()) {
+        throw new BadRequestException(
+          this.errorMessageService.getMessageWithLanguage(
+            'STUDENT',
+            'CAN_ONLY_UPDATE_OWN_PROFILE',
+            user?.preferred_language || DEFAULT_LANGUAGE,
+          ),
+        );
+      }
+      targetSchoolId = user.school_id as string;
+      if (!targetSchoolId) {
+        throw new BadRequestException(
+          this.errorMessageService.getMessageWithLanguage(
+            'SCHOOL',
+            'STUDENT_MUST_HAVE_SCHOOL_ID',
+            user?.preferred_language || DEFAULT_LANGUAGE,
+          ),
+        );
+      }
+    } else if (user.role.name === RoleEnum.SCHOOL_ADMIN) {
       // School admin can only access their own school
       targetSchoolId = user.school_id as string;
       if (!targetSchoolId) {
@@ -617,8 +645,10 @@ export class StudentService {
 
     // If email is being updated, check for conflicts
     if (updateStudentDto.email && updateStudentDto.email !== student.email) {
-      encryptedNewEmail = this.emailEncryptionService.encryptEmail(updateStudentDto.email);
-      
+      encryptedNewEmail = this.emailEncryptionService.encryptEmail(
+        updateStudentDto.email,
+      );
+
       // Check if email already exists in central users
       const existingUser = await this.userModel.findOne({
         email: encryptedNewEmail,
@@ -746,9 +776,18 @@ export class StudentService {
       student.last_name = updateStudentDto.last_name;
     }
     if (updateStudentDto.email !== undefined) {
-      student.email = encryptedNewEmail || this.emailEncryptionService.encryptEmail(updateStudentDto.email);
+      student.email =
+        encryptedNewEmail ||
+        this.emailEncryptionService.encryptEmail(updateStudentDto.email);
     }
-    if (updateStudentDto.status !== undefined) {
+    if (updateStudentDto.profile_pic !== undefined) {
+      student.profile_pic = updateStudentDto.profile_pic;
+    }
+    // Students cannot update their own status - only admins can
+    if (
+      updateStudentDto.status !== undefined &&
+      user.role.name !== RoleEnum.STUDENT
+    ) {
       student.status = updateStudentDto.status;
     }
 
@@ -760,7 +799,11 @@ export class StudentService {
       if (updateStudentDto.email && updateStudentDto.email !== originalEmail) {
         await this.globalStudentModel.updateOne(
           { student_id: new Types.ObjectId(id) },
-          { email: encryptedNewEmail || this.emailEncryptionService.encryptEmail(updateStudentDto.email) },
+          {
+            email:
+              encryptedNewEmail ||
+              this.emailEncryptionService.encryptEmail(updateStudentDto.email),
+          },
         );
       }
 
@@ -794,6 +837,7 @@ export class StudentService {
           email: updatedStudent.email,
           student_code: updatedStudent.student_code,
           school_id: updatedStudent.school_id,
+          profile_pic: updatedStudent.profile_pic,
           status: updatedStudent.status,
           updated_at: updatedStudent.updated_at,
         },

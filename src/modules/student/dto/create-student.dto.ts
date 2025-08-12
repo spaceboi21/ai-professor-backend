@@ -27,6 +27,15 @@ export class CreateStudentDto {
   @ApiProperty({ example: 'alice.smith@student.com' })
   email: string;
 
+  @IsString({ message: 'Profile picture must be a string' })
+  @IsOptional()
+  @ApiProperty({
+    example: 'https://example.com/profile.jpg',
+    required: false,
+    description: 'Profile picture URL (must be a valid URL)',
+  })
+  profile_pic?: string;
+
   @IsOptional()
   @IsString({ message: 'School ID must be a string' })
   @IsNotEmpty({ message: 'School ID is required' })
