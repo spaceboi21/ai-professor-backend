@@ -590,6 +590,32 @@ export class CommunityService {
           },
         },
         {
+          $lookup: {
+            from: 'forum_likes',
+            let: { discussionId: '$_id', userId: new Types.ObjectId(user.id) },
+            pipeline: [
+              {
+                $match: {
+                  $expr: {
+                    $and: [
+                      { $eq: ['$entity_id', '$$discussionId'] },
+                      { $eq: ['$entity_type', 'DISCUSSION'] },
+                      { $eq: ['$liked_by', '$$userId'] },
+                    ],
+                  },
+                },
+              },
+            ],
+            as: 'userLike',
+          },
+        },
+        {
+          $addFields: {
+            has_liked: { $gt: [{ $size: '$userLike' }, 0] },
+            liked_at: { $arrayElemAt: ['$userLike.created_at', 0] },
+          },
+        },
+        {
           $addFields: {
             last_reply_date: {
               $ifNull: ['$last_reply.created_at', '$created_at'],
@@ -703,6 +729,14 @@ export class CommunityService {
         tenantConnection,
       );
 
+      // Check if current user has liked this discussion
+      const LikeModel = tenantConnection.model(ForumLike.name, ForumLikeSchema);
+      const userLike = await LikeModel.findOne({
+        entity_type: LikeEntityTypeEnum.DISCUSSION,
+        entity_id: new Types.ObjectId(discussionId),
+        liked_by: new Types.ObjectId(user.id),
+      }).lean();
+
       // Attach user details
       const userDetails = await this.getUserDetails(
         discussion.created_by.toString(),
@@ -762,6 +796,8 @@ export class CommunityService {
         ...discussion,
         created_by_user: userDetails || null,
         attachments: formattedAttachments,
+        has_liked: !!userLike,
+        liked_at: userLike?.created_at || null,
       };
 
       return {
@@ -1272,6 +1308,39 @@ export class CommunityService {
           },
         },
         {
+          $lookup: {
+            from: 'forum_likes',
+            let: { replyId: '$_id', userId: new Types.ObjectId(user.id) },
+            pipeline: [
+              {
+                $match: {
+                  $expr: {
+                    $and: [
+                      { $eq: ['$entity_id', '$$replyId'] },
+                      { $eq: ['$entity_type', 'REPLY'] },
+                      { $eq: ['$liked_by', '$$userId'] },
+                    ],
+                  },
+                },
+              },
+            ],
+            as: 'userLike',
+          },
+        },
+        {
+          $addFields: {
+            has_liked: { $gt: [{ $size: '$userLike' }, 0] },
+            liked_at: { $arrayElemAt: ['$userLike.created_at', 0] },
+          },
+        },
+        {
+          $addFields: {
+            last_reply_date: {
+              $ifNull: ['$last_reply.created_at', '$created_at'],
+            },
+          },
+        },
+        {
           $sort: { created_at: 1 },
         },
         { $skip: options.skip },
@@ -1571,6 +1640,39 @@ export class CommunityService {
           },
         },
         {
+          $lookup: {
+            from: 'forum_likes',
+            let: { replyId: '$_id', userId: new Types.ObjectId(user.id) },
+            pipeline: [
+              {
+                $match: {
+                  $expr: {
+                    $and: [
+                      { $eq: ['$entity_id', '$$replyId'] },
+                      { $eq: ['$entity_type', 'REPLY'] },
+                      { $eq: ['$liked_by', '$$userId'] },
+                    ],
+                  },
+                },
+              },
+            ],
+            as: 'userLike',
+          },
+        },
+        {
+          $addFields: {
+            has_liked: { $gt: [{ $size: '$userLike' }, 0] },
+            liked_at: { $arrayElemAt: ['$userLike.created_at', 0] },
+          },
+        },
+        {
+          $addFields: {
+            last_reply_date: {
+              $ifNull: ['$last_reply.created_at', '$created_at'],
+            },
+          },
+        },
+        {
           $sort: { created_at: 1 },
         },
         { $skip: options.skip },
@@ -1718,6 +1820,13 @@ export class CommunityService {
         await LikeModel.deleteOne({ _id: existingLike._id });
         await this.updateLikeCount(entityType, entityId, -1, tenantConnection);
 
+        // Get updated like count
+        const updatedLikeCount = await this.getLikeCount(
+          entityType,
+          entityId,
+          tenantConnection,
+        );
+
         // Get user details for response
         const userDetails = await this.getUserDetails(
           user.id.toString(),
@@ -1731,8 +1840,13 @@ export class CommunityService {
             'UNLIKED_SUCCESSFULLY',
             user?.preferred_language || DEFAULT_LANGUAGE,
           ),
-          liked: false,
-          liked_by_user: userDetails || null,
+          data: {
+            liked: false,
+            has_liked: false,
+            like_count: updatedLikeCount,
+            liked_by_user: userDetails || null,
+            action: 'unliked',
+          },
         };
       } else {
         // Like
@@ -1744,6 +1858,13 @@ export class CommunityService {
 
         await newLike.save();
         await this.updateLikeCount(entityType, entityId, 1, tenantConnection);
+
+        // Get updated like count
+        const updatedLikeCount = await this.getLikeCount(
+          entityType,
+          entityId,
+          tenantConnection,
+        );
 
         // Send notification for new like
         const liker = await this.getUserDetails(
@@ -1853,6 +1974,36 @@ export class CommunityService {
         { $inc: { like_count: increment } },
       );
     }
+  }
+
+  /**
+   * Helper method to get current like count
+   */
+  private async getLikeCount(
+    entityType: LikeEntityTypeEnum,
+    entityId: string,
+    tenantConnection: any,
+  ): Promise<number> {
+    if (entityType === LikeEntityTypeEnum.DISCUSSION) {
+      const DiscussionModel = tenantConnection.model(
+        ForumDiscussion.name,
+        ForumDiscussionSchema,
+      );
+      const discussion = await DiscussionModel.findById(entityId)
+        .select('like_count')
+        .lean();
+      return discussion?.like_count || 0;
+    } else if (entityType === LikeEntityTypeEnum.REPLY) {
+      const ReplyModel = tenantConnection.model(
+        ForumReply.name,
+        ForumReplySchema,
+      );
+      const reply = await ReplyModel.findById(entityId)
+        .select('like_count')
+        .lean();
+      return reply?.like_count || 0;
+    }
+    return 0;
   }
 
   /**
@@ -4854,6 +5005,203 @@ export class CommunityService {
         this.errorMessageService.getMessageWithLanguage(
           'COMMUNITY',
           'DELETE_FORUM_ATTACHMENT_FAILED',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
+    }
+  }
+
+  /**
+   * Check if current user has liked a specific entity
+   */
+  async hasUserLiked(
+    entityType: LikeEntityTypeEnum,
+    entityId: string,
+    user: JWTUserPayload,
+  ) {
+    this.logger.log(
+      `Checking if user ${user.id} liked ${entityType}: ${entityId}`,
+    );
+
+    const resolvedSchoolId = this.resolveSchoolId(user);
+
+    // Validate school exists
+    const school = await this.schoolModel.findById(resolvedSchoolId);
+    if (!school) {
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'SCHOOL',
+          'NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
+    }
+
+    // Get tenant connection
+    const tenantConnection =
+      await this.tenantConnectionService.getTenantConnection(school.db_name);
+    const LikeModel = tenantConnection.model(ForumLike.name, ForumLikeSchema);
+
+    try {
+      const like = await LikeModel.findOne({
+        entity_type: entityType,
+        entity_id: new Types.ObjectId(entityId),
+        liked_by: new Types.ObjectId(user.id),
+      }).lean();
+
+      return {
+        message: this.errorMessageService.getSuccessMessageWithLanguage(
+          'COMMUNITY',
+          'LIKE_STATUS_RETRIEVED_SUCCESSFULLY',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+        data: {
+          entity_type: entityType,
+          entity_id: entityId,
+          has_liked: !!like,
+          liked_at: like?.created_at || null,
+        },
+      };
+    } catch (error) {
+      this.logger.error('Error checking like status', error?.stack || error);
+      throw new BadRequestException(
+        this.errorMessageService.getMessageWithLanguage(
+          'COMMUNITY',
+          'CHECK_LIKE_STATUS_FAILED',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
+    }
+  }
+
+  /**
+   * Get list of users who liked a specific entity
+   */
+  async getLikedByUsers(
+    entityType: LikeEntityTypeEnum,
+    entityId: string,
+    user: JWTUserPayload,
+    paginationDto?: PaginationDto,
+  ) {
+    this.logger.log(`Getting users who liked ${entityType}: ${entityId}`);
+
+    const resolvedSchoolId = this.resolveSchoolId(user);
+
+    // Validate school exists
+    const school = await this.schoolModel.findById(resolvedSchoolId);
+    if (!school) {
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'SCHOOL',
+          'NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
+    }
+
+    // Get tenant connection
+    const tenantConnection =
+      await this.tenantConnectionService.getTenantConnection(school.db_name);
+    const LikeModel = tenantConnection.model(ForumLike.name, ForumLikeSchema);
+
+    try {
+      const options = getPaginationOptions(paginationDto || {});
+
+      // Use aggregation pipeline for better performance
+      const aggregationPipeline: any[] = [
+        {
+          $match: {
+            entity_type: entityType,
+            entity_id: new Types.ObjectId(entityId),
+          },
+        },
+        {
+          $lookup: {
+            from: 'students',
+            localField: 'liked_by',
+            foreignField: '_id',
+            as: 'likedByStudent',
+          },
+        },
+        {
+          $lookup: {
+            from: 'users',
+            localField: 'liked_by',
+            foreignField: '_id',
+            as: 'likedByUser',
+          },
+        },
+        {
+          $addFields: {
+            liked_by_user: {
+              $cond: {
+                if: { $gt: [{ $size: '$likedByStudent' }, 0] },
+                then: {
+                  _id: { $arrayElemAt: ['$likedByStudent._id', 0] },
+                  first_name: {
+                    $arrayElemAt: ['$likedByStudent.first_name', 0],
+                  },
+                  last_name: {
+                    $arrayElemAt: ['$likedByStudent.last_name', 0],
+                  },
+                  email: { $arrayElemAt: ['$likedByStudent.email', 0] },
+                  image: { $arrayElemAt: ['$likedByStudent.image', 0] },
+                  role: 'STUDENT',
+                },
+                else: {
+                  _id: { $arrayElemAt: ['$likedByUser._id', 0] },
+                  first_name: {
+                    $arrayElemAt: ['$likedByUser.first_name', 0],
+                  },
+                  last_name: {
+                    $arrayElemAt: ['$likedByUser.last_name', 0],
+                  },
+                  email: { $arrayElemAt: ['$likedByUser.email', 0] },
+                  image: { $arrayElemAt: ['$likedByUser.profile_pic', 0] },
+                  role: { $arrayElemAt: ['$likedByUser.role', 0] },
+                },
+              },
+            },
+          },
+        },
+        {
+          $sort: { created_at: -1 },
+        },
+        { $skip: options.skip },
+        { $limit: options.limit },
+        {
+          $project: {
+            likedByStudent: 0,
+            likedByUser: 0,
+          },
+        },
+      ];
+
+      // Execute aggregation pipeline
+      const [likes, total] = await Promise.all([
+        LikeModel.aggregate(aggregationPipeline),
+        LikeModel.countDocuments({
+          entity_type: entityType,
+          entity_id: new Types.ObjectId(entityId),
+        }),
+      ]);
+
+      const result = createPaginationResult(likes, total, options);
+
+      return {
+        message: this.errorMessageService.getSuccessMessageWithLanguage(
+          'COMMUNITY',
+          'LIKED_BY_USERS_RETRIEVED_SUCCESSFULLY',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+        ...result,
+      };
+    } catch (error) {
+      this.logger.error('Error getting liked by users', error?.stack || error);
+      throw new BadRequestException(
+        this.errorMessageService.getMessageWithLanguage(
+          'COMMUNITY',
+          'GET_LIKED_BY_USERS_FAILED',
           user?.preferred_language || DEFAULT_LANGUAGE,
         ),
       );
