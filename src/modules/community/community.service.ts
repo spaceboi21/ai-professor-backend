@@ -2871,8 +2871,13 @@ export class CommunityService {
     tenantConnection?: any,
   ) {
     try {
+      this.logger.debug(
+        `Getting user details for userId: ${userId}, userRole: ${userRole}`,
+      );
+
       if (userRole === RoleEnum.STUDENT && tenantConnection) {
         // Students are stored in tenant database - use the tenant connection
+        this.logger.debug(`Fetching student details from tenant database`);
         const StudentModel = tenantConnection.model(
           Student.name,
           StudentSchema,
@@ -2882,6 +2887,9 @@ export class CommunityService {
           .lean();
 
         if (student) {
+          this.logger.debug(
+            `Student found: ${student.first_name} ${student.last_name}`,
+          );
           return {
             _id: student._id,
             first_name: student.first_name,
@@ -2891,15 +2899,37 @@ export class CommunityService {
             profile_pic: student.profile_pic || student.image || null,
             role: RoleEnum.STUDENT,
           };
+        } else {
+          this.logger.warn(`Student not found in tenant database: ${userId}`);
         }
       } else {
         // Professors, admins, etc. are stored in central database
+        this.logger.debug(
+          `Fetching user details from central database for role: ${userRole}`,
+        );
         const user = await this.userModel
-          .findById(userId)
+          .findById(new Types.ObjectId(userId))
           .select('first_name last_name email role profile_pic')
+          .populate('role', 'name')
           .lean();
 
         if (user) {
+          this.logger.debug(
+            `User found in central database: ${user.first_name} ${user.last_name}`,
+          );
+          // Handle both populated role object and ObjectId
+          let roleName = userRole;
+          if (
+            user.role &&
+            typeof user.role === 'object' &&
+            'name' in user.role
+          ) {
+            roleName = (user.role as any).name;
+            this.logger.debug(`Using populated role name: ${roleName}`);
+          } else {
+            this.logger.debug(`Using passed role name: ${roleName}`);
+          }
+
           return {
             _id: user._id,
             first_name: user.first_name,
@@ -2907,14 +2937,22 @@ export class CommunityService {
             email: this.emailEncryptionService.decryptEmail(user.email),
             image: user.profile_pic || null,
             profile_pic: user.profile_pic || null,
-            role: user.role,
+            role: roleName,
           };
+        } else {
+          this.logger.warn(`User not found in central database: ${userId}`);
         }
       }
 
+      this.logger.warn(
+        `No user details found for userId: ${userId}, userRole: ${userRole}`,
+      );
       return null;
     } catch (error) {
-      this.logger.error('Error fetching user details', error);
+      this.logger.error(
+        `Error fetching user details for userId: ${userId}, userRole: ${userRole}`,
+        error?.stack || error,
+      );
       return null;
     }
   }
