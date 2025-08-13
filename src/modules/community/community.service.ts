@@ -433,6 +433,58 @@ export class CommunityService {
         filter.created_by = new Types.ObjectId(filterDto.author_id);
       }
 
+      // Apply meeting-specific filters
+      if (filterDto?.meeting_platform) {
+        filter.meeting_platform = filterDto.meeting_platform;
+      }
+
+      if (
+        filterDto?.meeting_scheduled_from ||
+        filterDto?.meeting_scheduled_until
+      ) {
+        filter.meeting_scheduled_at = {};
+        if (filterDto.meeting_scheduled_from) {
+          filter.meeting_scheduled_at.$gte = new Date(
+            filterDto.meeting_scheduled_from,
+          );
+        }
+        if (filterDto.meeting_scheduled_until) {
+          filter.meeting_scheduled_at.$lte = new Date(
+            filterDto.meeting_scheduled_until,
+          );
+        }
+      }
+
+      if (filterDto?.meeting_timing) {
+        const now = new Date();
+        const todayStart = new Date(
+          now.getFullYear(),
+          now.getMonth(),
+          now.getDate(),
+        );
+        const todayEnd = new Date(
+          now.getFullYear(),
+          now.getMonth(),
+          now.getDate(),
+          23,
+          59,
+          59,
+          999,
+        );
+
+        switch (filterDto.meeting_timing) {
+          case 'upcoming':
+            filter.meeting_scheduled_at = { $gt: now };
+            break;
+          case 'past':
+            filter.meeting_scheduled_at = { $lt: now };
+            break;
+          case 'today':
+            filter.meeting_scheduled_at = { $gte: todayStart, $lte: todayEnd };
+            break;
+        }
+      }
+
       this.logger.debug(`Filter query: ${JSON.stringify(filter)}`);
 
       // Use aggregation pipeline for better performance
@@ -674,24 +726,171 @@ export class CommunityService {
             last_reply_date: {
               $ifNull: ['$last_reply.created_at', '$created_at'],
             },
+            // Add meeting-specific sorting fields
+            is_upcoming_meeting: {
+              $and: [
+                { $eq: ['$type', DiscussionTypeEnum.MEETING] },
+                { $gt: ['$meeting_scheduled_at', new Date()] },
+              ],
+            },
+            meeting_priority: {
+              $cond: {
+                if: { $eq: ['$type', DiscussionTypeEnum.MEETING] },
+                then: {
+                  $cond: {
+                    if: { $gt: ['$meeting_scheduled_at', new Date()] },
+                    then: { $subtract: ['$meeting_scheduled_at', new Date()] }, // Time until meeting
+                    else: 0, // Past meetings
+                  },
+                },
+                else: 0, // Non-meeting discussions
+              },
+            },
+            // Add additional meeting-specific computed fields
+            meeting_status: {
+              $cond: {
+                if: { $eq: ['$type', DiscussionTypeEnum.MEETING] },
+                then: {
+                  $cond: {
+                    if: { $gt: ['$meeting_scheduled_at', new Date()] },
+                    then: 'upcoming',
+                    else: {
+                      $cond: {
+                        if: {
+                          $lt: [
+                            {
+                              $add: [
+                                '$meeting_scheduled_at',
+                                {
+                                  $multiply: [
+                                    '$meeting_duration_minutes',
+                                    60000,
+                                  ],
+                                },
+                              ],
+                            },
+                            new Date(),
+                          ],
+                        },
+                        then: 'completed',
+                        else: 'ongoing',
+                      },
+                    },
+                  },
+                },
+                else: null,
+              },
+            },
+            meeting_time_until: {
+              $cond: {
+                if: {
+                  $and: [
+                    { $eq: ['$type', DiscussionTypeEnum.MEETING] },
+                    { $gt: ['$meeting_scheduled_at', new Date()] },
+                  ],
+                },
+                then: { $subtract: ['$meeting_scheduled_at', new Date()] },
+                else: null,
+              },
+            },
+            meeting_end_time: {
+              $cond: {
+                if: { $eq: ['$type', DiscussionTypeEnum.MEETING] },
+                then: {
+                  $add: [
+                    '$meeting_scheduled_at',
+                    { $multiply: ['$meeting_duration_minutes', 60000] },
+                  ],
+                },
+                else: null,
+              },
+            },
+            // Check if meeting is currently ongoing
+            is_meeting_ongoing: {
+              $cond: {
+                if: { $eq: ['$type', DiscussionTypeEnum.MEETING] },
+                then: {
+                  $and: [
+                    { $lte: ['$meeting_scheduled_at', new Date()] },
+                    {
+                      $gt: [
+                        {
+                          $add: [
+                            '$meeting_scheduled_at',
+                            { $multiply: ['$meeting_duration_minutes', 60000] },
+                          ],
+                        },
+                        new Date(),
+                      ],
+                    },
+                  ],
+                },
+                else: false,
+              },
+            },
           },
         },
         {
           $sort: {
             is_pinned: -1, // Pinned discussions first
-            last_reply_date: -1, // Sort by last reply date or discussion creation date
+            is_meeting_ongoing: -1, // Ongoing meetings second
+            is_upcoming_meeting: -1, // Upcoming meetings third
+            meeting_priority: 1, // Sort upcoming meetings by time (earliest first)
+            last_reply_date: -1, // Then by last reply date or discussion creation date
           },
         },
         { $skip: options.skip },
         { $limit: options.limit },
         {
           $project: {
+            // Include all base discussion fields
+            _id: 1,
+            title: 1,
+            content: 1,
+            type: 1,
+            tags: 1,
+            created_by: 1,
+            created_by_role: 1,
+            reply_count: 1,
+            view_count: 1,
+            like_count: 1,
+            status: 1,
+            created_at: 1,
+            updated_at: 1,
+            archived_at: 1,
+            archived_by: 1,
+            deleted_at: 1,
+            deleted_by: 1,
+            last_reply_at: 1,
+
+            // Explicitly include meeting fields
+            meeting_link: 1,
+            meeting_platform: 1,
+            meeting_scheduled_at: 1,
+            meeting_duration_minutes: 1,
+
+            // Include computed fields
+            is_pinned: 1,
+            pinned_at: 1,
+            last_reply: 1,
+            created_by_user: 1,
+            is_unread: 1,
+            has_liked: 1,
+            liked_at: 1,
+            is_upcoming_meeting: 1,
+            meeting_priority: 1,
+            meeting_status: 1,
+            meeting_time_until: 1,
+            meeting_end_time: 1,
+            is_meeting_ongoing: 1,
+
+            // Remove temporary fields
             userPin: 0,
             createdByStudent: 0,
             createdByUser: 0,
             userView: 0,
             last_reply_date: 0,
-            lastReply: 0, // Remove the array version
+            lastReply: 0,
           },
         },
       ];

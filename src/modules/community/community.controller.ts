@@ -34,11 +34,16 @@ import { DeleteForumAttachmentDto } from './dto/delete-forum-attachment.dto';
 import { PaginationDto } from 'src/common/dto/pagination.dto';
 import { LikeEntityTypeEnum } from 'src/database/schemas/tenant/forum-like.schema';
 import { AttachmentEntityTypeEnum } from 'src/database/schemas/tenant/forum-attachment.schema';
+import { DiscussionTypeEnum } from 'src/database/schemas/tenant/forum-discussion.schema';
 import { JWTUserPayload } from 'src/common/types/jwr-user.type';
 import { PinDiscussionDto } from './dto/pin-discussion.dto';
 import { SchoolMembersFilterDto } from './dto/school-members-filter.dto';
 import { ExportDiscussionsDto } from './dto/export-discussions.dto';
 import { ExportDiscussionsResponseDto } from './dto/export-discussions-response.dto';
+import {
+  DiscussionsListResponseDto,
+  SingleDiscussionResponseDto,
+} from './dto/discussion-response.dto';
 import { Response } from 'express';
 
 @ApiTags('Community')
@@ -55,7 +60,11 @@ export class CommunityController {
     RoleEnum.SCHOOL_ADMIN,
     RoleEnum.SUPER_ADMIN,
   )
-  @ApiOperation({ summary: 'Create a new forum discussion' })
+  @ApiOperation({
+    summary: 'Create a new forum discussion',
+    description:
+      'Create a new discussion with support for various types including meetings. Meeting type discussions require video platform details, scheduled time, and duration. Only professors and admins can create meeting discussions.',
+  })
   @ApiResponse({
     status: HttpStatus.CREATED,
     description: 'Discussion created successfully',
@@ -66,7 +75,8 @@ export class CommunityController {
   })
   @ApiResponse({
     status: HttpStatus.FORBIDDEN,
-    description: 'Access denied - insufficient permissions',
+    description:
+      'Access denied - insufficient permissions or students cannot create meeting discussions',
   })
   async createDiscussion(
     @Body() createDiscussionDto: CreateDiscussionDto,
@@ -87,10 +97,58 @@ export class CommunityController {
   )
   @ApiOperation({
     summary: 'Get all discussions with filtering and pagination',
+    description:
+      'Retrieve discussions with support for meeting details, filtering by type, status, tags, and search. Meeting type discussions include video platform, scheduled time, duration, and computed fields like meeting status and time until meeting.',
   })
   @ApiResponse({
     status: HttpStatus.OK,
     description: 'Discussions retrieved successfully',
+    type: DiscussionsListResponseDto,
+    content: {
+      'application/json': {
+        example: {
+          message: 'Discussions retrieved successfully',
+          data: [
+            {
+              _id: '507f1f77bcf86cd799439011',
+              title: 'Weekly Therapy Session',
+              content: 'Join us for our weekly group therapy session...',
+              type: 'meeting',
+              tags: ['therapy', 'group-session', 'weekly'],
+              meeting_link: 'https://meet.google.com/abc-defg-hij',
+              meeting_platform: 'google_meet',
+              meeting_scheduled_at: '2024-01-15T10:00:00.000Z',
+              meeting_duration_minutes: 60,
+              meeting_status: 'upcoming',
+              meeting_time_until: 3600000,
+              meeting_end_time: '2024-01-15T11:00:00.000Z',
+              is_meeting_ongoing: false,
+              is_pinned: false,
+              has_liked: false,
+              is_unread: true,
+              reply_count: 0,
+              view_count: 5,
+              like_count: 0,
+              created_by_user: {
+                _id: '507f1f77bcf86cd799439012',
+                first_name: 'Dr. John',
+                last_name: 'Smith',
+                email: 'john.smith@school.com',
+                role: 'PROFESSOR',
+              },
+              created_at: '2024-01-15T09:00:00.000Z',
+              updated_at: '2024-01-15T09:00:00.000Z',
+            },
+          ],
+          pagination: {
+            page: 1,
+            limit: 10,
+            total: 1,
+            totalPages: 1,
+          },
+        },
+      },
+    },
   })
   @ApiResponse({
     status: HttpStatus.FORBIDDEN,
@@ -100,6 +158,8 @@ export class CommunityController {
     name: 'type',
     required: false,
     enum: ['discussion', 'question', 'case_study', 'announcement', 'meeting'],
+    description:
+      'Filter by discussion type. Meeting type includes video platform details and computed meeting fields.',
   })
   @ApiQuery({
     name: 'status',
@@ -130,10 +190,15 @@ export class CommunityController {
     RoleEnum.SCHOOL_ADMIN,
     RoleEnum.SUPER_ADMIN,
   )
-  @ApiOperation({ summary: 'Get a single discussion by ID' })
+  @ApiOperation({
+    summary: 'Get a single discussion by ID',
+    description:
+      'Retrieve detailed discussion information including meeting details (if type is meeting), attachments, mentions, and user interaction status.',
+  })
   @ApiResponse({
     status: HttpStatus.OK,
     description: 'Discussion retrieved successfully',
+    type: SingleDiscussionResponseDto,
   })
   @ApiResponse({
     status: HttpStatus.NOT_FOUND,
@@ -449,6 +514,205 @@ export class CommunityController {
       req.user as JWTUserPayload,
       paginationDto,
     );
+  }
+
+  @Get('discussions/meetings')
+  @Roles(
+    RoleEnum.STUDENT,
+    RoleEnum.PROFESSOR,
+    RoleEnum.SCHOOL_ADMIN,
+    RoleEnum.SUPER_ADMIN,
+  )
+  @ApiOperation({
+    summary: 'Get all meeting discussions with enhanced filtering',
+    description:
+      "Retrieve meeting discussions with support for platform filtering, date ranges, and timing-based filtering. Includes upcoming, past, and today's meetings.",
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Meeting discussions retrieved successfully',
+    type: DiscussionsListResponseDto,
+  })
+  @ApiResponse({
+    status: HttpStatus.FORBIDDEN,
+    description: 'Access denied - insufficient permissions',
+  })
+  @ApiQuery({
+    name: 'meeting_platform',
+    required: false,
+    enum: ['google_meet', 'zoom', 'teams', 'other'],
+    description: 'Filter by video platform',
+  })
+  @ApiQuery({
+    name: 'meeting_scheduled_from',
+    required: false,
+    type: String,
+    description: 'Filter meetings scheduled from this date (ISO format)',
+  })
+  @ApiQuery({
+    name: 'meeting_scheduled_until',
+    required: false,
+    type: String,
+    description: 'Filter meetings scheduled until this date (ISO format)',
+  })
+  @ApiQuery({
+    name: 'meeting_timing',
+    required: false,
+    enum: ['upcoming', 'past', 'today'],
+    description: 'Filter by meeting timing',
+  })
+  @ApiQuery({ name: 'search', required: false, type: String })
+  @ApiQuery({ name: 'tags', required: false, type: [String] })
+  @ApiQuery({ name: 'author_id', required: false, type: String })
+  @ApiQuery({ name: 'page', required: false, type: Number })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  async getMeetingDiscussions(
+    @Query() filterDto: DiscussionFilterDto,
+    @Query() paginationDto: PaginationDto,
+    @Request() req: any,
+  ) {
+    // Force type to be MEETING for this endpoint
+    filterDto.type = DiscussionTypeEnum.MEETING;
+    return this.communityService.findAllDiscussions(
+      req.user as JWTUserPayload,
+      filterDto,
+      paginationDto,
+    );
+  }
+
+  @Get('discussions/meetings/upcoming')
+  @Roles(
+    RoleEnum.STUDENT,
+    RoleEnum.PROFESSOR,
+    RoleEnum.SCHOOL_ADMIN,
+    RoleEnum.SUPER_ADMIN,
+  )
+  @ApiOperation({
+    summary: 'Get upcoming meeting discussions',
+    description:
+      'Retrieve all upcoming meeting discussions sorted by scheduled time (earliest first).',
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Upcoming meeting discussions retrieved successfully',
+    type: DiscussionsListResponseDto,
+  })
+  @ApiResponse({
+    status: HttpStatus.FORBIDDEN,
+    description: 'Access denied - insufficient permissions',
+  })
+  @ApiQuery({ name: 'page', required: false, type: Number })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  async getUpcomingMeetingDiscussions(
+    @Query() paginationDto: PaginationDto,
+    @Request() req: any,
+  ) {
+    const filterDto: DiscussionFilterDto = {
+      type: DiscussionTypeEnum.MEETING,
+      meeting_timing: 'upcoming',
+    };
+    return this.communityService.findAllDiscussions(
+      req.user as JWTUserPayload,
+      filterDto,
+      paginationDto,
+    );
+  }
+
+  @Get('discussions/meetings/today')
+  @Roles(
+    RoleEnum.STUDENT,
+    RoleEnum.PROFESSOR,
+    RoleEnum.SCHOOL_ADMIN,
+    RoleEnum.SUPER_ADMIN,
+  )
+  @ApiOperation({
+    summary: "Get today's meeting discussions",
+    description: 'Retrieve all meeting discussions scheduled for today.',
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: "Today's meeting discussions retrieved successfully",
+    type: DiscussionsListResponseDto,
+  })
+  @ApiResponse({
+    status: HttpStatus.FORBIDDEN,
+    description: 'Access denied - insufficient permissions',
+  })
+  @ApiQuery({ name: 'page', required: false, type: Number })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  async getTodayMeetingDiscussions(
+    @Query() paginationDto: PaginationDto,
+    @Request() req: any,
+  ) {
+    const filterDto: DiscussionFilterDto = {
+      type: DiscussionTypeEnum.MEETING,
+      meeting_timing: 'today',
+    };
+    return this.communityService.findAllDiscussions(
+      req.user as JWTUserPayload,
+      filterDto,
+      paginationDto,
+    );
+  }
+
+  @Get('discussions/meetings/test')
+  @Roles(
+    RoleEnum.STUDENT,
+    RoleEnum.PROFESSOR,
+    RoleEnum.SCHOOL_ADMIN,
+    RoleEnum.SUPER_ADMIN,
+  )
+  @ApiOperation({
+    summary: 'Test endpoint for meeting discussions with all fields',
+    description:
+      'Test endpoint to verify that all meeting fields are properly included in the response. Returns a single meeting discussion with complete meeting details.',
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Test meeting discussion retrieved successfully',
+    type: SingleDiscussionResponseDto,
+  })
+  @ApiResponse({
+    status: HttpStatus.FORBIDDEN,
+    description: 'Access denied - insufficient permissions',
+  })
+  async testMeetingDiscussionFields(@Request() req: any) {
+    // This endpoint will help verify that all meeting fields are properly included
+    const filterDto: DiscussionFilterDto = {
+      type: DiscussionTypeEnum.MEETING,
+    };
+    const paginationDto: PaginationDto = { page: 1, limit: 1 };
+
+    const result = await this.communityService.findAllDiscussions(
+      req.user as JWTUserPayload,
+      filterDto,
+      paginationDto,
+    );
+
+    // Return the first meeting discussion if available
+    if (result.data && result.data.length > 0) {
+      return {
+        message: 'Test meeting discussion retrieved successfully',
+        data: result.data[0],
+        meeting_fields_verified: {
+          has_meeting_link: !!result.data[0].meeting_link,
+          has_meeting_platform: !!result.data[0].meeting_platform,
+          has_meeting_scheduled_at: !!result.data[0].meeting_scheduled_at,
+          has_meeting_duration_minutes:
+            !!result.data[0].meeting_duration_minutes,
+          has_meeting_status: !!result.data[0].meeting_status,
+          has_meeting_time_until: !!result.data[0].meeting_time_until,
+          has_meeting_end_time: !!result.data[0].meeting_end_time,
+          has_is_meeting_ongoing: !!result.data[0].is_meeting_ongoing,
+        },
+      };
+    }
+
+    return {
+      message: 'No meeting discussions found for testing',
+      data: null,
+      meeting_fields_verified: null,
+    };
   }
 
   @Get('discussions/:id/pin-status')

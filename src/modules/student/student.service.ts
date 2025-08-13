@@ -413,6 +413,8 @@ export class StudentService {
                 },
               ],
             },
+            // Ensure profile_pic is included
+            profile_pic: '$profile_pic',
           },
         },
         { $sort: sort },

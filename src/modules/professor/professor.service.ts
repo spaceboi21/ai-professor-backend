@@ -98,7 +98,9 @@ export class ProfessorService {
 
     // Check if email already exists in central users
     const encryptedEmail = this.emailEncryptionService.encryptEmail(email);
-    const existingUser = await this.userModel.findOne({ email: encryptedEmail });
+    const existingUser = await this.userModel.findOne({
+      email: encryptedEmail,
+    });
     if (existingUser) {
       throw new ConflictException(
         this.errorMessageService.getMessageWithLanguage(
@@ -439,8 +441,8 @@ export class ProfessorService {
     ]);
 
     // Decrypt emails in the aggregation results
-    const decryptedProfessors = professors.map(professor => 
-      this.emailEncryptionService.decryptEmailFields(professor, ['email'])
+    const decryptedProfessors = professors.map((professor) =>
+      this.emailEncryptionService.decryptEmailFields(professor, ['email']),
     );
 
     const pagination = createPaginationResult(decryptedProfessors, total, {
