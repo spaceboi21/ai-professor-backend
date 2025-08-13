@@ -1,16 +1,8 @@
 import { ApiProperty } from '@nestjs/swagger';
-import {
-  IsOptional,
-  IsEnum,
-  IsString,
-  IsArray,
-  IsDateString,
-  IsMongoId,
-} from 'class-validator';
+import { IsOptional, IsEnum, IsString, IsArray } from 'class-validator';
 import {
   DiscussionTypeEnum,
   DiscussionStatusEnum,
-  VideoPlatformEnum,
 } from 'src/database/schemas/tenant/forum-discussion.schema';
 
 export class DiscussionFilterDto {
@@ -62,47 +54,4 @@ export class DiscussionFilterDto {
     required: false,
   })
   author_id?: string;
-
-  // Meeting-specific filters
-  @IsOptional()
-  @IsEnum(VideoPlatformEnum)
-  @ApiProperty({
-    example: VideoPlatformEnum.GOOGLE_MEET,
-    description:
-      'Filter by video platform (only applies to meeting type discussions)',
-    enum: VideoPlatformEnum,
-    required: false,
-  })
-  meeting_platform?: VideoPlatformEnum;
-
-  @IsOptional()
-  @IsDateString()
-  @ApiProperty({
-    example: '2024-01-15T00:00:00.000Z',
-    description:
-      'Filter meetings scheduled from this date (only applies to meeting type discussions)',
-    required: false,
-  })
-  meeting_scheduled_from?: string;
-
-  @IsOptional()
-  @IsDateString()
-  @ApiProperty({
-    example: '2024-01-31T23:59:59.999Z',
-    description:
-      'Filter meetings scheduled until this date (only applies to meeting type discussions)',
-    required: false,
-  })
-  meeting_scheduled_until?: string;
-
-  @IsOptional()
-  @IsString()
-  @ApiProperty({
-    example: 'upcoming',
-    description:
-      'Filter by meeting timing: "upcoming" (future meetings), "past" (expired meetings), "today" (meetings scheduled today)',
-    enum: ['upcoming', 'past', 'today'],
-    required: false,
-  })
-  meeting_timing?: 'upcoming' | 'past' | 'today';
 }

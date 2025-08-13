@@ -1884,6 +1884,10 @@ export const SUCCESS_MESSAGES: {
       [LanguageEnum.ENGLISH]: 'Professor created successfully',
       [LanguageEnum.FRENCH]: 'Professeur créé avec succès',
     },
+    PROFESSOR_RETRIEVED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'Professor retrieved successfully',
+      [LanguageEnum.FRENCH]: 'Professeur récupéré avec succès',
+    },
     PROFESSOR_UPDATED_SUCCESSFULLY: {
       [LanguageEnum.ENGLISH]: 'Professor updated successfully',
       [LanguageEnum.FRENCH]: 'Professeur mis à jour avec succès',

@@ -248,39 +248,6 @@ export class DiscussionResponseDto {
   })
   meeting_duration_minutes?: number;
 
-  // Computed meeting fields (only for meeting type discussions)
-  @ApiProperty({
-    example: 'upcoming',
-    description:
-      'Meeting status: upcoming, ongoing, or completed (only for meeting type)',
-    enum: ['upcoming', 'ongoing', 'completed'],
-    required: false,
-  })
-  meeting_status?: 'upcoming' | 'ongoing' | 'completed';
-
-  @ApiProperty({
-    example: 3600000,
-    description:
-      'Time until meeting starts in milliseconds (only for upcoming meetings)',
-    required: false,
-  })
-  meeting_time_until?: number;
-
-  @ApiProperty({
-    example: '2024-01-15T11:00:00.000Z',
-    description: 'Calculated meeting end time (only for meeting type)',
-    required: false,
-  })
-  meeting_end_time?: Date;
-
-  @ApiProperty({
-    example: false,
-    description:
-      'Whether the meeting is currently ongoing (only for meeting type)',
-    required: false,
-  })
-  is_meeting_ongoing?: boolean;
-
   // User details
   @ApiProperty({
     type: DiscussionUserDto,
