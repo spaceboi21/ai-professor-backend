@@ -504,6 +504,10 @@ export const ERROR_MESSAGES: {
       [LanguageEnum.ENGLISH]: 'Failed to retrieve module overview',
       [LanguageEnum.FRENCH]: "Échec de la récupération de l'aperçu du module",
     },
+    PYTHON_SERVICE_FETCH_FAILED: {
+      [LanguageEnum.ENGLISH]: 'Failed to fetch modules from Python service',
+      [LanguageEnum.FRENCH]: 'Échec de la récupération des modules depuis le service Python',
+    },
     MODULE_ID_REQUIRED_WHEN_TYPE_IS_MODULE: {
       [LanguageEnum.ENGLISH]: 'Module ID is required when type is MODULE',
       [LanguageEnum.FRENCH]:
