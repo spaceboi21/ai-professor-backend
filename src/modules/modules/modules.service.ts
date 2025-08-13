@@ -59,7 +59,7 @@ import {
 import { QuizTypeEnum } from 'src/common/constants/quiz.constant';
 import { PythonService, ModuleValidationResponse } from './python.service';
 import { ErrorMessageService } from 'src/common/services/error-message.service';
-import { DEFAULT_LANGUAGE } from 'src/common/constants/language.constant';
+import { DEFAULT_LANGUAGE, LanguageEnum } from 'src/common/constants/language.constant';
 
 @Injectable()
 export class ModulesService {
@@ -1519,6 +1519,27 @@ export class ModulesService {
           'MODULE',
           'RETRIEVE_MODULE_OVERVIEW_FAILED',
           user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
+    }
+  }
+
+  /**
+   * Get modules from Python service
+   */
+  async getModulesFromPythonService() {
+    try {
+      this.logger.log('Fetching modules from Python service');
+      const response = await this.pythonService.getModules();
+      this.logger.log('Successfully fetched modules from Python service');
+      return response;
+    } catch (error) {
+      this.logger.error('Error fetching modules from Python service', error?.stack || error);
+      throw new BadRequestException(
+        this.errorMessageService.getMessageWithLanguage(
+          'MODULE',
+          'PYTHON_SERVICE_FETCH_FAILED',
+          LanguageEnum.ENGLISH, // Default to English for now
         ),
       );
     }
