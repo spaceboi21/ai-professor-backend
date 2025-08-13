@@ -566,14 +566,6 @@ export class CommunityService {
           },
         },
         {
-          $lookup: {
-            from: 'users',
-            localField: 'created_by',
-            foreignField: '_id',
-            as: 'createdByUser',
-          },
-        },
-        {
           $addFields: {
             created_by_user: {
               $cond: {
@@ -593,19 +585,7 @@ export class CommunityService {
                   },
                   role: 'STUDENT',
                 },
-                else: {
-                  _id: { $arrayElemAt: ['$createdByUser._id', 0] },
-                  first_name: {
-                    $arrayElemAt: ['$createdByUser.first_name', 0],
-                  },
-                  last_name: { $arrayElemAt: ['$createdByUser.last_name', 0] },
-                  email: { $arrayElemAt: ['$createdByUser.email', 0] },
-                  image: { $arrayElemAt: ['$createdByUser.profile_pic', 0] },
-                  profile_pic: {
-                    $arrayElemAt: ['$createdByUser.profile_pic', 0],
-                  },
-                  role: { $arrayElemAt: ['$createdByUser.role', 0] },
-                },
+                else: null, // Will be populated later for professors/admins
               },
             },
           },
@@ -739,9 +719,26 @@ export class CommunityService {
       ]);
 
       this.logger.debug(`Found ${discussions.length} discussions`);
+      console.log(discussions);
 
-      // Decrypt emails in the aggregation results
+      // Process discussions and populate user details
       for (const discussion of discussions) {
+        // If created_by_user is null (professor/admin), populate it using getUserDetails
+        if (
+          !discussion.created_by_user &&
+          discussion.created_by &&
+          discussion.created_by_role
+        ) {
+          this.logger.debug(
+            `Populating user details for discussion ${discussion._id} created by ${discussion.created_by}`,
+          );
+          discussion.created_by_user = await this.getUserDetails(
+            discussion.created_by.toString(),
+            discussion.created_by_role,
+            tenantConnection,
+          );
+        }
+
         // Decrypt email in created_by_user
         if (discussion.created_by_user && discussion.created_by_user.email) {
           discussion.created_by_user.email =
@@ -1336,14 +1333,6 @@ export class CommunityService {
                 },
               },
               {
-                $lookup: {
-                  from: 'users',
-                  localField: 'mentioned_user',
-                  foreignField: '_id',
-                  as: 'mentionedUser',
-                },
-              },
-              {
                 $addFields: {
                   mentioned_user_details: {
                     $cond: {
@@ -1360,20 +1349,7 @@ export class CommunityService {
                         image: { $arrayElemAt: ['$mentionedStudent.image', 0] },
                         role: 'STUDENT',
                       },
-                      else: {
-                        _id: { $arrayElemAt: ['$mentionedUser._id', 0] },
-                        first_name: {
-                          $arrayElemAt: ['$mentionedUser.first_name', 0],
-                        },
-                        last_name: {
-                          $arrayElemAt: ['$mentionedUser.last_name', 0],
-                        },
-                        email: { $arrayElemAt: ['$mentionedUser.email', 0] },
-                        image: {
-                          $arrayElemAt: ['$mentionedUser.profile_pic', 0],
-                        },
-                        role: { $arrayElemAt: ['$mentionedUser.role', 0] },
-                      },
+                      else: null, // Will be populated later for professors/admins
                     },
                   },
                 },
@@ -1399,14 +1375,6 @@ export class CommunityService {
           },
         },
         {
-          $lookup: {
-            from: 'users',
-            localField: 'created_by',
-            foreignField: '_id',
-            as: 'createdByUser',
-          },
-        },
-        {
           $addFields: {
             created_by_user: {
               $cond: {
@@ -1426,23 +1394,9 @@ export class CommunityService {
                   },
                   role: 'STUDENT',
                 },
-                else: {
-                  _id: { $arrayElemAt: ['$createdByUser._id', 0] },
-                  first_name: {
-                    $arrayElemAt: ['$createdByUser.first_name', 0],
-                  },
-                  last_name: { $arrayElemAt: ['$createdByUser.last_name', 0] },
-                  email: { $arrayElemAt: ['$createdByUser.email', 0] },
-                  image: { $arrayElemAt: ['$createdByUser.profile_pic', 0] },
-                  profile_pic: {
-                    $arrayElemAt: ['$createdByUser.profile_pic', 0],
-                  },
-                  role: { $arrayElemAt: ['$createdByUser.role', 0] },
-                },
+                else: null, // Will be populated later for professors/admins
               },
             },
-            has_sub_replies: { $gt: ['$sub_reply_count', 0] },
-            sub_reply_count: { $ifNull: ['$sub_reply_count', 0] },
           },
         },
         {
@@ -1546,8 +1500,24 @@ export class CommunityService {
 
       this.logger.debug(`Found ${replies.length} replies`);
 
-      // Decrypt emails in the aggregation results
+      // Process replies and populate user details
       for (const reply of replies) {
+        // If created_by_user is null (professor/admin), populate it using getUserDetails
+        if (
+          !reply.created_by_user &&
+          reply.created_by &&
+          reply.created_by_role
+        ) {
+          this.logger.debug(
+            `Populating user details for reply ${reply._id} created by ${reply.created_by}`,
+          );
+          reply.created_by_user = await this.getUserDetails(
+            reply.created_by.toString(),
+            reply.created_by_role,
+            tenantConnection,
+          );
+        }
+
         // Decrypt email in created_by_user
         if (reply.created_by_user && reply.created_by_user.email) {
           reply.created_by_user.email =
@@ -1743,14 +1713,6 @@ export class CommunityService {
                 },
               },
               {
-                $lookup: {
-                  from: 'users',
-                  localField: 'mentioned_user',
-                  foreignField: '_id',
-                  as: 'mentionedUser',
-                },
-              },
-              {
                 $addFields: {
                   mentioned_user_details: {
                     $cond: {
@@ -1767,20 +1729,7 @@ export class CommunityService {
                         image: { $arrayElemAt: ['$mentionedStudent.image', 0] },
                         role: 'STUDENT',
                       },
-                      else: {
-                        _id: { $arrayElemAt: ['$mentionedUser._id', 0] },
-                        first_name: {
-                          $arrayElemAt: ['$mentionedUser.first_name', 0],
-                        },
-                        last_name: {
-                          $arrayElemAt: ['$mentionedUser.last_name', 0],
-                        },
-                        email: { $arrayElemAt: ['$mentionedUser.email', 0] },
-                        image: {
-                          $arrayElemAt: ['$mentionedUser.profile_pic', 0],
-                        },
-                        role: { $arrayElemAt: ['$mentionedUser.role', 0] },
-                      },
+                      else: null, // Will be populated later for professors/admins
                     },
                   },
                 },
@@ -1806,14 +1755,6 @@ export class CommunityService {
           },
         },
         {
-          $lookup: {
-            from: 'users',
-            localField: 'created_by',
-            foreignField: '_id',
-            as: 'createdByUser',
-          },
-        },
-        {
           $addFields: {
             created_by_user: {
               $cond: {
@@ -1833,19 +1774,7 @@ export class CommunityService {
                   },
                   role: 'STUDENT',
                 },
-                else: {
-                  _id: { $arrayElemAt: ['$createdByUser._id', 0] },
-                  first_name: {
-                    $arrayElemAt: ['$createdByUser.first_name', 0],
-                  },
-                  last_name: { $arrayElemAt: ['$createdByUser.last_name', 0] },
-                  email: { $arrayElemAt: ['$createdByUser.email', 0] },
-                  image: { $arrayElemAt: ['$createdByUser.profile_pic', 0] },
-                  profile_pic: {
-                    $arrayElemAt: ['$createdByUser.profile_pic', 0],
-                  },
-                  role: { $arrayElemAt: ['$createdByUser.role', 0] },
-                },
+                else: null, // Will be populated later for professors/admins
               },
             },
           },
@@ -2875,7 +2804,11 @@ export class CommunityService {
         `Getting user details for userId: ${userId}, userRole: ${userRole}`,
       );
 
-      if (userRole === RoleEnum.STUDENT && tenantConnection) {
+      // Normalize role comparison - handle both string and enum values
+      const normalizedRole = userRole?.toString()?.toUpperCase();
+      this.logger.debug(`Normalized role: ${normalizedRole}`);
+
+      if (normalizedRole === RoleEnum.STUDENT && tenantConnection) {
         // Students are stored in tenant database - use the tenant connection
         this.logger.debug(`Fetching student details from tenant database`);
         const StudentModel = tenantConnection.model(
@@ -2907,36 +2840,72 @@ export class CommunityService {
         this.logger.debug(
           `Fetching user details from central database for role: ${userRole}`,
         );
+        this.logger.debug(`Converting userId to ObjectId: ${userId}`);
+
+        const objectId = new Types.ObjectId(userId);
+        this.logger.debug(`ObjectId created: ${objectId}`);
+
         const user = await this.userModel
-          .findById(new Types.ObjectId(userId))
+          .findById(objectId)
           .select('first_name last_name email role profile_pic')
           .populate('role', 'name')
           .lean();
 
-        if (user) {
+        // Try without population as fallback if populated query fails
+        let userWithoutPopulate: any = null;
+        if (!user) {
           this.logger.debug(
-            `User found in central database: ${user.first_name} ${user.last_name}`,
+            `User not found with population, trying without population`,
           );
+          userWithoutPopulate = await this.userModel
+            .findById(objectId)
+            .select('first_name last_name email role profile_pic')
+            .lean();
+        }
+
+        // Use either populated or non-populated user data
+        const userData = user || userWithoutPopulate;
+
+        if (userData) {
+          this.logger.debug(
+            `User found: ${userData.first_name} ${userData.last_name}`,
+          );
+          this.logger.debug(
+            `User role field: ${JSON.stringify(userData.role)}`,
+          );
+
           // Handle both populated role object and ObjectId
           let roleName = userRole;
           if (
-            user.role &&
-            typeof user.role === 'object' &&
-            'name' in user.role
+            userData.role &&
+            typeof userData.role === 'object' &&
+            'name' in userData.role
           ) {
-            roleName = (user.role as any).name;
+            roleName = (userData.role as any).name;
             this.logger.debug(`Using populated role name: ${roleName}`);
           } else {
             this.logger.debug(`Using passed role name: ${roleName}`);
           }
 
+          // Handle email decryption safely
+          let decryptedEmail = '';
+          try {
+            decryptedEmail = this.emailEncryptionService.decryptEmail(
+              userData.email,
+            );
+            this.logger.debug(`Email decrypted successfully`);
+          } catch (emailError) {
+            this.logger.error(`Error decrypting email: ${emailError}`);
+            decryptedEmail = userData.email; // Fallback to encrypted email
+          }
+
           return {
-            _id: user._id,
-            first_name: user.first_name,
-            last_name: user.last_name,
-            email: this.emailEncryptionService.decryptEmail(user.email),
-            image: user.profile_pic || null,
-            profile_pic: user.profile_pic || null,
+            _id: userData._id,
+            first_name: userData.first_name,
+            last_name: userData.last_name,
+            email: decryptedEmail,
+            image: userData.profile_pic || null,
+            profile_pic: userData.profile_pic || null,
             role: roleName,
           };
         } else {
