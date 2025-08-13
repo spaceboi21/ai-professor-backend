@@ -582,14 +582,16 @@ export class ChatService {
     if (userRole === RoleEnum.STUDENT) {
       // Students are in tenant database
       if (!schoolId) {
-        throw new BadRequestException('School ID required to fetch student details');
+        throw new BadRequestException(
+          'School ID required to fetch student details',
+        );
       }
 
       const connection = await this.getTenantConnection(schoolId);
       const StudentModel = connection.model(Student.name, StudentSchema);
 
       const student = await StudentModel.findById(userId)
-        .select('first_name last_name email')
+        .select('first_name last_name email profile_pic')
         .lean();
 
       return student
@@ -598,6 +600,8 @@ export class ChatService {
             first_name: student.first_name,
             last_name: student.last_name,
             email: student.email,
+            image: student.profile_pic || null,
+            profile_pic: student.profile_pic || null,
             role: RoleEnum.STUDENT,
           }
         : null;
@@ -605,7 +609,7 @@ export class ChatService {
       // Professors and other roles are in central database
       const user = await this.userModel
         .findById(userId)
-        .select('first_name last_name email')
+        .select('first_name last_name email profile_pic')
         .lean();
 
       return user
@@ -614,6 +618,8 @@ export class ChatService {
             first_name: user.first_name,
             last_name: user.last_name,
             email: user.email,
+            image: user.profile_pic || null,
+            profile_pic: user.profile_pic || null,
             role: userRole,
           }
         : null;
@@ -764,8 +770,6 @@ export class ChatService {
       _id: { $ne: new Types.ObjectId(currentUser.id) }, // Exclude current user
     };
 
-
-
     if (search) {
       professorQuery.$or = [
         { first_name: { $regex: search, $options: 'i' } },
@@ -778,7 +782,7 @@ export class ChatService {
       // If role is STUDENT, only search students
       const [students, totalStudents] = await Promise.all([
         StudentModel.find(studentQuery)
-          .select('first_name last_name email')
+          .select('first_name last_name email profile_pic')
           .skip(skip)
           .limit(numericLimit)
           .lean(),
@@ -791,6 +795,8 @@ export class ChatService {
           first_name: student.first_name,
           last_name: student.last_name,
           email: student.email,
+          image: student.profile_pic || null,
+          profile_pic: student.profile_pic || null,
           role: RoleEnum.STUDENT,
         },
         conversation_user_role: RoleEnum.STUDENT,
@@ -807,14 +813,12 @@ export class ChatService {
       const [professors, totalProfessors] = await Promise.all([
         this.userModel
           .find(professorQuery)
-          .select('first_name last_name email role')
+          .select('first_name last_name email role profile_pic')
           .skip(skip)
           .limit(numericLimit)
           .lean(),
         this.userModel.countDocuments(professorQuery),
       ]);
-
-
 
       const formattedProfessors = professors.map((professor) => ({
         conversation_user: {
@@ -822,6 +826,8 @@ export class ChatService {
           first_name: professor.first_name,
           last_name: professor.last_name,
           email: professor.email,
+          image: professor.profile_pic || null,
+          profile_pic: professor.profile_pic || null,
           role: RoleEnum.PROFESSOR, // Map to PROFESSOR enum
         },
         conversation_user_role: RoleEnum.PROFESSOR,
@@ -843,18 +849,21 @@ export class ChatService {
     // Calculate how many to fetch from each database
     const totalAvailable = totalStudents + totalProfessors;
     const remainingLimit = numericLimit;
-    
+
     // Fetch more than needed from each to ensure we get enough after sorting
-    const fetchLimit = Math.min(remainingLimit * 2, Math.max(totalStudents, totalProfessors));
-    
+    const fetchLimit = Math.min(
+      remainingLimit * 2,
+      Math.max(totalStudents, totalProfessors),
+    );
+
     const [students, professors] = await Promise.all([
       StudentModel.find(studentQuery)
-        .select('first_name last_name email')
+        .select('first_name last_name email profile_pic')
         .limit(fetchLimit)
         .lean(),
       this.userModel
         .find(professorQuery)
-        .select('first_name last_name email role')
+        .select('first_name last_name email role profile_pic')
         .limit(fetchLimit)
         .lean(),
     ]);
@@ -865,6 +874,8 @@ export class ChatService {
         first_name: student.first_name,
         last_name: student.last_name,
         email: student.email,
+        image: student.profile_pic || null,
+        profile_pic: student.profile_pic || null,
         role: RoleEnum.STUDENT,
       },
       conversation_user_role: RoleEnum.STUDENT,
@@ -876,6 +887,8 @@ export class ChatService {
         first_name: professor.first_name,
         last_name: professor.last_name,
         email: professor.email,
+        image: professor.profile_pic || null,
+        profile_pic: professor.profile_pic || null,
         role: RoleEnum.PROFESSOR, // Map to PROFESSOR enum
       },
       conversation_user_role: RoleEnum.PROFESSOR,
