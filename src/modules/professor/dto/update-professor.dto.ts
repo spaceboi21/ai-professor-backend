@@ -39,7 +39,6 @@ export class UpdateProfessorDto {
 
   @IsOptional()
   @IsString()
-  @IsUrl({}, { message: 'Profile picture must be a valid URL' })
   @Matches(/\.(jpg|jpeg|png|webp)(\?.*)?$/i, {
     message: 'Profile picture must be an image file (jpg, jpeg, png, webp)',
   })
