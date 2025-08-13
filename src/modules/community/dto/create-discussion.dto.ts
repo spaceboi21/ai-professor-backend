@@ -17,7 +17,50 @@ import {
   DiscussionTypeEnum,
   VideoPlatformEnum,
 } from 'src/database/schemas/tenant/forum-discussion.schema';
-import { CreateForumAttachmentDto } from './forum-attachment.dto';
+
+// Simple DTO for discussion attachments
+export class DiscussionAttachmentDto {
+  @IsString({ message: 'Original filename must be a string' })
+  @IsNotEmpty({ message: 'Original filename is required' })
+  @ApiProperty({
+    example: 'document.pdf',
+    description: 'Original filename of the uploaded file',
+  })
+  original_filename: string;
+
+  @IsString({ message: 'Stored filename must be a string' })
+  @IsNotEmpty({ message: 'Stored filename is required' })
+  @ApiProperty({
+    example: '1234567890-uuid-document.pdf',
+    description: 'Generated filename for storage',
+  })
+  stored_filename: string;
+
+  @IsString({ message: 'File URL must be a string' })
+  @IsNotEmpty({ message: 'File URL is required' })
+  @ApiProperty({
+    example:
+      'https://bucket.s3.amazonaws.com/forum-attachments/1234567890-uuid-document.pdf',
+    description: 'URL where the file is stored',
+  })
+  file_url: string;
+
+  @IsString({ message: 'MIME type must be a string' })
+  @IsNotEmpty({ message: 'MIME type is required' })
+  @ApiProperty({
+    example: 'application/pdf',
+    description: 'MIME type of the uploaded file',
+  })
+  mime_type: string;
+
+  @IsNumber({}, { message: 'File size must be a number' })
+  @IsNotEmpty({ message: 'File size is required' })
+  @ApiProperty({
+    example: 1024000,
+    description: 'File size in bytes',
+  })
+  file_size: number;
+}
 
 export class CreateDiscussionDto {
   @IsOptional()
@@ -72,7 +115,7 @@ export class CreateDiscussionDto {
   @IsOptional()
   @IsArray()
   @ValidateNested({ each: true })
-  @Type(() => CreateForumAttachmentDto)
+  @Type(() => DiscussionAttachmentDto)
   @ApiProperty({
     example: [
       {
@@ -86,9 +129,9 @@ export class CreateDiscussionDto {
     ],
     description: 'Array of attachments for the discussion',
     required: false,
-    type: [CreateForumAttachmentDto],
+    type: [DiscussionAttachmentDto],
   })
-  attachments?: CreateForumAttachmentDto[];
+  attachments?: DiscussionAttachmentDto[];
 
   @IsOptional()
   @IsArray()

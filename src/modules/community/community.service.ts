@@ -268,9 +268,14 @@ export class CommunityService {
         for (const attachment of attachments) {
           await this.createForumAttachment(
             {
-              ...attachment,
               discussion_id: savedDiscussion._id,
+              reply_id: undefined, // No reply for discussion attachments
               entity_type: AttachmentEntityTypeEnum.DISCUSSION,
+              original_filename: attachment.original_filename,
+              stored_filename: attachment.stored_filename,
+              file_url: attachment.file_url,
+              mime_type: attachment.mime_type,
+              file_size: attachment.file_size,
             },
             user,
           );
@@ -631,6 +636,70 @@ export class CommunityService {
           },
         },
         {
+          $lookup: {
+            from: 'forum_attachments',
+            let: { discussionId: '$_id' },
+            pipeline: [
+              {
+                $match: {
+                  $expr: { $eq: ['$discussion_id', '$$discussionId'] },
+                  reply_id: null, // Only discussion attachments
+                  status: AttachmentStatusEnum.ACTIVE,
+                  deleted_at: null,
+                },
+              },
+              { $sort: { created_at: 1 } },
+              {
+                $lookup: {
+                  from: 'students',
+                  localField: 'uploaded_by',
+                  foreignField: '_id',
+                  as: 'uploadedByStudent',
+                },
+              },
+              {
+                $addFields: {
+                  uploaded_by_user: {
+                    $cond: {
+                      if: { $gt: [{ $size: '$uploadedByStudent' }, 0] },
+                      then: {
+                        _id: { $arrayElemAt: ['$uploadedByStudent._id', 0] },
+                        first_name: {
+                          $arrayElemAt: ['$uploadedByStudent.first_name', 0],
+                        },
+                        last_name: {
+                          $arrayElemAt: ['$uploadedByStudent.last_name', 0],
+                        },
+                        email: {
+                          $arrayElemAt: ['$uploadedByStudent.email', 0],
+                        },
+                        image: {
+                          $arrayElemAt: ['$uploadedByStudent.image', 0],
+                        },
+                        role: 'STUDENT',
+                      },
+                      else: null, // Will be populated later for professors/admins
+                    },
+                  },
+                },
+              },
+              {
+                $project: {
+                  _id: 1,
+                  original_filename: 1,
+                  stored_filename: 1,
+                  file_url: 1,
+                  mime_type: 1,
+                  file_size: 1,
+                  created_at: 1,
+                  uploaded_by_user: 1,
+                },
+              },
+            ],
+            as: 'attachments',
+          },
+        },
+        {
           $sort: {
             is_pinned: -1, // Pinned discussions first
             last_reply_date: -1, // Sort by last reply date or discussion creation date
@@ -680,6 +749,7 @@ export class CommunityService {
             meeting_time_until: 1,
             meeting_end_time: 1,
             is_meeting_ongoing: 1,
+            attachments: 1,
           },
         },
       ];
@@ -742,6 +812,38 @@ export class CommunityService {
             this.emailEncryptionService.decryptEmail(
               discussion.last_reply_user.email,
             );
+        }
+
+        // Process attachments and populate professor details
+        if (discussion.attachments && Array.isArray(discussion.attachments)) {
+          for (const attachment of discussion.attachments) {
+            // If uploaded_by_user is null (professor/admin), populate it using getUserDetails
+            if (
+              !attachment.uploaded_by_user &&
+              attachment.uploaded_by &&
+              attachment.uploaded_by_role
+            ) {
+              this.logger.debug(
+                `Populating uploaded_by_user for attachment ${attachment._id}`,
+              );
+              attachment.uploaded_by_user = await this.getUserDetails(
+                attachment.uploaded_by.toString(),
+                attachment.uploaded_by_role,
+                tenantConnection,
+              );
+            }
+
+            // Decrypt email in uploaded_by_user if it exists
+            if (
+              attachment.uploaded_by_user &&
+              attachment.uploaded_by_user.email
+            ) {
+              attachment.uploaded_by_user.email =
+                this.emailEncryptionService.decryptEmail(
+                  attachment.uploaded_by_user.email,
+                );
+            }
+          }
         }
       }
 
@@ -3769,6 +3871,70 @@ export class CommunityService {
           },
         },
         {
+          $lookup: {
+            from: 'forum_attachments',
+            let: { discussionId: '$_id' },
+            pipeline: [
+              {
+                $match: {
+                  $expr: { $eq: ['$discussion_id', '$$discussionId'] },
+                  reply_id: null, // Only discussion attachments
+                  status: AttachmentStatusEnum.ACTIVE,
+                  deleted_at: null,
+                },
+              },
+              { $sort: { created_at: 1 } },
+              {
+                $lookup: {
+                  from: 'students',
+                  localField: 'uploaded_by',
+                  foreignField: '_id',
+                  as: 'uploadedByStudent',
+                },
+              },
+              {
+                $addFields: {
+                  uploaded_by_user: {
+                    $cond: {
+                      if: { $gt: [{ $size: '$uploadedByStudent' }, 0] },
+                      then: {
+                        _id: { $arrayElemAt: ['$uploadedByStudent._id', 0] },
+                        first_name: {
+                          $arrayElemAt: ['$uploadedByStudent.first_name', 0],
+                        },
+                        last_name: {
+                          $arrayElemAt: ['$uploadedByStudent.last_name', 0],
+                        },
+                        email: {
+                          $arrayElemAt: ['$uploadedByStudent.email', 0],
+                        },
+                        image: {
+                          $arrayElemAt: ['$uploadedByStudent.image', 0],
+                        },
+                        role: 'STUDENT',
+                      },
+                      else: null, // Will be populated later for professors/admins
+                    },
+                  },
+                },
+              },
+              {
+                $project: {
+                  _id: 1,
+                  original_filename: 1,
+                  stored_filename: 1,
+                  file_url: 1,
+                  mime_type: 1,
+                  file_size: 1,
+                  created_at: 1,
+                  uploaded_by_user: 1,
+                },
+              },
+            ],
+            as: 'attachments',
+          },
+        },
+        {
           $replaceRoot: {
             newRoot: {
               $mergeObjects: [
@@ -3777,6 +3943,7 @@ export class CommunityService {
                   created_by_details: '$created_by_details',
                   is_pinned: '$is_pinned',
                   pinned_at: '$pinned_at',
+                  attachments: '$attachments',
                 },
               ],
             },
@@ -3832,6 +3999,38 @@ export class CommunityService {
             this.emailEncryptionService.decryptEmail(
               discussion.created_by_details.email,
             );
+        }
+
+        // Process attachments and populate professor details
+        if (discussion.attachments && Array.isArray(discussion.attachments)) {
+          for (const attachment of discussion.attachments) {
+            // If uploaded_by_user is null (professor/admin), populate it using getUserDetails
+            if (
+              !attachment.uploaded_by_user &&
+              attachment.uploaded_by &&
+              attachment.uploaded_by_role
+            ) {
+              this.logger.debug(
+                `Populating uploaded_by_user for attachment ${attachment._id}`,
+              );
+              attachment.uploaded_by_user = await this.getUserDetails(
+                attachment.uploaded_by.toString(),
+                attachment.uploaded_by_role,
+                tenantConnection,
+              );
+            }
+
+            // Decrypt email in uploaded_by_user if it exists
+            if (
+              attachment.uploaded_by_user &&
+              attachment.uploaded_by_user.email
+            ) {
+              attachment.uploaded_by_user.email =
+                this.emailEncryptionService.decryptEmail(
+                  attachment.uploaded_by_user.email,
+                );
+            }
+          }
         }
       }
 
