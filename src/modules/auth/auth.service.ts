@@ -144,6 +144,19 @@ export class AuthService {
     });
 
     this.logger.log(`SuperAdmin login successful: ${email}`);
+    
+    // Get school details if super admin has school_id
+    let schoolDetails: { name: string; logo: string } | null = null;
+    if (isSuperAdminExists.school_id) {
+      const school = await this.schoolModel.findById(isSuperAdminExists.school_id);
+      if (school) {
+        schoolDetails = {
+          name: school.name,
+          logo: school.logo,
+        };
+      }
+    }
+    
     return {
       message: this.errorMessageService.getSuccessMessageWithLanguage(
         'AUTH',
@@ -160,6 +173,7 @@ export class AuthService {
         preferred_language: updatedPreferredLanguage || DEFAULT_LANGUAGE,
         profile_pic: isSuperAdminExists.profile_pic,
       },
+      ...(schoolDetails && { school: schoolDetails }),
     };
   }
 
@@ -294,6 +308,10 @@ export class AuthService {
         role_name: user.role.name as RoleEnum,
         preferred_language: updatedPreferredLanguage || DEFAULT_LANGUAGE,
         profile_pic: user.profile_pic,
+      },
+      school: {
+        name: school.name,
+        logo: school.logo,
       },
     };
   }
@@ -445,6 +463,10 @@ export class AuthService {
         preferred_language: finalPreferredLanguage,
         profile_pic: student.profile_pic,
       },
+      school: {
+        name: school.name,
+        logo: school.logo,
+      },
     };
   }
 
@@ -536,6 +558,10 @@ export class AuthService {
         ...decryptedStudent,
         role: user.role, // role from JWT (already populated)
         preferred_language: student.preferred_language || DEFAULT_LANGUAGE,
+        school: {
+          name: school.name,
+          logo: school.logo,
+        },
       };
     } else {
       // For other roles, get from central userModel
@@ -564,11 +590,24 @@ export class AuthService {
         ['email'],
       );
 
+      // Get school information for school admin/professor users
+      let schoolDetails: { name: string; logo: string } | null = null;
+      if (userData.school_id) {
+        const school = await this.schoolModel.findById(userData.school_id);
+        if (school) {
+          schoolDetails = {
+            name: school.name,
+            logo: school.logo,
+          };
+        }
+      }
+
       return {
         ...decryptedUserData,
         role: user.role, // role from JWT (already populated)
         preferred_language: userData.preferred_language || DEFAULT_LANGUAGE,
         profile_pic: userData.profile_pic,
+        ...(schoolDetails && { school: schoolDetails }),
       };
     }
   }
