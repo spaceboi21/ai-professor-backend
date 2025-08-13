@@ -952,7 +952,6 @@ export class CommunityService {
         status: AttachmentStatusEnum.ACTIVE,
         deleted_at: null,
       })
-        .populate('uploaded_by', 'first_name last_name email role profile_pic')
         .sort({ created_at: 1 })
         .lean();
 
@@ -1015,39 +1014,25 @@ export class CommunityService {
         };
       });
 
-      const formattedAttachments = attachments.map((attachment) => {
-        if (attachment.uploaded_by) {
-          const user = attachment.uploaded_by as any;
-          if (user.role === RoleEnum.STUDENT) {
-            // Get student details
-            return {
-              ...attachment,
-              uploaded_by_user: {
-                _id: user._id,
-                first_name: user.first_name,
-                last_name: user.last_name,
-                email: this.emailEncryptionService.decryptEmail(user.email),
-                role: RoleEnum.STUDENT,
-                image: user.image,
-              },
-            };
-          } else {
-            // Get professor/admin details
-            return {
-              ...attachment,
-              uploaded_by_user: {
-                _id: user._id,
-                first_name: user.first_name,
-                last_name: user.last_name,
-                email: this.emailEncryptionService.decryptEmail(user.email),
-                role: user.role,
-                image: user.profile_pic,
-              },
-            };
+      const formattedAttachments = await Promise.all(
+        attachments.map(async (attachment) => {
+          // Get user details for the uploader using getUserDetails
+          let uploadedByUser: any = null;
+          if (attachment.uploaded_by) {
+            // Use the actual role from the attachment schema
+            uploadedByUser = await this.getUserDetails(
+              attachment.uploaded_by.toString(),
+              attachment.uploaded_by_role,
+              tenantConnection,
+            );
           }
-        }
-        return attachment;
-      });
+
+          return {
+            ...attachment,
+            uploaded_by_user: uploadedByUser,
+          };
+        }),
+      );
 
       const discussionWithUser = {
         ...discussion,
@@ -1653,37 +1638,25 @@ export class CommunityService {
           .lean();
 
         // Format attachment user details
-        const formattedAttachments = attachments.map((attachment) => {
-          if (attachment.uploaded_by) {
-            const user = attachment.uploaded_by as any;
-            if (user.role === RoleEnum.STUDENT) {
-              return {
-                ...attachment,
-                uploaded_by_user: {
-                  _id: user._id,
-                  first_name: user.first_name,
-                  last_name: user.last_name,
-                  email: this.emailEncryptionService.decryptEmail(user.email),
-                  role: RoleEnum.STUDENT,
-                  image: user.image,
-                },
-              };
-            } else {
-              return {
-                ...attachment,
-                uploaded_by_user: {
-                  _id: user._id,
-                  first_name: user.first_name,
-                  last_name: user.last_name,
-                  email: this.emailEncryptionService.decryptEmail(user.email),
-                  role: user.role,
-                  image: user.profile_pic,
-                },
-              };
+        const formattedAttachments = await Promise.all(
+          attachments.map(async (attachment) => {
+            // Get user details for the uploader using getUserDetails
+            let uploadedByUser: any = null;
+            if (attachment.uploaded_by) {
+              // Use the actual role from the attachment schema
+              uploadedByUser = await this.getUserDetails(
+                attachment.uploaded_by.toString(),
+                attachment.uploaded_by_role,
+                tenantConnection,
+              );
             }
-          }
-          return attachment;
-        });
+
+            return {
+              ...attachment,
+              uploaded_by_user: uploadedByUser,
+            };
+          }),
+        );
 
         reply.attachments = formattedAttachments;
       }
@@ -1978,37 +1951,25 @@ export class CommunityService {
           .lean();
 
         // Format attachment user details
-        const formattedAttachments = attachments.map((attachment) => {
-          if (attachment.uploaded_by) {
-            const user = attachment.uploaded_by as any;
-            if (user.role === RoleEnum.STUDENT) {
-              return {
-                ...attachment,
-                uploaded_by_user: {
-                  _id: user._id,
-                  first_name: user.first_name,
-                  last_name: user.last_name,
-                  email: this.emailEncryptionService.decryptEmail(user.email),
-                  role: RoleEnum.STUDENT,
-                  image: user.image,
-                },
-              };
-            } else {
-              return {
-                ...attachment,
-                uploaded_by_user: {
-                  _id: user._id,
-                  first_name: user.first_name,
-                  last_name: user.last_name,
-                  email: this.emailEncryptionService.decryptEmail(user.email),
-                  role: user.role,
-                  image: user.profile_pic,
-                },
-              };
+        const formattedAttachments = await Promise.all(
+          attachments.map(async (attachment) => {
+            // Get user details for the uploader using getUserDetails
+            let uploadedByUser: any = null;
+            if (attachment.uploaded_by) {
+              // Use the actual role from the attachment schema
+              uploadedByUser = await this.getUserDetails(
+                attachment.uploaded_by.toString(),
+                attachment.uploaded_by_role,
+                tenantConnection,
+              );
             }
-          }
-          return attachment;
-        });
+
+            return {
+              ...attachment,
+              uploaded_by_user: uploadedByUser,
+            };
+          }),
+        );
 
         subReply.attachments = formattedAttachments;
       }
@@ -5298,39 +5259,25 @@ export class CommunityService {
         .lean();
 
       // Format user details
-      const formattedAttachments = attachments.map((attachment) => {
-        if (attachment.uploaded_by) {
-          const user = attachment.uploaded_by as any;
-          if (user.role === RoleEnum.STUDENT) {
-            // Get student details
-            return {
-              ...attachment,
-              uploaded_by_user: {
-                _id: user._id,
-                first_name: user.first_name,
-                last_name: user.last_name,
-                email: this.emailEncryptionService.decryptEmail(user.email),
-                role: RoleEnum.STUDENT,
-                image: user.image,
-              },
-            };
-          } else {
-            // Get professor/admin details
-            return {
-              ...attachment,
-              uploaded_by_user: {
-                _id: user._id,
-                first_name: user.first_name,
-                last_name: user.last_name,
-                email: this.emailEncryptionService.decryptEmail(user.email),
-                role: user.role,
-                image: user.profile_pic,
-              },
-            };
+      const formattedAttachments = await Promise.all(
+        attachments.map(async (attachment) => {
+          // Get user details for the uploader using getUserDetails
+          let uploadedByUser: any = null;
+          if (attachment.uploaded_by) {
+            // Use the actual role from the attachment schema
+            uploadedByUser = await this.getUserDetails(
+              attachment.uploaded_by.toString(),
+              attachment.uploaded_by_role,
+              tenantConnection,
+            );
           }
-        }
-        return attachment;
-      });
+
+          return {
+            ...attachment,
+            uploaded_by_user: uploadedByUser,
+          };
+        }),
+      );
 
       return {
         message: this.errorMessageService.getSuccessMessageWithLanguage(
@@ -5394,39 +5341,25 @@ export class CommunityService {
         .lean();
 
       // Format user details
-      const formattedAttachments = attachments.map((attachment) => {
-        if (attachment.uploaded_by) {
-          const user = attachment.uploaded_by as any;
-          if (user.role === RoleEnum.STUDENT) {
-            // Get student details
-            return {
-              ...attachment,
-              uploaded_by_user: {
-                _id: user._id,
-                first_name: user.first_name,
-                last_name: user.last_name,
-                email: this.emailEncryptionService.decryptEmail(user.email),
-                role: RoleEnum.STUDENT,
-                image: user.image,
-              },
-            };
-          } else {
-            // Get professor/admin details
-            return {
-              ...attachment,
-              uploaded_by_user: {
-                _id: user._id,
-                first_name: user.first_name,
-                last_name: user.last_name,
-                email: this.emailEncryptionService.decryptEmail(user.email),
-                role: user.role,
-                image: user.profile_pic,
-              },
-            };
+      const formattedAttachments = await Promise.all(
+        attachments.map(async (attachment) => {
+          // Get user details for the uploader using getUserDetails
+          let uploadedByUser: any = null;
+          if (attachment.uploaded_by) {
+            // Use the actual role from the attachment schema
+            uploadedByUser = await this.getUserDetails(
+              attachment.uploaded_by.toString(),
+              attachment.uploaded_by_role,
+              tenantConnection,
+            );
           }
-        }
-        return attachment;
-      });
+
+          return {
+            ...attachment,
+            uploaded_by_user: uploadedByUser,
+          };
+        }),
+      );
 
       return {
         message: this.errorMessageService.getSuccessMessageWithLanguage(
