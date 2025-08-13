@@ -487,14 +487,6 @@ export class CommunityService {
                 },
               },
               {
-                $lookup: {
-                  from: 'users',
-                  localField: 'created_by',
-                  foreignField: '_id',
-                  as: 'lastReplyUserCentral',
-                },
-              },
-              {
                 $addFields: {
                   last_reply_user: {
                     $cond: {
@@ -511,27 +503,7 @@ export class CommunityService {
                         image: { $arrayElemAt: ['$lastReplyUser.image', 0] },
                         role: 'STUDENT',
                       },
-                      else: {
-                        _id: { $arrayElemAt: ['$lastReplyUserCentral._id', 0] },
-                        first_name: {
-                          $arrayElemAt: ['$lastReplyUserCentral.first_name', 0],
-                        },
-                        last_name: {
-                          $arrayElemAt: ['$lastReplyUserCentral.last_name', 0],
-                        },
-                        email: {
-                          $arrayElemAt: ['$lastReplyUserCentral.email', 0],
-                        },
-                        image: {
-                          $arrayElemAt: [
-                            '$lastReplyUserCentral.profile_pic',
-                            0,
-                          ],
-                        },
-                        role: {
-                          $arrayElemAt: ['$lastReplyUserCentral.role', 0],
-                        },
-                      },
+                      else: null, // Will be populated later for professors/admins
                     },
                   },
                 },
@@ -735,6 +707,23 @@ export class CommunityService {
           discussion.created_by_user = await this.getUserDetails(
             discussion.created_by.toString(),
             discussion.created_by_role,
+            tenantConnection,
+          );
+        }
+
+        // If last_reply_user is null (professor/admin), populate it using getUserDetails
+        if (
+          !discussion.last_reply_user &&
+          discussion.last_reply &&
+          discussion.last_reply.created_by &&
+          discussion.last_reply.created_by_role
+        ) {
+          this.logger.debug(
+            `Populating last reply user details for discussion ${discussion._id}`,
+          );
+          discussion.last_reply_user = await this.getUserDetails(
+            discussion.last_reply.created_by.toString(),
+            discussion.last_reply.created_by_role,
             tenantConnection,
           );
         }
@@ -3756,14 +3745,6 @@ export class CommunityService {
           },
         },
         {
-          $lookup: {
-            from: 'users',
-            localField: 'discussion.created_by',
-            foreignField: '_id',
-            as: 'createdByUser',
-          },
-        },
-        {
           $addFields: {
             created_by_details: {
               $cond: {
@@ -3780,16 +3761,7 @@ export class CommunityService {
                   image: { $arrayElemAt: ['$createdByStudent.image', 0] },
                   role: 'STUDENT',
                 },
-                else: {
-                  _id: { $arrayElemAt: ['$createdByUser._id', 0] },
-                  first_name: {
-                    $arrayElemAt: ['$createdByUser.first_name', 0],
-                  },
-                  last_name: { $arrayElemAt: ['$createdByUser.last_name', 0] },
-                  email: { $arrayElemAt: ['$createdByUser.email', 0] },
-                  image: { $arrayElemAt: ['$createdByUser.profile_pic', 0] },
-                  role: { $arrayElemAt: ['$createdByUser.role', 0] },
-                },
+                else: null, // Will be populated later for professors/admins
               },
             },
             is_pinned: true,
@@ -3835,6 +3807,22 @@ export class CommunityService {
 
       // Decrypt emails in the aggregation results
       for (const discussion of discussions) {
+        // If created_by_details is null (professor/admin), populate it using getUserDetails
+        if (
+          !discussion.created_by_details &&
+          discussion.created_by &&
+          discussion.created_by_role
+        ) {
+          this.logger.debug(
+            `Populating created_by_details for pinned discussion ${discussion._id}`,
+          );
+          discussion.created_by_details = await this.getUserDetails(
+            discussion.created_by.toString(),
+            discussion.created_by_role,
+            tenantConnection,
+          );
+        }
+
         // Decrypt email in created_by_details
         if (
           discussion.created_by_details &&
@@ -4005,14 +3993,6 @@ export class CommunityService {
           },
         },
         {
-          $lookup: {
-            from: 'users',
-            localField: 'mentioned_by',
-            foreignField: '_id',
-            as: 'mentionedByUser',
-          },
-        },
-        {
           $addFields: {
             mentioned_by_user: {
               $cond: {
@@ -4084,6 +4064,22 @@ export class CommunityService {
 
       // Decrypt emails in the aggregation results
       for (const mention of mentions) {
+        // If mentioned_by_user is null (professor/admin), populate it using getUserDetails
+        if (
+          !mention.mentioned_by_user &&
+          mention.mentioned_by &&
+          mention.mentioned_by_role
+        ) {
+          this.logger.debug(
+            `Populating mentioned_by_user for mention ${mention._id}`,
+          );
+          mention.mentioned_by_user = await this.getUserDetails(
+            mention.mentioned_by.toString(),
+            mention.mentioned_by_role,
+            tenantConnection,
+          );
+        }
+
         // Decrypt email in mentioned_by_user
         if (mention.mentioned_by_user && mention.mentioned_by_user.email) {
           mention.mentioned_by_user.email =
@@ -5478,14 +5474,6 @@ export class CommunityService {
           },
         },
         {
-          $lookup: {
-            from: 'users',
-            localField: 'liked_by',
-            foreignField: '_id',
-            as: 'likedByUser',
-          },
-        },
-        {
           $addFields: {
             liked_by_user: {
               $cond: {
@@ -5502,18 +5490,7 @@ export class CommunityService {
                   image: { $arrayElemAt: ['$likedByStudent.image', 0] },
                   role: 'STUDENT',
                 },
-                else: {
-                  _id: { $arrayElemAt: ['$likedByUser._id', 0] },
-                  first_name: {
-                    $arrayElemAt: ['$likedByUser.first_name', 0],
-                  },
-                  last_name: {
-                    $arrayElemAt: ['$likedByUser.last_name', 0],
-                  },
-                  email: { $arrayElemAt: ['$likedByUser.email', 0] },
-                  image: { $arrayElemAt: ['$likedByUser.profile_pic', 0] },
-                  role: { $arrayElemAt: ['$likedByUser.role', 0] },
-                },
+                else: null, // Will be populated later for professors/admins
               },
             },
           },
@@ -5526,7 +5503,6 @@ export class CommunityService {
         {
           $project: {
             likedByStudent: 0,
-            likedByUser: 0,
           },
         },
       ];
@@ -5542,6 +5518,16 @@ export class CommunityService {
 
       // Decrypt emails in the aggregation results
       for (const like of likes) {
+        // If liked_by_user is null (professor/admin), populate it using getUserDetails
+        if (!like.liked_by_user && like.liked_by && like.liked_by_role) {
+          this.logger.debug(`Populating liked_by_user for like ${like._id}`);
+          like.liked_by_user = await this.getUserDetails(
+            like.liked_by.toString(),
+            like.liked_by_role,
+            tenantConnection,
+          );
+        }
+
         // Decrypt email in liked_by_user
         if (like.liked_by_user && like.liked_by_user.email) {
           like.liked_by_user.email = this.emailEncryptionService.decryptEmail(
