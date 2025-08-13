@@ -25,6 +25,7 @@ import {
 } from 'src/database/schemas/tenant/student.schema';
 import { School } from 'src/database/schemas/central/school.schema';
 import { ErrorMessageService } from 'src/common/services/error-message.service';
+import { EmailEncryptionService } from 'src/common/services/email-encryption.service';
 
 @Injectable()
 export class ChatService {
@@ -54,6 +55,7 @@ export class ChatService {
     private readonly schoolModel: Model<School>,
     private readonly tenantConnectionService: TenantConnectionService,
     private readonly errorMessageService: ErrorMessageService,
+    private readonly emailEncryptionService: EmailEncryptionService,
   ) {}
 
   async createMessage(
@@ -599,7 +601,7 @@ export class ChatService {
             _id: student._id,
             first_name: student.first_name,
             last_name: student.last_name,
-            email: student.email,
+            email: this.emailEncryptionService.decryptEmail(student.email || ''),
             image: student.profile_pic || null,
             profile_pic: student.profile_pic || null,
             role: RoleEnum.STUDENT,
@@ -617,7 +619,7 @@ export class ChatService {
             _id: user._id,
             first_name: user.first_name,
             last_name: user.last_name,
-            email: user.email,
+            email: this.emailEncryptionService.decryptEmail(user.email || ''),
             image: user.profile_pic || null,
             profile_pic: user.profile_pic || null,
             role: userRole,
@@ -794,7 +796,7 @@ export class ChatService {
           _id: student._id,
           first_name: student.first_name,
           last_name: student.last_name,
-          email: student.email,
+          email: this.emailEncryptionService.decryptEmail(student.email || ''),
           image: student.profile_pic || null,
           profile_pic: student.profile_pic || null,
           role: RoleEnum.STUDENT,
@@ -825,7 +827,7 @@ export class ChatService {
           _id: professor._id,
           first_name: professor.first_name,
           last_name: professor.last_name,
-          email: professor.email,
+          email: this.emailEncryptionService.decryptEmail(professor.email || ''),
           image: professor.profile_pic || null,
           profile_pic: professor.profile_pic || null,
           role: RoleEnum.PROFESSOR, // Map to PROFESSOR enum
@@ -873,7 +875,7 @@ export class ChatService {
         _id: student._id,
         first_name: student.first_name,
         last_name: student.last_name,
-        email: student.email,
+        email: this.emailEncryptionService.decryptEmail(student.email || ''),
         image: student.profile_pic || null,
         profile_pic: student.profile_pic || null,
         role: RoleEnum.STUDENT,
@@ -886,7 +888,7 @@ export class ChatService {
         _id: professor._id,
         first_name: professor.first_name,
         last_name: professor.last_name,
-        email: professor.email,
+        email: this.emailEncryptionService.decryptEmail(professor.email || ''),
         image: professor.profile_pic || null,
         profile_pic: professor.profile_pic || null,
         role: RoleEnum.PROFESSOR, // Map to PROFESSOR enum
