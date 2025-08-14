@@ -69,13 +69,20 @@ export class SchoolsService {
     ]);
 
     // Decrypt school emails
-    const decryptedSchools = schools.map(school => {
+    const decryptedSchools = schools.map((school) => {
       if (school.email) {
         school.email = this.emailEncryptionService.decryptEmail(school.email);
       }
       // Also decrypt created_by email if it exists and is populated
-      if (school.created_by && typeof school.created_by === 'object' && 'email' in school.created_by) {
-        (school.created_by as any).email = this.emailEncryptionService.decryptEmail((school.created_by as any).email);
+      if (
+        school.created_by &&
+        typeof school.created_by === 'object' &&
+        'email' in school.created_by
+      ) {
+        (school.created_by as any).email =
+          this.emailEncryptionService.decryptEmail(
+            (school.created_by as any).email,
+          );
       }
       return school;
     });
@@ -129,21 +136,23 @@ export class SchoolsService {
     }
 
     // find the super admin who is attached to this school
-    const superAdmin = await this.userModel.findOne(
-      {
-        school_id: new Types.ObjectId(school._id.toString()),
-        role: new Types.ObjectId(ROLE_IDS.SCHOOL_ADMIN),
-      },
-      {
-        _id: 1,
-        email: 1,
-        first_name: 1,
-        last_name: 1,
-        created_at: 1,
-        last_logged_in: 1,
-        status: 1,
-      },
-    ).lean();
+    const superAdmin = await this.userModel
+      .findOne(
+        {
+          school_id: new Types.ObjectId(school._id.toString()),
+          role: new Types.ObjectId(ROLE_IDS.SCHOOL_ADMIN),
+        },
+        {
+          _id: 1,
+          email: 1,
+          first_name: 1,
+          last_name: 1,
+          created_at: 1,
+          last_logged_in: 1,
+          status: 1,
+        },
+      )
+      .lean();
 
     // Decrypt school email
     if (school.email) {
@@ -151,8 +160,15 @@ export class SchoolsService {
     }
 
     // Decrypt created_by email if it exists and is populated
-    if (school.created_by && typeof school.created_by === 'object' && 'email' in school.created_by) {
-      (school.created_by as any).email = this.emailEncryptionService.decryptEmail((school.created_by as any).email);
+    if (
+      school.created_by &&
+      typeof school.created_by === 'object' &&
+      'email' in school.created_by
+    ) {
+      (school.created_by as any).email =
+        this.emailEncryptionService.decryptEmail(
+          (school.created_by as any).email,
+        );
     }
 
     // Decrypt super admin email if it exists
@@ -248,7 +264,7 @@ export class SchoolsService {
 
     // Authorization check - School admin can only update their own school
     if (user.role.name === RoleEnum.SCHOOL_ADMIN) {
-      if (school._id.toString() !== user.school_id) {
+      if (school._id.toString() !== user.school_id?.toString()) {
         throw new BadRequestException(
           this.errorMessageService.getMessageWithLanguage(
             'SCHOOL',
