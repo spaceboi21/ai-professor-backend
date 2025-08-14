@@ -419,10 +419,16 @@ export class StudentAnchorTagAttemptService {
     );
 
     return {
-      ...updatedAttempt,
       attempt_id: updatedAttempt._id,
+      score_percentage: updatedAttempt.score_percentage,
+      correct_answers: isCorrect ? 1 : 0,
+      total_questions: 1,
+      is_passed: isCorrect,
+      time_taken_seconds: updatedAttempt.time_spent_seconds,
+      status: updatedAttempt.status,
+      completed_at: updatedAttempt.completed_at,
+      ai_verification: aiVerificationResult ? 'completed' : 'not_applicable',
       ai_verification_report: aiVerificationResult,
-      ai_verification_result: undefined,
     };
   }
 

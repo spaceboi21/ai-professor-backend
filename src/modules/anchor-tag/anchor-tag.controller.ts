@@ -193,6 +193,21 @@ export class AnchorTagController {
   @ApiResponse({
     status: 200,
     description: 'Answer submitted successfully',
+    schema: {
+      type: 'object',
+      properties: {
+        attempt_id: { type: 'string', example: '689ca67309405aa1187a95c0' },
+        score_percentage: { type: 'number', example: 100 },
+        correct_answers: { type: 'number', example: 1 },
+        total_questions: { type: 'number', example: 1 },
+        is_passed: { type: 'boolean', example: true },
+        time_taken_seconds: { type: 'number', example: 80 },
+        status: { type: 'string', example: 'COMPLETED' },
+        completed_at: { type: 'string', example: '2025-08-13T14:52:52.067Z' },
+        ai_verification: { type: 'string', example: 'completed' },
+        ai_verification_report: { type: 'object', nullable: true, example: null }
+      }
+    }
   })
   @ApiResponse({
     status: 400,
