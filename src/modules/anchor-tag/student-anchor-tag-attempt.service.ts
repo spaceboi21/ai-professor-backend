@@ -419,7 +419,7 @@ export class StudentAnchorTagAttemptService {
     );
 
     return {
-      ...updatedAttempt.toObject(),
+      ...updatedAttempt,
       attempt_id: updatedAttempt._id,
       ai_verification_report: aiVerificationResult,
       ai_verification_result: undefined,
