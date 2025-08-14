@@ -1,7 +1,16 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsNotEmpty, IsString, Matches } from 'class-validator';
+import { IsNotEmpty, IsOptional, IsString, Matches } from 'class-validator';
 
 export class SetNewPasswordDto {
+  @IsOptional()
+  @IsString({ message: 'Current password must be a string' })
+  @ApiProperty({
+    example: '{n!Zb>0toGg:',
+    description: 'Current password (optional - only validated if provided)',
+    required: false,
+  })
+  current_password?: string;
+
   @IsString({ message: 'Token must be a string' })
   @IsNotEmpty({ message: 'Token is required' })
   @ApiProperty({
@@ -20,7 +29,7 @@ export class SetNewPasswordDto {
     },
   )
   @ApiProperty({
-    example: 'NewPassword123!',
+    example: 'Test@123',
     description:
       'New password - must be at least 8 characters with uppercase, lowercase, number, and special character',
   })

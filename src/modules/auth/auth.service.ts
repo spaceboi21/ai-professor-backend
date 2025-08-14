@@ -144,11 +144,13 @@ export class AuthService {
     });
 
     this.logger.log(`SuperAdmin login successful: ${email}`);
-    
+
     // Get school details if super admin has school_id
     let schoolDetails: { name: string; logo: string } | null = null;
     if (isSuperAdminExists.school_id) {
-      const school = await this.schoolModel.findById(isSuperAdminExists.school_id);
+      const school = await this.schoolModel.findById(
+        isSuperAdminExists.school_id,
+      );
       if (school) {
         schoolDetails = {
           name: school.name,
@@ -156,7 +158,7 @@ export class AuthService {
         };
       }
     }
-    
+
     return {
       message: this.errorMessageService.getSuccessMessageWithLanguage(
         'AUTH',
@@ -825,7 +827,7 @@ export class AuthService {
   }
 
   async setNewPassword(setNewPasswordDto: SetNewPasswordDto) {
-    const { token, new_password } = setNewPasswordDto;
+    const { token, new_password, current_password } = setNewPasswordDto;
     this.logger.log('Setting new password with token');
 
     try {
@@ -834,9 +836,17 @@ export class AuthService {
 
       // Check if it's a student or school user based on role
       if (payload.role_name === RoleEnum.STUDENT) {
-        return this.handleStudentPasswordReset(payload, new_password);
+        return this.handleStudentPasswordReset(
+          payload,
+          new_password,
+          current_password,
+        );
       } else {
-        return this.handleSchoolUserPasswordReset(payload, new_password);
+        return this.handleSchoolUserPasswordReset(
+          payload,
+          new_password,
+          current_password,
+        );
       }
     } catch (error) {
       if (
@@ -859,6 +869,7 @@ export class AuthService {
   private async handleSchoolUserPasswordReset(
     payload: any,
     new_password: string,
+    current_password?: string,
   ) {
     // Find the school user
     const user = await this.userModel.findById(payload.id).select('+password');
@@ -905,6 +916,26 @@ export class AuthService {
       );
     }
 
+    // If current_password is provided, validate it
+    if (current_password) {
+      const isCurrentPasswordMatch = await this.bcryptUtil.comparePassword(
+        current_password,
+        user.password,
+      );
+      if (!isCurrentPasswordMatch) {
+        this.logger.warn(
+          `Current password mismatch for password reset: ${user.email}`,
+        );
+        throw new BadRequestException(
+          this.errorMessageService.getMessageWithLanguage(
+            'AUTH',
+            'CURRENT_PASSWORD_MISMATCH',
+            user.preferred_language || DEFAULT_LANGUAGE,
+          ),
+        );
+      }
+    }
+
     // Hash the new password
     const hashedPassword = await this.bcryptUtil.hashPassword(new_password);
 
@@ -938,7 +969,11 @@ export class AuthService {
     };
   }
 
-  private async handleStudentPasswordReset(payload: any, new_password: string) {
+  private async handleStudentPasswordReset(
+    payload: any,
+    new_password: string,
+    current_password?: string,
+  ) {
     // Get the school information
     const school = await this.schoolModel.findById(payload.school_id);
     if (!school) {
@@ -984,6 +1019,26 @@ export class AuthService {
           student.preferred_language || DEFAULT_LANGUAGE,
         ),
       );
+    }
+
+    // If current_password is provided, validate it
+    if (current_password) {
+      const isCurrentPasswordMatch = await this.bcryptUtil.comparePassword(
+        current_password,
+        student.password,
+      );
+      if (!isCurrentPasswordMatch) {
+        this.logger.warn(
+          `Current password mismatch for student password reset: ${student.email}`,
+        );
+        throw new BadRequestException(
+          this.errorMessageService.getMessageWithLanguage(
+            'AUTH',
+            'CURRENT_PASSWORD_MISMATCH',
+            student.preferred_language || DEFAULT_LANGUAGE,
+          ),
+        );
+      }
     }
 
     // Hash the new password

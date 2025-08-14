@@ -55,6 +55,10 @@ export const ERROR_MESSAGES: {
       [LanguageEnum.ENGLISH]: 'Invalid old password',
       [LanguageEnum.FRENCH]: 'Ancien mot de passe invalide',
     },
+    CURRENT_PASSWORD_MISMATCH: {
+      [LanguageEnum.ENGLISH]: 'Current password is incorrect',
+      [LanguageEnum.FRENCH]: 'Le mot de passe actuel est incorrect',
+    },
     INVALID_RESET_TOKEN: {
       [LanguageEnum.ENGLISH]: 'Invalid reset token',
       [LanguageEnum.FRENCH]: 'Jeton de réinitialisation invalide',
@@ -506,7 +510,8 @@ export const ERROR_MESSAGES: {
     },
     PYTHON_SERVICE_FETCH_FAILED: {
       [LanguageEnum.ENGLISH]: 'Failed to fetch modules from Python service',
-      [LanguageEnum.FRENCH]: 'Échec de la récupération des modules depuis le service Python',
+      [LanguageEnum.FRENCH]:
+        'Échec de la récupération des modules depuis le service Python',
     },
     MODULE_ID_REQUIRED_WHEN_TYPE_IS_MODULE: {
       [LanguageEnum.ENGLISH]: 'Module ID is required when type is MODULE',
@@ -1892,6 +1897,10 @@ export const SUCCESS_MESSAGES: {
       [LanguageEnum.ENGLISH]: 'Professor retrieved successfully',
       [LanguageEnum.FRENCH]: 'Professeur récupéré avec succès',
     },
+    PROFESSORS_RETRIEVED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'Professors retrieved successfully',
+      [LanguageEnum.FRENCH]: 'Professeurs récupérés avec succès',
+    },
     PROFESSOR_UPDATED_SUCCESSFULLY: {
       [LanguageEnum.ENGLISH]: 'Professor updated successfully',
       [LanguageEnum.FRENCH]: 'Professeur mis à jour avec succès',
@@ -1903,6 +1912,10 @@ export const SUCCESS_MESSAGES: {
     PROFESSOR_DELETED_SUCCESSFULLY: {
       [LanguageEnum.ENGLISH]: 'Professor deleted successfully',
       [LanguageEnum.FRENCH]: 'Professeur supprimé avec succès',
+    },
+    PASSWORD_UPDATED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'Password updated successfully',
+      [LanguageEnum.FRENCH]: 'Mot de passe mis à jour avec succès',
     },
   },
 

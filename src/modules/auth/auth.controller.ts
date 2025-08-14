@@ -40,10 +40,10 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Super Admin Login' })
   @ApiBody({ type: LoginSuperAdminDto })
-  @ApiResponse({ 
-    status: 200, 
+  @ApiResponse({
+    status: 200,
     description: 'Login successful',
-    type: LoginResponseDto
+    type: LoginResponseDto,
   })
   @ApiResponse({ status: 400, description: 'Invalid email or password' })
   async superAdminLogin(
@@ -58,10 +58,10 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'School Admin or Professor Login' })
   @ApiBody({ type: LoginSchoolAdminDto })
-  @ApiResponse({ 
-    status: 200, 
+  @ApiResponse({
+    status: 200,
     description: 'Login successful',
-    type: LoginResponseDto
+    type: LoginResponseDto,
   })
   @ApiResponse({ status: 400, description: 'Invalid email or password' })
   async schoolAdminLogin(
@@ -76,10 +76,10 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Student Login' })
   @ApiBody({ type: LoginStudentDto })
-  @ApiResponse({ 
-    status: 200, 
+  @ApiResponse({
+    status: 200,
     description: 'Login successful',
-    type: LoginResponseDto
+    type: LoginResponseDto,
   })
   @ApiResponse({ status: 400, description: 'Invalid email or password' })
   async studentLogin(@Body() body: LoginStudentDto, @Req() req: Request) {
@@ -91,15 +91,21 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Refresh Access Token' })
   @ApiBody({ type: RefreshTokenDto })
-  @ApiResponse({ 
-    status: 200, 
+  @ApiResponse({
+    status: 200,
     description: 'Token refreshed successfully',
     schema: {
       type: 'object',
       properties: {
         message: { type: 'string', example: 'Token refreshed successfully' },
-        access_token: { type: 'string', example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...' },
-        refresh_token: { type: 'string', example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...' },
+        access_token: {
+          type: 'string',
+          example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
+        },
+        refresh_token: {
+          type: 'string',
+          example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
+        },
         access_token_expires_in: { type: 'number', example: 900 },
         refresh_token_expires_in: { type: 'number', example: 604800 },
       },
@@ -114,10 +120,10 @@ export class AuthController {
   @Get('me')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get current user info' })
-  @ApiResponse({ 
-    status: 200, 
+  @ApiResponse({
+    status: 200,
     description: 'User info',
-    type: UserMeResponseDto
+    type: UserMeResponseDto,
   })
   async getMe(@User() user: JWTUserPayload) {
     return this.authService.getMe(user);
@@ -141,10 +147,17 @@ export class AuthController {
 
   @Post('set-new-password')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Set new password using reset token' })
+  @ApiOperation({
+    summary: 'Set new password using reset token',
+    description:
+      "Set new password with optional current password validation. If current_password is provided, it will be validated against the user's current password.",
+  })
   @ApiBody({ type: SetNewPasswordDto })
   @ApiResponse({ status: 200, description: 'Password updated successfully' })
-  @ApiResponse({ status: 400, description: 'Invalid or expired token' })
+  @ApiResponse({
+    status: 400,
+    description: 'Invalid or expired token, or current password mismatch',
+  })
   @ApiResponse({ status: 404, description: 'User not found' })
   async setNewPassword(@Body() setNewPasswordDto: SetNewPasswordDto) {
     return this.authService.setNewPassword(setNewPasswordDto);

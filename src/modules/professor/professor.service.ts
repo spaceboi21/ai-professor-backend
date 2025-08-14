@@ -159,7 +159,7 @@ export class ProfessorService {
       this.logger.log(`Credentials email sent to: ${email}`);
 
       return {
-        message: this.errorMessageService.getMessageWithLanguage(
+        message: this.errorMessageService.getSuccessMessageWithLanguage(
           'PROFESSOR',
           'PROFESSOR_CREATED_SUCCESSFULLY',
           adminUser?.preferred_language || DEFAULT_LANGUAGE,
@@ -253,7 +253,7 @@ export class ProfessorService {
     try {
       const updatedProfessor = await professor.save();
       return {
-        message: this.errorMessageService.getMessageWithLanguage(
+        message: this.errorMessageService.getSuccessMessageWithLanguage(
           'PROFESSOR',
           'PROFESSOR_UPDATED_SUCCESSFULLY',
           user?.preferred_language || DEFAULT_LANGUAGE,
@@ -335,7 +335,7 @@ export class ProfessorService {
     try {
       const updatedProfessor = await professor.save();
       return {
-        message: this.errorMessageService.getMessageWithLanguage(
+        message: this.errorMessageService.getSuccessMessageWithLanguage(
           'PROFESSOR',
           'PASSWORD_UPDATED_SUCCESSFULLY',
           user?.preferred_language || DEFAULT_LANGUAGE,
@@ -452,7 +452,7 @@ export class ProfessorService {
     });
 
     return {
-      message: this.errorMessageService.getMessageWithLanguage(
+      message: this.errorMessageService.getSuccessMessageWithLanguage(
         'PROFESSOR',
         'PROFESSORS_RETRIEVED_SUCCESSFULLY',
         user?.preferred_language || DEFAULT_LANGUAGE,
@@ -486,7 +486,7 @@ export class ProfessorService {
     }
 
     return {
-      message: this.errorMessageService.getMessageWithLanguage(
+      message: this.errorMessageService.getSuccessMessageWithLanguage(
         'PROFESSOR',
         'PROFESSOR_RETRIEVED_SUCCESSFULLY',
         user?.preferred_language || DEFAULT_LANGUAGE,
@@ -642,7 +642,7 @@ export class ProfessorService {
     );
 
     return {
-      message: this.errorMessageService.getMessageWithLanguage(
+      message: this.errorMessageService.getSuccessMessageWithLanguage(
         'PROFESSOR',
         'PROFESSOR_DELETED_SUCCESSFULLY',
         user?.preferred_language || DEFAULT_LANGUAGE,
