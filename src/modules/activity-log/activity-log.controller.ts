@@ -166,6 +166,7 @@ export class ActivityLogController {
                   name: { type: 'string' },
                   email: { type: 'string' },
                   role: { type: 'string' },
+                  profile_pic: { type: 'string', nullable: true },
                 },
               },
               school: {
@@ -488,6 +489,7 @@ export class ActivityLogController {
                 name: { type: 'string' },
                 email: { type: 'string' },
                 role: { type: 'string' },
+                profile_pic: { type: 'string', nullable: true },
               },
             },
             school: {
