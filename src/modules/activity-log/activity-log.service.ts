@@ -76,6 +76,7 @@ interface PopulatedUser {
   first_name: string;
   last_name: string;
   email: string;
+  profile_pic?: string;
 }
 
 interface PopulatedSchool {
@@ -284,7 +285,7 @@ export class ActivityLogService {
       // Get logs with user and school population
       const logs = await this.activityLogModel
         .find(query)
-        .populate('performed_by', 'first_name last_name email')
+        .populate('performed_by', 'first_name last_name email profile_pic')
         .populate('school_id', 'name')
         .populate('target_user_id', 'first_name last_name email')
         .sort({ created_at: -1 })
@@ -320,6 +321,7 @@ export class ActivityLogService {
                   name: `${performedBy.first_name} ${performedBy.last_name}`.trim(),
                   email: this.emailEncryptionService.decryptEmail(performedBy.email || ''),
                   role: log.performed_by_role,
+                  profile_pic: performedBy.profile_pic || null,
                 }
               : null,
           school:
@@ -458,7 +460,7 @@ export class ActivityLogService {
 
       const log = await this.activityLogModel
         .findById(logId)
-        .populate('performed_by', 'first_name last_name email')
+        .populate('performed_by', 'first_name last_name email profile_pic')
         .populate('school_id', 'name')
         .populate('target_user_id', 'first_name last_name email')
         .lean();
@@ -494,6 +496,7 @@ export class ActivityLogService {
                 name: `${performedBy.first_name} ${performedBy.last_name}`.trim(),
                 email: this.emailEncryptionService.decryptEmail(performedBy.email || ''),
                 role: log.performed_by_role,
+                profile_pic: performedBy.profile_pic || null,
               }
             : null,
         school:
@@ -660,7 +663,7 @@ export class ActivityLogService {
 
     const logs = await this.activityLogModel
       .find(query)
-      .populate('performed_by', 'first_name last_name email')
+      .populate('performed_by', 'first_name last_name email profile_pic')
       .populate('school_id', 'name')
       .populate('target_user_id', 'first_name last_name email')
       .sort({ created_at: -1 })
