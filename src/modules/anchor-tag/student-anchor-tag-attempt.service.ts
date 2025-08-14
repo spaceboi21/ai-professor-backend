@@ -418,7 +418,12 @@ export class StudentAnchorTagAttemptService {
       `Anchor tag attempt completed for student ${user.id}, score: ${scorePercentage}%`,
     );
 
-    return updatedAttempt;
+    return {
+      ...updatedAttempt.toObject(),
+      attempt_id: updatedAttempt._id,
+      ai_verification_report: aiVerificationResult,
+      ai_verification_result: undefined,
+    };
   }
 
   async skipAnchorTag(

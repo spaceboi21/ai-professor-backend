@@ -543,7 +543,7 @@ export class AnchorTagController {
               is_correct: true,
               score_percentage: 85,
             },
-            ai_verification_result: {
+            ai_verification_report: {
               score_percentage: 85,
               questions_results: [
                 {
