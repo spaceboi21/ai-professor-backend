@@ -300,7 +300,7 @@ export class ActivityLogService {
         const school = log.school_id as any;
         const targetUser = log.target_user_id as any;
 
-        // Decrypt target_user_email if it exists
+                // Decrypt target_user_email if it exists
         const decryptedLog = this.emailEncryptionService.decryptEmailFields(
           log,
           ['target_user_email'],
@@ -318,7 +318,7 @@ export class ActivityLogService {
               ? {
                   id: performedBy._id,
                   name: `${performedBy.first_name} ${performedBy.last_name}`.trim(),
-                  email: performedBy.email,
+                  email: this.emailEncryptionService.decryptEmail(performedBy.email || ''),
                   role: log.performed_by_role,
                 }
               : null,
@@ -327,14 +327,14 @@ export class ActivityLogService {
               ? {
                   id: school._id,
                   name: school.name,
-                }
-              : null,
+              }
+            : null,
           target_user:
             targetUser && targetUser.first_name
               ? {
                   id: targetUser._id,
                   name: `${targetUser.first_name} ${targetUser.last_name}`.trim(),
-                  email: targetUser.email,
+                  email: this.emailEncryptionService.decryptEmail(targetUser.email || ''),
                   role: log.target_user_role,
                 }
               : null,
@@ -492,7 +492,7 @@ export class ActivityLogService {
             ? {
                 id: performedBy._id,
                 name: `${performedBy.first_name} ${performedBy.last_name}`.trim(),
-                email: performedBy.email,
+                email: this.emailEncryptionService.decryptEmail(performedBy.email || ''),
                 role: log.performed_by_role,
               }
             : null,
@@ -508,7 +508,7 @@ export class ActivityLogService {
             ? {
                 id: targetUser._id,
                 name: `${targetUser.first_name} ${targetUser.last_name}`.trim(),
-                email: targetUser.email,
+                email: this.emailEncryptionService.decryptEmail(targetUser.email || ''),
                 role: log.target_user_role,
               }
             : null,
