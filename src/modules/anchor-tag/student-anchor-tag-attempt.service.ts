@@ -402,7 +402,7 @@ export class StudentAnchorTagAttemptService {
       attempt._id,
       updateData,
       { new: true },
-    );
+    ).lean();
 
     if (!updatedAttempt) {
       throw new NotFoundException(
