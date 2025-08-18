@@ -69,6 +69,61 @@ export class AnchorTagService {
     private readonly notificationsService: NotificationsService,
   ) {}
 
+  /**
+   * Helper method to check if an anchor tag title already exists in the same bibliography
+   * @param bibliography_id - The bibliography ID
+   * @param title - The anchor tag title to check
+   * @param user - User context for tenant connection
+   * @param excludeAnchorTagId - Optional anchor tag ID to exclude from check (for updates)
+   * @returns Promise<boolean> - true if title exists, false otherwise
+   */
+  private async checkAnchorTagTitleExists(
+    bibliography_id: string | Types.ObjectId,
+    title: string,
+    user: JWTUserPayload,
+    excludeAnchorTagId?: string | Types.ObjectId,
+  ): Promise<boolean> {
+    // Validate school
+    const school = await this.schoolModel.findById(user.school_id);
+    if (!school) {
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'SCHOOL',
+          'NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
+    }
+
+    // Get tenant connection
+    const tenantConnection =
+      await this.tenantConnectionService.getTenantConnection(school.db_name);
+    const AnchorTagModel = tenantConnection.model(
+      AnchorTag.name,
+      AnchorTagSchema,
+    );
+
+    // Normalize input title (trim + lowercase)
+    const normalizedTitle = title.trim().toLowerCase();
+
+    // Build case-insensitive query using aggregation expression
+    const query: any = {
+      bibliography_id: new Types.ObjectId(bibliography_id.toString()),
+      deleted_at: null,
+      $expr: {
+        $eq: [{ $toLower: '$title' }, normalizedTitle],
+      },
+    };
+
+    // Exclude the anchor tag being updated
+    if (excludeAnchorTagId) {
+      query._id = { $ne: new Types.ObjectId(excludeAnchorTagId.toString()) };
+    }
+
+    const exists = await AnchorTagModel.exists(query);
+    return !!exists;
+  }
+
   async createAnchorTag(
     createAnchorTagDto: CreateAnchorTagDto,
     user: JWTUserPayload,
@@ -141,6 +196,23 @@ export class AnchorTagService {
         this.errorMessageService.getMessageWithLanguage(
           'ANCHOR_TAG',
           'BIBLIOGRAPHY_NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
+    }
+
+    // Check for duplicate anchor tag title in the same bibliography
+    const titleExists = await this.checkAnchorTagTitleExists(
+      bibliography_id,
+      createAnchorTagDto.title,
+      user,
+    );
+
+    if (titleExists) {
+      throw new ConflictException(
+        this.errorMessageService.getMessageWithLanguage(
+          'ANCHOR_TAG',
+          'DUPLICATE_TITLE_IN_BIBLIOGRAPHY',
           user?.preferred_language || DEFAULT_LANGUAGE,
         ),
       );
@@ -479,6 +551,29 @@ export class AnchorTagService {
           this.errorMessageService.getMessageWithLanguage(
             'ANCHOR_TAG',
             'QUIZ_GROUP_NOT_FOUND',
+            user?.preferred_language || DEFAULT_LANGUAGE,
+          ),
+        );
+      }
+    }
+
+    // Check for duplicate anchor tag title in the same bibliography (excluding current anchor tag)
+    if (
+      updateAnchorTagDto.title &&
+      updateAnchorTagDto.title !== existingAnchorTag.title
+    ) {
+      const titleExists = await this.checkAnchorTagTitleExists(
+        existingAnchorTag.bibliography_id,
+        updateAnchorTagDto.title,
+        user,
+        id,
+      );
+
+      if (titleExists) {
+        throw new ConflictException(
+          this.errorMessageService.getMessageWithLanguage(
+            'ANCHOR_TAG',
+            'DUPLICATE_TITLE_IN_BIBLIOGRAPHY',
             user?.preferred_language || DEFAULT_LANGUAGE,
           ),
         );

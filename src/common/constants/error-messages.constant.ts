@@ -538,6 +538,10 @@ export const ERROR_MESSAGES: {
       [LanguageEnum.ENGLISH]: 'Bibliography not found',
       [LanguageEnum.FRENCH]: 'Bibliographie non trouvée',
     },
+    QUIZ_GROUP_NOT_FOUND: {
+      [LanguageEnum.ENGLISH]: 'Quiz group not found',
+      [LanguageEnum.FRENCH]: 'Groupe de quiz non trouvé',
+    },
   },
 
   // Chapter Related
@@ -1285,6 +1289,12 @@ export const ERROR_MESSAGES: {
     BIBLIOGRAPHY_NOT_FOUND: {
       [LanguageEnum.ENGLISH]: 'Bibliography not found',
       [LanguageEnum.FRENCH]: 'Bibliographie non trouvée',
+    },
+    DUPLICATE_TITLE_IN_BIBLIOGRAPHY: {
+      [LanguageEnum.ENGLISH]:
+        'An anchor tag with this title already exists in this bibliography',
+      [LanguageEnum.FRENCH]:
+        "Un tag d'ancrage avec ce titre existe déjà dans cette bibliographie",
     },
     QUIZ_GROUP_NOT_FOUND: {
       [LanguageEnum.ENGLISH]: 'Quiz group not found',
