@@ -123,6 +123,7 @@ export class PptBibliographyService {
           title: slide.title,
           content: slide.content,
           notes: slide.notes,
+          background: slide.background,
         })),
       },
       message: `PowerPoint processed successfully. ${pptData.totalSlides} slides found. Use the bibliography ID to create anchor tags manually.`,

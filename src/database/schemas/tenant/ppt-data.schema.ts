@@ -17,6 +17,16 @@ export interface PptSlideContent {
   position?: { x: number; y: number };
 }
 
+export interface PptBackgroundStyle {
+  type: 'solid' | 'gradient' | 'pattern' | 'image' | 'none';
+  color?: string;
+  gradientColors?: string[];
+  gradientDirection?: 'horizontal' | 'vertical' | 'diagonal';
+  patternType?: string;
+  imageUrl?: string;
+  transparency?: number;
+}
+
 export interface PptSlide {
   slideNumber: number;
   title: string;
@@ -24,6 +34,7 @@ export interface PptSlide {
   notes: string;
   layout: string;
   slideId: string;
+  background: PptBackgroundStyle;
 }
 
 export interface PptMetadata {
