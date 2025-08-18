@@ -98,4 +98,12 @@ AnchorTagSchema.index({ bibliography_id: 1, content_type: 1, status: 1 });
 AnchorTagSchema.index({ quiz_group_id: 1 });
 AnchorTagSchema.index({ created_by: 1, status: 1 });
 AnchorTagSchema.index({ content_type: 1, content_reference: 1 });
+
+// Create compound index for bibliography_id, title, and deleted_at to ensure unique titles per bibliography
+// Only active anchor tags (deleted_at is null) will be considered for uniqueness
+// Note: Title uniqueness is enforced case-insensitively in the application layer
+AnchorTagSchema.index(
+  { bibliography_id: 1, title: 1, deleted_at: 1 },
+  { unique: true },
+);
 AnchorTagSchema.index({ is_mandatory: 1, status: 1 });
