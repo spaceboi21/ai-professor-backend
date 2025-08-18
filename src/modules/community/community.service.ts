@@ -302,10 +302,17 @@ export class CommunityService {
 
       await Promise.all(mentionPromises.filter(Boolean));
 
+      // Get user details for notifications
+      const userDetails = await this.getUserDetails(
+        user.id.toString(),
+        user.role.name,
+        tenantConnection,
+      );
+
       // Send notifications to all school members about new discussion
       await this.notifyNewDiscussion(
         savedDiscussion,
-        user,
+        userDetails,
         resolvedSchoolId,
         tenantConnection,
       );
@@ -313,17 +320,12 @@ export class CommunityService {
       // Send notifications to mentioned users
       await this.notifyMentionedUsersInDiscussion(
         savedDiscussion,
-        user,
+        userDetails,
         resolvedMentions,
         resolvedSchoolId,
       );
 
       // Attach user details to the response
-      const userDetails = await this.getUserDetails(
-        user.id.toString(),
-        user.role.name,
-        tenantConnection,
-      );
       const discussionWithUser = {
         ...savedDiscussion.toObject(),
         created_by_user: userDetails || null,
