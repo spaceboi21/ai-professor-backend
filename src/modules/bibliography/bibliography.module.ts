@@ -1,7 +1,14 @@
 import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
-import { BibliographyService } from './bibliography.service';
 import { BibliographyController } from './bibliography.controller';
+import { PptBibliographyController } from './ppt-bibliography.controller';
+import { BibliographyService } from './bibliography.service';
+import { PptBibliographyService } from './ppt-bibliography.service';
+import { PptParserService } from './ppt-parser.service';
+import {
+  Bibliography,
+  BibliographySchema,
+} from 'src/database/schemas/tenant/bibliography.schema';
 import { User, UserSchema } from 'src/database/schemas/central/user.schema';
 import {
   School,
@@ -10,9 +17,11 @@ import {
 import { TenantConnectionService } from 'src/database/tenant-connection.service';
 import { ChaptersModule } from '../chapters/chapters.module';
 import { AnchorTagModule } from '../anchor-tag/anchor-tag.module';
+import { ConfigModule } from '@nestjs/config';
 
 @Module({
   imports: [
+    ConfigModule,
     MongooseModule.forFeature([
       { name: User.name, schema: UserSchema },
       { name: School.name, schema: SchoolSchema },
@@ -20,8 +29,13 @@ import { AnchorTagModule } from '../anchor-tag/anchor-tag.module';
     ChaptersModule,
     AnchorTagModule,
   ],
-  controllers: [BibliographyController],
-  providers: [BibliographyService, TenantConnectionService],
-  exports: [BibliographyService],
+  controllers: [BibliographyController, PptBibliographyController],
+  providers: [
+    BibliographyService,
+    TenantConnectionService,
+    PptParserService,
+    PptBibliographyService,
+  ],
+  exports: [BibliographyService, PptParserService, PptBibliographyService],
 })
 export class BibliographyModule {}
