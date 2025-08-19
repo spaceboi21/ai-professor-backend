@@ -28,6 +28,8 @@ import { JWTUserPayload } from 'src/common/types/jwr-user.type';
 import { LearningLogsService } from './learning-logs.service';
 import { LearningLogsFilterDto } from './dto/learning-logs-filter.dto';
 import { LearningLogsResponseDto } from './dto/learning-logs-response.dto';
+import { ModuleFeedbackFilterDto } from './dto/module-feedback-filter.dto';
+import { ModuleFeedbackResponseDto } from './dto/module-feedback-response.dto';
 import { PaginationDto } from 'src/common/dto/pagination.dto';
 import { CreateLearningLogReviewDto } from './dto/create-learning-log-review.dto';
 import { LearningLogReviewResponseDto } from './dto/learning-log-review-response.dto';
@@ -238,6 +240,38 @@ export class LearningLogsController {
       this.logger.error(`Failed to download CSV file ${filename}: ${error.message}`);
       throw new NotFoundException('File not found or could not be downloaded');
     }
+  }
+
+  @Get('module/:moduleId/feedback')
+  @Roles(RoleEnum.STUDENT)
+  @ApiOperation({
+    summary: 'Get all feedback for a module',
+    description: 'Get all feedback (reviews) received by the logged-in student for a specific module from professors and school admins.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Module feedback retrieved successfully',
+    type: ModuleFeedbackResponseDto,
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Bad request - Only students can access this endpoint',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Module not found',
+  })
+  @ApiParam({
+    name: 'moduleId',
+    description: 'Module ID to get feedback for',
+    example: '507f1f77bcf86cd799439011',
+  })
+  async getFeedbackByModule(
+    @Param('moduleId') moduleId: string,
+    @User() user: JWTUserPayload,
+  ): Promise<ModuleFeedbackResponseDto> {
+    this.logger.log(`Student ${user.id} requesting feedback for module ${moduleId}`);
+    return this.learningLogsService.getFeedbackByModule(moduleId, user);
   }
 
   @Get('stats/skill-gaps')
