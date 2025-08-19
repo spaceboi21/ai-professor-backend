@@ -28,6 +28,10 @@ import { AIChatFeedback } from 'src/database/schemas/tenant/ai-chat-feedback.sch
 import { AIChatFeedbackSchema } from 'src/database/schemas/tenant/ai-chat-feedback.schema';
 import { ModuleProfessorAssignment } from 'src/database/schemas/tenant/module-professor-assignment.schema';
 import { ModuleProfessorAssignmentSchema } from 'src/database/schemas/tenant/module-professor-assignment.schema';
+import { StudentQuizAttempt } from 'src/database/schemas/tenant/student-quiz-attempt.schema';
+import { StudentQuizAttemptSchema } from 'src/database/schemas/tenant/student-quiz-attempt.schema';
+import { AIChatSession } from 'src/database/schemas/tenant/ai-chat-session.schema';
+import { AIChatSessionSchema } from 'src/database/schemas/tenant/ai-chat-session.schema';
 import {
   ProgressStatusEnum,
   StatusEnum,
@@ -299,6 +303,14 @@ export class SchoolAdminService {
       ModuleProfessorAssignment.name,
       ModuleProfessorAssignmentSchema,
     );
+    const StudentQuizAttemptModel = tenantConnection.model(
+      StudentQuizAttempt.name,
+      StudentQuizAttemptSchema,
+    );
+    const AIChatSessionModel = tenantConnection.model(
+      AIChatSession.name,
+      AIChatSessionSchema,
+    );
 
     try {
       // Build date filter
@@ -516,6 +528,28 @@ export class SchoolAdminService {
         );
       }
 
+      // Calculate quiz statistics
+      let quizStatistics = {
+        total_quiz_attempts: 0,
+        passed_quiz_attempts: 0,
+        quiz_pass_rate: 0,
+        average_quiz_score: 0,
+        total_ai_chat_sessions: 0,
+      };
+      try {
+        quizStatistics = await this.calculateQuizStatistics(
+          tenantConnection,
+          moduleFilter,
+          dateFilter,
+          user,
+        );
+      } catch (error) {
+        this.logger.warn(
+          'Error calculating quiz statistics:',
+          error?.message,
+        );
+      }
+
       // Add debug logging
       this.logger.log(
         `Dashboard stats - Active students: ${activeStudents.length}, Total students: ${totalStudents}, Total modules: ${totalModules}, Active modules: ${activeModules}`,
@@ -538,6 +572,7 @@ export class SchoolAdminService {
           module_performance: modulePerformance,
           ai_feedback_errors: errorAnalysis,
           engagement_metrics: engagementMetrics,
+          quiz_statistics: quizStatistics,
         },
       };
     } catch (error) {
@@ -686,6 +721,93 @@ export class SchoolAdminService {
       average_session_duration: averageSessionDuration,
       completion_rate: completionRate,
     };
+  }
+
+  private async calculateQuizStatistics(
+    tenantConnection: any,
+    moduleFilter: any,
+    dateFilter: any,
+    user: JWTUserPayload,
+  ): Promise<any> {
+    try {
+      const StudentQuizAttemptModel = tenantConnection.model(
+        StudentQuizAttempt.name,
+        StudentQuizAttemptSchema,
+      );
+      const AIChatSessionModel = tenantConnection.model(
+        AIChatSession.name,
+        AIChatSessionSchema,
+      );
+
+      // Build quiz attempt query
+      const quizAttemptQuery: any = { deleted_at: null };
+      if (Object.keys(moduleFilter).length > 0) {
+        quizAttemptQuery.module_id = moduleFilter.module_id;
+      }
+      if (Object.keys(dateFilter).length > 0) {
+        quizAttemptQuery.created_at = dateFilter;
+      }
+
+      // Build AI chat session query
+      const aiChatSessionQuery: any = { deleted_at: null };
+      if (Object.keys(moduleFilter).length > 0) {
+        aiChatSessionQuery.module_id = moduleFilter.module_id;
+      }
+      if (Object.keys(dateFilter).length > 0) {
+        aiChatSessionQuery.created_at = dateFilter;
+      }
+
+      // Get quiz statistics
+      const [
+        totalQuizAttempts,
+        passedQuizAttempts,
+        totalAIChatSessions,
+        quizAttemptsWithScores,
+      ] = await Promise.all([
+        StudentQuizAttemptModel.countDocuments(quizAttemptQuery),
+        StudentQuizAttemptModel.countDocuments({
+          ...quizAttemptQuery,
+          is_passed: true,
+        }),
+        AIChatSessionModel.countDocuments(aiChatSessionQuery),
+        StudentQuizAttemptModel.find(quizAttemptQuery)
+          .select('score_percentage is_passed')
+          .lean(),
+      ]);
+
+      // Calculate pass rate
+      const passRate =
+        totalQuizAttempts > 0
+          ? Math.round((passedQuizAttempts / totalQuizAttempts) * 100)
+          : 0;
+
+      // Calculate average score
+      const totalScore = quizAttemptsWithScores.reduce(
+        (sum, attempt) => sum + (attempt.score_percentage || 0),
+        0,
+      );
+      const averageScore =
+        quizAttemptsWithScores.length > 0
+          ? Math.round(totalScore / quizAttemptsWithScores.length)
+          : 0;
+
+      return {
+        total_quiz_attempts: totalQuizAttempts,
+        passed_quiz_attempts: passedQuizAttempts,
+        quiz_pass_rate: passRate,
+        average_quiz_score: averageScore,
+        total_ai_chat_sessions: totalAIChatSessions,
+      };
+    } catch (error) {
+      this.logger.warn('Error calculating quiz statistics:', error?.message);
+      return {
+        total_quiz_attempts: 0,
+        passed_quiz_attempts: 0,
+        quiz_pass_rate: 0,
+        average_quiz_score: 0,
+        total_ai_chat_sessions: 0,
+      };
+    }
   }
 
   async resetPassword(userId: string, resetPasswordDto: ResetPasswordDto) {
