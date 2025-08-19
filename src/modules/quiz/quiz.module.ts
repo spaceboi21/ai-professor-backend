@@ -12,6 +12,7 @@ import {
 import { TenantConnectionService } from 'src/database/tenant-connection.service';
 import { ProgressService } from '../progress/progress.service';
 import { PythonService } from '../progress/python.service';
+import { NotificationsService } from '../notifications/notifications.service';
 
 @Module({
   imports: [
@@ -28,6 +29,7 @@ import { PythonService } from '../progress/python.service';
     TenantConnectionService,
     ProgressService,
     PythonService,
+    NotificationsService,
   ],
   exports: [QuizService, QuizAnalyticsService],
 })
