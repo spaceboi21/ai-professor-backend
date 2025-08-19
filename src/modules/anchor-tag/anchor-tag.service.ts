@@ -768,9 +768,33 @@ export class AnchorTagService {
       .populate('quiz_group_id', 'title subject category difficulty')
       .lean();
 
+    // Fetch user data for each anchor tag from central database
+    const anchorTagsWithUserData = await Promise.all(
+      anchorTags.map(async (anchorTag) => {
+        let createdByUser: any = null;
+        if (anchorTag.created_by) {
+          try {
+            createdByUser = await this.userModel
+              .findById(anchorTag.created_by)
+              .select('first_name last_name email profile_pic')
+              .lean();
+          } catch (error) {
+            this.logger.warn(
+              `Failed to fetch user data for created_by ${anchorTag.created_by}:`,
+              error,
+            );
+          }
+        }
+        return {
+          ...anchorTag,
+          created_by: createdByUser,
+        };
+      }),
+    );
+
     // Fetch quizzes for each anchor tag's quiz group and student attempt status
     const anchorTagsWithQuizzes = await Promise.all(
-      anchorTags.map(async (anchorTag) => {
+      anchorTagsWithUserData.map(async (anchorTag) => {
         let anchorTagWithData: any = { ...anchorTag };
 
         // Add quiz group and quizzes
