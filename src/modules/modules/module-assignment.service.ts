@@ -41,6 +41,8 @@ import {
   NotificationStatusEnum,
 } from 'src/common/constants/notification.constant';
 import { RecipientTypeEnum } from 'src/database/schemas/tenant/notification.schema';
+import { ErrorMessageService } from 'src/common/services/error-message.service';
+import { DEFAULT_LANGUAGE } from 'src/common/constants/language.constant';
 
 export interface AssignmentResult {
   professor_id: string | Types.ObjectId;
@@ -87,6 +89,7 @@ export class ModuleAssignmentService {
     private readonly schoolModel: Model<School>,
     private readonly tenantConnectionService: TenantConnectionService,
     private readonly notificationsService: NotificationsService,
+    private readonly errorMessageService: ErrorMessageService,
   ) {}
 
   /**
@@ -101,14 +104,24 @@ export class ModuleAssignmentService {
     if (user.role.name === RoleEnum.SUPER_ADMIN) {
       if (!bodySchoolId) {
         throw new BadRequestException(
-          'School ID is required in request body/query for super admin',
+          this.errorMessageService.getMessageWithLanguage(
+            'SCHOOL',
+            'SUPER_ADMIN_SCHOOL_ID_REQUIRED',
+            user?.preferred_language || DEFAULT_LANGUAGE,
+          ),
         );
       }
       return bodySchoolId.toString();
     } else {
       // For other roles, use school_id from user context
       if (!user.school_id) {
-        throw new BadRequestException('User school ID not found');
+        throw new BadRequestException(
+          this.errorMessageService.getMessageWithLanguage(
+            'SCHOOL',
+            'USER_SCHOOL_ID_NOT_FOUND',
+            user?.preferred_language || DEFAULT_LANGUAGE,
+          ),
+        );
       }
       return user.school_id.toString();
     }
@@ -128,7 +141,13 @@ export class ModuleAssignmentService {
       new Types.ObjectId(resolvedSchoolId),
     );
     if (!school) {
-      throw new NotFoundException('School not found');
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'SCHOOL',
+          'SCHOOL_NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     // Get tenant connection
@@ -146,7 +165,13 @@ export class ModuleAssignmentService {
     // Validate module exists
     const module = await ModuleModel.findById(assignDto.module_id);
     if (!module) {
-      throw new NotFoundException('Module not found');
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'MODULE',
+          'MODULE_NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
     // Validate all professors exist and are from the same school
     const professorIds = assignDto.professor_ids.map(
@@ -161,7 +186,11 @@ export class ModuleAssignmentService {
     });
     if (professors.length !== assignDto.professor_ids.length) {
       throw new NotFoundException(
-        'One or more professors not found or not from this school',
+        this.errorMessageService.getMessageWithLanguage(
+          'PROFESSOR',
+          'PROFESSOR_NOT_FOUND_OR_NOT_IN_YOUR_SCHOOL',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
       );
     }
 
@@ -215,7 +244,11 @@ export class ModuleAssignmentService {
           results.push({
             professor_id: professorId,
             status: 'updated',
-            message: 'Assignment updated successfully',
+            message: this.errorMessageService.getSuccessMessageWithLanguage(
+              'MODULE',
+              'ASSIGNMENT_UPDATED_SUCCESSFULLY',
+              user?.preferred_language || DEFAULT_LANGUAGE,
+            ),
           });
 
           // Add notification for professor
@@ -261,7 +294,11 @@ export class ModuleAssignmentService {
           results.push({
             professor_id: professorId,
             status: 'assigned',
-            message: 'Professor assigned successfully',
+            message: this.errorMessageService.getSuccessMessageWithLanguage(
+              'MODULE',
+              'PROFESSOR_ASSIGNED_SUCCESSFULLY',
+              user?.preferred_language || DEFAULT_LANGUAGE,
+            ),
           });
 
           // Add notification for professor
@@ -278,7 +315,11 @@ export class ModuleAssignmentService {
         results.push({
           professor_id: professorId,
           status: 'error',
-          message: 'Failed to assign professor',
+          message: this.errorMessageService.getMessageWithLanguage(
+            'MODULE',
+            'PROFESSOR_ASSIGNMENT_FAILED',
+            user?.preferred_language || DEFAULT_LANGUAGE,
+          ),
         });
       }
     }
@@ -303,7 +344,11 @@ export class ModuleAssignmentService {
     }
 
     return {
-      message: 'Professor assignments processed',
+      message: this.errorMessageService.getSuccessMessageWithLanguage(
+        'MODULE',
+        'PROFESSOR_ASSIGNMENTS_PROCESSED',
+        user?.preferred_language || DEFAULT_LANGUAGE,
+      ),
       data: {
         module_id: assignDto.module_id,
         module_title: module.title,
@@ -327,7 +372,13 @@ export class ModuleAssignmentService {
       new Types.ObjectId(resolvedSchoolId),
     );
     if (!school) {
-      throw new NotFoundException('School not found');
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'SCHOOL',
+          'SCHOOL_NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     // Get tenant connection
@@ -346,7 +397,13 @@ export class ModuleAssignmentService {
     // Validate module exists
     const module = await ModuleModel.findById(manageDto.module_id);
     if (!module) {
-      throw new NotFoundException('Module not found');
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'MODULE',
+          'MODULE_NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     // Validate all professors exist and are from the same school
@@ -363,7 +420,11 @@ export class ModuleAssignmentService {
 
     if (professors.length !== manageDto.professor_ids.length) {
       throw new NotFoundException(
-        'One or more professors not found or not from this school',
+        this.errorMessageService.getMessageWithLanguage(
+          'PROFESSOR',
+          'PROFESSOR_NOT_FOUND_OR_NOT_IN_YOUR_SCHOOL',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
       );
     }
 
@@ -446,7 +507,11 @@ export class ModuleAssignmentService {
           results.assigned.push({
             professor_id: professorId,
             status: 'reactivated',
-            message: 'Professor assignment reactivated successfully',
+            message: this.errorMessageService.getSuccessMessageWithLanguage(
+              'MODULE',
+              'PROFESSOR_ASSIGNMENT_REACTIVATED_SUCCESSFULLY',
+              user?.preferred_language || DEFAULT_LANGUAGE,
+            ),
           });
         } else {
           // Create new assignment
@@ -483,7 +548,11 @@ export class ModuleAssignmentService {
           results.assigned.push({
             professor_id: professorId,
             status: 'assigned',
-            message: 'Professor assigned successfully',
+            message: this.errorMessageService.getSuccessMessageWithLanguage(
+              'MODULE',
+              'PROFESSOR_ASSIGNED_SUCCESSFULLY',
+              user?.preferred_language || DEFAULT_LANGUAGE,
+            ),
           });
         }
 
@@ -500,7 +569,11 @@ export class ModuleAssignmentService {
         results.assigned.push({
           professor_id: professorId,
           status: 'error',
-          message: 'Failed to assign professor',
+          message: this.errorMessageService.getMessageWithLanguage(
+            'MODULE',
+            'PROFESSOR_ASSIGNMENT_FAILED',
+            user?.preferred_language || DEFAULT_LANGUAGE,
+          ),
         });
       }
     }
@@ -547,7 +620,11 @@ export class ModuleAssignmentService {
         results.unassigned.push({
           professor_id: assignment.professor_id.toString(),
           status: 'unassigned',
-          message: 'Professor unassigned successfully',
+          message: this.errorMessageService.getSuccessMessageWithLanguage(
+            'MODULE',
+            'PROFESSOR_UNASSIGNED_SUCCESSFULLY',
+            user?.preferred_language || DEFAULT_LANGUAGE,
+          ),
         });
 
         // Add notification for professor
@@ -566,7 +643,11 @@ export class ModuleAssignmentService {
         results.unassigned.push({
           professor_id: assignment.professor_id.toString(),
           status: 'error',
-          message: 'Failed to unassign professor',
+          message: this.errorMessageService.getMessageWithLanguage(
+            'MODULE',
+            'PROFESSOR_UNASSIGNMENT_FAILED',
+            user?.preferred_language || DEFAULT_LANGUAGE,
+          ),
         });
       }
     }
@@ -580,7 +661,11 @@ export class ModuleAssignmentService {
       results.unchanged.push({
         professor_id: assignment.professor_id.toString(),
         status: 'unchanged',
-        message: 'Professor already assigned',
+        message: this.errorMessageService.getSuccessMessageWithLanguage(
+          'MODULE',
+          'PROFESSOR_ALREADY_ASSIGNED',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
       });
     }
 
@@ -604,7 +689,11 @@ export class ModuleAssignmentService {
     }
 
     return {
-      message: 'Module assignments managed successfully',
+      message: this.errorMessageService.getSuccessMessageWithLanguage(
+        'MODULE',
+        'MODULE_ASSIGNMENTS_MANAGED_SUCCESSFULLY',
+        user?.preferred_language || DEFAULT_LANGUAGE,
+      ),
       data: {
         module_id: manageDto.module_id,
         module_title: module.title,
@@ -639,7 +728,13 @@ export class ModuleAssignmentService {
       new Types.ObjectId(resolvedSchoolId),
     );
     if (!school) {
-      throw new NotFoundException('School not found');
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'SCHOOL',
+          'SCHOOL_NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     // Get tenant connection
@@ -660,7 +755,13 @@ export class ModuleAssignmentService {
       new Types.ObjectId(unassignDto.module_id),
     );
     if (!module) {
-      throw new NotFoundException('Module not found');
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'MODULE',
+          'MODULE_NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     // Validate professor exists
@@ -673,7 +774,11 @@ export class ModuleAssignmentService {
 
     if (!professor) {
       throw new NotFoundException(
-        'Professor not found or not from this school',
+        this.errorMessageService.getMessageWithLanguage(
+          'PROFESSOR',
+          'PROFESSOR_NOT_FOUND_OR_NOT_IN_YOUR_SCHOOL',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
       );
     }
 
@@ -685,7 +790,13 @@ export class ModuleAssignmentService {
     });
 
     if (!assignment) {
-      throw new NotFoundException('Professor is not assigned to this module');
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'MODULE',
+          'PROFESSOR_NOT_ASSIGNED_TO_MODULE',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     // Create audit log before deactivating
@@ -741,7 +852,11 @@ export class ModuleAssignmentService {
     }
 
     return {
-      message: 'Professor unassigned successfully',
+      message: this.errorMessageService.getSuccessMessageWithLanguage(
+        'MODULE',
+        'PROFESSOR_UNASSIGNED_SUCCESSFULLY',
+        user?.preferred_language || DEFAULT_LANGUAGE,
+      ),
       data: {
         module_id: unassignDto.module_id,
         module_title: module.title,
@@ -765,7 +880,13 @@ export class ModuleAssignmentService {
     // Validate school exists
     const school = await this.schoolModel.findById(resolvedSchoolId);
     if (!school) {
-      throw new NotFoundException('School not found');
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'SCHOOL',
+          'SCHOOL_NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     // Get tenant connection
@@ -782,7 +903,13 @@ export class ModuleAssignmentService {
     // Validate module exists
     const module = await ModuleModel.findById(moduleId);
     if (!module) {
-      throw new NotFoundException('Module not found');
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'MODULE',
+          'MODULE_NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     // Get active assignments (NO populate)
@@ -822,7 +949,11 @@ export class ModuleAssignmentService {
     });
 
     return {
-      message: 'Module assignments retrieved successfully',
+      message: this.errorMessageService.getSuccessMessageWithLanguage(
+        'MODULE',
+        'MODULE_ASSIGNMENTS_RETRIEVED_SUCCESSFULLY',
+        user?.preferred_language || DEFAULT_LANGUAGE,
+      ),
       data: {
         module_id: moduleId,
         module_title: module.title,
@@ -848,7 +979,13 @@ export class ModuleAssignmentService {
       new Types.ObjectId(resolvedSchoolId),
     );
     if (!school) {
-      throw new NotFoundException('School not found');
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'SCHOOL',
+          'SCHOOL_NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     // Get tenant connection
@@ -870,7 +1007,11 @@ export class ModuleAssignmentService {
 
     if (!professor) {
       throw new NotFoundException(
-        'Professor not found or not from this school',
+        this.errorMessageService.getMessageWithLanguage(
+          'PROFESSOR',
+          'PROFESSOR_NOT_FOUND_OR_NOT_IN_YOUR_SCHOOL',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
       );
     }
 
@@ -912,7 +1053,11 @@ export class ModuleAssignmentService {
     }));
 
     return {
-      message: 'Professor assignments retrieved successfully',
+      message: this.errorMessageService.getSuccessMessageWithLanguage(
+        'MODULE',
+        'PROFESSOR_ASSIGNMENTS_RETRIEVED_SUCCESSFULLY',
+        user?.preferred_language || DEFAULT_LANGUAGE,
+      ),
       data: {
         professor_id: professorId,
         professor_name: `${professor.first_name} ${professor.last_name}`.trim(),
@@ -949,7 +1094,13 @@ export class ModuleAssignmentService {
       new Types.ObjectId(resolvedSchoolId),
     );
     if (!school) {
-      throw new NotFoundException('School not found');
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'SCHOOL',
+          'SCHOOL_NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     // Get tenant connection
@@ -990,7 +1141,13 @@ export class ModuleAssignmentService {
       new Types.ObjectId(resolvedSchoolId),
     );
     if (!school) {
-      throw new NotFoundException('School not found');
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'SCHOOL',
+          'SCHOOL_NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     // Get tenant connection
@@ -1084,7 +1241,11 @@ export class ModuleAssignmentService {
     });
 
     return {
-      message: 'Assignment audit logs retrieved successfully',
+      message: this.errorMessageService.getSuccessMessageWithLanguage(
+        'MODULE',
+        'ASSIGNMENT_AUDIT_LOGS_RETRIEVED_SUCCESSFULLY',
+        user?.preferred_language || DEFAULT_LANGUAGE,
+      ),
       data: {
         audit_logs: auditLogData,
         pagination: {

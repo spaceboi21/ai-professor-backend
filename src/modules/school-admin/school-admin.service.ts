@@ -522,7 +522,11 @@ export class SchoolAdminService {
       );
 
       return {
-        message: 'Dashboard statistics retrieved successfully',
+        message: this.errorMessageService.getSuccessMessageWithLanguage(
+          'SCHOOL_ADMIN',
+          'DASHBOARD_STATISTICS_RETRIEVED_SUCCESSFULLY',
+          DEFAULT_LANGUAGE,
+        ),
         data: {
           overview: {
             active_students: activeStudents.length,

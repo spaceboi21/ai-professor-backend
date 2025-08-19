@@ -1173,7 +1173,11 @@ export class AuthService {
       );
 
       return {
-        message: 'Preferred language updated successfully',
+        message: this.errorMessageService.getSuccessMessageWithLanguage(
+          'AUTH',
+          'PREFERRED_LANGUAGE_UPDATED_SUCCESSFULLY',
+          updatedUser?.preferred_language || DEFAULT_LANGUAGE,
+        ),
         data: {
           user_id: updatedUser._id,
           preferred_language: updatedUser.preferred_language,

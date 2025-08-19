@@ -30,6 +30,8 @@ import {
   createPaginationResult,
 } from 'src/common/utils/pagination.util';
 import { createMultiLanguageContent } from 'src/common/utils/notification.utils';
+import { ErrorMessageService } from 'src/common/services/error-message.service';
+import { DEFAULT_LANGUAGE } from 'src/common/constants/language.constant';
 
 @Injectable()
 export class NotificationsService {
@@ -41,6 +43,7 @@ export class NotificationsService {
     @InjectModel(School.name)
     private readonly schoolModel: Model<School>,
     private readonly tenantConnectionService: TenantConnectionService,
+    private readonly errorMessageService: ErrorMessageService,
   ) {}
 
   async createNotification(
@@ -65,7 +68,13 @@ export class NotificationsService {
     // Validate school exists
     const school = await this.schoolModel.findById(schoolId);
     if (!school) {
-      throw new NotFoundException('School not found');
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'SCHOOL',
+          'NOT_FOUND',
+          DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     // Get tenant connection for the school
@@ -96,7 +105,11 @@ export class NotificationsService {
       );
 
       return {
-        message: 'Notification created successfully',
+        message: this.errorMessageService.getSuccessMessageWithLanguage(
+          'NOTIFICATIONS',
+          'NOTIFICATION_CREATED_SUCCESSFULLY',
+          DEFAULT_LANGUAGE,
+        ),
         data: notification,
       };
     } catch (error) {
@@ -104,7 +117,13 @@ export class NotificationsService {
         `Error creating notification for ${recipientType} ${recipientId}:`,
         error?.stack || error,
       );
-      throw new BadRequestException('Failed to create notification');
+      throw new BadRequestException(
+        this.errorMessageService.getMessageWithLanguage(
+          'NOTIFICATIONS',
+          'CREATE_FAILED',
+          DEFAULT_LANGUAGE,
+        ),
+      );
     }
   }
 
@@ -132,7 +151,13 @@ export class NotificationsService {
     // Validate school exists
     const school = await this.schoolModel.findById(schoolId);
     if (!school) {
-      throw new NotFoundException('School not found');
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'SCHOOL',
+          'NOT_FOUND',
+          DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     // Get tenant connection for the school
@@ -169,7 +194,11 @@ export class NotificationsService {
       );
 
       return {
-        message: 'Multi-language notification created successfully',
+        message: this.errorMessageService.getSuccessMessageWithLanguage(
+          'NOTIFICATIONS',
+          'NOTIFICATION_CREATED_SUCCESSFULLY',
+          DEFAULT_LANGUAGE,
+        ),
         data: notification,
       };
     } catch (error) {
@@ -193,11 +222,15 @@ export class NotificationsService {
     );
 
     // Validate school exists
-    const school = await this.schoolModel.findById(
-      new Types.ObjectId(schoolId),
-    );
+    const school = await this.schoolModel.findById(schoolId);
     if (!school) {
-      throw new NotFoundException('School not found');
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'SCHOOL',
+          'NOT_FOUND',
+          DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     // Get tenant connection for the school
@@ -266,7 +299,11 @@ export class NotificationsService {
       this.logger.log(`Created ${result.length} notifications successfully`);
 
       return {
-        message: 'Module published notifications created successfully',
+        message: this.errorMessageService.getSuccessMessageWithLanguage(
+          'NOTIFICATIONS',
+          'NOTIFICATIONS_CREATED_SUCCESSFULLY',
+          DEFAULT_LANGUAGE,
+        ),
         data: {
           notifications_created: result.length,
           total_students: students.length,
@@ -295,11 +332,15 @@ export class NotificationsService {
     );
 
     // Validate school exists
-    const school = await this.schoolModel.findById(
-      new Types.ObjectId(schoolId),
-    );
+    const school = await this.schoolModel.findById(schoolId);
     if (!school) {
-      throw new NotFoundException('School not found');
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'SCHOOL',
+          'NOT_FOUND',
+          DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     // Get tenant connection for the school
@@ -368,7 +409,11 @@ export class NotificationsService {
       this.logger.log(`Created ${result.length} notifications successfully`);
 
       return {
-        message: 'Module unpublished notifications created successfully',
+        message: this.errorMessageService.getSuccessMessageWithLanguage(
+          'NOTIFICATIONS',
+          'NOTIFICATIONS_CREATED_SUCCESSFULLY',
+          DEFAULT_LANGUAGE,
+        ),
         data: {
           notifications_created: result.length,
           total_students: students.length,
@@ -382,7 +427,11 @@ export class NotificationsService {
         error?.stack || error,
       );
       throw new BadRequestException(
-        'Failed to create module unpublished notifications',
+        this.errorMessageService.getMessageWithLanguage(
+          'NOTIFICATIONS',
+          'CREATE_FAILED',
+          DEFAULT_LANGUAGE,
+        ),
       );
     }
   }
@@ -397,7 +446,13 @@ export class NotificationsService {
     // Validate school exists
     const school = await this.schoolModel.findById(user.school_id);
     if (!school) {
-      throw new NotFoundException('School not found');
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'SCHOOL',
+          'NOT_FOUND',
+          DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     // Get tenant connection for the school
@@ -435,13 +490,23 @@ export class NotificationsService {
       );
 
       return {
-        message: 'Notifications retrieved successfully',
+        message: this.errorMessageService.getSuccessMessageWithLanguage(
+          'NOTIFICATIONS',
+          'NOTIFICATIONS_RETRIEVED_SUCCESSFULLY',
+          DEFAULT_LANGUAGE,
+        ),
         data: result.data,
         pagination_data: result.pagination_data,
       };
     } catch (error) {
       this.logger.error('Error getting notifications', error?.stack || error);
-      throw new BadRequestException('Failed to retrieve notifications');
+      throw new BadRequestException(
+        this.errorMessageService.getMessageWithLanguage(
+          'NOTIFICATIONS',
+          'RETRIEVE_FAILED',
+          DEFAULT_LANGUAGE,
+        ),
+      );
     }
   }
 
@@ -455,7 +520,13 @@ export class NotificationsService {
     // Validate school exists
     const school = await this.schoolModel.findById(user.school_id);
     if (!school) {
-      throw new NotFoundException('School not found');
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'SCHOOL',
+          'NOT_FOUND',
+          DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     // Get tenant connection for the school
@@ -482,11 +553,21 @@ export class NotificationsService {
       ).lean();
 
       if (!notification) {
-        throw new NotFoundException('Notification not found');
+        throw new NotFoundException(
+          this.errorMessageService.getMessageWithLanguage(
+            'NOTIFICATIONS',
+            'NOT_FOUND',
+            DEFAULT_LANGUAGE,
+          ),
+        );
       }
 
       return {
-        message: 'Notification marked as read',
+        message: this.errorMessageService.getSuccessMessageWithLanguage(
+          'NOTIFICATIONS',
+          'NOTIFICATION_MARKED_READ_SUCCESSFULLY',
+          DEFAULT_LANGUAGE,
+        ),
         data: notification,
       };
     } catch (error) {
@@ -497,7 +578,13 @@ export class NotificationsService {
       if (error instanceof NotFoundException) {
         throw error;
       }
-      throw new BadRequestException('Failed to mark notification as read');
+      throw new BadRequestException(
+        this.errorMessageService.getMessageWithLanguage(
+          'NOTIFICATIONS',
+          'MARK_READ_FAILED',
+          DEFAULT_LANGUAGE,
+        ),
+      );
     }
   }
 
@@ -512,7 +599,13 @@ export class NotificationsService {
     // Validate school exists
     const school = await this.schoolModel.findById(user.school_id);
     if (!school) {
-      throw new NotFoundException('School not found');
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'SCHOOL',
+          'NOT_FOUND',
+          DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     // Get tenant connection for the school
@@ -538,7 +631,11 @@ export class NotificationsService {
       );
 
       return {
-        message: 'All notifications marked as read',
+        message: this.errorMessageService.getSuccessMessageWithLanguage(
+          'NOTIFICATIONS',
+          'NOTIFICATIONS_MARKED_READ_SUCCESSFULLY',
+          DEFAULT_LANGUAGE,
+        ),
         data: {
           modified_count: result.modifiedCount,
         },
@@ -548,7 +645,13 @@ export class NotificationsService {
         'Error marking all notifications as read',
         error?.stack || error,
       );
-      throw new BadRequestException('Failed to mark notifications as read');
+      throw new BadRequestException(
+        this.errorMessageService.getMessageWithLanguage(
+          'NOTIFICATIONS',
+          'MARK_ALL_READ_FAILED',
+          DEFAULT_LANGUAGE,
+        ),
+      );
     }
   }
 
@@ -558,7 +661,13 @@ export class NotificationsService {
     // Validate school exists
     const school = await this.schoolModel.findById(user.school_id);
     if (!school) {
-      throw new NotFoundException('School not found');
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'SCHOOL',
+          'NOT_FOUND',
+          DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     // Get tenant connection for the school
@@ -578,14 +687,24 @@ export class NotificationsService {
       });
 
       return {
-        message: 'Unread count retrieved successfully',
+        message: this.errorMessageService.getSuccessMessageWithLanguage(
+          'NOTIFICATIONS',
+          'UNREAD_COUNT_RETRIEVED_SUCCESSFULLY',
+          DEFAULT_LANGUAGE,
+        ),
         data: {
           unread_count: count,
         },
       };
     } catch (error) {
       this.logger.error('Error getting unread count', error?.stack || error);
-      throw new BadRequestException('Failed to get unread count');
+      throw new BadRequestException(
+        this.errorMessageService.getMessageWithLanguage(
+          'NOTIFICATIONS',
+          'GET_UNREAD_COUNT_FAILED',
+          DEFAULT_LANGUAGE,
+        ),
+      );
     }
   }
 }

@@ -42,6 +42,7 @@ export interface CreateActivityLogDto {
   module_name?: string;
   chapter_id?: Types.ObjectId;
   chapter_name?: string;
+  quiz_group_id?: Types.ObjectId;
   metadata?: Record<string, any>;
   ip_address?: string;
   user_agent?: string;
@@ -129,7 +130,21 @@ export class ActivityLogService {
     createActivityLogDto: CreateActivityLogDto,
   ): Promise<ActivityLog> {
     try {
-      const { activity_type, target_user_email, ...rest } = createActivityLogDto;
+      this.logger.debug(
+        `Creating activity log: ${createActivityLogDto.activity_type}`,
+      );
+      this.logger.debug(`Activity log DTO:`, {
+        activity_type: createActivityLogDto.activity_type,
+        description: createActivityLogDto.description,
+        performed_by: createActivityLogDto.performed_by,
+        performed_by_role: createActivityLogDto.performed_by_role,
+        module_id: createActivityLogDto.module_id,
+        chapter_id: createActivityLogDto.chapter_id,
+        quiz_group_id: createActivityLogDto.quiz_group_id,
+      });
+
+      const { activity_type, target_user_email, ...rest } =
+        createActivityLogDto;
 
       const category = ACTIVITY_CATEGORY_MAPPING[activity_type];
       const level = ACTIVITY_LEVEL_MAPPING[activity_type];
@@ -150,9 +165,10 @@ export class ActivityLogService {
         ...rest,
       });
 
+      this.logger.debug(`Saving activity log to database...`);
       const savedLog = await activityLog.save();
       this.logger.log(
-        `Activity logged: ${activity_type} by ${createActivityLogDto.performed_by}`,
+        `Activity logged: ${activity_type} by ${createActivityLogDto.performed_by} with ID: ${savedLog._id}`,
       );
 
       return savedLog;
@@ -160,6 +176,7 @@ export class ActivityLogService {
       // Log the error but don't throw - this prevents breaking the main application
       this.logger.error('Error creating activity log (non-critical):', {
         error: error.message,
+        stack: error.stack,
         activityType: createActivityLogDto.activity_type,
         performedBy: createActivityLogDto.performed_by,
         endpoint: createActivityLogDto.endpoint,
@@ -268,10 +285,11 @@ export class ActivityLogService {
       // Text search
       if (filterDto.search) {
         // Encrypt the search term for email fields
-        const encryptedSearchTerm = this.emailEncryptionService.encryptEmailFields(
-          { search: filterDto.search },
-          ['search'],
-        ).search;
+        const encryptedSearchTerm =
+          this.emailEncryptionService.encryptEmailFields(
+            { search: filterDto.search },
+            ['search'],
+          ).search;
 
         query.$or = [
           { description: { $regex: filterDto.search, $options: 'i' } },
@@ -301,7 +319,7 @@ export class ActivityLogService {
         const school = log.school_id as any;
         const targetUser = log.target_user_id as any;
 
-                // Decrypt target_user_email if it exists
+        // Decrypt target_user_email if it exists
         const decryptedLog = this.emailEncryptionService.decryptEmailFields(
           log,
           ['target_user_email'],
@@ -319,7 +337,9 @@ export class ActivityLogService {
               ? {
                   id: performedBy._id,
                   name: `${performedBy.first_name} ${performedBy.last_name}`.trim(),
-                  email: this.emailEncryptionService.decryptEmail(performedBy.email || ''),
+                  email: this.emailEncryptionService.decryptEmail(
+                    performedBy.email || '',
+                  ),
                   role: log.performed_by_role,
                   profile_pic: performedBy.profile_pic || null,
                 }
@@ -329,14 +349,16 @@ export class ActivityLogService {
               ? {
                   id: school._id,
                   name: school.name,
-              }
-            : null,
+                }
+              : null,
           target_user:
             targetUser && targetUser.first_name
               ? {
                   id: targetUser._id,
                   name: `${targetUser.first_name} ${targetUser.last_name}`.trim(),
-                  email: this.emailEncryptionService.decryptEmail(targetUser.email || ''),
+                  email: this.emailEncryptionService.decryptEmail(
+                    targetUser.email || '',
+                  ),
                   role: log.target_user_role,
                 }
               : null,
@@ -494,7 +516,9 @@ export class ActivityLogService {
             ? {
                 id: performedBy._id,
                 name: `${performedBy.first_name} ${performedBy.last_name}`.trim(),
-                email: this.emailEncryptionService.decryptEmail(performedBy.email || ''),
+                email: this.emailEncryptionService.decryptEmail(
+                  performedBy.email || '',
+                ),
                 role: log.performed_by_role,
                 profile_pic: performedBy.profile_pic || null,
               }
@@ -511,7 +535,9 @@ export class ActivityLogService {
             ? {
                 id: targetUser._id,
                 name: `${targetUser.first_name} ${targetUser.last_name}`.trim(),
-                email: this.emailEncryptionService.decryptEmail(targetUser.email || ''),
+                email: this.emailEncryptionService.decryptEmail(
+                  targetUser.email || '',
+                ),
                 role: log.target_user_role,
               }
             : null,
@@ -647,10 +673,11 @@ export class ActivityLogService {
 
     if (filterDto.search) {
       // Encrypt the search term for email fields
-      const encryptedSearchTerm = this.emailEncryptionService.encryptEmailFields(
-        { search: filterDto.search },
-        ['search'],
-      ).search;
+      const encryptedSearchTerm =
+        this.emailEncryptionService.encryptEmailFields(
+          { search: filterDto.search },
+          ['search'],
+        ).search;
 
       query.$or = [
         { description: { $regex: filterDto.search, $options: 'i' } },
@@ -675,10 +702,9 @@ export class ActivityLogService {
       const targetUser = log.target_user_id as any;
 
       // Decrypt target_user_email if it exists
-      const decryptedLog = this.emailEncryptionService.decryptEmailFields(
-        log,
-        ['target_user_email'],
-      );
+      const decryptedLog = this.emailEncryptionService.decryptEmailFields(log, [
+        'target_user_email',
+      ]);
 
       return {
         timestamp: log.created_at,
@@ -699,7 +725,8 @@ export class ActivityLogService {
             ? `${targetUser.first_name} ${targetUser.last_name}`.trim()
             : 'N/A',
         target_user_email:
-          decryptedLog.target_user_email || (targetUser && targetUser.email ? targetUser.email : 'N/A'),
+          decryptedLog.target_user_email ||
+          (targetUser && targetUser.email ? targetUser.email : 'N/A'),
         target_user_role: log.target_user_role || 'N/A',
         module: log.module_name || 'N/A',
         chapter: log.chapter_name || 'N/A',

@@ -46,6 +46,8 @@ export enum ActivityTypeEnum {
   QUIZ_UPDATED = 'QUIZ_UPDATED',
   QUIZ_DELETED = 'QUIZ_DELETED',
   QUIZ_ATTEMPTED = 'QUIZ_ATTEMPTED',
+  QUIZ_STARTED = 'QUIZ_STARTED',
+  QUIZ_SUBMITTED = 'QUIZ_SUBMITTED',
 
   // Anchor Tag Management
   ANCHOR_TAG_CREATED = 'ANCHOR_TAG_CREATED',
@@ -58,6 +60,10 @@ export enum ActivityTypeEnum {
   // Progress Tracking
   PROGRESS_UPDATED = 'PROGRESS_UPDATED',
   PROGRESS_COMPLETED = 'PROGRESS_COMPLETED',
+  MODULE_STARTED = 'MODULE_STARTED',
+  MODULE_COMPLETED = 'MODULE_COMPLETED',
+  CHAPTER_STARTED = 'CHAPTER_STARTED',
+  CHAPTER_COMPLETED = 'CHAPTER_COMPLETED',
 
   // AI Chat
   AI_CHAT_STARTED = 'AI_CHAT_STARTED',
@@ -163,6 +169,8 @@ export const ACTIVITY_CATEGORY_MAPPING: Record<
   [ActivityTypeEnum.QUIZ_UPDATED]: ActivityCategoryEnum.CONTENT_MANAGEMENT,
   [ActivityTypeEnum.QUIZ_DELETED]: ActivityCategoryEnum.CONTENT_MANAGEMENT,
   [ActivityTypeEnum.QUIZ_ATTEMPTED]: ActivityCategoryEnum.CONTENT_MANAGEMENT,
+  [ActivityTypeEnum.QUIZ_STARTED]: ActivityCategoryEnum.CONTENT_MANAGEMENT,
+  [ActivityTypeEnum.QUIZ_SUBMITTED]: ActivityCategoryEnum.CONTENT_MANAGEMENT,
 
   // Anchor Tag Management
   [ActivityTypeEnum.ANCHOR_TAG_CREATED]:
@@ -180,6 +188,10 @@ export const ACTIVITY_CATEGORY_MAPPING: Record<
   // Progress Tracking
   [ActivityTypeEnum.PROGRESS_UPDATED]: ActivityCategoryEnum.PROGRESS_TRACKING,
   [ActivityTypeEnum.PROGRESS_COMPLETED]: ActivityCategoryEnum.PROGRESS_TRACKING,
+  [ActivityTypeEnum.MODULE_STARTED]: ActivityCategoryEnum.PROGRESS_TRACKING,
+  [ActivityTypeEnum.MODULE_COMPLETED]: ActivityCategoryEnum.PROGRESS_TRACKING,
+  [ActivityTypeEnum.CHAPTER_STARTED]: ActivityCategoryEnum.PROGRESS_TRACKING,
+  [ActivityTypeEnum.CHAPTER_COMPLETED]: ActivityCategoryEnum.PROGRESS_TRACKING,
 
   // AI Interaction
   [ActivityTypeEnum.AI_CHAT_STARTED]: ActivityCategoryEnum.AI_INTERACTION,
@@ -231,6 +243,10 @@ export const ACTIVITY_LEVEL_MAPPING: Record<
   [ActivityTypeEnum.QUIZ_UPDATED]: ActivityLevelEnum.INFO,
   [ActivityTypeEnum.PROGRESS_UPDATED]: ActivityLevelEnum.INFO,
   [ActivityTypeEnum.PROGRESS_COMPLETED]: ActivityLevelEnum.INFO,
+  [ActivityTypeEnum.MODULE_STARTED]: ActivityLevelEnum.INFO,
+  [ActivityTypeEnum.MODULE_COMPLETED]: ActivityLevelEnum.INFO,
+  [ActivityTypeEnum.CHAPTER_STARTED]: ActivityLevelEnum.INFO,
+  [ActivityTypeEnum.CHAPTER_COMPLETED]: ActivityLevelEnum.INFO,
   [ActivityTypeEnum.AI_CHAT_STARTED]: ActivityLevelEnum.INFO,
   [ActivityTypeEnum.AI_CHAT_MESSAGE_SENT]: ActivityLevelEnum.INFO,
   [ActivityTypeEnum.AI_FEEDBACK_GIVEN]: ActivityLevelEnum.INFO,
@@ -267,6 +283,8 @@ export const ACTIVITY_LEVEL_MAPPING: Record<
   [ActivityTypeEnum.MODULE_UNASSIGNED]: ActivityLevelEnum.WARNING,
   [ActivityTypeEnum.CHAPTER_REORDERED]: ActivityLevelEnum.WARNING,
   [ActivityTypeEnum.QUIZ_ATTEMPTED]: ActivityLevelEnum.WARNING,
+  [ActivityTypeEnum.QUIZ_STARTED]: ActivityLevelEnum.WARNING,
+  [ActivityTypeEnum.QUIZ_SUBMITTED]: ActivityLevelEnum.WARNING,
   [ActivityTypeEnum.STUDENT_BULK_IMPORT]: ActivityLevelEnum.WARNING,
   [ActivityTypeEnum.ANCHOR_TAG_DELETED]: ActivityLevelEnum.WARNING,
   [ActivityTypeEnum.ANCHOR_TAG_SKIPPED]: ActivityLevelEnum.WARNING,

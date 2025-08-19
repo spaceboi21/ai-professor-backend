@@ -518,6 +518,23 @@ export const ERROR_MESSAGES: {
       [LanguageEnum.FRENCH]:
         "L'ID du module est requis lorsque le type est MODULE",
     },
+    PROFESSOR_ASSIGNMENT_FAILED: {
+      [LanguageEnum.ENGLISH]: 'Failed to assign professor to module',
+      [LanguageEnum.FRENCH]: "Échec de l'attribution du professeur au module",
+    },
+    PROFESSOR_UNASSIGNMENT_FAILED: {
+      [LanguageEnum.ENGLISH]: 'Failed to unassign professor from module',
+      [LanguageEnum.FRENCH]:
+        'Échec de la désattribution du professeur du module',
+    },
+    PROFESSOR_NOT_ASSIGNED_TO_MODULE: {
+      [LanguageEnum.ENGLISH]: 'Professor is not assigned to this module',
+      [LanguageEnum.FRENCH]: "Le professeur n'est pas assigné à ce module",
+    },
+    PROFESSOR_ALREADY_ASSIGNED: {
+      [LanguageEnum.ENGLISH]: 'Professor is already assigned to this module',
+      [LanguageEnum.FRENCH]: 'Le professeur est déjà assigné à ce module',
+    },
     CHAPTER_ID_REQUIRED_WHEN_TYPE_IS_CHAPTER: {
       [LanguageEnum.ENGLISH]: 'Chapter ID is required when type is CHAPTER',
       [LanguageEnum.FRENCH]:
@@ -1080,6 +1097,18 @@ export const ERROR_MESSAGES: {
       [LanguageEnum.ENGLISH]: 'Failed to get unread count',
       [LanguageEnum.FRENCH]: "Échec de l'obtention du nombre de non lus",
     },
+    NOTIFICATIONS_MARKED_READ_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'Notifications marked as read successfully',
+      [LanguageEnum.FRENCH]: 'Notifications marquées comme lues avec succès',
+    },
+    NOTIFICATIONS_CREATED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'Notifications created successfully',
+      [LanguageEnum.FRENCH]: 'Notifications créées avec succès',
+    },
+    UNREAD_COUNT_RETRIEVED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'Unread count retrieved successfully',
+      [LanguageEnum.FRENCH]: 'Nombre de non lus récupéré avec succès',
+    },
   },
 
   // General Errors
@@ -1552,6 +1581,11 @@ export const ERROR_MESSAGES: {
       [LanguageEnum.FRENCH]:
         "Tous les administrateurs d'école récupérés avec succès",
     },
+    DASHBOARD_STATISTICS_RETRIEVED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'Dashboard statistics retrieved successfully',
+      [LanguageEnum.FRENCH]:
+        'Statistiques du tableau de bord récupérées avec succès',
+    },
   },
 };
 
@@ -1559,6 +1593,83 @@ export const ERROR_MESSAGES: {
 export const SUCCESS_MESSAGES: {
   [key: string]: { [key: string]: ErrorMessages };
 } = {
+  // Module Related Success Messages
+  MODULE: {
+    MODULES_RETRIEVED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'Modules retrieved successfully',
+      [LanguageEnum.FRENCH]: 'Modules récupérés avec succès',
+    },
+    CREATED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'Module created successfully',
+      [LanguageEnum.FRENCH]: 'Module créé avec succès',
+    },
+    UPDATED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'Module updated successfully',
+      [LanguageEnum.FRENCH]: 'Module mis à jour avec succès',
+    },
+    DELETED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'Module deleted successfully',
+      [LanguageEnum.FRENCH]: 'Module supprimé avec succès',
+    },
+    PUBLISHED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'Module published successfully',
+      [LanguageEnum.FRENCH]: 'Module publié avec succès',
+    },
+    UNPUBLISHED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'Module unpublished successfully',
+      [LanguageEnum.FRENCH]: 'Module dépublié avec succès',
+    },
+    NO_ASSIGNED_MODULES: {
+      [LanguageEnum.ENGLISH]: 'No assigned modules found',
+      [LanguageEnum.FRENCH]: 'Aucun module assigné trouvé',
+    },
+    MODULE_RETRIEVED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'Module retrieved successfully',
+      [LanguageEnum.FRENCH]: 'Module récupéré avec succès',
+    },
+    MODULE_OVERVIEW_RETRIEVED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'Module overview retrieved successfully',
+      [LanguageEnum.FRENCH]: 'Aperçu du module récupéré avec succès',
+    },
+    ASSIGNMENT_UPDATED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'Assignment updated successfully',
+      [LanguageEnum.FRENCH]: 'Affectation mise à jour avec succès',
+    },
+    PROFESSOR_ASSIGNED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'Professor assigned successfully',
+      [LanguageEnum.FRENCH]: 'Professeur assigné avec succès',
+    },
+    PROFESSOR_ASSIGNMENT_REACTIVATED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'Professor assignment reactivated successfully',
+      [LanguageEnum.FRENCH]: 'Affectation du professeur réactivée avec succès',
+    },
+    PROFESSOR_UNASSIGNED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'Professor unassigned successfully',
+      [LanguageEnum.FRENCH]: 'Professeur désassigné avec succès',
+    },
+    MODULE_ASSIGNMENTS_MANAGED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'Module assignments managed successfully',
+      [LanguageEnum.FRENCH]: 'Affectations de modules gérées avec succès',
+    },
+    MODULE_ASSIGNMENTS_RETRIEVED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'Module assignments retrieved successfully',
+      [LanguageEnum.FRENCH]: 'Affectations de modules récupérées avec succès',
+    },
+    PROFESSOR_ASSIGNMENTS_RETRIEVED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'Professor assignments retrieved successfully',
+      [LanguageEnum.FRENCH]:
+        'Affectations de professeurs récupérées avec succès',
+    },
+    ASSIGNMENT_AUDIT_LOGS_RETRIEVED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'Assignment audit logs retrieved successfully',
+      [LanguageEnum.FRENCH]:
+        "Journaux d'audit des affectations récupérés avec succès",
+    },
+    PROFESSOR_ASSIGNMENTS_PROCESSED: {
+      [LanguageEnum.ENGLISH]: 'Professor assignments processed successfully',
+      [LanguageEnum.FRENCH]: 'Affectations de professeurs traitées avec succès',
+    },
+  },
   // Quiz Related Success Messages
   QUIZ: {
     QUIZ_GROUP_CREATED_SUCCESSFULLY: {
@@ -1588,6 +1699,372 @@ export const SUCCESS_MESSAGES: {
     STUDENTS_NOTIFIED_ABOUT_NEW_QUIZ: {
       [LanguageEnum.ENGLISH]: 'Students notified about new quiz successfully',
       [LanguageEnum.FRENCH]: 'Étudiants notifiés du nouveau quiz avec succès',
+    },
+  },
+  // Chapter Related Success Messages
+  CHAPTER: {
+    CHAPTER_CREATED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'Chapter created successfully',
+      [LanguageEnum.FRENCH]: 'Chapitre créé avec succès',
+    },
+    CHAPTER_UPDATED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'Chapter updated successfully',
+      [LanguageEnum.FRENCH]: 'Chapitre mis à jour avec succès',
+    },
+    CHAPTER_DELETED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'Chapter deleted successfully',
+      [LanguageEnum.FRENCH]: 'Chapitre supprimé avec succès',
+    },
+    CHAPTER_RETRIEVED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'Chapter retrieved successfully',
+      [LanguageEnum.FRENCH]: 'Chapitre récupéré avec succès',
+    },
+    CHAPTERS_RETRIEVED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'Chapters retrieved successfully',
+      [LanguageEnum.FRENCH]: 'Chapitres récupérés avec succès',
+    },
+    CHAPTER_REORDERED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'Chapters reordered successfully',
+      [LanguageEnum.FRENCH]: 'Chapitres réordonnés avec succès',
+    },
+  },
+  // Bibliography Related Success Messages
+  BIBLIOGRAPHY: {
+    BIBLIOGRAPHY_CREATED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'Bibliography created successfully',
+      [LanguageEnum.FRENCH]: 'Bibliographie créée avec succès',
+    },
+    BIBLIOGRAPHY_UPDATED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'Bibliography updated successfully',
+      [LanguageEnum.FRENCH]: 'Bibliographie mise à jour avec succès',
+    },
+    BIBLIOGRAPHY_DELETED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'Bibliography deleted successfully',
+      [LanguageEnum.FRENCH]: 'Bibliographie supprimée avec succès',
+    },
+    BIBLIOGRAPHY_RETRIEVED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'Bibliography retrieved successfully',
+      [LanguageEnum.FRENCH]: 'Bibliographie récupérée avec succès',
+    },
+    BIBLIOGRAPHIES_RETRIEVED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'Bibliographies retrieved successfully',
+      [LanguageEnum.FRENCH]: 'Bibliographies récupérées avec succès',
+    },
+    BIBLIOGRAPHY_REORDERED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'Bibliography reordered successfully',
+      [LanguageEnum.FRENCH]: 'Bibliographie réordonnée avec succès',
+    },
+  },
+  // Student Related Success Messages
+  STUDENT: {
+    STUDENT_CREATED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'Student created successfully',
+      [LanguageEnum.FRENCH]: 'Étudiant créé avec succès',
+    },
+    STUDENT_UPDATED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'Student updated successfully',
+      [LanguageEnum.FRENCH]: 'Étudiant mis à jour avec succès',
+    },
+    STUDENT_DELETED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'Student deleted successfully',
+      [LanguageEnum.FRENCH]: 'Étudiant supprimé avec succès',
+    },
+    STUDENT_RETRIEVED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'Student retrieved successfully',
+      [LanguageEnum.FRENCH]: 'Étudiant récupéré avec succès',
+    },
+    STUDENTS_RETRIEVED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'Students retrieved successfully',
+      [LanguageEnum.FRENCH]: 'Étudiants récupérés avec succès',
+    },
+    STUDENT_PASSWORD_UPDATED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'Student password updated successfully',
+      [LanguageEnum.FRENCH]:
+        "Mot de passe de l'étudiant mis à jour avec succès",
+    },
+    STUDENTS_IMPORTED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'Students imported successfully',
+      [LanguageEnum.FRENCH]: 'Étudiants importés avec succès',
+    },
+  },
+  // Professor Related Success Messages
+  PROFESSOR: {
+    PROFESSOR_CREATED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'Professor created successfully',
+      [LanguageEnum.FRENCH]: 'Professeur créé avec succès',
+    },
+    PROFESSOR_UPDATED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'Professor updated successfully',
+      [LanguageEnum.FRENCH]: 'Professeur mis à jour avec succès',
+    },
+    PROFESSOR_DELETED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'Professor deleted successfully',
+      [LanguageEnum.FRENCH]: 'Professeur supprimé avec succès',
+    },
+    PROFESSOR_RETRIEVED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'Professor retrieved successfully',
+      [LanguageEnum.FRENCH]: 'Professeur récupéré avec succès',
+    },
+    PROFESSORS_RETRIEVED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'Professors retrieved successfully',
+      [LanguageEnum.FRENCH]: 'Professeurs récupérés avec succès',
+    },
+    PROFESSOR_PASSWORD_UPDATED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'Professor password updated successfully',
+      [LanguageEnum.FRENCH]:
+        'Mot de passe du professeur mis à jour avec succès',
+    },
+  },
+  // School Related Success Messages
+  SCHOOL: {
+    SCHOOL_CREATED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'School created successfully',
+      [LanguageEnum.FRENCH]: 'École créée avec succès',
+    },
+    SCHOOL_UPDATED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'School updated successfully',
+      [LanguageEnum.FRENCH]: 'École mise à jour avec succès',
+    },
+    SCHOOL_DELETED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'School deleted successfully',
+      [LanguageEnum.FRENCH]: 'École supprimée avec succès',
+    },
+    SCHOOL_RETRIEVED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'School retrieved successfully',
+      [LanguageEnum.FRENCH]: 'École récupérée avec succès',
+    },
+    SCHOOLS_RETRIEVED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'Schools retrieved successfully',
+      [LanguageEnum.FRENCH]: 'Écoles récupérées avec succès',
+    },
+    SCHOOL_DASHBOARD_RETRIEVED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'School dashboard retrieved successfully',
+      [LanguageEnum.FRENCH]: "Tableau de bord de l'école récupéré avec succès",
+    },
+  },
+  // Auth Related Success Messages
+  AUTH: {
+    LOGIN_SUCCESSFUL: {
+      [LanguageEnum.ENGLISH]: 'Login successful',
+      [LanguageEnum.FRENCH]: 'Connexion réussie',
+    },
+    LOGOUT_SUCCESSFUL: {
+      [LanguageEnum.ENGLISH]: 'Logout successful',
+      [LanguageEnum.FRENCH]: 'Déconnexion réussie',
+    },
+    PASSWORD_RESET_EMAIL_SENT: {
+      [LanguageEnum.ENGLISH]: 'Password reset email sent successfully',
+      [LanguageEnum.FRENCH]:
+        'Email de réinitialisation du mot de passe envoyé avec succès',
+    },
+    PASSWORD_RESET_SUCCESSFUL: {
+      [LanguageEnum.ENGLISH]: 'Password reset successful',
+      [LanguageEnum.FRENCH]: 'Réinitialisation du mot de passe réussie',
+    },
+    PASSWORD_CHANGED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'Password changed successfully',
+      [LanguageEnum.FRENCH]: 'Mot de passe changé avec succès',
+    },
+    REFRESH_TOKEN_SUCCESSFUL: {
+      [LanguageEnum.ENGLISH]: 'Token refreshed successfully',
+      [LanguageEnum.FRENCH]: 'Jeton actualisé avec succès',
+    },
+  },
+  // Community Related Success Messages
+  COMMUNITY: {
+    DISCUSSION_CREATED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'Discussion created successfully',
+      [LanguageEnum.FRENCH]: 'Discussion créée avec succès',
+    },
+    DISCUSSION_UPDATED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'Discussion updated successfully',
+      [LanguageEnum.FRENCH]: 'Discussion mise à jour avec succès',
+    },
+    DISCUSSION_DELETED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'Discussion deleted successfully',
+      [LanguageEnum.FRENCH]: 'Discussion supprimée avec succès',
+    },
+    DISCUSSION_RETRIEVED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'Discussion retrieved successfully',
+      [LanguageEnum.FRENCH]: 'Discussion récupérée avec succès',
+    },
+    DISCUSSIONS_RETRIEVED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'Discussions retrieved successfully',
+      [LanguageEnum.FRENCH]: 'Discussions récupérées avec succès',
+    },
+    REPLY_CREATED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'Reply created successfully',
+      [LanguageEnum.FRENCH]: 'Réponse créée avec succès',
+    },
+    REPLY_UPDATED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'Reply updated successfully',
+      [LanguageEnum.FRENCH]: 'Réponse mise à jour avec succès',
+    },
+    REPLY_DELETED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'Reply deleted successfully',
+      [LanguageEnum.FRENCH]: 'Réponse supprimée avec succès',
+    },
+    REPLIES_RETRIEVED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'Replies retrieved successfully',
+      [LanguageEnum.FRENCH]: 'Réponses récupérées avec succès',
+    },
+    LIKE_TOGGLED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'Like toggled successfully',
+      [LanguageEnum.FRENCH]: 'Like basculé avec succès',
+    },
+    PIN_TOGGLED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'Pin toggled successfully',
+      [LanguageEnum.FRENCH]: 'Épinglage basculé avec succès',
+    },
+    CONTENT_REPORTED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'Content reported successfully',
+      [LanguageEnum.FRENCH]: 'Contenu signalé avec succès',
+    },
+    DISCUSSIONS_EXPORTED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'Discussions exported successfully',
+      [LanguageEnum.FRENCH]: 'Discussions exportées avec succès',
+    },
+  },
+  // Learning Logs Related Success Messages
+  LEARNING_LOGS: {
+    LEARNING_LOG_CREATED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'Learning log created successfully',
+      [LanguageEnum.FRENCH]: "Journal d'apprentissage créé avec succès",
+    },
+    LEARNING_LOG_UPDATED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'Learning log updated successfully',
+      [LanguageEnum.FRENCH]: "Journal d'apprentissage mis à jour avec succès",
+    },
+    LEARNING_LOG_DELETED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'Learning log deleted successfully',
+      [LanguageEnum.FRENCH]: "Journal d'apprentissage supprimé avec succès",
+    },
+    LEARNING_LOG_RETRIEVED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'Learning log retrieved successfully',
+      [LanguageEnum.FRENCH]: "Journal d'apprentissage récupéré avec succès",
+    },
+    LEARNING_LOGS_RETRIEVED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'Learning logs retrieved successfully',
+      [LanguageEnum.FRENCH]: "Journaux d'apprentissage récupérés avec succès",
+    },
+    LEARNING_LOG_REVIEWED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'Learning log reviewed successfully',
+      [LanguageEnum.FRENCH]: "Journal d'apprentissage révisé avec succès",
+    },
+    LEARNING_LOGS_EXPORTED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'Learning logs exported successfully',
+      [LanguageEnum.FRENCH]: "Journaux d'apprentissage exportés avec succès",
+    },
+  },
+  // Notifications Related Success Messages
+  NOTIFICATIONS: {
+    NOTIFICATION_CREATED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'Notification created successfully',
+      [LanguageEnum.FRENCH]: 'Notification créée avec succès',
+    },
+    NOTIFICATION_RETRIEVED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'Notification retrieved successfully',
+      [LanguageEnum.FRENCH]: 'Notification récupérée avec succès',
+    },
+    NOTIFICATIONS_RETRIEVED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'Notifications retrieved successfully',
+      [LanguageEnum.FRENCH]: 'Notifications récupérées avec succès',
+    },
+    NOTIFICATION_MARKED_READ_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'Notification marked as read successfully',
+      [LanguageEnum.FRENCH]: 'Notification marquée comme lue avec succès',
+    },
+    NOTIFICATIONS_MARKED_READ_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'Notifications marked as read successfully',
+      [LanguageEnum.FRENCH]: 'Notifications marquées comme lues avec succès',
+    },
+    NOTIFICATIONS_CREATED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'Notifications created successfully',
+      [LanguageEnum.FRENCH]: 'Notifications créées avec succès',
+    },
+    UNREAD_COUNT_RETRIEVED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'Unread count retrieved successfully',
+      [LanguageEnum.FRENCH]: 'Nombre de non lus récupéré avec succès',
+    },
+  },
+  // User Related Success Messages
+  USER: {
+    USER_CREATED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'User created successfully',
+      [LanguageEnum.FRENCH]: 'Utilisateur créé avec succès',
+    },
+    USER_UPDATED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'User updated successfully',
+      [LanguageEnum.FRENCH]: 'Utilisateur mis à jour avec succès',
+    },
+    USER_DELETED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'User deleted successfully',
+      [LanguageEnum.FRENCH]: 'Utilisateur supprimé avec succès',
+    },
+    USER_RETRIEVED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'User retrieved successfully',
+      [LanguageEnum.FRENCH]: 'Utilisateur récupéré avec succès',
+    },
+    USERS_RETRIEVED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'Users retrieved successfully',
+      [LanguageEnum.FRENCH]: 'Utilisateurs récupérés avec succès',
+    },
+    USER_PASSWORD_UPDATED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'User password updated successfully',
+      [LanguageEnum.FRENCH]:
+        "Mot de passe de l'utilisateur mis à jour avec succès",
+    },
+  },
+  // Progress Related Success Messages
+  PROGRESS: {
+    MODULE_STARTED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'Module started successfully',
+      [LanguageEnum.FRENCH]: 'Module commencé avec succès',
+    },
+    CHAPTER_STARTED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'Chapter started successfully',
+      [LanguageEnum.FRENCH]: 'Chapitre commencé avec succès',
+    },
+    CHAPTER_MARKED_AS_COMPLETE_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'Chapter marked as complete successfully',
+      [LanguageEnum.FRENCH]: 'Chapitre marqué comme terminé avec succès',
+    },
+    QUIZ_ATTEMPT_STARTED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'Quiz attempt started successfully',
+      [LanguageEnum.FRENCH]: 'Tentative de quiz commencée avec succès',
+    },
+    QUIZ_ANSWERS_SUBMITTED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'Quiz answers submitted successfully',
+      [LanguageEnum.FRENCH]: 'Réponses au quiz soumises avec succès',
+    },
+    CHAPTER_PROGRESS_RETRIEVED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'Chapter progress retrieved successfully',
+      [LanguageEnum.FRENCH]: 'Progrès du chapitre récupéré avec succès',
+    },
+    QUIZ_ATTEMPTS_RETRIEVED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'Quiz attempts retrieved successfully',
+      [LanguageEnum.FRENCH]: 'Tentatives de quiz récupérées avec succès',
+    },
+    MODULE_PROGRESS_RETRIEVED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'Module progress retrieved successfully',
+      [LanguageEnum.FRENCH]: 'Progrès du module récupéré avec succès',
+    },
+    DASHBOARD_DATA_RETRIEVED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'Dashboard data retrieved successfully',
+      [LanguageEnum.FRENCH]:
+        'Données du tableau de bord récupérées avec succès',
+    },
+    ADMIN_DASHBOARD_DATA_RETRIEVED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'Admin dashboard data retrieved successfully',
+      [LanguageEnum.FRENCH]:
+        'Données du tableau de bord administrateur récupérées avec succès',
+    },
+  },
+  // AI Chat Related Success Messages
+  AI_CHAT: {
+    AI_SESSION_COMPLETED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'AI session completed successfully',
+      [LanguageEnum.FRENCH]: 'Session IA terminée avec succès',
     },
   },
 };

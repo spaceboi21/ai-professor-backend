@@ -729,7 +729,13 @@ export class AnchorTagService {
       { new: true },
     );
 
-    return { message: 'Anchor tag deleted successfully' };
+    return {
+      message: this.errorMessageService.getSuccessMessageWithLanguage(
+        'ANCHOR_TAG',
+        'ANCHOR_TAG_DELETED_SUCCESSFULLY',
+        user?.preferred_language || DEFAULT_LANGUAGE,
+      ),
+    };
   }
 
   async getAnchorTagsByBibliography(
@@ -1048,7 +1054,7 @@ export class AnchorTagService {
 
     if (mandatoryAnchorTags.length === 0) {
       return {
-        message: this.errorMessageService.getMessageWithLanguage(
+        message: this.errorMessageService.getSuccessMessageWithLanguage(
           'ANCHOR_TAG',
           'NO_MANDATORY_ANCHOR_TAGS_FOUND',
           user?.preferred_language || DEFAULT_LANGUAGE,
@@ -1125,7 +1131,7 @@ export class AnchorTagService {
     }
 
     return {
-      message: this.errorMessageService.getMessageWithLanguage(
+      message: this.errorMessageService.getSuccessMessageWithLanguage(
         'ANCHOR_TAG',
         'MISSED_ANCHOR_TAG_NOTIFICATIONS_PROCESSED',
         user?.preferred_language || DEFAULT_LANGUAGE,

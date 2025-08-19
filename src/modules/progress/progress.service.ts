@@ -190,7 +190,7 @@ export class ProgressService {
       );
 
       return {
-        message: this.errorMessageService.getMessageWithLanguage(
+        message: this.errorMessageService.getSuccessMessageWithLanguage(
           'PROGRESS',
           'MODULE_STARTED_SUCCESSFULLY',
           user?.preferred_language || DEFAULT_LANGUAGE,
@@ -337,7 +337,7 @@ export class ProgressService {
       );
 
       return {
-        message: this.errorMessageService.getMessageWithLanguage(
+        message: this.errorMessageService.getSuccessMessageWithLanguage(
           'PROGRESS',
           'CHAPTER_STARTED_SUCCESSFULLY',
           user?.preferred_language || DEFAULT_LANGUAGE,
@@ -499,7 +499,7 @@ export class ProgressService {
       );
 
       return {
-        message: this.errorMessageService.getMessageWithLanguage(
+        message: this.errorMessageService.getSuccessMessageWithLanguage(
           'PROGRESS',
           'CHAPTER_MARKED_AS_COMPLETE_SUCCESSFULLY',
           user?.preferred_language || DEFAULT_LANGUAGE,
@@ -675,7 +675,7 @@ export class ProgressService {
       );
 
       return {
-        message: this.errorMessageService.getMessageWithLanguage(
+        message: this.errorMessageService.getSuccessMessageWithLanguage(
           'PROGRESS',
           'QUIZ_ATTEMPT_STARTED_SUCCESSFULLY',
           user?.preferred_language || DEFAULT_LANGUAGE,
@@ -885,7 +885,7 @@ export class ProgressService {
     );
 
     return {
-      message: this.errorMessageService.getMessageWithLanguage(
+      message: this.errorMessageService.getSuccessMessageWithLanguage(
         'PROGRESS',
         'QUIZ_ANSWERS_SUBMITTED_SUCCESSFULLY',
         user?.preferred_language || DEFAULT_LANGUAGE,
@@ -911,7 +911,7 @@ export class ProgressService {
   /**
    * Calculate tag performance based on quiz results
    * @param quizzes - All quizzes in the quiz group
-   * @param answers - Student's answers 
+   * @param answers - Student's answers
    * @param aiVerificationResult - AI verification result containing individual question results
    * @returns Array of tag performance data
    */
@@ -931,7 +931,7 @@ export class ProgressService {
     // Process each quiz and its tags
     quizzes.forEach((quiz, index) => {
       const quizId = quiz._id.toString();
-      
+
       // Find the student's answer for this quiz
       const studentAnswer = answers.find(
         (answer) => answer.quiz_id.toString() === quizId,
@@ -943,44 +943,52 @@ export class ProgressService {
 
       // Determine if this question was answered correctly
       let isCorrect = false;
-      
+
       if (aiVerificationResult && aiVerificationResult.questions_results) {
         // Use AI verification result if available
         // Find the matching question result by comparing quiz_id with the order
         const questionResult = aiVerificationResult.questions_results.find(
-          (result: any) => result.question_index === index + 1 // AI uses 1-based indexing
+          (result: any) => result.question_index === index + 1, // AI uses 1-based indexing
         );
         isCorrect = questionResult?.is_correct || false;
-        
-        this.logger.debug(`Quiz ${quizId} (index ${index + 1}): ${isCorrect ? 'CORRECT' : 'INCORRECT'}`);
+
+        this.logger.debug(
+          `Quiz ${quizId} (index ${index + 1}): ${isCorrect ? 'CORRECT' : 'INCORRECT'}`,
+        );
       } else {
         // Fallback to manual comparison (compare with quiz.answer)
         if (quiz.answer && studentAnswer.selected_answers) {
           // For multiple choice, check if selected answers match correct answers
-          const correctAnswers = Array.isArray(quiz.answer) ? quiz.answer : [quiz.answer];
+          const correctAnswers = Array.isArray(quiz.answer)
+            ? quiz.answer
+            : [quiz.answer];
           const selectedAnswers = studentAnswer.selected_answers;
-          
+
           // Simple comparison - all selected answers must be correct and no missing answers
-          isCorrect = 
+          isCorrect =
             correctAnswers.length === selectedAnswers.length &&
-            correctAnswers.every(answer => selectedAnswers.includes(answer));
+            correctAnswers.every((answer) => selectedAnswers.includes(answer));
         }
       }
 
       // Process each tag for this quiz
       if (quiz.tags && Array.isArray(quiz.tags)) {
-        this.logger.debug(`Processing ${quiz.tags.length} tags for quiz ${quizId}: [${quiz.tags.join(', ')}]`);
+        this.logger.debug(
+          `Processing ${quiz.tags.length} tags for quiz ${quizId}: [${quiz.tags.join(', ')}]`,
+        );
         quiz.tags.forEach((tag: string) => {
           if (!tagTracker[tag]) {
             tagTracker[tag] = { correct: 0, total: 0 };
           }
-          
+
           tagTracker[tag].total += 1;
           if (isCorrect) {
             tagTracker[tag].correct += 1;
           }
-          
-          this.logger.debug(`Tag "${tag}": ${tagTracker[tag].correct}/${tagTracker[tag].total} (${isCorrect ? 'added correct' : 'added incorrect'})`);
+
+          this.logger.debug(
+            `Tag "${tag}": ${tagTracker[tag].correct}/${tagTracker[tag].total} (${isCorrect ? 'added correct' : 'added incorrect'})`,
+          );
         });
       } else {
         this.logger.debug(`No tags found for quiz ${quizId}`);
@@ -989,9 +997,10 @@ export class ProgressService {
 
     // Convert to the required format and calculate percentages
     const tagPerformance = Object.entries(tagTracker).map(([tag, counts]) => {
-      const performance_percentage = counts.total > 0 
-        ? Math.round((counts.correct / counts.total) * 10000) / 100 // Round to 2 decimal places
-        : 0;
+      const performance_percentage =
+        counts.total > 0
+          ? Math.round((counts.correct / counts.total) * 10000) / 100 // Round to 2 decimal places
+          : 0;
 
       return {
         tag,
@@ -1001,11 +1010,15 @@ export class ProgressService {
       };
     });
 
-    this.logger.log(`Calculated tag performance for ${tagPerformance.length} tags:`);
-    tagPerformance.forEach(tag => {
-      this.logger.log(`  - ${tag.tag}: ${tag.performance_percentage}% (${tag.correct_count}/${tag.total_count})`);
+    this.logger.log(
+      `Calculated tag performance for ${tagPerformance.length} tags:`,
+    );
+    tagPerformance.forEach((tag) => {
+      this.logger.log(
+        `  - ${tag.tag}: ${tag.performance_percentage}% (${tag.correct_count}/${tag.total_count})`,
+      );
     });
-    
+
     return tagPerformance;
   }
 
@@ -1377,7 +1390,11 @@ export class ProgressService {
       const result = createPaginationResult(progress, total, paginationOptions);
 
       return {
-        message: 'Module progress retrieved successfully',
+        message: this.errorMessageService.getSuccessMessageWithLanguage(
+          'PROGRESS',
+          'MODULE_PROGRESS_RETRIEVED_SUCCESSFULLY',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
         data: result.data,
         pagination_data: result.pagination_data,
       };
@@ -1470,7 +1487,7 @@ export class ProgressService {
       const result = createPaginationResult(progress, total, paginationOptions);
 
       return {
-        message: this.errorMessageService.getMessageWithLanguage(
+        message: this.errorMessageService.getSuccessMessageWithLanguage(
           'PROGRESS',
           'CHAPTER_PROGRESS_RETRIEVED_SUCCESSFULLY',
           user?.preferred_language || DEFAULT_LANGUAGE,
@@ -1580,7 +1597,7 @@ export class ProgressService {
       const result = createPaginationResult(attempts, total, paginationOptions);
 
       return {
-        message: this.errorMessageService.getMessageWithLanguage(
+        message: this.errorMessageService.getSuccessMessageWithLanguage(
           'PROGRESS',
           'QUIZ_ATTEMPTS_RETRIEVED_SUCCESSFULLY',
           user?.preferred_language || DEFAULT_LANGUAGE,
@@ -1805,7 +1822,11 @@ export class ProgressService {
           : 0;
 
       return {
-        message: 'Dashboard data retrieved successfully',
+        message: this.errorMessageService.getSuccessMessageWithLanguage(
+          'PROGRESS',
+          'DASHBOARD_DATA_RETRIEVED_SUCCESSFULLY',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
         data: {
           overview: {
             total_modules: totalModules,
@@ -1931,7 +1952,11 @@ export class ProgressService {
       }
 
       return {
-        message: 'Admin dashboard data retrieved successfully',
+        message: this.errorMessageService.getSuccessMessageWithLanguage(
+          'PROGRESS',
+          'ADMIN_DASHBOARD_DATA_RETRIEVED_SUCCESSFULLY',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
         data: {
           overview: {
             total_students: totalStudents,

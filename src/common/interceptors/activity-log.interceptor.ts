@@ -30,11 +30,17 @@ export class ActivityLogInterceptor implements NestInterceptor {
 
     // Skip logging for certain endpoints
     if (this.shouldSkipLogging(request)) {
+      this.logger.debug(`Skipping logging for: ${request.url}`);
       return next.handle();
     }
 
     const startTime = Date.now();
     const activityType = this.determineActivityType(request);
+
+    // Log what we're processing
+    this.logger.debug(
+      `Processing request: ${request.method} ${request.url} -> Activity: ${activityType}`,
+    );
 
     return next.handle().pipe(
       tap((data) => {
@@ -110,12 +116,37 @@ export class ActivityLogInterceptor implements NestInterceptor {
         return;
       }
 
+      // Enhanced logging for student activities
+      if (
+        user.role.name === RoleEnum.STUDENT &&
+        this.isProgressRelatedActivity(activityType)
+      ) {
+        this.logger.debug(
+          `Logging student activity: ${activityType} for user ${user.id} at ${request.url}`,
+        );
+      }
+
       const description = this.generateDescription(
         request,
         activityType,
         isSuccess,
       );
       const metadata = this.extractMetadata(request, response, activityType);
+
+      // Log metadata for debugging student activities
+      if (
+        user.role.name === RoleEnum.STUDENT &&
+        this.isProgressRelatedActivity(activityType)
+      ) {
+        this.logger.debug(`Student activity metadata:`, {
+          activityType,
+          module_id: metadata.module_id,
+          chapter_id: metadata.chapter_id,
+          quiz_group_id: metadata.quiz_group_id,
+          score_percentage: metadata.score_percentage,
+          progress_status: metadata.progress_status,
+        });
+      }
 
       // Determine status based on HTTP response code and success
       let status: 'SUCCESS' | 'WARNING' | 'ERROR' | 'INFO' = 'SUCCESS';
@@ -147,6 +178,9 @@ export class ActivityLogInterceptor implements NestInterceptor {
           metadata.chapter_id?.toString(),
         ),
         chapter_name: metadata.chapter_name,
+        quiz_group_id: this.safeObjectIdConversion(
+          metadata.quiz_group_id?.toString(),
+        ),
         metadata: {
           ...metadata,
           request_body: this.sanitizeRequestBody(request.body),
@@ -169,14 +203,21 @@ export class ActivityLogInterceptor implements NestInterceptor {
       Promise.resolve()
         .then(async () => {
           try {
-            await this.activityLogService.createActivityLog(
-              createActivityLogDto,
+            this.logger.debug(
+              `Attempting to create activity log: ${activityType}`,
             );
-            this.logger.debug(`Activity logged successfully: ${activityType}`);
+            const result =
+              await this.activityLogService.createActivityLog(
+                createActivityLogDto,
+              );
+            this.logger.debug(
+              `Activity logged successfully: ${activityType} with ID: ${result._id}`,
+            );
           } catch (logError) {
             // Log the error but don't throw - this prevents breaking the main application
             this.logger.error('Failed to log activity (non-critical):', {
               error: logError.message,
+              stack: logError.stack,
               activityType,
               endpoint: request.url,
               userId: user.id,
@@ -187,6 +228,7 @@ export class ActivityLogInterceptor implements NestInterceptor {
           // Catch any unhandled promise rejections
           this.logger.error('Unhandled error in activity logging promise:', {
             error: promiseError.message,
+            stack: promiseError.stack,
             activityType,
             endpoint: request.url,
           });
@@ -221,12 +263,62 @@ export class ActivityLogInterceptor implements NestInterceptor {
     const { method, url } = request;
     const path = url.split('?')[0]; // Remove query parameters
 
+    // Debug logging to see what paths are being processed
+    this.logger.debug(`Processing request: ${method} ${path}`);
+    this.logger.debug(`Full URL: ${url}`);
+    this.logger.debug(`Path after split: ${path}`);
+
     // Authentication activities
     if (path.includes('/auth/login')) {
+      this.logger.debug(`Auth login detected: ${path}`);
       return ActivityTypeEnum.USER_LOGIN;
     }
     if (path.includes('/auth/logout')) {
+      this.logger.debug(`Auth logout detected: ${path}`);
       return ActivityTypeEnum.USER_LOGOUT;
+    }
+
+    // Progress tracking activities (check this first for more specific detection)
+    if (path.includes('/progress')) {
+      this.logger.debug(`Progress endpoint detected: ${path}`);
+      this.logger.debug(`Checking progress sub-paths...`);
+
+      if (path.includes('/modules/start')) {
+        this.logger.debug(`Module start detected: ${path}`);
+        return ActivityTypeEnum.MODULE_STARTED;
+      }
+      if (path.includes('/chapters/start')) {
+        this.logger.debug(`Chapter start detected: ${path}`);
+        return ActivityTypeEnum.CHAPTER_STARTED;
+      }
+      if (path.includes('/chapters/complete')) {
+        this.logger.debug(`Chapter complete detected: ${path}`);
+        return ActivityTypeEnum.CHAPTER_COMPLETED;
+      }
+      if (path.includes('/quiz/start')) {
+        this.logger.debug(`Quiz start detected: ${path}`);
+        return ActivityTypeEnum.QUIZ_STARTED;
+      }
+      if (path.includes('/quiz/submit')) {
+        this.logger.debug(`Quiz submit detected: ${path}`);
+        return ActivityTypeEnum.QUIZ_SUBMITTED;
+      }
+      if (method === 'PATCH' || method === 'PUT') {
+        this.logger.debug(`Progress update detected: ${method} ${path}`);
+        return ActivityTypeEnum.PROGRESS_UPDATED;
+      }
+
+      // Fallback for other progress endpoints
+      if (method === 'POST') {
+        this.logger.debug(
+          `Progress POST endpoint detected, using PROGRESS_UPDATED: ${path}`,
+        );
+        return ActivityTypeEnum.PROGRESS_UPDATED;
+      }
+
+      this.logger.debug(
+        `Progress endpoint detected but no specific activity type matched: ${path}`,
+      );
     }
 
     // User management activities
@@ -277,12 +369,6 @@ export class ActivityLogInterceptor implements NestInterceptor {
       if (path.includes('/attempt')) return ActivityTypeEnum.QUIZ_ATTEMPTED;
     }
 
-    // Progress activities
-    if (path.includes('/progress')) {
-      if (method === 'PATCH' || method === 'PUT')
-        return ActivityTypeEnum.PROGRESS_UPDATED;
-    }
-
     // AI Chat activities
     if (path.includes('/ai-chat')) {
       if (method === 'POST' && path.includes('/start'))
@@ -298,6 +384,11 @@ export class ActivityLogInterceptor implements NestInterceptor {
       if (method === 'POST') return ActivityTypeEnum.FILE_UPLOADED;
       if (method === 'DELETE') return ActivityTypeEnum.FILE_DELETED;
     }
+
+    // Log what we're about to return as default
+    this.logger.debug(
+      `No specific activity type matched, using default for ${method} ${path}`,
+    );
 
     // Default activity type based on HTTP method
     switch (method) {
@@ -349,6 +440,10 @@ export class ActivityLogInterceptor implements NestInterceptor {
         return `Module deletion ${status}`;
       case ActivityTypeEnum.MODULE_ASSIGNED:
         return `Module assignment ${status}`;
+      case ActivityTypeEnum.MODULE_STARTED:
+        return `Module started ${status}`;
+      case ActivityTypeEnum.MODULE_COMPLETED:
+        return `Module completed ${status}`;
       case ActivityTypeEnum.CHAPTER_CREATED:
         return `Chapter creation ${status}`;
       case ActivityTypeEnum.CHAPTER_UPDATED:
@@ -357,6 +452,10 @@ export class ActivityLogInterceptor implements NestInterceptor {
         return `Chapter deletion ${status}`;
       case ActivityTypeEnum.CHAPTER_REORDERED:
         return `Chapter reordering ${status}`;
+      case ActivityTypeEnum.CHAPTER_STARTED:
+        return `Chapter started ${status}`;
+      case ActivityTypeEnum.CHAPTER_COMPLETED:
+        return `Chapter completed ${status}`;
       case ActivityTypeEnum.QUIZ_CREATED:
         return `Quiz creation ${status}`;
       case ActivityTypeEnum.QUIZ_UPDATED:
@@ -365,8 +464,14 @@ export class ActivityLogInterceptor implements NestInterceptor {
         return `Quiz deletion ${status}`;
       case ActivityTypeEnum.QUIZ_ATTEMPTED:
         return `Quiz attempt ${status}`;
+      case ActivityTypeEnum.QUIZ_STARTED:
+        return `Quiz started ${status}`;
+      case ActivityTypeEnum.QUIZ_SUBMITTED:
+        return `Quiz submitted ${status}`;
       case ActivityTypeEnum.PROGRESS_UPDATED:
         return `Progress update ${status}`;
+      case ActivityTypeEnum.PROGRESS_COMPLETED:
+        return `Progress completed ${status}`;
       case ActivityTypeEnum.AI_CHAT_STARTED:
         return `AI chat session started ${status}`;
       case ActivityTypeEnum.AI_CHAT_MESSAGE_SENT:
@@ -404,7 +509,7 @@ export class ActivityLogInterceptor implements NestInterceptor {
         metadata.target_user_id = request.params.id;
       }
 
-      // Only extract module information for module-related activities
+      // Extract module information for module-related activities
       if (this.isModuleRelatedActivity(activityType)) {
         if (request.params?.module_id) {
           metadata.module_id = request.params.module_id;
@@ -417,7 +522,7 @@ export class ActivityLogInterceptor implements NestInterceptor {
         }
       }
 
-      // Only extract chapter information for chapter-related activities
+      // Extract chapter information for chapter-related activities
       if (this.isChapterRelatedActivity(activityType)) {
         if (request.params?.chapter_id) {
           metadata.chapter_id = request.params.chapter_id;
@@ -427,6 +532,76 @@ export class ActivityLogInterceptor implements NestInterceptor {
         }
         if (request.body?.chapter_name) {
           metadata.chapter_name = request.body.chapter_name;
+        }
+      }
+
+      // Extract quiz information for quiz-related activities
+      if (this.isQuizRelatedActivity(activityType)) {
+        if (request.params?.quiz_group_id) {
+          metadata.quiz_group_id = request.params.quiz_group_id;
+        }
+        if (request.body?.quiz_group_id) {
+          metadata.quiz_group_id = request.body.quiz_group_id;
+        }
+        // Extract attempt_id for quiz submission
+        if (request.body?.attempt_id) {
+          metadata.attempt_id = request.body.attempt_id;
+        }
+        // Extract score and performance data for quiz submission
+        if (request.body?.score_percentage !== undefined) {
+          metadata.score_percentage = request.body.score_percentage;
+        }
+        if (request.body?.correct_answers !== undefined) {
+          metadata.correct_answers = request.body.correct_answers;
+        }
+        if (request.body?.total_questions !== undefined) {
+          metadata.total_questions = request.body.total_questions;
+        }
+        if (request.body?.is_passed !== undefined) {
+          metadata.is_passed = request.body.is_passed;
+        }
+        if (request.body?.time_taken_seconds !== undefined) {
+          metadata.time_taken_seconds = request.body.time_taken_seconds;
+        }
+      }
+
+      // Extract progress-specific information
+      if (this.isProgressRelatedActivity(activityType)) {
+        // For progress activities, extract module_id and chapter_id from body
+        if (request.body?.module_id) {
+          metadata.module_id = request.body.module_id;
+        }
+        if (request.body?.chapter_id) {
+          metadata.chapter_id = request.body.chapter_id;
+        }
+        if (request.body?.quiz_group_id) {
+          metadata.quiz_group_id = request.body.quiz_group_id;
+        }
+
+        // Extract progress status and completion information
+        if (request.body?.status) {
+          metadata.progress_status = request.body.status;
+        }
+        if (request.body?.started_at) {
+          metadata.started_at = request.body.started_at;
+        }
+        if (request.body?.completed_at) {
+          metadata.completed_at = request.body.completed_at;
+        }
+        if (request.body?.progress_percentage !== undefined) {
+          metadata.progress_percentage = request.body.progress_percentage;
+        }
+        if (request.body?.chapters_completed !== undefined) {
+          metadata.chapters_completed = request.body.chapters_completed;
+        }
+        if (request.body?.total_chapters !== undefined) {
+          metadata.total_chapters = request.body.total_chapters;
+        }
+        if (request.body?.chapter_sequence !== undefined) {
+          metadata.chapter_sequence = request.body.chapter_sequence;
+        }
+        if (request.body?.chapter_quiz_completed !== undefined) {
+          metadata.chapter_quiz_completed = request.body.chapter_quiz_completed;
         }
       }
     } catch (error) {
@@ -451,6 +626,10 @@ export class ActivityLogInterceptor implements NestInterceptor {
       ActivityTypeEnum.QUIZ_UPDATED,
       ActivityTypeEnum.QUIZ_DELETED,
       ActivityTypeEnum.QUIZ_ATTEMPTED,
+      ActivityTypeEnum.QUIZ_STARTED,
+      ActivityTypeEnum.QUIZ_SUBMITTED,
+      ActivityTypeEnum.MODULE_STARTED,
+      ActivityTypeEnum.MODULE_COMPLETED,
     ].includes(activityType);
   }
 
@@ -464,6 +643,35 @@ export class ActivityLogInterceptor implements NestInterceptor {
       ActivityTypeEnum.QUIZ_UPDATED,
       ActivityTypeEnum.QUIZ_DELETED,
       ActivityTypeEnum.QUIZ_ATTEMPTED,
+      ActivityTypeEnum.QUIZ_STARTED,
+      ActivityTypeEnum.QUIZ_SUBMITTED,
+      ActivityTypeEnum.CHAPTER_STARTED,
+      ActivityTypeEnum.CHAPTER_COMPLETED,
+    ].includes(activityType);
+  }
+
+  private isQuizRelatedActivity(activityType: ActivityTypeEnum): boolean {
+    return [
+      ActivityTypeEnum.QUIZ_CREATED,
+      ActivityTypeEnum.QUIZ_UPDATED,
+      ActivityTypeEnum.QUIZ_DELETED,
+      ActivityTypeEnum.QUIZ_ATTEMPTED,
+      ActivityTypeEnum.QUIZ_STARTED,
+      ActivityTypeEnum.QUIZ_SUBMITTED,
+    ].includes(activityType);
+  }
+
+  private isProgressRelatedActivity(activityType: ActivityTypeEnum): boolean {
+    return [
+      ActivityTypeEnum.MODULE_STARTED,
+      ActivityTypeEnum.MODULE_COMPLETED,
+      ActivityTypeEnum.CHAPTER_STARTED,
+      ActivityTypeEnum.CHAPTER_COMPLETED,
+      ActivityTypeEnum.QUIZ_ATTEMPTED,
+      ActivityTypeEnum.QUIZ_STARTED,
+      ActivityTypeEnum.QUIZ_SUBMITTED,
+      ActivityTypeEnum.PROGRESS_UPDATED,
+      ActivityTypeEnum.PROGRESS_COMPLETED,
     ].includes(activityType);
   }
 

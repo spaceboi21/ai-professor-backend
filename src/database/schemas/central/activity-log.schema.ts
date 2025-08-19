@@ -69,6 +69,9 @@ export class ActivityLog extends Document {
   @Prop({ type: String })
   chapter_name: string;
 
+  @Prop({ type: Types.ObjectId, index: true })
+  quiz_group_id: Types.ObjectId;
+
   @Prop({ type: Object, default: {} })
   metadata: Record<string, any>;
 
@@ -125,6 +128,7 @@ ActivityLogSchema.index({ is_success: 1, created_at: -1 });
 ActivityLogSchema.index({ target_user_id: 1, created_at: -1 });
 ActivityLogSchema.index({ module_id: 1, created_at: -1 });
 ActivityLogSchema.index({ chapter_id: 1, created_at: -1 });
+ActivityLogSchema.index({ quiz_group_id: 1, created_at: -1 });
 ActivityLogSchema.index({ status: 1, created_at: -1 });
 
 // Compound indexes for common query patterns
