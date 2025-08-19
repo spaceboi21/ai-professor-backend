@@ -204,6 +204,22 @@ export class ProgressController {
           time_taken_seconds: 25,
           status: 'COMPLETED',
           completed_at: '2024-01-15T10:25:00.000Z',
+          ai_verification: 'completed',
+          ai_verification_report: {},
+          tag_performance: [
+            {
+              tag: 'Trauma',
+              correct_count: 2,
+              total_count: 3,
+              performance_percentage: 66.67
+            },
+            {
+              tag: 'Depression',
+              correct_count: 3,
+              total_count: 4,
+              performance_percentage: 75.0
+            }
+          ],
         },
       },
     },

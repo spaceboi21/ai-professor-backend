@@ -20,6 +20,14 @@ export class LearningLogReview extends Document {
   })
   ai_feedback_id: Types.ObjectId;
 
+  // Reference to the student who owns the learning log
+  @Prop({
+    type: Types.ObjectId,
+    required: true,
+    index: true,
+  })
+  student_id: Types.ObjectId;
+
   // Reference to the reviewer (user who gave the review)
   @Prop({
     type: Types.ObjectId,
@@ -71,4 +79,5 @@ export const LearningLogReviewSchema = SchemaFactory.createForClass(LearningLogR
 // Create indexes for better query performance
 LearningLogReviewSchema.index({ ai_feedback_id: 1, reviewer_role: 1 });
 LearningLogReviewSchema.index({ reviewer_id: 1, reviewer_role: 1 });
+LearningLogReviewSchema.index({ student_id: 1, created_at: -1 }); // For efficient student feedback queries
 LearningLogReviewSchema.index({ created_at: -1 }); 

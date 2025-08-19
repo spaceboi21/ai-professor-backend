@@ -797,11 +797,13 @@ export class ProgressService {
       );
     }
 
-    // Get all quizzes for this group with correct answers
+    // Get all quizzes for this group with correct answers (sorted by sequence)
     const quizzes = await QuizModel.find({
       quiz_group_id: new Types.ObjectId(quiz_group_id),
       deleted_at: null,
-    }).lean();
+    })
+      .sort({ sequence: 1 }) // Ensure consistent ordering
+      .lean();
 
     // Prepare questions for AI verification
     const questionsForAI: QuizQuestion[] = [];
@@ -863,6 +865,14 @@ export class ProgressService {
       attempt.ai_verification_result = aiVerificationResult;
     }
 
+    // Calculate tag performance for this quiz group
+    const tagPerformance = this.calculateTagPerformance(
+      quizzes,
+      answers,
+      aiVerificationResult,
+    );
+    attempt.tag_performance = tagPerformance;
+
     await attempt.save();
 
     // Update chapter/module progress if quiz is passed
@@ -891,8 +901,112 @@ export class ProgressService {
         completed_at: attempt.completed_at,
         ai_verification: aiVerificationResult ? 'completed' : 'failed',
         ai_verification_report: aiVerificationResult,
+        tag_performance: attempt.tag_performance,
       },
     };
+  }
+
+  // ========== TAG PERFORMANCE CALCULATION ==========
+
+  /**
+   * Calculate tag performance based on quiz results
+   * @param quizzes - All quizzes in the quiz group
+   * @param answers - Student's answers 
+   * @param aiVerificationResult - AI verification result containing individual question results
+   * @returns Array of tag performance data
+   */
+  private calculateTagPerformance(
+    quizzes: any[],
+    answers: any[],
+    aiVerificationResult: any,
+  ): Array<{
+    tag: string;
+    correct_count: number;
+    total_count: number;
+    performance_percentage: number;
+  }> {
+    // Initialize tag tracking object
+    const tagTracker: Record<string, { correct: number; total: number }> = {};
+
+    // Process each quiz and its tags
+    quizzes.forEach((quiz, index) => {
+      const quizId = quiz._id.toString();
+      
+      // Find the student's answer for this quiz
+      const studentAnswer = answers.find(
+        (answer) => answer.quiz_id.toString() === quizId,
+      );
+
+      if (!studentAnswer) {
+        return; // Skip if no answer found
+      }
+
+      // Determine if this question was answered correctly
+      let isCorrect = false;
+      
+      if (aiVerificationResult && aiVerificationResult.questions_results) {
+        // Use AI verification result if available
+        // Find the matching question result by comparing quiz_id with the order
+        const questionResult = aiVerificationResult.questions_results.find(
+          (result: any) => result.question_index === index + 1 // AI uses 1-based indexing
+        );
+        isCorrect = questionResult?.is_correct || false;
+        
+        this.logger.debug(`Quiz ${quizId} (index ${index + 1}): ${isCorrect ? 'CORRECT' : 'INCORRECT'}`);
+      } else {
+        // Fallback to manual comparison (compare with quiz.answer)
+        if (quiz.answer && studentAnswer.selected_answers) {
+          // For multiple choice, check if selected answers match correct answers
+          const correctAnswers = Array.isArray(quiz.answer) ? quiz.answer : [quiz.answer];
+          const selectedAnswers = studentAnswer.selected_answers;
+          
+          // Simple comparison - all selected answers must be correct and no missing answers
+          isCorrect = 
+            correctAnswers.length === selectedAnswers.length &&
+            correctAnswers.every(answer => selectedAnswers.includes(answer));
+        }
+      }
+
+      // Process each tag for this quiz
+      if (quiz.tags && Array.isArray(quiz.tags)) {
+        this.logger.debug(`Processing ${quiz.tags.length} tags for quiz ${quizId}: [${quiz.tags.join(', ')}]`);
+        quiz.tags.forEach((tag: string) => {
+          if (!tagTracker[tag]) {
+            tagTracker[tag] = { correct: 0, total: 0 };
+          }
+          
+          tagTracker[tag].total += 1;
+          if (isCorrect) {
+            tagTracker[tag].correct += 1;
+          }
+          
+          this.logger.debug(`Tag "${tag}": ${tagTracker[tag].correct}/${tagTracker[tag].total} (${isCorrect ? 'added correct' : 'added incorrect'})`);
+        });
+      } else {
+        this.logger.debug(`No tags found for quiz ${quizId}`);
+      }
+    });
+
+    // Convert to the required format and calculate percentages
+    const tagPerformance = Object.entries(tagTracker).map(([tag, counts]) => {
+      const performance_percentage = counts.total > 0 
+        ? Math.round((counts.correct / counts.total) * 10000) / 100 // Round to 2 decimal places
+        : 0;
+
+      return {
+        tag,
+        correct_count: counts.correct,
+        total_count: counts.total,
+        performance_percentage,
+      };
+    });
+
+    this.logger.log(`Calculated tag performance for ${tagPerformance.length} tags:`);
+    tagPerformance.forEach(tag => {
+      this.logger.log(`  - ${tag.tag}: ${tag.performance_percentage}% (${tag.correct_count}/${tag.total_count})`);
+    });
+    
+    return tagPerformance;
   }
 
   // ========== VALIDATION METHODS ==========

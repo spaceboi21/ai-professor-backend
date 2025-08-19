@@ -91,6 +91,25 @@ export class StudentQuizAttempt extends Document {
   @Prop({ type: Object, default: null })
   ai_verification_result: any;
 
+  // Store tag performance for the quiz group
+  @Prop({
+    type: [
+      {
+        tag: { type: String, required: true },
+        correct_count: { type: Number, default: 0 },
+        total_count: { type: Number, default: 0 },
+        performance_percentage: { type: Number, default: 0 },
+      },
+    ],
+    default: [],
+  })
+  tag_performance: Array<{
+    tag: string;
+    correct_count: number;
+    total_count: number;
+    performance_percentage: number;
+  }>;
+
   readonly created_at?: Date;
   readonly updated_at?: Date;
 }
