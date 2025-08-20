@@ -161,14 +161,27 @@ export class ActivityLogService {
 
       // Check for duplicate activity before creating
       if (createActivityLogDto.endpoint && createActivityLogDto.performed_by) {
-        const thirtySecondsAgo = new Date(Date.now() - 30 * 1000); // 30 seconds ago
+        // Check for exact duplicate within a very short time window (5 seconds)
+        const fiveSecondsAgo = new Date(Date.now() - 5 * 1000); // 5 seconds ago
 
-        const duplicateQuery = {
+        const duplicateQuery: any = {
           performed_by: createActivityLogDto.performed_by,
           activity_type: createActivityLogDto.activity_type,
           endpoint: createActivityLogDto.endpoint,
-          created_at: { $gte: thirtySecondsAgo },
+          http_method: createActivityLogDto.http_method,
+          created_at: { $gte: fiveSecondsAgo },
         };
+
+        // Add more specific fields for exact matching
+        if (createActivityLogDto.module_id) {
+          duplicateQuery.module_id = createActivityLogDto.module_id;
+        }
+        if (createActivityLogDto.chapter_id) {
+          duplicateQuery.chapter_id = createActivityLogDto.chapter_id;
+        }
+        if (createActivityLogDto.quiz_group_id) {
+          duplicateQuery.quiz_group_id = createActivityLogDto.quiz_group_id;
+        }
 
         const existingLog = await this.activityLogModel.findOne(duplicateQuery);
 
