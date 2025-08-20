@@ -397,7 +397,7 @@ export class CommunityController {
   }
 
   @Post('discussions/:id/archive')
-  @Roles(RoleEnum.SCHOOL_ADMIN, RoleEnum.SUPER_ADMIN)
+  @Roles(RoleEnum.SCHOOL_ADMIN, RoleEnum.SUPER_ADMIN, RoleEnum.PROFESSOR)
   @ApiOperation({ summary: 'Archive a discussion (admin only)' })
   @ApiResponse({
     status: HttpStatus.OK,

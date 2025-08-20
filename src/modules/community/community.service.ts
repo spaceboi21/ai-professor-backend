@@ -2558,9 +2558,11 @@ export class CommunityService {
   async archiveDiscussion(discussionId: string, user: JWTUserPayload) {
     // Only school admins and super admins can archive discussions
     if (
-      ![RoleEnum.SCHOOL_ADMIN, RoleEnum.SUPER_ADMIN].includes(
-        user.role.name as RoleEnum,
-      )
+      ![
+        RoleEnum.SCHOOL_ADMIN,
+        RoleEnum.SUPER_ADMIN,
+        RoleEnum.PROFESSOR,
+      ].includes(user.role.name as RoleEnum)
     ) {
       throw new ForbiddenException(
         this.errorMessageService.getMessageWithLanguage(
