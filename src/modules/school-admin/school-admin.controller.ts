@@ -25,7 +25,7 @@ import { RoleGuard } from 'src/common/guards/roles.guard';
 import { JWTUserPayload } from 'src/common/types/jwr-user.type';
 import { CreateSchoolAdminDto } from './dto/create-school-admin.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
-import { DashboardFilterDto } from './dto/dashboard-filter.dto';
+import { DashboardFilterDto, EnhancedDashboardResponseDto } from './dto/dashboard-filter.dto';
 import { UpdateSchoolAdminDto } from './dto/update-school-admin.dto';
 import { SchoolAdminService } from './school-admin.service';
 import { ParseObjectIdPipe } from '@nestjs/mongoose';
@@ -129,9 +129,17 @@ export class SchoolAdminController {
             average_session_duration: 45,
             completion_rate: 78,
           },
+          quiz_statistics: {
+            total_quiz_attempts: 150,
+            passed_quiz_attempts: 120,
+            quiz_pass_rate: 80,
+            average_quiz_score: 75,
+            total_ai_chat_sessions: 85,
+          },
         },
       },
     },
+    type: EnhancedDashboardResponseDto,
   })
   async getDashboard(
     @User() user: JWTUserPayload,
