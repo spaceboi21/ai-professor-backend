@@ -401,28 +401,46 @@ export class CommunityService {
         deleted_at: null,
       };
 
-      // Simple role-based filtering
-      if (user.role.name === RoleEnum.STUDENT) {
+      // Apply status filtering logic
+      if (filterDto?.status) {
+        // If a specific status is requested, apply it based on user permissions
+        if (user.role.name === RoleEnum.STUDENT) {
+          // Students can only see ACTIVE discussions
+          if (filterDto.status === DiscussionStatusEnum.ACTIVE) {
+            filter.status = DiscussionStatusEnum.ACTIVE;
+          } else {
+            // If student requests non-ACTIVE status, still only show ACTIVE
+            filter.status = DiscussionStatusEnum.ACTIVE;
+          }
+        } else if (user.role.name === RoleEnum.PROFESSOR) {
+          // Professors can see ACTIVE and ARCHIVED discussions
+          if (
+            [
+              DiscussionStatusEnum.ACTIVE,
+              DiscussionStatusEnum.ARCHIVED,
+            ].includes(filterDto.status)
+          ) {
+            filter.status = filterDto.status;
+          } else {
+            // If professor requests other status, fall back to ACTIVE
+            filter.status = DiscussionStatusEnum.ACTIVE;
+          }
+        } else if (
+          [RoleEnum.SCHOOL_ADMIN, RoleEnum.SUPER_ADMIN].includes(
+            user.role.name as RoleEnum,
+          )
+        ) {
+          // Admins can see all statuses
+          filter.status = filterDto.status;
+        }
+      } else {
+        // If no status is specified, default to ACTIVE for all users
         filter.status = DiscussionStatusEnum.ACTIVE;
-      } else if (user.role.name === RoleEnum.PROFESSOR) {
-        filter.status = {
-          $in: [DiscussionStatusEnum.ACTIVE, DiscussionStatusEnum.ARCHIVED],
-        };
       }
-      // Admins can see all content
 
       // Apply additional filters
       if (filterDto?.type) {
         filter.type = filterDto.type;
-      }
-
-      if (
-        filterDto?.status &&
-        [RoleEnum.SCHOOL_ADMIN, RoleEnum.SUPER_ADMIN].includes(
-          user.role.name as RoleEnum,
-        )
-      ) {
-        filter.status = filterDto.status;
       }
 
       if (filterDto?.search) {
@@ -2558,9 +2576,11 @@ export class CommunityService {
   async archiveDiscussion(discussionId: string, user: JWTUserPayload) {
     // Only school admins and super admins can archive discussions
     if (
-      ![RoleEnum.SCHOOL_ADMIN, RoleEnum.SUPER_ADMIN].includes(
-        user.role.name as RoleEnum,
-      )
+      ![
+        RoleEnum.SCHOOL_ADMIN,
+        RoleEnum.SUPER_ADMIN,
+        RoleEnum.PROFESSOR,
+      ].includes(user.role.name as RoleEnum)
     ) {
       throw new ForbiddenException(
         this.errorMessageService.getMessageWithLanguage(
