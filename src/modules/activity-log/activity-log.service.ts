@@ -153,15 +153,19 @@ export class ActivityLogService {
 
       // Check for duplicate activity before creating
       if (createActivityLogDto.endpoint && createActivityLogDto.performed_by) {
-        // Check for exact duplicate within a very short time window (5 seconds)
-        const fiveSecondsAgo = new Date(Date.now() - 5 * 1000); // 5 seconds ago
+        // Check for duplicate within 1-10 seconds range (skip very recent duplicates)
+        const oneSecondAgo = new Date(Date.now() - 1 * 1000); // 1 second ago
+        const tenSecondsAgo = new Date(Date.now() - 10 * 1000); // 10 seconds ago
 
         const duplicateQuery: any = {
           performed_by: createActivityLogDto.performed_by,
           activity_type: createActivityLogDto.activity_type,
           endpoint: createActivityLogDto.endpoint,
           http_method: createActivityLogDto.http_method,
-          created_at: { $gte: fiveSecondsAgo },
+          created_at: {
+            $gte: tenSecondsAgo, // Between 10 seconds ago
+            $lte: oneSecondAgo, // and 1 second ago
+          },
         };
 
         // Add more specific fields for exact matching
@@ -178,8 +182,11 @@ export class ActivityLogService {
         const existingLog = await this.activityLogModel.findOne(duplicateQuery);
 
         if (existingLog) {
+          const timeDiff = existingLog.created_at
+            ? Math.round((Date.now() - existingLog.created_at.getTime()) / 1000)
+            : 'unknown';
           this.logger.log(
-            `Skipping duplicate activity log: ${createActivityLogDto.activity_type} by ${createActivityLogDto.performed_by} on ${createActivityLogDto.endpoint}`,
+            `Skipping duplicate activity log: ${createActivityLogDto.activity_type} by ${createActivityLogDto.performed_by} on ${createActivityLogDto.endpoint} (found similar log created ${timeDiff} seconds ago)`,
           );
           // Return the existing log to prevent downstream errors
           return existingLog;
