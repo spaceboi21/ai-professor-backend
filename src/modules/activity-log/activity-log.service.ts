@@ -345,7 +345,7 @@ export class ActivityLogService {
             performedBy = await this.getUserDetails(
               log.performed_by.toString(),
               log.performed_by_role,
-              log.school_id?.toString(),
+              log.school_id._id?.toString(),
             );
           }
 
@@ -355,7 +355,7 @@ export class ActivityLogService {
             targetUserDetails = await this.getUserDetails(
               targetUser.toString(),
               log.target_user_role,
-              log.school_id?.toString(),
+              log.school_id._id?.toString(),
             );
           }
 
@@ -454,10 +454,11 @@ export class ActivityLogService {
             StudentSchema,
           );
 
-          const student = await StudentModel.findById(userId)
+          const student = await StudentModel.findById(
+            new Types.ObjectId(userId),
+          )
             .select('first_name last_name email profile_pic')
             .lean();
-
           if (student) {
             this.logger.debug(
               `Student found: ${student.first_name} ${student.last_name}`,
