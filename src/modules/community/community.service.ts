@@ -3214,7 +3214,9 @@ export class CommunityService {
       const titleFr = 'Nouveau Like sur Votre Contenu';
       const messageEn = `${liker.first_name} ${liker.last_name} liked your ${entityType}: "${entityTitle}"`;
       const messageFr = `${liker.first_name} ${liker.last_name} a aimé votre ${entityType}: "${entityTitle}"`;
-      const metadata = {
+
+      // Base metadata
+      const metadata: any = {
         entity_type: entityType,
         entity_id: entity._id,
         entity_title: entityTitle,
@@ -3222,6 +3224,11 @@ export class CommunityService {
         liker_name: `${liker.first_name} ${liker.last_name}`,
         liker_role: liker.role,
       };
+
+      // Add discussion_id to metadata if entity type is reply
+      if (entityType === 'reply' && entity.discussion_id) {
+        metadata.discussion_id = new Types.ObjectId(entity.discussion_id);
+      }
 
       const recipientType =
         entity.created_by_role === RoleEnum.STUDENT
