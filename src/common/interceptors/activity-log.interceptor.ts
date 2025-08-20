@@ -107,6 +107,12 @@ export class ActivityLogInterceptor implements NestInterceptor {
     executionTimeMs: number,
   ): Promise<void> {
     try {
+      // Skip logging for SYSTEM_MAINTENANCE activities
+      if (activityType === ActivityTypeEnum.SYSTEM_MAINTENANCE) {
+        this.logger.debug('Skipping SYSTEM_MAINTENANCE activity logging');
+        return;
+      }
+
       // Validate user exists
       if (!user) {
         this.logger.debug(
