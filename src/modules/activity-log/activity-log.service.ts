@@ -13,6 +13,10 @@ import {
 import { User } from 'src/database/schemas/central/user.schema';
 import { School } from 'src/database/schemas/central/school.schema';
 import {
+  Student,
+  StudentSchema,
+} from 'src/database/schemas/tenant/student.schema';
+import {
   ActivityTypeEnum,
   ActivityCategoryEnum,
   ActivityLevelEnum,
@@ -27,6 +31,8 @@ import {
 } from 'src/common/utils/pagination.util';
 import { PaginationDto } from 'src/common/dto/pagination.dto';
 import { EmailEncryptionService } from 'src/common/services/email-encryption.service';
+import { TenantConnectionService } from 'src/database/tenant-connection.service';
+import { TenantService } from 'src/modules/central/tenant.service';
 
 export interface CreateActivityLogDto {
   activity_type: ActivityTypeEnum;
@@ -85,6 +91,14 @@ interface PopulatedSchool {
   name: string;
 }
 
+export interface UserDetails {
+  id: Types.ObjectId;
+  name: string;
+  email: string;
+  role: string;
+  profile_pic?: string | null;
+}
+
 @Injectable()
 export class ActivityLogService {
   private readonly logger = new Logger(ActivityLogService.name);
@@ -97,6 +111,8 @@ export class ActivityLogService {
     @InjectModel(School.name)
     private readonly schoolModel: Model<School>,
     private readonly emailEncryptionService: EmailEncryptionService,
+    private readonly tenantConnectionService: TenantConnectionService,
+    private readonly tenantService: TenantService,
   ) {}
 
   private safeObjectIdConversion(
@@ -303,9 +319,7 @@ export class ActivityLogService {
       // Get logs with user and school population
       const logs = await this.activityLogModel
         .find(query)
-        .populate('performed_by', 'first_name last_name email profile_pic')
         .populate('school_id', 'name')
-        .populate('target_user_id', 'first_name last_name email')
         .sort({ created_at: -1 })
         .skip(options.skip)
         .limit(options.limit)
@@ -313,80 +327,80 @@ export class ActivityLogService {
 
       const total = await this.activityLogModel.countDocuments(query);
 
-      // Transform the data for better readability
-      const transformedLogs = logs.map((log) => {
-        const performedBy = log.performed_by as any;
-        const school = log.school_id as any;
-        const targetUser = log.target_user_id as any;
+      // Transform the data for better readability with custom user population
+      const transformedLogs = await Promise.all(
+        logs.map(async (log) => {
+          const school = log.school_id as any;
+          const targetUser = log.target_user_id as any;
 
-        // Decrypt target_user_email if it exists
-        const decryptedLog = this.emailEncryptionService.decryptEmailFields(
-          log,
-          ['target_user_email'],
-        );
+          // Decrypt target_user_email if it exists
+          const decryptedLog = this.emailEncryptionService.decryptEmailFields(
+            log,
+            ['target_user_email'],
+          );
 
-        return {
-          id: log._id,
-          timestamp: log.created_at,
-          activity_type: log.activity_type,
-          category: log.category,
-          level: log.level,
-          description: log.description,
-          performed_by:
-            performedBy && performedBy.first_name
+          // Get performed_by user details based on role
+          let performedBy: UserDetails | null = null;
+          if (log.performed_by) {
+            performedBy = await this.getUserDetails(
+              log.performed_by.toString(),
+              log.performed_by_role,
+              log.school_id?.toString(),
+            );
+          }
+
+          // Get target_user details based on role
+          let targetUserDetails: UserDetails | null = null;
+          if (targetUser && log.target_user_role) {
+            targetUserDetails = await this.getUserDetails(
+              targetUser.toString(),
+              log.target_user_role,
+              log.school_id?.toString(),
+            );
+          }
+
+          return {
+            id: log._id,
+            timestamp: log.created_at,
+            activity_type: log.activity_type,
+            category: log.category,
+            level: log.level,
+            description: log.description,
+            performed_by: performedBy,
+            school:
+              school && school.name
+                ? {
+                    id: school._id,
+                    name: school.name,
+                  }
+                : null,
+            target_user: targetUserDetails,
+            target_user_email: decryptedLog.target_user_email || null,
+            module: log.module_id
               ? {
-                  id: performedBy._id,
-                  name: `${performedBy.first_name} ${performedBy.last_name}`.trim(),
-                  email: this.emailEncryptionService.decryptEmail(
-                    performedBy.email || '',
-                  ),
-                  role: log.performed_by_role,
-                  profile_pic: performedBy.profile_pic || null,
+                  id: log.module_id,
+                  name: log.module_name,
                 }
               : null,
-          school:
-            school && school.name
+            chapter: log.chapter_id
               ? {
-                  id: school._id,
-                  name: school.name,
+                  id: log.chapter_id,
+                  name: log.chapter_name,
                 }
               : null,
-          target_user:
-            targetUser && targetUser.first_name
-              ? {
-                  id: targetUser._id,
-                  name: `${targetUser.first_name} ${targetUser.last_name}`.trim(),
-                  email: this.emailEncryptionService.decryptEmail(
-                    targetUser.email || '',
-                  ),
-                  role: log.target_user_role,
-                }
-              : null,
-          target_user_email: decryptedLog.target_user_email || null,
-          module: log.module_id
-            ? {
-                id: log.module_id,
-                name: log.module_name,
-              }
-            : null,
-          chapter: log.chapter_id
-            ? {
-                id: log.chapter_id,
-                name: log.chapter_name,
-              }
-            : null,
-          metadata: log.metadata,
-          ip_address: log.ip_address,
-          user_agent: log.user_agent,
-          is_success: log.is_success,
-          error_message: log.error_message,
-          execution_time_ms: log.execution_time_ms,
-          endpoint: log.endpoint,
-          http_method: log.http_method,
-          http_status_code: log.http_status_code,
-          status: log.status,
-        };
-      });
+            metadata: log.metadata,
+            ip_address: log.ip_address,
+            user_agent: log.user_agent,
+            is_success: log.is_success,
+            error_message: log.error_message,
+            execution_time_ms: log.execution_time_ms,
+            endpoint: log.endpoint,
+            http_method: log.http_method,
+            http_status_code: log.http_status_code,
+            status: log.status,
+          };
+        }),
+      );
 
       return createPaginationResult(transformedLogs, total, options);
     } catch (error) {
@@ -407,6 +421,99 @@ export class ActivityLogService {
 
   private isPopulatedSchool(school: any): school is PopulatedSchool {
     return school && typeof school === 'object' && 'name' in school;
+  }
+
+  /**
+   * Helper method to get user details based on role
+   * Students are fetched from tenant database, others from central database
+   */
+  private async getUserDetails(
+    userId: string,
+    userRole: string,
+    schoolId?: string,
+  ): Promise<UserDetails | null> {
+    try {
+      this.logger.debug(
+        `Getting user details for userId: ${userId}, userRole: ${userRole}`,
+      );
+
+      // Normalize role comparison - handle both string and enum values
+      const normalizedRole = userRole?.toString()?.toUpperCase();
+      this.logger.debug(`Normalized role: ${normalizedRole}`);
+
+      if (normalizedRole === RoleEnum.STUDENT && schoolId) {
+        // Students are stored in tenant database - use the tenant connection
+        this.logger.debug(`Fetching student details from tenant database`);
+
+        try {
+          const dbName = await this.tenantService.getTenantDbName(schoolId);
+          const tenantConnection =
+            await this.tenantConnectionService.getTenantConnection(dbName);
+          const StudentModel = tenantConnection.model(
+            Student.name,
+            StudentSchema,
+          );
+
+          const student = await StudentModel.findById(userId)
+            .select('first_name last_name email profile_pic')
+            .lean();
+
+          if (student) {
+            this.logger.debug(
+              `Student found: ${student.first_name} ${student.last_name}`,
+            );
+            return {
+              id: student._id,
+              name: `${student.first_name} ${student.last_name}`.trim(),
+              email: this.emailEncryptionService.decryptEmail(student.email),
+              role: RoleEnum.STUDENT,
+              profile_pic: student.profile_pic || null,
+            };
+          } else {
+            this.logger.warn(`Student not found in tenant database: ${userId}`);
+          }
+        } catch (error) {
+          this.logger.warn(
+            `Error fetching student from tenant database: ${error.message}`,
+          );
+        }
+      } else {
+        // Professors, admins, etc. are stored in central database
+        this.logger.debug(
+          `Fetching user details from central database for role: ${userRole}`,
+        );
+
+        const objectId = new Types.ObjectId(userId);
+        const user = await this.userModel
+          .findById(objectId)
+          .select('first_name last_name email profile_pic')
+          .lean();
+
+        if (user) {
+          this.logger.debug(`User found: ${user.first_name} ${user.last_name}`);
+          return {
+            id: user._id,
+            name: `${user.first_name} ${user.last_name}`.trim(),
+            email: this.emailEncryptionService.decryptEmail(user.email),
+            role: userRole,
+            profile_pic: user.profile_pic || null,
+          };
+        } else {
+          this.logger.warn(`User not found in central database: ${userId}`);
+        }
+      }
+
+      this.logger.warn(
+        `No user details found for userId: ${userId}, userRole: ${userRole}`,
+      );
+      return null;
+    } catch (error) {
+      this.logger.error(
+        `Error fetching user details for userId: ${userId}, userRole: ${userRole}`,
+        error?.stack || error,
+      );
+      return null;
+    }
   }
 
   private async applyAccessControl(
@@ -482,9 +589,7 @@ export class ActivityLogService {
 
       const log = await this.activityLogModel
         .findById(logId)
-        .populate('performed_by', 'first_name last_name email profile_pic')
         .populate('school_id', 'name')
-        .populate('target_user_id', 'first_name last_name email')
         .lean();
 
       if (!log) {
@@ -500,9 +605,27 @@ export class ActivityLogService {
         throw new UnauthorizedException('Access denied to this activity log');
       }
 
-      const performedBy = log.performed_by as any;
       const school = log.school_id as any;
-      const targetUser = log.target_user_id as any;
+
+      // Get performed_by user details based on role
+      let performedBy: UserDetails | null = null;
+      if (log.performed_by) {
+        performedBy = await this.getUserDetails(
+          log.performed_by.toString(),
+          log.performed_by_role,
+          log.school_id?.toString(),
+        );
+      }
+
+      // Get target_user details based on role
+      let targetUserDetails: UserDetails | null = null;
+      if (log.target_user_id && log.target_user_role) {
+        targetUserDetails = await this.getUserDetails(
+          log.target_user_id.toString(),
+          log.target_user_role,
+          log.school_id?.toString(),
+        );
+      }
 
       return {
         id: log._id,
@@ -511,18 +634,7 @@ export class ActivityLogService {
         category: log.category,
         level: log.level,
         description: log.description,
-        performed_by:
-          performedBy && performedBy.first_name
-            ? {
-                id: performedBy._id,
-                name: `${performedBy.first_name} ${performedBy.last_name}`.trim(),
-                email: this.emailEncryptionService.decryptEmail(
-                  performedBy.email || '',
-                ),
-                role: log.performed_by_role,
-                profile_pic: performedBy.profile_pic || null,
-              }
-            : null,
+        performed_by: performedBy,
         school:
           school && school.name
             ? {
@@ -530,17 +642,7 @@ export class ActivityLogService {
                 name: school.name,
               }
             : null,
-        target_user:
-          targetUser && targetUser.first_name
-            ? {
-                id: targetUser._id,
-                name: `${targetUser.first_name} ${targetUser.last_name}`.trim(),
-                email: this.emailEncryptionService.decryptEmail(
-                  targetUser.email || '',
-                ),
-                role: log.target_user_role,
-              }
-            : null,
+        target_user: targetUserDetails,
         module: log.module_id
           ? {
               id: log.module_id,
@@ -690,55 +792,76 @@ export class ActivityLogService {
 
     const logs = await this.activityLogModel
       .find(query)
-      .populate('performed_by', 'first_name last_name email profile_pic')
       .populate('school_id', 'name')
-      .populate('target_user_id', 'first_name last_name email')
       .sort({ created_at: -1 })
       .lean();
 
-    return logs.map((log) => {
-      const performedBy = log.performed_by as any;
-      const school = log.school_id as any;
-      const targetUser = log.target_user_id as any;
+    // Transform logs with custom user population
+    const transformedLogs = await Promise.all(
+      logs.map(async (log) => {
+        const school = log.school_id as any;
 
-      // Decrypt target_user_email if it exists
-      const decryptedLog = this.emailEncryptionService.decryptEmailFields(log, [
-        'target_user_email',
-      ]);
+        // Decrypt target_user_email if it exists
+        const decryptedLog = this.emailEncryptionService.decryptEmailFields(
+          log,
+          ['target_user_email'],
+        );
 
-      return {
-        timestamp: log.created_at,
-        activity_type: log.activity_type,
-        category: log.category,
-        level: log.level,
-        description: log.description,
-        performed_by:
-          performedBy && performedBy.first_name
-            ? `${performedBy.first_name} ${performedBy.last_name}`.trim()
-            : 'N/A',
-        performed_by_email:
-          performedBy && performedBy.email ? performedBy.email : 'N/A',
-        performed_by_role: log.performed_by_role,
-        school: school && school.name ? school.name : 'N/A',
-        target_user:
-          targetUser && targetUser.first_name
-            ? `${targetUser.first_name} ${targetUser.last_name}`.trim()
-            : 'N/A',
-        target_user_email:
-          decryptedLog.target_user_email ||
-          (targetUser && targetUser.email ? targetUser.email : 'N/A'),
-        target_user_role: log.target_user_role || 'N/A',
-        module: log.module_name || 'N/A',
-        chapter: log.chapter_name || 'N/A',
-        is_success: log.is_success ? 'Success' : 'Failed',
-        error_message: log.error_message || 'N/A',
-        execution_time_ms: log.execution_time_ms || 'N/A',
-        ip_address: log.ip_address || 'N/A',
-        endpoint: log.endpoint || 'N/A',
-        http_method: log.http_method || 'N/A',
-        http_status_code: log.http_status_code || 'N/A',
-        status: log.status,
-      };
-    });
+        // Get performed_by user details based on role
+        let performedBy: UserDetails | null = null;
+        let performedByEmail = 'N/A';
+        if (log.performed_by) {
+          performedBy = await this.getUserDetails(
+            log.performed_by.toString(),
+            log.performed_by_role,
+            log.school_id?.toString(),
+          );
+          if (performedBy && performedBy.email) {
+            performedByEmail = performedBy.email;
+          }
+        }
+
+        // Get target_user details based on role
+        let targetUser: UserDetails | null = null;
+        let targetUserEmail = 'N/A';
+        if (log.target_user_id && log.target_user_role) {
+          targetUser = await this.getUserDetails(
+            log.target_user_id.toString(),
+            log.target_user_role,
+            log.school_id?.toString(),
+          );
+          if (targetUser && targetUser.email) {
+            targetUserEmail = targetUser.email;
+          }
+        }
+
+        return {
+          timestamp: log.created_at,
+          activity_type: log.activity_type,
+          category: log.category,
+          level: log.level,
+          description: log.description,
+          performed_by: performedBy ? performedBy.name : 'N/A',
+          performed_by_email: performedByEmail,
+          performed_by_role: log.performed_by_role,
+          school: school && school.name ? school.name : 'N/A',
+          target_user: targetUser ? targetUser.name : 'N/A',
+          target_user_email: decryptedLog.target_user_email || targetUserEmail,
+          target_user_role: log.target_user_role || 'N/A',
+          module: log.module_name || 'N/A',
+          chapter: log.chapter_name || 'N/A',
+          is_success: log.is_success ? 'Success' : 'Failed',
+          error_message: log.error_message || 'N/A',
+          execution_time_ms: log.execution_time_ms || 'N/A',
+          ip_address: log.ip_address || 'N/A',
+          endpoint: log.endpoint || 'N/A',
+          http_method: log.http_method || 'N/A',
+          http_status_code: log.http_status_code || 'N/A',
+          status: log.status,
+        };
+      }),
+    );
+
+    return transformedLogs;
   }
 }
