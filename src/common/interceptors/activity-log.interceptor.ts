@@ -275,11 +275,6 @@ export class ActivityLogInterceptor implements NestInterceptor {
     this.logger.debug(`Full URL: ${url}`);
     this.logger.debug(`Path after split: ${path}`);
 
-    // Authentication activities - be more specific about login detection
-    if (path.includes('/auth') && path.includes('/login')) {
-      this.logger.debug(`Auth login detected: ${path}`);
-      return ActivityTypeEnum.USER_LOGIN;
-    }
     if (path.includes('/auth/logout')) {
       this.logger.debug(`Auth logout detected: ${path}`);
       return ActivityTypeEnum.USER_LOGOUT;
