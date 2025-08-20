@@ -15,13 +15,8 @@ export class TranslationService {
   generateActivityDescription(
     activityType: string,
     context: Record<string, any> = {},
-    isSuccess: boolean = true,
   ): MultiLanguageContent {
-    const descriptions = this.getActivityDescriptions(
-      activityType,
-      context,
-      isSuccess,
-    );
+    const descriptions = this.getActivityDescriptions(activityType, context);
     return {
       en: descriptions.en,
       fr: descriptions.fr,
@@ -34,7 +29,6 @@ export class TranslationService {
   private getActivityDescriptions(
     activityType: string,
     context: Record<string, any> = {},
-    isSuccess: boolean = true,
   ): MultiLanguageContent {
     const {
       userName,
@@ -44,163 +38,162 @@ export class TranslationService {
       targetUserName,
       action,
     } = context;
-    const status = isSuccess ? 'successfully' : 'failed';
 
     switch (activityType) {
       case 'USER_LOGIN':
         return {
-          en: `${userName || 'User'} logged in ${status}`,
-          fr: `${userName || 'Utilisateur'} s'est connecté ${isSuccess ? 'avec succès' : 'sans succès'}`,
+          en: `${userName || 'User'} logged in successfully`,
+          fr: `${userName || 'Utilisateur'} s'est connecté avec succès`,
         };
 
       case 'USER_LOGOUT':
         return {
-          en: `${userName || 'User'} logged out ${status}`,
-          fr: `${userName || 'Utilisateur'} s'est déconnecté ${isSuccess ? 'avec succès' : 'sans succès'}`,
+          en: `${userName || 'User'} logged out`,
+          fr: `${userName || 'Utilisateur'} s'est déconnecté`,
         };
 
       case 'MODULE_ACCESSED':
         return {
-          en: `${userName || 'User'} accessed module: ${moduleName || 'Unknown Module'} ${status}`,
-          fr: `${userName || 'Utilisateur'} a accédé au module: ${moduleName || 'Module Inconnu'} ${isSuccess ? 'avec succès' : 'sans succès'}`,
+          en: `${userName || 'User'} accessed module: ${moduleName || 'Unknown Module'}`,
+          fr: `${userName || 'Utilisateur'} a accédé au module: ${moduleName || 'Module Inconnu'}`,
         };
 
       case 'CHAPTER_ACCESSED':
         return {
-          en: `${userName || 'User'} accessed chapter: ${chapterName || 'Unknown Chapter'} in module: ${moduleName || 'Unknown Module'} ${status}`,
-          fr: `${userName || 'Utilisateur'} a accédé au chapitre: ${chapterName || 'Chapitre Inconnu'} dans le module: ${moduleName || 'Module Inconnu'} ${isSuccess ? 'avec succès' : 'sans succès'}`,
+          en: `${userName || 'User'} accessed chapter: ${chapterName || 'Unknown Chapter'} in module: ${moduleName || 'Unknown Module'}`,
+          fr: `${userName || 'Utilisateur'} a accédé au chapitre: ${chapterName || 'Chapitre Inconnu'} dans le module: ${moduleName || 'Module Inconnu'}`,
         };
 
       case 'MODULE_CREATED':
         return {
-          en: `${userName || 'User'} created module: ${moduleName || 'Unknown Module'} ${status}`,
-          fr: `${userName || 'Utilisateur'} a créé le module: ${moduleName || 'Module Inconnu'} ${isSuccess ? 'avec succès' : 'sans succès'}`,
+          en: `${userName || 'User'} created module: ${moduleName || 'Unknown Module'}`,
+          fr: `${userName || 'Utilisateur'} a créé le module: ${moduleName || 'Module Inconnu'}`,
         };
 
       case 'MODULE_UPDATED':
         return {
-          en: `${userName || 'User'} updated module: ${moduleName || 'Unknown Module'} ${status}`,
-          fr: `${userName || 'Utilisateur'} a mis à jour le module: ${moduleName || 'Module Inconnu'} ${isSuccess ? 'avec succès' : 'sans succès'}`,
+          en: `${userName || 'User'} updated module: ${moduleName || 'Unknown Module'}`,
+          fr: `${userName || 'Utilisateur'} a mis à jour le module: ${moduleName || 'Module Inconnu'}`,
         };
 
       case 'MODULE_DELETED':
         return {
-          en: `${userName || 'User'} deleted module: ${moduleName || 'Unknown Module'} ${status}`,
-          fr: `${userName || 'Utilisateur'} a supprimé le module: ${moduleName || 'Module Inconnu'} ${isSuccess ? 'avec succès' : 'sans succès'}`,
+          en: `${userName || 'User'} deleted module: ${moduleName || 'Unknown Module'}`,
+          fr: `${userName || 'Utilisateur'} a supprimé le module: ${moduleName || 'Module Inconnu'}`,
         };
 
       case 'CHAPTER_CREATED':
         return {
-          en: `${userName || 'User'} created chapter: ${chapterName || 'Unknown Chapter'} in module: ${moduleName || 'Unknown Module'} ${status}`,
-          fr: `${userName || 'Utilisateur'} a créé le chapitre: ${chapterName || 'Chapitre Inconnu'} dans le module: ${moduleName || 'Module Inconnu'} ${isSuccess ? 'avec succès' : 'sans succès'}`,
+          en: `${userName || 'User'} created chapter: ${chapterName || 'Unknown Chapter'} in module: ${moduleName || 'Unknown Module'}`,
+          fr: `${userName || 'Utilisateur'} a créé le chapitre: ${chapterName || 'Chapitre Inconnu'} dans le module: ${moduleName || 'Module Inconnu'}`,
         };
 
       case 'CHAPTER_UPDATED':
         return {
-          en: `${userName || 'User'} updated chapter: ${chapterName || 'Unknown Chapter'} in module: ${moduleName || 'Module Inconnu'} ${status}`,
-          fr: `${userName || 'Utilisateur'} a mis à jour le chapitre: ${chapterName || 'Chapitre Inconnu'} dans le module: ${moduleName || 'Module Inconnu'} ${isSuccess ? 'avec succès' : 'sans succès'}`,
+          en: `${userName || 'User'} updated chapter: ${chapterName || 'Unknown Chapter'} in module: ${moduleName || 'Unknown Module'}`,
+          fr: `${userName || 'Utilisateur'} a mis à jour le chapitre: ${chapterName || 'Chapitre Inconnu'} dans le module: ${moduleName || 'Module Inconnu'}`,
         };
 
       case 'CHAPTER_DELETED':
         return {
-          en: `${userName || 'User'} deleted chapter: ${chapterName || 'Unknown Chapter'} from module: ${moduleName || 'Unknown Module'} ${status}`,
-          fr: `${userName || 'Utilisateur'} a supprimé le chapitre: ${chapterName || 'Chapitre Inconnu'} du module: ${moduleName || 'Module Inconnu'} ${isSuccess ? 'avec succès' : 'sans succès'}`,
+          en: `${userName || 'User'} deleted chapter: ${chapterName || 'Unknown Chapter'} from module: ${moduleName || 'Unknown Module'}`,
+          fr: `${userName || 'Utilisateur'} a supprimé le chapitre: ${chapterName || 'Chapitre Inconnu'} du module: ${moduleName || 'Module Inconnu'}`,
         };
 
       case 'QUIZ_COMPLETED':
         return {
-          en: `${userName || 'User'} completed quiz in chapter: ${chapterName || 'Unknown Chapter'} ${status}`,
-          fr: `${userName || 'Utilisateur'} a terminé le quiz dans le chapitre: ${chapterName || 'Chapitre Inconnu'} ${isSuccess ? 'avec succès' : 'sans succès'}`,
+          en: `${userName || 'User'} completed quiz in chapter: ${chapterName || 'Unknown Chapter'}`,
+          fr: `${userName || 'Utilisateur'} a terminé le quiz dans le chapitre: ${chapterName || 'Chapitre Inconnu'}`,
         };
 
       case 'USER_CREATED':
         return {
-          en: `${userName || 'User'} account was created ${status}`,
-          fr: `Le compte de ${userName || 'Utilisateur'} a été créé ${isSuccess ? 'avec succès' : 'sans succès'}`,
+          en: `${userName || 'User'} account was created`,
+          fr: `Le compte de ${userName || 'Utilisateur'} a été créé`,
         };
 
       case 'USER_UPDATED':
         return {
-          en: `${userName || 'User'} profile was updated ${status}`,
-          fr: `Le profil de ${userName || 'Utilisateur'} a été mis à jour ${isSuccess ? 'avec succès' : 'sans succès'}`,
+          en: `${userName || 'User'} profile was updated`,
+          fr: `Le profil de ${userName || 'Utilisateur'} a été mis à jour`,
         };
 
       case 'USER_DELETED':
         return {
-          en: `${userName || 'User'} account was deleted ${status}`,
-          fr: `Le compte de ${userName || 'Utilisateur'} a été supprimé ${isSuccess ? 'avec succès' : 'sans succès'}`,
+          en: `${userName || 'User'} account was deleted`,
+          fr: `Le compte de ${userName || 'Utilisateur'} a été supprimé`,
         };
 
       case 'SCHOOL_CREATED':
         return {
-          en: `School "${schoolName || 'Unknown School'}" was created ${status}`,
-          fr: `L'école "${schoolName || 'École Inconnue'}" a été créée ${isSuccess ? 'avec succès' : 'sans succès'}`,
+          en: `School "${schoolName || 'Unknown School'}" was created`,
+          fr: `L'école "${schoolName || 'École Inconnue'}" a été créée`,
         };
 
       case 'SCHOOL_UPDATED':
         return {
-          en: `School "${schoolName || 'Unknown School'}" was updated ${status}`,
-          fr: `L'école "${schoolName || 'École Inconnue'}" a été mise à jour ${isSuccess ? 'avec succès' : 'sans succès'}`,
+          en: `School "${schoolName || 'Unknown School'}" was updated`,
+          fr: `L'école "${schoolName || 'École Inconnue'}" a été mise à jour`,
         };
 
       case 'SCHOOL_DELETED':
         return {
-          en: `School "${schoolName || 'Unknown School'}" was deleted ${status}`,
-          fr: `L'école "${schoolName || 'École Inconnue'}" a été supprimée ${isSuccess ? 'avec succès' : 'sans succès'}`,
+          en: `School "${schoolName || 'Unknown School'}" was deleted`,
+          fr: `L'école "${schoolName || 'École Inconnue'}" a été supprimée`,
         };
 
       case 'PROFESSOR_ASSIGNED':
         return {
-          en: `${targetUserName || 'Professor'} was assigned to module: ${moduleName || 'Unknown Module'} ${status}`,
-          fr: `${targetUserName || 'Professeur'} a été assigné au module: ${moduleName || 'Module Inconnu'} ${isSuccess ? 'avec succès' : 'sans succès'}`,
+          en: `${targetUserName || 'Professor'} was assigned to module: ${moduleName || 'Unknown Module'}`,
+          fr: `${targetUserName || 'Professeur'} a été assigné au module: ${moduleName || 'Module Inconnu'}`,
         };
 
       case 'PROFESSOR_UNASSIGNED':
         return {
-          en: `${targetUserName || 'Professor'} was unassigned from module: ${moduleName || 'Unknown Module'} ${status}`,
-          fr: `${targetUserName || 'Professeur'} a été désassigné du module: ${moduleName || 'Module Inconnu'} ${isSuccess ? 'avec succès' : 'sans succès'}`,
+          en: `${targetUserName || 'Professor'} was unassigned from module: ${moduleName || 'Unknown Module'}`,
+          fr: `${targetUserName || 'Professeur'} a été désassigné du module: ${moduleName || 'Module Inconnu'}`,
         };
 
       case 'STUDENT_ENROLLED':
         return {
-          en: `${targetUserName || 'Student'} was enrolled in school: ${schoolName || 'Unknown School'} ${status}`,
-          fr: `${targetUserName || 'Étudiant'} a été inscrit à l'école: ${schoolName || 'École Inconnue'} ${isSuccess ? 'avec succès' : 'sans succès'}`,
+          en: `${targetUserName || 'Student'} was enrolled in school: ${schoolName || 'Unknown School'}`,
+          fr: `${targetUserName || 'Étudiant'} a été inscrit à l'école: ${schoolName || 'École Inconnue'}`,
         };
 
       case 'STUDENT_UNENROLLED':
         return {
-          en: `${targetUserName || 'Student'} was unenrolled from school: ${schoolName || 'Unknown School'} ${status}`,
-          fr: `${targetUserName || 'Étudiant'} a été désinscrit de l'école: ${schoolName || 'École Inconnue'} ${isSuccess ? 'avec succès' : 'sans succès'}`,
+          en: `${targetUserName || 'Student'} was unenrolled from school: ${schoolName || 'Unknown School'}`,
+          fr: `${targetUserName || 'Étudiant'} a été désinscrit de l'école: ${schoolName || 'École Inconnue'}`,
         };
 
       case 'FILE_UPLOADED':
         return {
-          en: `${userName || 'User'} uploaded a file to ${moduleName || 'module'} ${status}`,
-          fr: `${userName || 'Utilisateur'} a téléchargé un fichier vers ${moduleName || 'le module'} ${isSuccess ? 'avec succès' : 'sans succès'}`,
+          en: `${userName || 'User'} uploaded a file to ${moduleName || 'module'}`,
+          fr: `${userName || 'Utilisateur'} a téléchargé un fichier vers ${moduleName || 'le module'}`,
         };
 
       case 'FILE_DELETED':
         return {
-          en: `${userName || 'User'} deleted a file from ${moduleName || 'module'} ${status}`,
-          fr: `${userName || 'Utilisateur'} a supprimé un fichier du ${moduleName || 'module'} ${isSuccess ? 'avec succès' : 'sans succès'}`,
+          en: `${userName || 'User'} deleted a file from ${moduleName || 'module'}`,
+          fr: `${userName || 'Utilisateur'} a supprimé un fichier du ${moduleName || 'module'}`,
         };
 
       case 'SETTINGS_UPDATED':
         return {
-          en: `${userName || 'User'} updated settings ${status}`,
-          fr: `${userName || 'Utilisateur'} a mis à jour les paramètres ${isSuccess ? 'avec succès' : 'sans succès'}`,
+          en: `${userName || 'User'} updated settings`,
+          fr: `${userName || 'Utilisateur'} a mis à jour les paramètres`,
         };
 
       case 'PASSWORD_CHANGED':
         return {
-          en: `${userName || 'User'} changed password ${status}`,
-          fr: `${userName || 'Utilisateur'} a changé le mot de passe ${isSuccess ? 'avec succès' : 'sans succès'}`,
+          en: `${userName || 'User'} changed password`,
+          fr: `${userName || 'Utilisateur'} a changé le mot de passe`,
         };
 
       case 'EMAIL_VERIFIED':
         return {
-          en: `${userName || 'User'} verified email address ${status}`,
-          fr: `${userName || 'Utilisateur'} a vérifié l'adresse e-mail ${isSuccess ? 'avec succès' : 'sans succès'}`,
+          en: `${userName || 'User'} verified email address`,
+          fr: `${userName || 'Utilisateur'} a vérifié l'adresse e-mail`,
         };
 
       case 'LOGIN_FAILED':
@@ -223,8 +216,8 @@ export class TranslationService {
 
       default:
         return {
-          en: `${userName || 'User'} performed action: ${activityType} ${status}`,
-          fr: `${userName || 'Utilisateur'} a effectué l'action: ${activityType} ${isSuccess ? 'avec succès' : 'sans succès'}`,
+          en: `${userName || 'User'} performed action: ${activityType}`,
+          fr: `${userName || 'Utilisateur'} a effectué l'action: ${activityType}`,
         };
     }
   }
