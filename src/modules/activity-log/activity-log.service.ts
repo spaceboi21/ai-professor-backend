@@ -9,6 +9,7 @@ import { Model, Types } from 'mongoose';
 import {
   ActivityLog,
   ActivityLogSchema,
+  MultiLanguageDescription,
 } from 'src/database/schemas/central/activity-log.schema';
 import { User } from 'src/database/schemas/central/user.schema';
 import { School } from 'src/database/schemas/central/school.schema';
@@ -36,7 +37,7 @@ import { TenantService } from 'src/modules/central/tenant.service';
 
 export interface CreateActivityLogDto {
   activity_type: ActivityTypeEnum;
-  description: string;
+  description: MultiLanguageDescription;
   performed_by: Types.ObjectId;
   performed_by_role: RoleEnum;
   school_id?: Types.ObjectId;
@@ -342,7 +343,9 @@ export class ActivityLogService {
           ).search;
 
         query.$or = [
-          { description: { $regex: filterDto.search, $options: 'i' } },
+          { 'description.en': { $regex: filterDto.search, $options: 'i' } },
+          { 'description.fr': { $regex: filterDto.search, $options: 'i' } },
+          { description: { $regex: filterDto.search, $options: 'i' } }, // For backward compatibility with old string descriptions
           { school_name: { $regex: filterDto.search, $options: 'i' } },
           { target_user_email: { $regex: encryptedSearchTerm, $options: 'i' } },
           { module_name: { $regex: filterDto.search, $options: 'i' } },
@@ -393,13 +396,36 @@ export class ActivityLogService {
             );
           }
 
+          // Handle both old string descriptions and new multilingual descriptions
+          let description_en: string;
+          let description_fr: string;
+
+          if (typeof log.description === 'string') {
+            // Old format - description is still a string (before migration)
+            description_en = log.description;
+            description_fr = log.description; // Fallback to English
+            this.logger.warn(
+              `Activity log ${log._id} still has string description, migration may be needed`,
+            );
+          } else if (log.description && typeof log.description === 'object') {
+            // New format - description is an object with en/fr properties
+            description_en = log.description.en || 'Unknown activity';
+            description_fr =
+              log.description.fr || log.description.en || 'Activité inconnue';
+          } else {
+            // Fallback if description is null or undefined
+            description_en = 'Unknown activity';
+            description_fr = 'Activité inconnue';
+          }
+
           return {
             id: log._id,
             timestamp: log.created_at,
             activity_type: log.activity_type,
             category: log.category,
             level: log.level,
-            description: log.description,
+            description_en,
+            description_fr,
             performed_by: performedBy,
             school:
               school && school.name
@@ -662,13 +688,36 @@ export class ActivityLogService {
         );
       }
 
+      // Handle both old string descriptions and new multilingual descriptions
+      let description_en: string;
+      let description_fr: string;
+
+      if (typeof log.description === 'string') {
+        // Old format - description is still a string (before migration)
+        description_en = log.description;
+        description_fr = log.description; // Fallback to English
+        this.logger.warn(
+          `Activity log ${logId} still has string description, migration may be needed`,
+        );
+      } else if (log.description && typeof log.description === 'object') {
+        // New format - description is an object with en/fr properties
+        description_en = log.description.en || 'Unknown activity';
+        description_fr =
+          log.description.fr || log.description.en || 'Activité inconnue';
+      } else {
+        // Fallback if description is null or undefined
+        description_en = 'Unknown activity';
+        description_fr = 'Activité inconnue';
+      }
+
       return {
         id: log._id,
         timestamp: log.created_at,
         activity_type: log.activity_type,
         category: log.category,
         level: log.level,
-        description: log.description,
+        description_en,
+        description_fr,
         performed_by: performedBy,
         school:
           school && school.name
@@ -817,7 +866,9 @@ export class ActivityLogService {
         ).search;
 
       query.$or = [
-        { description: { $regex: filterDto.search, $options: 'i' } },
+        { 'description.en': { $regex: filterDto.search, $options: 'i' } },
+        { 'description.fr': { $regex: filterDto.search, $options: 'i' } },
+        { description: { $regex: filterDto.search, $options: 'i' } }, // For backward compatibility with old string descriptions
         { school_name: { $regex: filterDto.search, $options: 'i' } },
         { target_user_email: { $regex: encryptedSearchTerm, $options: 'i' } },
         { module_name: { $regex: filterDto.search, $options: 'i' } },
@@ -870,12 +921,32 @@ export class ActivityLogService {
           }
         }
 
+        // Handle both old string descriptions and new multilingual descriptions
+        let description_en: string;
+        let description_fr: string;
+
+        if (typeof log.description === 'string') {
+          // Old format - description is still a string (before migration)
+          description_en = log.description;
+          description_fr = log.description; // Fallback to English
+        } else if (log.description && typeof log.description === 'object') {
+          // New format - description is an object with en/fr properties
+          description_en = log.description.en || 'Unknown activity';
+          description_fr =
+            log.description.fr || log.description.en || 'Activité inconnue';
+        } else {
+          // Fallback if description is null or undefined
+          description_en = 'Unknown activity';
+          description_fr = 'Activité inconnue';
+        }
+
         return {
           timestamp: log.created_at,
           activity_type: log.activity_type,
           category: log.category,
           level: log.level,
-          description: log.description,
+          description_en,
+          description_fr,
           performed_by: performedBy ? performedBy.name : 'N/A',
           performed_by_email: performedByEmail,
           performed_by_role: log.performed_by_role,

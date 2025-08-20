@@ -16,6 +16,11 @@ import { ActivityTypeEnum } from 'src/common/constants/activity.constant';
 import { RoleEnum } from 'src/common/constants/roles.constant';
 import { JWTUserPayload } from 'src/common/types/jwr-user.type';
 import { Types } from 'mongoose';
+import {
+  getActivityDescription,
+  ActivityDescriptionTranslations,
+} from 'src/common/constants/activity-descriptions.constant';
+import { MultiLanguageDescription } from 'src/database/schemas/central/activity-log.schema';
 
 @Injectable()
 export class ActivityLogInterceptor implements NestInterceptor {
@@ -269,7 +274,7 @@ export class ActivityLogInterceptor implements NestInterceptor {
     this.logger.debug(`Path after split: ${path}`);
 
     // Authentication activities
-    if (path.includes('/auth/login')) {
+    if (path.includes('/login')) {
       this.logger.debug(`Auth login detected: ${path}`);
       return ActivityTypeEnum.USER_LOGIN;
     }
@@ -410,81 +415,13 @@ export class ActivityLogInterceptor implements NestInterceptor {
     request: Request,
     activityType: ActivityTypeEnum,
     isSuccess: boolean,
-  ): string {
-    const { method, url } = request;
-    const path = url.split('?')[0];
-    const status = isSuccess ? 'successfully' : 'failed';
+  ): MultiLanguageDescription {
+    const descriptions = getActivityDescription(activityType, isSuccess);
 
-    switch (activityType) {
-      case ActivityTypeEnum.USER_LOGIN:
-        return `User login ${status}`;
-      case ActivityTypeEnum.USER_LOGOUT:
-        return `User logout ${status}`;
-      case ActivityTypeEnum.USER_CREATED:
-        return `User creation ${status}`;
-      case ActivityTypeEnum.USER_UPDATED:
-        return `User update ${status}`;
-      case ActivityTypeEnum.USER_DELETED:
-        return `User deletion ${status}`;
-      case ActivityTypeEnum.SCHOOL_CREATED:
-        return `School creation ${status}`;
-      case ActivityTypeEnum.SCHOOL_UPDATED:
-        return `School update ${status}`;
-      case ActivityTypeEnum.SCHOOL_DELETED:
-        return `School deletion ${status}`;
-      case ActivityTypeEnum.MODULE_CREATED:
-        return `Module creation ${status}`;
-      case ActivityTypeEnum.MODULE_UPDATED:
-        return `Module update ${status}`;
-      case ActivityTypeEnum.MODULE_DELETED:
-        return `Module deletion ${status}`;
-      case ActivityTypeEnum.MODULE_ASSIGNED:
-        return `Module assignment ${status}`;
-      case ActivityTypeEnum.MODULE_STARTED:
-        return `Module started ${status}`;
-      case ActivityTypeEnum.MODULE_COMPLETED:
-        return `Module completed ${status}`;
-      case ActivityTypeEnum.CHAPTER_CREATED:
-        return `Chapter creation ${status}`;
-      case ActivityTypeEnum.CHAPTER_UPDATED:
-        return `Chapter update ${status}`;
-      case ActivityTypeEnum.CHAPTER_DELETED:
-        return `Chapter deletion ${status}`;
-      case ActivityTypeEnum.CHAPTER_REORDERED:
-        return `Chapter reordering ${status}`;
-      case ActivityTypeEnum.CHAPTER_STARTED:
-        return `Chapter started ${status}`;
-      case ActivityTypeEnum.CHAPTER_COMPLETED:
-        return `Chapter completed ${status}`;
-      case ActivityTypeEnum.QUIZ_CREATED:
-        return `Quiz creation ${status}`;
-      case ActivityTypeEnum.QUIZ_UPDATED:
-        return `Quiz update ${status}`;
-      case ActivityTypeEnum.QUIZ_DELETED:
-        return `Quiz deletion ${status}`;
-      case ActivityTypeEnum.QUIZ_ATTEMPTED:
-        return `Quiz attempt ${status}`;
-      case ActivityTypeEnum.QUIZ_STARTED:
-        return `Quiz started ${status}`;
-      case ActivityTypeEnum.QUIZ_SUBMITTED:
-        return `Quiz submitted ${status}`;
-      case ActivityTypeEnum.PROGRESS_UPDATED:
-        return `Progress update ${status}`;
-      case ActivityTypeEnum.PROGRESS_COMPLETED:
-        return `Progress completed ${status}`;
-      case ActivityTypeEnum.AI_CHAT_STARTED:
-        return `AI chat session started ${status}`;
-      case ActivityTypeEnum.AI_CHAT_MESSAGE_SENT:
-        return `AI chat message sent ${status}`;
-      case ActivityTypeEnum.AI_FEEDBACK_GIVEN:
-        return `AI feedback provided ${status}`;
-      case ActivityTypeEnum.FILE_UPLOADED:
-        return `File upload ${status}`;
-      case ActivityTypeEnum.FILE_DELETED:
-        return `File deletion ${status}`;
-      default:
-        return `${method} ${path} ${status}`;
-    }
+    return {
+      en: descriptions.en,
+      fr: descriptions.fr,
+    };
   }
 
   private extractMetadata(
