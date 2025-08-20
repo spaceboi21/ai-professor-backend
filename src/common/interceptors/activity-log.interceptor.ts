@@ -334,11 +334,7 @@ export class ActivityLogInterceptor implements NestInterceptor {
     }
 
     // User management activities
-    if (
-      path.includes('/users') ||
-      path.includes('/students') ||
-      path.includes('/professors')
-    ) {
+    if (path.includes('/students') || path.includes('/professors')) {
       if (method === 'POST') return ActivityTypeEnum.USER_CREATED;
       if (method === 'PATCH' || method === 'PUT')
         return ActivityTypeEnum.USER_UPDATED;
@@ -402,20 +398,8 @@ export class ActivityLogInterceptor implements NestInterceptor {
       `No specific activity type matched, using default for ${method} ${path}`,
     );
 
-    // Default activity type based on HTTP method (removed USER_LOGIN defaults)
-    switch (method) {
-      case 'GET':
-        return ActivityTypeEnum.SYSTEM_MAINTENANCE; // Default for GET requests (system access)
-      case 'POST':
-        return ActivityTypeEnum.USER_CREATED; // Default for POST requests
-      case 'PATCH':
-      case 'PUT':
-        return ActivityTypeEnum.USER_UPDATED; // Default for PUT/PATCH requests
-      case 'DELETE':
-        return ActivityTypeEnum.USER_DELETED; // Default for DELETE requests
-      default:
-        return ActivityTypeEnum.SYSTEM_MAINTENANCE; // Default fallback
-    }
+    // Return SYSTEM_MAINTENANCE for unmatched requests (will be skipped from logging)
+    return ActivityTypeEnum.SYSTEM_MAINTENANCE;
   }
 
   private generateDescription(
