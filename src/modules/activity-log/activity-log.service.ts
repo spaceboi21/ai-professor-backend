@@ -149,15 +149,7 @@ export class ActivityLogService {
       this.logger.debug(
         `Creating activity log: ${createActivityLogDto.activity_type}`,
       );
-      this.logger.debug(`Activity log DTO:`, {
-        activity_type: createActivityLogDto.activity_type,
-        description: createActivityLogDto.description,
-        performed_by: createActivityLogDto.performed_by,
-        performed_by_role: createActivityLogDto.performed_by_role,
-        module_id: createActivityLogDto.module_id,
-        chapter_id: createActivityLogDto.chapter_id,
-        quiz_group_id: createActivityLogDto.quiz_group_id,
-      });
+      this.logger.debug(`Activity log DTO:`, createActivityLogDto);
 
       // Check for duplicate activity before creating
       if (createActivityLogDto.endpoint && createActivityLogDto.performed_by) {
