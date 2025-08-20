@@ -261,6 +261,10 @@ export class ActivityLogInterceptor implements NestInterceptor {
       '/api/activity-logs', // Skip logging activity log requests to prevent infinite loops
       '/api/auth/me', // Skip logging for /me endpoint (get current user info)
       '/api/notifications/unread-count', // Skip frequent notification checks
+      '/api/auth/super-admin/login', // Skip super admin login (manual logging)
+      '/api/auth/school-admin/login', // Skip school admin login (manual logging)
+      '/api/auth/student/login', // Skip student login (manual logging)
+      '/api/auth/logout', // Skip logout (will be handled manually if needed)
     ];
 
     return skipPaths.some((path) => request.url.startsWith(path));
@@ -392,10 +396,10 @@ export class ActivityLogInterceptor implements NestInterceptor {
       `No specific activity type matched, using default for ${method} ${path}`,
     );
 
-    // Default activity type based on HTTP method
+    // Default activity type based on HTTP method (removed USER_LOGIN defaults)
     switch (method) {
       case 'GET':
-        return ActivityTypeEnum.USER_LOGIN; // Default for GET requests
+        return ActivityTypeEnum.SYSTEM_MAINTENANCE; // Default for GET requests (system access)
       case 'POST':
         return ActivityTypeEnum.USER_CREATED; // Default for POST requests
       case 'PATCH':
@@ -404,7 +408,7 @@ export class ActivityLogInterceptor implements NestInterceptor {
       case 'DELETE':
         return ActivityTypeEnum.USER_DELETED; // Default for DELETE requests
       default:
-        return ActivityTypeEnum.USER_LOGIN;
+        return ActivityTypeEnum.SYSTEM_MAINTENANCE; // Default fallback
     }
   }
 
