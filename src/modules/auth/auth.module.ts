@@ -15,6 +15,7 @@ import {
 } from 'src/database/schemas/central/global-student.schema';
 import { TenantConnectionService } from 'src/database/tenant-connection.service';
 import { MailModule } from 'src/mail/mail.module';
+import { ActivityLogModule } from '../activity-log/activity-log.module';
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import { MailModule } from 'src/mail/mail.module';
     ]),
     UtilsModule,
     MailModule,
+    ActivityLogModule,
   ],
   controllers: [AuthController],
   providers: [AuthService, TenantConnectionService],

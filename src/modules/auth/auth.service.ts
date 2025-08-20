@@ -34,6 +34,9 @@ import { JWTUserPayload } from 'src/common/types/jwr-user.type';
 import { DEFAULT_LANGUAGE } from 'src/common/constants/language.constant';
 import { ErrorMessageService } from 'src/common/services/error-message.service';
 import { EmailEncryptionService } from 'src/common/services/email-encryption.service';
+import { ActivityLogService } from '../activity-log/activity-log.service';
+import { ActivityTypeEnum } from 'src/common/constants/activity.constant';
+import { getActivityDescription } from 'src/common/constants/activity-descriptions.constant';
 
 @Injectable()
 export class AuthService {
@@ -48,14 +51,15 @@ export class AuthService {
     private readonly schoolModel: Model<School>,
     @InjectModel(GlobalStudent.name)
     private readonly globalStudentModel: Model<GlobalStudent>,
+    private readonly tenantConnectionService: TenantConnectionService,
     private readonly bcryptUtil: BcryptUtil,
     private readonly jwtUtil: JwtUtil,
     private readonly tokenUtil: TokenUtil,
-    private readonly tenantConnectionService: TenantConnectionService,
     private readonly mailService: MailService,
     private readonly configService: ConfigService,
     private readonly errorMessageService: ErrorMessageService,
     private readonly emailEncryptionService: EmailEncryptionService,
+    private readonly activityLogService: ActivityLogService,
   ) {}
 
   async superAdminLogin(loginData: LoginSuperAdminDto, req: Request) {
@@ -293,6 +297,40 @@ export class AuthService {
     });
 
     this.logger.log(`SchoolAdmin login successful: ${email}`);
+
+    // Log successful login activity
+    try {
+      const description = getActivityDescription(
+        ActivityTypeEnum.USER_LOGIN,
+        true,
+      );
+      await this.activityLogService.createActivityLog({
+        activity_type: ActivityTypeEnum.USER_LOGIN,
+        description: {
+          en: description.en,
+          fr: description.fr,
+        },
+        performed_by: user._id,
+        performed_by_role: user.role.name as RoleEnum,
+        school_id: school._id,
+        school_name: school.name,
+        ip_address: req.ip || 'unknown',
+        user_agent: req.headers['user-agent'] || 'unknown',
+        is_success: true,
+        endpoint: req.url || '/api/auth/school-admin/login',
+        http_method: req.method || 'POST',
+        http_status_code: 200,
+        status: 'SUCCESS',
+        metadata: {
+          login_type: 'school_admin',
+          user_role: user.role.name,
+        },
+      });
+    } catch (error) {
+      this.logger.error('Failed to log school admin login activity:', error);
+      // Don't throw error to not break login flow
+    }
+
     return {
       message: this.errorMessageService.getSuccessMessageWithLanguage(
         'AUTH',
@@ -447,6 +485,40 @@ export class AuthService {
     const finalPreferredLanguage = updatedPreferredLanguage || DEFAULT_LANGUAGE;
 
     this.logger.log(`Student login successful: ${email}`);
+
+    // Log successful student login activity
+    try {
+      const description = getActivityDescription(
+        ActivityTypeEnum.USER_LOGIN,
+        true,
+      );
+      await this.activityLogService.createActivityLog({
+        activity_type: ActivityTypeEnum.USER_LOGIN,
+        description: {
+          en: description.en,
+          fr: description.fr,
+        },
+        performed_by: student._id,
+        performed_by_role: RoleEnum.STUDENT,
+        school_id: school._id,
+        school_name: school.name,
+        ip_address: req.ip || 'unknown',
+        user_agent: req.headers['user-agent'] || 'unknown',
+        is_success: true,
+        endpoint: req.url || '/api/auth/student/login',
+        http_method: req.method || 'POST',
+        http_status_code: 200,
+        status: 'SUCCESS',
+        metadata: {
+          login_type: 'student',
+          student_code: student.student_code,
+        },
+      });
+    } catch (error) {
+      this.logger.error('Failed to log student login activity:', error);
+      // Don't throw error to not break login flow
+    }
+
     return {
       message: this.errorMessageService.getSuccessMessageWithLanguage(
         'AUTH',

@@ -259,6 +259,8 @@ export class ActivityLogInterceptor implements NestInterceptor {
       '/static',
       '/favicon.ico',
       '/api/activity-logs', // Skip logging activity log requests to prevent infinite loops
+      '/api/auth/me', // Skip logging for /me endpoint (get current user info)
+      '/api/notifications/unread-count', // Skip frequent notification checks
     ];
 
     return skipPaths.some((path) => request.url.startsWith(path));
@@ -273,8 +275,8 @@ export class ActivityLogInterceptor implements NestInterceptor {
     this.logger.debug(`Full URL: ${url}`);
     this.logger.debug(`Path after split: ${path}`);
 
-    // Authentication activities
-    if (path.includes('/login')) {
+    // Authentication activities - be more specific about login detection
+    if (path.includes('/auth') && path.includes('/login')) {
       this.logger.debug(`Auth login detected: ${path}`);
       return ActivityTypeEnum.USER_LOGIN;
     }
