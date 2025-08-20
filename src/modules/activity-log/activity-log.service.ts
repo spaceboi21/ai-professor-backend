@@ -33,10 +33,14 @@ import { PaginationDto } from 'src/common/dto/pagination.dto';
 import { EmailEncryptionService } from 'src/common/services/email-encryption.service';
 import { TenantConnectionService } from 'src/database/tenant-connection.service';
 import { TenantService } from 'src/modules/central/tenant.service';
+import {
+  TranslationService,
+  MultiLanguageContent,
+} from 'src/common/services/translation.service';
 
 export interface CreateActivityLogDto {
   activity_type: ActivityTypeEnum;
-  description: string;
+  description: string | { en: string; fr: string };
   performed_by: Types.ObjectId;
   performed_by_role: RoleEnum;
   school_id?: Types.ObjectId;
@@ -113,6 +117,7 @@ export class ActivityLogService {
     private readonly emailEncryptionService: EmailEncryptionService,
     private readonly tenantConnectionService: TenantConnectionService,
     private readonly tenantService: TenantService,
+    private readonly translationService: TranslationService,
   ) {}
 
   private safeObjectIdConversion(
@@ -193,11 +198,28 @@ export class ActivityLogService {
         }
       }
 
-      const { activity_type, target_user_email, ...rest } =
-        createActivityLogDto;
+      const {
+        activity_type,
+        target_user_email,
+        description: originalDescription,
+        ...rest
+      } = createActivityLogDto;
 
       const category = ACTIVITY_CATEGORY_MAPPING[activity_type];
       const level = ACTIVITY_LEVEL_MAPPING[activity_type];
+
+      // Handle description field - support both string and language object
+      let description: string | { en: string; fr: string };
+      if (typeof originalDescription === 'string') {
+        // If description is a string, convert to language object with English as default
+        description = {
+          en: originalDescription,
+          fr: originalDescription, // Use same text for French initially
+        };
+      } else {
+        // If description is already a language object, use it as is
+        description = originalDescription;
+      }
 
       // Encrypt target_user_email if provided
       const encryptedTargetUserEmail = target_user_email
@@ -211,6 +233,7 @@ export class ActivityLogService {
         activity_type,
         category,
         level,
+        description,
         target_user_email: encryptedTargetUserEmail,
         ...rest,
       });
@@ -342,7 +365,11 @@ export class ActivityLogService {
           ).search;
 
         query.$or = [
+          // Search in string descriptions
           { description: { $regex: filterDto.search, $options: 'i' } },
+          // Search in language object descriptions
+          { 'description.en': { $regex: filterDto.search, $options: 'i' } },
+          { 'description.fr': { $regex: filterDto.search, $options: 'i' } },
           { school_name: { $regex: filterDto.search, $options: 'i' } },
           { target_user_email: { $regex: encryptedSearchTerm, $options: 'i' } },
           { module_name: { $regex: filterDto.search, $options: 'i' } },
@@ -393,13 +420,27 @@ export class ActivityLogService {
             );
           }
 
+          // Helper function to safely extract description text
+          const getDescriptionText = (desc: any, lang: 'en' | 'fr'): string => {
+            if (
+              desc &&
+              typeof desc === 'object' &&
+              'en' in desc &&
+              'fr' in desc
+            ) {
+              return desc[lang] || desc.en || 'No description available';
+            }
+            return desc || 'No description available';
+          };
+
           return {
             id: log._id,
             timestamp: log.created_at,
             activity_type: log.activity_type,
             category: log.category,
             level: log.level,
-            description: log.description,
+            description_en: getDescriptionText(log.description, 'en'),
+            description_fr: getDescriptionText(log.description, 'fr'),
             performed_by: performedBy,
             school:
               school && school.name
@@ -662,13 +703,22 @@ export class ActivityLogService {
         );
       }
 
+      // Helper function to safely extract description text
+      const getDescriptionText = (desc: any, lang: 'en' | 'fr'): string => {
+        if (desc && typeof desc === 'object' && 'en' in desc && 'fr' in desc) {
+          return desc[lang] || desc.en || 'No description available';
+        }
+        return desc || 'No description available';
+      };
+
       return {
         id: log._id,
         timestamp: log.created_at,
         activity_type: log.activity_type,
         category: log.category,
         level: log.level,
-        description: log.description,
+        description_en: getDescriptionText(log.description, 'en'),
+        description_fr: getDescriptionText(log.description, 'fr'),
         performed_by: performedBy,
         school:
           school && school.name
@@ -817,7 +867,11 @@ export class ActivityLogService {
         ).search;
 
       query.$or = [
+        // Search in string descriptions
         { description: { $regex: filterDto.search, $options: 'i' } },
+        // Search in language object descriptions
+        { 'description.en': { $regex: filterDto.search, $options: 'i' } },
+        { 'description.fr': { $regex: filterDto.search, $options: 'i' } },
         { school_name: { $regex: filterDto.search, $options: 'i' } },
         { target_user_email: { $regex: encryptedSearchTerm, $options: 'i' } },
         { module_name: { $regex: filterDto.search, $options: 'i' } },
@@ -870,12 +924,26 @@ export class ActivityLogService {
           }
         }
 
+        // Helper function to safely extract description text
+        const getDescriptionText = (desc: any, lang: 'en' | 'fr'): string => {
+          if (
+            desc &&
+            typeof desc === 'object' &&
+            'en' in desc &&
+            'fr' in desc
+          ) {
+            return desc[lang] || desc.en || 'No description available';
+          }
+          return desc || 'No description available';
+        };
+
         return {
           timestamp: log.created_at,
           activity_type: log.activity_type,
           category: log.category,
           level: log.level,
-          description: log.description,
+          description_en: getDescriptionText(log.description, 'en'),
+          description_fr: getDescriptionText(log.description, 'fr'),
           performed_by: performedBy ? performedBy.name : 'N/A',
           performed_by_email: performedByEmail,
           performed_by_role: log.performed_by_role,
@@ -898,5 +966,125 @@ export class ActivityLogService {
     );
 
     return transformedLogs;
+  }
+
+  /**
+   * Generate description in both English and French based on activity type and context
+   */
+  async generateDescription(
+    activityType: ActivityTypeEnum,
+    context: Record<string, any> = {},
+  ): Promise<MultiLanguageContent> {
+    try {
+      // Get user details for context
+      let userName = 'User';
+      if (context.performed_by) {
+        const userDetails = await this.getUserDetails(
+          context.performed_by.toString(),
+          context.performed_by_role || RoleEnum.STUDENT,
+          context.school_id?.toString(),
+        );
+        if (userDetails) {
+          userName = userDetails.name;
+        }
+      }
+
+      // Get target user details for context
+      let targetUserName = 'User';
+      if (context.target_user_id && context.target_user_role) {
+        const targetUserDetails = await this.getUserDetails(
+          context.target_user_id.toString(),
+          context.target_user_role,
+          context.school_id?.toString(),
+        );
+        if (targetUserDetails) {
+          targetUserName = targetUserDetails.name;
+        }
+      }
+
+      // Prepare context for translation service
+      const translationContext = {
+        userName,
+        targetUserName,
+        schoolName: context.school_name || context.school?.name,
+        moduleName: context.module_name || context.module?.name,
+        chapterName: context.chapter_name || context.chapter?.name,
+        action: context.action || context.description,
+        ...context,
+      };
+
+      // Generate descriptions using translation service
+      return this.translationService.generateActivityDescription(
+        activityType,
+        translationContext,
+      );
+    } catch (error) {
+      this.logger.warn(
+        'Error generating description, using fallback',
+        error.message,
+      );
+
+      // Fallback to simple descriptions
+      return {
+        en: `User performed ${activityType}`,
+        fr: `L'utilisateur a effectué ${activityType}`,
+      };
+    }
+  }
+
+  /**
+   * Create activity log with auto-generated descriptions
+   */
+  async createActivityLogWithGeneratedDescription(
+    activityType: ActivityTypeEnum,
+    context: Record<string, any> = {},
+    additionalData: Partial<CreateActivityLogDto> = {},
+  ): Promise<ActivityLog> {
+    try {
+      // Generate descriptions in both languages
+      const descriptions = await this.generateDescription(
+        activityType,
+        context,
+      );
+
+      // Create the activity log DTO
+      const createActivityLogDto: CreateActivityLogDto = {
+        activity_type: activityType,
+        description: descriptions,
+        performed_by: context.performed_by,
+        performed_by_role: context.performed_by_role,
+        school_id: context.school_id,
+        school_name: context.school_name,
+        target_user_id: context.target_user_id,
+        target_user_email: context.target_user_email,
+        target_user_role: context.target_user_role,
+        module_id: context.module_id,
+        module_name: context.module_name,
+        chapter_id: context.chapter_id,
+        chapter_name: context.chapter_name,
+        quiz_group_id: context.quiz_group_id,
+        metadata: context.metadata,
+        ip_address: context.ip_address,
+        user_agent: context.user_agent,
+        session_id: context.session_id,
+        is_success: context.is_success,
+        error_message: context.error_message,
+        execution_time_ms: context.execution_time_ms,
+        endpoint: context.endpoint,
+        http_method: context.http_method,
+        http_status_code: context.http_status_code,
+        status: context.status,
+        ...additionalData,
+      };
+
+      // Create the activity log
+      return await this.createActivityLog(createActivityLogDto);
+    } catch (error) {
+      this.logger.error(
+        'Error creating activity log with generated description',
+        error,
+      );
+      throw error;
+    }
   }
 }
