@@ -40,6 +40,8 @@ import {
   QuizGroupSchema,
 } from 'src/database/schemas/tenant/quiz-group.schema';
 import { Quiz, QuizSchema } from 'src/database/schemas/tenant/quiz.schema';
+import { AIChatFeedback, AIChatFeedbackSchema } from 'src/database/schemas/tenant/ai-chat-feedback.schema';
+import { LearningLogReview, LearningLogReviewSchema } from 'src/database/schemas/tenant/learning-log-review.schema';
 import { TenantConnectionService } from 'src/database/tenant-connection.service';
 import { JWTUserPayload } from 'src/common/types/jwr-user.type';
 import { RoleEnum } from 'src/common/constants/roles.constant';
@@ -1754,6 +1756,8 @@ export class ProgressService {
     );
 
     const ModuleModel = tenantConnection.model(Module.name, ModuleSchema);
+    const AIChatFeedbackModel = tenantConnection.model(AIChatFeedback.name, AIChatFeedbackSchema);
+    const LearningLogReviewModel = tenantConnection.model(LearningLogReview.name, LearningLogReviewSchema);
 
     try {
       const studentObjectId = new Types.ObjectId(studentId);
@@ -1766,14 +1770,13 @@ export class ProgressService {
       ).lean();
       const deletedModuleIds = deletedModules.map((m) => m._id);
 
-      const [
-        totalModules,
-        inProgressModules,
-        completedModules,
-        totalQuizAttempts,
-        passedQuizzes,
-        recentActivity,
-      ] = await Promise.all([
+      // Execute main queries with fallback for new features
+      let totalModules: number, inProgressModules: number, completedModules: number, totalQuizAttempts: number, passedQuizzes: number, recentActivity: any[];
+      let aiConversationErrors: any[] = [];
+      let recentFeedback: any = { ai_feedback: [], professor_feedback: [] };
+
+      try {
+        const mainResults = await Promise.all([
         StudentModuleProgressModel.countDocuments({
           student_id: studentObjectId,
           module_id: { $nin: deletedModuleIds },
@@ -1807,7 +1810,128 @@ export class ProgressService {
           .sort({ last_accessed_at: -1 })
           .limit(5)
           .lean(),
-      ]);
+        ]);
+
+        [totalModules, inProgressModules, completedModules, totalQuizAttempts, passedQuizzes, recentActivity] = mainResults;
+
+        // Execute additional queries for new features with error handling
+        try {
+          const additionalResults = await Promise.all([
+        // Get AI conversation errors categorized by skill_gaps
+        AIChatFeedbackModel.find({
+          student_id: studentObjectId,
+          deleted_at: null,
+          skill_gaps: { $exists: true, $ne: [] },
+        })
+          .select('skill_gaps module_id created_at')
+          .populate('module_id', 'title')
+          .sort({ created_at: -1 })
+          .limit(50)
+          .lean(),
+        // Get recent AI and professor feedback
+        Promise.all([
+          // Get recent AI feedback
+          AIChatFeedbackModel.find({
+            student_id: studentObjectId,
+            deleted_at: null,
+          })
+            .select('rating suggestions strengths areas_for_improvement module_id created_at')
+            .populate('module_id', 'title')
+            .sort({ created_at: -1 })
+            .limit(3)
+            .lean(),
+          // Get recent professor feedback with proper aggregation
+          LearningLogReviewModel.aggregate([
+            {
+              $match: {
+                student_id: studentObjectId,
+                deleted_at: null,
+              },
+            },
+            {
+              $sort: { created_at: -1 },
+            },
+            {
+              $limit: 3,
+            },
+            {
+              $lookup: {
+                from: 'ai_chat_feedback',
+                localField: 'ai_feedback_id',
+                foreignField: '_id',
+                pipeline: [
+                  {
+                    $match: {
+                      deleted_at: null,
+                    },
+                  },
+                  {
+                    $lookup: {
+                      from: 'modules',
+                      localField: 'module_id',
+                      foreignField: '_id',
+                      pipeline: [
+                        {
+                          $match: {
+                            deleted_at: null,
+                          },
+                        },
+                        {
+                          $project: {
+                            title: 1,
+                          },
+                        },
+                      ],
+                      as: 'module',
+                    },
+                  },
+                  {
+                    $unwind: {
+                      path: '$module',
+                      preserveNullAndEmptyArrays: true,
+                    },
+                  },
+                  {
+                    $project: {
+                      module_title: '$module.title',
+                    },
+                  },
+                ],
+                as: 'ai_feedback',
+              },
+            },
+            {
+              $unwind: {
+                path: '$ai_feedback',
+                preserveNullAndEmptyArrays: true,
+              },
+            },
+            {
+              $project: {
+                rating: 1,
+                feedback: 1,
+                reviewer_role: 1,
+                created_at: 1,
+                module_title: '$ai_feedback.module_title',
+              },
+            },
+          ]),
+        ]).then(([aiFeedback, professorFeedback]) => ({
+          ai_feedback: aiFeedback as any[],
+          professor_feedback: professorFeedback as any[],
+        })),
+          ]);
+
+          // @ts-ignore - Explicit casting to handle complex typing
+          [aiConversationErrors, recentFeedback] = additionalResults;
+        } catch (additionalError) {
+          this.logger.warn('Error fetching additional dashboard data, using defaults:', additionalError);
+          // Keep defaults: aiConversationErrors = [], recentFeedback = { ai_feedback: [], professor_feedback: [] }
+        }
+      } catch (mainError) {
+        this.logger.error('Error fetching main dashboard data:', mainError);
+        throw mainError; // Re-throw main errors as they are critical
+      }
 
       // Calculate average progress
       const moduleProgresses = await StudentModuleProgressModel.find({
@@ -1820,6 +1944,132 @@ export class ProgressService {
               0,
             ) / moduleProgresses.length
           : 0;
+
+      // Process AI conversation errors by skill_gaps with proper error handling
+      let conversationErrorsSummary: any[] = [];
+      try {
+        const errorSummary: Record<string, any> = {};
+        
+        if (Array.isArray(aiConversationErrors)) {
+          aiConversationErrors.forEach((feedback: any) => {
+            try {
+              if (feedback && feedback.skill_gaps && Array.isArray(feedback.skill_gaps)) {
+                feedback.skill_gaps.forEach((skillGap: any) => {
+                  if (skillGap && typeof skillGap === 'string' && skillGap.trim() !== '') {
+                    const cleanSkillGap = skillGap.trim();
+                    if (!errorSummary[cleanSkillGap]) {
+                      errorSummary[cleanSkillGap] = {
+                        count: 0,
+                        modules: new Set(),
+                        latest_occurrence: null,
+                      };
+                    }
+                    errorSummary[cleanSkillGap].count++;
+                    
+                    // Safely add module title
+                    const moduleTitle = feedback.module_id?.title;
+                    if (moduleTitle && typeof moduleTitle === 'string') {
+                      errorSummary[cleanSkillGap].modules.add(moduleTitle);
+                    }
+                    
+                    // Safely update latest occurrence
+                    if (feedback.created_at) {
+                      try {
+                        const currentDate = new Date(feedback.created_at);
+                        const lastOccurrence = errorSummary[cleanSkillGap].latest_occurrence;
+                        if (!lastOccurrence || currentDate > new Date(lastOccurrence)) {
+                          errorSummary[cleanSkillGap].latest_occurrence = feedback.created_at;
+                        }
+                      } catch (dateError) {
+                        this.logger.warn('Invalid date format in feedback:', feedback.created_at);
+                      }
+                    }
+                  }
+                });
+              }
+            } catch (feedbackError) {
+              this.logger.warn('Error processing individual feedback:', feedbackError);
+            }
+          });
+        }
+
+        // Convert error summary to array format and sort by count
+        conversationErrorsSummary = Object.entries(errorSummary)
+          .map(([skillGap, data]: [string, any]) => ({
+            skill_gap: skillGap,
+            count: data.count,
+            modules: Array.from(data.modules).filter((module: any) => module && module.trim() !== ''),
+            latest_occurrence: data.latest_occurrence,
+          }))
+          .filter(item => item.count > 0)
+          .sort((a, b) => b.count - a.count)
+          .slice(0, 10); // Top 10 most frequent issues
+      } catch (error) {
+        this.logger.error('Error processing AI conversation errors:', error);
+        conversationErrorsSummary = [];
+      }
+
+      // Format recent feedback preview with proper error handling
+      let recentFeedbackPreview: any = {
+        ai_feedback: [] as any[],
+        professor_feedback: [] as any[],
+      };
+      
+      try {
+        // Process AI feedback safely
+        if (recentFeedback && Array.isArray(recentFeedback.ai_feedback)) {
+          // @ts-ignore - Explicit casting to handle complex typing
+          recentFeedbackPreview.ai_feedback = recentFeedback.ai_feedback
+            .filter((feedback: any) => feedback && feedback._id)
+            .map((feedback: any) => {
+              try {
+                return {
+                  _id: feedback._id?.toString() || '',
+                  module_title: feedback.module_id?.title || 'Unknown Module',
+                  overall_score: (feedback.rating && typeof feedback.rating.overall_score === 'number') ? feedback.rating.overall_score : null,
+                  strengths: Array.isArray(feedback.strengths) ? feedback.strengths.slice(0, 2) : [],
+                  areas_for_improvement: Array.isArray(feedback.areas_for_improvement) ? feedback.areas_for_improvement.slice(0, 2) : [],
+                  suggestions: Array.isArray(feedback.suggestions) ? feedback.suggestions.slice(0, 1) : [],
+                  created_at: feedback.created_at || null,
+                };
+              } catch (processingError) {
+                this.logger.warn('Error processing AI feedback item:', processingError);
+                return null;
+              }
+            })
+            .filter(item => item !== null);
+        }
+
+        // Process professor feedback safely
+        if (recentFeedback && Array.isArray(recentFeedback.professor_feedback)) {
+          // @ts-ignore - Explicit casting to handle complex typing
+          recentFeedbackPreview.professor_feedback = recentFeedback.professor_feedback
+            .filter((review: any) => review && review._id)
+            .map((review: any) => {
+              try {
+                const feedbackText = (review.feedback && typeof review.feedback === 'string') ? review.feedback : '';
+                return {
+                  _id: review._id?.toString() || '',
+                  module_title: review.module_title || 'Unknown Module',
+                  rating: (typeof review.rating === 'number') ? review.rating : null,
+                  feedback: feedbackText.length > 150 ? feedbackText.substring(0, 150) + '...' : feedbackText,
+                  reviewer_role: review.reviewer_role || 'UNKNOWN',
+                  created_at: review.created_at || null,
+                };
+              } catch (processingError) {
+                this.logger.warn('Error processing professor feedback item:', processingError);
+                return null;
+              }
+            })
+            .filter(item => item !== null);
+        }
+            } catch (error) {
+        this.logger.error('Error processing recent feedback preview:', error);
+        recentFeedbackPreview = {
+          ai_feedback: [],
+          professor_feedback: [],
+        };
+      }
 
       return {
         message: this.errorMessageService.getSuccessMessageWithLanguage(
@@ -1837,6 +2087,8 @@ export class ProgressService {
             average_progress: Math.round(averageProgress),
           },
           recent_activity: recentActivity,
+          ai_conversation_errors_summary: conversationErrorsSummary,
+          recent_feedback_preview: recentFeedbackPreview,
         },
       };
     } catch (error) {
