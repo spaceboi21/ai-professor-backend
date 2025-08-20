@@ -9,6 +9,12 @@ import {
 } from 'src/common/constants/activity.constant';
 import { RoleEnum } from 'src/common/constants/roles.constant';
 
+// Multi-language content interface
+export interface MultiLanguageContent {
+  en: string;
+  fr: string;
+}
+
 @Schema({
   collection: 'activity_logs',
   timestamps: {
@@ -33,8 +39,32 @@ export class ActivityLog extends Document {
   @Prop({ type: String, required: true, enum: ActivityLevelEnum, index: true })
   level: ActivityLevelEnum;
 
-  @Prop({ type: String, required: true })
-  description: string;
+  @Prop({
+    type: Object,
+    required: true,
+    validate: {
+      validator: function (content: any) {
+        // Allow both string and multi-language object formats
+        if (typeof content === 'string') {
+          return content && content.trim().length > 0;
+        }
+        if (typeof content === 'object' && content !== null) {
+          return (
+            content.en &&
+            typeof content.en === 'string' &&
+            content.en.trim().length > 0 &&
+            content.fr &&
+            typeof content.fr === 'string' &&
+            content.fr.trim().length > 0
+          );
+        }
+        return false;
+      },
+      message:
+        'Description must be a string or contain both English (en) and French (fr) versions',
+    },
+  })
+  description: string | MultiLanguageContent;
 
   @Prop({ type: Types.ObjectId, ref: User.name, required: true, index: true })
   performed_by: Types.ObjectId;

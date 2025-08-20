@@ -974,6 +974,7 @@ export class ActivityLogService {
   async generateDescription(
     activityType: ActivityTypeEnum,
     context: Record<string, any> = {},
+    isSuccess: boolean = true,
   ): Promise<MultiLanguageContent> {
     try {
       // Get user details for context
@@ -1013,10 +1014,11 @@ export class ActivityLogService {
         ...context,
       };
 
-      // Generate descriptions using translation service
+      // Generate descriptions using translation service with success status
       return this.translationService.generateActivityDescription(
         activityType,
         translationContext,
+        isSuccess,
       );
     } catch (error) {
       this.logger.warn(
@@ -1024,10 +1026,11 @@ export class ActivityLogService {
         error.message,
       );
 
-      // Fallback to simple descriptions
+      // Fallback to simple descriptions with success status
+      const status = isSuccess ? 'successfully' : 'failed';
       return {
-        en: `User performed ${activityType}`,
-        fr: `L'utilisateur a effectué ${activityType}`,
+        en: `User performed ${activityType} ${status}`,
+        fr: `L'utilisateur a effectué ${activityType} ${isSuccess ? 'avec succès' : 'sans succès'}`,
       };
     }
   }
@@ -1041,16 +1044,25 @@ export class ActivityLogService {
     additionalData: Partial<CreateActivityLogDto> = {},
   ): Promise<ActivityLog> {
     try {
-      // Generate descriptions in both languages
+      // Extract isSuccess from context or additionalData
+      const isSuccess =
+        context.is_success !== undefined
+          ? context.is_success
+          : additionalData.is_success !== undefined
+            ? additionalData.is_success
+            : true;
+
+      // Generate descriptions in both languages with success status
       const descriptions = await this.generateDescription(
         activityType,
         context,
+        isSuccess,
       );
 
       // Create the activity log DTO
       const createActivityLogDto: CreateActivityLogDto = {
         activity_type: activityType,
-        description: descriptions,
+        description: descriptions, // This will be the multi-language object
         performed_by: context.performed_by,
         performed_by_role: context.performed_by_role,
         school_id: context.school_id,
@@ -1067,7 +1079,7 @@ export class ActivityLogService {
         ip_address: context.ip_address,
         user_agent: context.user_agent,
         session_id: context.session_id,
-        is_success: context.is_success,
+        is_success: isSuccess,
         error_message: context.error_message,
         execution_time_ms: context.execution_time_ms,
         endpoint: context.endpoint,

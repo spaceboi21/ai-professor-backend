@@ -43,6 +43,20 @@ await activityLogService.createActivityLogWithGeneratedDescription(
     performed_by: userId,
     performed_by_role: RoleEnum.STUDENT,
     school_id: schoolId,
+    is_success: true, // Will generate "User logged in successfully"
+    // ... other context
+  },
+);
+
+// For failed operations
+await activityLogService.createActivityLogWithGeneratedDescription(
+  ActivityTypeEnum.USER_LOGIN,
+  {
+    performed_by: userId,
+    performed_by_role: RoleEnum.STUDENT,
+    school_id: schoolId,
+    is_success: false, // Will generate "User logged in failed"
+    error_message: 'Invalid credentials',
     // ... other context
   },
 );
@@ -56,6 +70,7 @@ await activityLogService.createActivityLogWithGeneratedDescription(
     module_name: 'Introduction to Mathematics',
     module_id: moduleId,
     school_id: schoolId,
+    is_success: true, // Will generate "User accessed module: Introduction to Mathematics successfully"
   },
 );
 
@@ -178,3 +193,71 @@ The system includes fallback mechanisms:
 - If user details can't be fetched, uses generic "User" placeholder
 - If context is missing, uses activity type as fallback
 - All errors are logged but don't break the main application flow
+
+## Expected Database Structure
+
+When using the new system, your activity logs will be stored in the database with descriptions in both languages, similar to how notifications work:
+
+### Database Document Example:
+
+```json
+{
+  "_id": {
+    "$oid": "689abad2d79d2f3eef03e6ea"
+  },
+  "activity_type": "USER_LOGIN",
+  "category": "AUTHENTICATION",
+  "level": "INFO",
+  "description": {
+    "en": "John Doe logged in successfully",
+    "fr": "John Doe s'est connecté avec succès"
+  },
+  "performed_by": {
+    "$oid": "686b76d4ff4d893850b06644"
+  },
+  "performed_by_role": "PROFESSOR",
+  "school_id": {
+    "$oid": "686b5e79e4a3c29b94ac1341"
+  },
+  "school_name": "Anirudh International School",
+  "is_success": true,
+  "status": "SUCCESS",
+  "created_at": {
+    "$date": "2025-08-20T08:36:25.759Z"
+  },
+  "updated_at": {
+    "$date": "2025-08-20T08:36:25.759Z"
+  }
+}
+```
+
+### Failed Operation Example:
+
+```json
+{
+  "description": {
+    "en": "John Doe logged in failed",
+    "fr": "John Doe s'est connecté sans succès"
+  },
+  "is_success": false,
+  "status": "ERROR",
+  "error_message": "Invalid credentials"
+}
+```
+
+## Testing the New System
+
+To test if the multi-language descriptions are working:
+
+1. **Check the database directly** - Look for the `description` field to contain an object with `en` and `fr` keys
+2. **Use the API endpoints** - The responses should now include `description_en` and `description_fr` fields
+3. **Monitor the logs** - Look for successful creation of activity logs with generated descriptions
+
+## Troubleshooting
+
+If descriptions are still showing as strings instead of multi-language objects:
+
+1. **Check the interceptor** - Ensure it's using `createActivityLogWithGeneratedDescription`
+2. **Verify the schema** - Make sure the database schema supports `Object` type for description
+3. **Check the translation service** - Ensure it's properly injected and working
+4. **Monitor the logs** - Look for any errors in description generation
