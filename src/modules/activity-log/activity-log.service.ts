@@ -159,6 +159,28 @@ export class ActivityLogService {
         quiz_group_id: createActivityLogDto.quiz_group_id,
       });
 
+      // Check for duplicate activity before creating
+      if (createActivityLogDto.endpoint && createActivityLogDto.performed_by) {
+        const thirtySecondsAgo = new Date(Date.now() - 30 * 1000); // 30 seconds ago
+
+        const duplicateQuery = {
+          performed_by: createActivityLogDto.performed_by,
+          activity_type: createActivityLogDto.activity_type,
+          endpoint: createActivityLogDto.endpoint,
+          created_at: { $gte: thirtySecondsAgo },
+        };
+
+        const existingLog = await this.activityLogModel.findOne(duplicateQuery);
+
+        if (existingLog) {
+          this.logger.log(
+            `Skipping duplicate activity log: ${createActivityLogDto.activity_type} by ${createActivityLogDto.performed_by} on ${createActivityLogDto.endpoint}`,
+          );
+          // Return the existing log to prevent downstream errors
+          return existingLog;
+        }
+      }
+
       const { activity_type, target_user_email, ...rest } =
         createActivityLogDto;
 
