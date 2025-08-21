@@ -5718,4 +5718,463 @@ export class CommunityService {
       );
     }
   }
+
+  /**
+   * Update a forum discussion
+   */
+  async updateDiscussion(
+    discussionId: string,
+    updateDiscussionDto: any,
+    user: JWTUserPayload,
+  ) {
+    const {
+      title,
+      content,
+      tags,
+      mentions,
+      meeting_link,
+      meeting_platform,
+      meeting_scheduled_at,
+      meeting_duration_minutes,
+    } = updateDiscussionDto;
+
+    this.logger.log(`Updating discussion: ${discussionId} by user: ${user.id}`);
+
+    const resolvedSchoolId = this.resolveSchoolId(user);
+
+    // Validate school exists
+    const school = await this.schoolModel.findById(resolvedSchoolId);
+    if (!school) {
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'SCHOOL',
+          'NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
+    }
+
+    // Get tenant connection
+    const tenantConnection =
+      await this.tenantConnectionService.getTenantConnection(school.db_name);
+    const DiscussionModel = tenantConnection.model(
+      ForumDiscussion.name,
+      ForumDiscussionSchema,
+    );
+    const MentionModel = tenantConnection.model(
+      ForumMention.name,
+      ForumMentionSchema,
+    );
+
+    try {
+      // Find the discussion and check permissions
+      const discussion = await DiscussionModel.findOne({
+        _id: discussionId,
+        deleted_at: null,
+      });
+
+      if (!discussion) {
+        throw new NotFoundException(
+          this.errorMessageService.getMessageWithLanguage(
+            'COMMUNITY',
+            'DISCUSSION_NOT_FOUND',
+            user?.preferred_language || DEFAULT_LANGUAGE,
+          ),
+        );
+      }
+
+      // Check if user can edit this discussion (only creator or admins)
+      const canEdit =
+        discussion.created_by.toString() === user.id ||
+        [RoleEnum.SCHOOL_ADMIN, RoleEnum.SUPER_ADMIN].includes(
+          user.role.name as RoleEnum,
+        );
+
+      if (!canEdit) {
+        throw new ForbiddenException(
+          this.errorMessageService.getMessageWithLanguage(
+            'COMMUNITY',
+            'CANNOT_EDIT_DISCUSSION',
+            user?.preferred_language || DEFAULT_LANGUAGE,
+          ),
+        );
+      }
+
+      // Prepare update data
+      const updateData: any = {};
+
+      if (title !== undefined) updateData.title = title;
+      if (tags !== undefined) updateData.tags = tags || [];
+
+      // Handle content and mentions
+      if (content !== undefined) {
+        const extractedMentions = mentions || extractMentions(content);
+
+        // Resolve mentions to user IDs
+        const resolvedMentions = await resolveMentions(
+          extractedMentions,
+          tenantConnection,
+          this.userModel,
+        );
+
+        // Format content with mention links
+        const formattedContent = formatMentionsInContent(
+          content,
+          resolvedMentions,
+        );
+        updateData.content = formattedContent;
+
+        // Update mention records for this discussion
+        await MentionModel.deleteMany({
+          discussion_id: new Types.ObjectId(discussionId),
+          reply_id: null, // Only discussion mentions, not reply mentions
+        });
+
+        // Create new mention records
+        const mentionPromises = resolvedMentions.map(async (mention) => {
+          if (mention.userId) {
+            const mentionRecord = new MentionModel({
+              discussion_id: new Types.ObjectId(discussionId),
+              mentioned_by: new Types.ObjectId(user.id),
+              mentioned_user: mention.userId,
+              mention_text: mention.mentionText,
+            });
+            return mentionRecord.save();
+          }
+        });
+
+        await Promise.all(mentionPromises.filter(Boolean));
+      }
+
+      // Handle meeting fields for meeting type discussions
+      if (discussion.type === DiscussionTypeEnum.MEETING) {
+        if (meeting_link !== undefined) updateData.meeting_link = meeting_link;
+        if (meeting_platform !== undefined)
+          updateData.meeting_platform = meeting_platform;
+        if (meeting_scheduled_at !== undefined) {
+          updateData.meeting_scheduled_at = meeting_scheduled_at
+            ? new Date(meeting_scheduled_at)
+            : null;
+        }
+        if (meeting_duration_minutes !== undefined) {
+          updateData.meeting_duration_minutes = meeting_duration_minutes;
+        }
+      }
+
+      // Update the discussion
+      const updatedDiscussion = await DiscussionModel.findOneAndUpdate(
+        { _id: discussionId },
+        { $set: updateData },
+        { new: true, lean: true },
+      );
+
+      this.logger.log(`Discussion updated successfully: ${discussionId}`);
+
+      return {
+        message: this.errorMessageService.getMessageWithLanguage(
+          'COMMUNITY',
+          'DISCUSSION_UPDATED_SUCCESSFULLY',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+        data: updatedDiscussion,
+      };
+    } catch (error) {
+      this.logger.error(`Error updating discussion: ${discussionId}`, error);
+      if (
+        error instanceof NotFoundException ||
+        error instanceof ForbiddenException ||
+        error instanceof BadRequestException
+      ) {
+        throw error;
+      }
+      throw new BadRequestException(
+        this.errorMessageService.getMessageWithLanguage(
+          'COMMUNITY',
+          'UPDATE_DISCUSSION_FAILED',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
+    }
+  }
+
+  /**
+   * Update a forum reply
+   */
+  async updateReply(
+    replyId: string,
+    updateReplyDto: any,
+    user: JWTUserPayload,
+  ) {
+    const { content, mentions } = updateReplyDto;
+
+    this.logger.log(`Updating reply: ${replyId} by user: ${user.id}`);
+
+    const resolvedSchoolId = this.resolveSchoolId(user);
+
+    // Validate school exists
+    const school = await this.schoolModel.findById(resolvedSchoolId);
+    if (!school) {
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'SCHOOL',
+          'NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
+    }
+
+    // Get tenant connection
+    const tenantConnection =
+      await this.tenantConnectionService.getTenantConnection(school.db_name);
+    const ReplyModel = tenantConnection.model(
+      ForumReply.name,
+      ForumReplySchema,
+    );
+    const MentionModel = tenantConnection.model(
+      ForumMention.name,
+      ForumMentionSchema,
+    );
+
+    try {
+      // Find the reply and check permissions
+      const reply = await ReplyModel.findOne({
+        _id: replyId,
+        deleted_at: null,
+      });
+
+      if (!reply) {
+        throw new NotFoundException(
+          this.errorMessageService.getMessageWithLanguage(
+            'COMMUNITY',
+            'REPLY_NOT_FOUND',
+            user?.preferred_language || DEFAULT_LANGUAGE,
+          ),
+        );
+      }
+
+      // Check if user can edit this reply (only creator or admins)
+      const canEdit =
+        reply.created_by.toString() === user.id ||
+        [RoleEnum.SCHOOL_ADMIN, RoleEnum.SUPER_ADMIN].includes(
+          user.role.name as RoleEnum,
+        );
+
+      if (!canEdit) {
+        throw new ForbiddenException(
+          this.errorMessageService.getMessageWithLanguage(
+            'COMMUNITY',
+            'CANNOT_EDIT_REPLY',
+            user?.preferred_language || DEFAULT_LANGUAGE,
+          ),
+        );
+      }
+
+      // Prepare update data
+      const updateData: any = {};
+
+      // Handle content and mentions
+      if (content !== undefined) {
+        const extractedMentions = mentions || extractMentions(content);
+
+        // Resolve mentions to user IDs
+        const resolvedMentions = await resolveMentions(
+          extractedMentions,
+          tenantConnection,
+          this.userModel,
+        );
+
+        // Format content with mention links
+        const formattedContent = formatMentionsInContent(
+          content,
+          resolvedMentions,
+        );
+        updateData.content = formattedContent;
+
+        // Update mention records for this reply
+        await MentionModel.deleteMany({
+          reply_id: new Types.ObjectId(replyId),
+        });
+
+        // Create new mention records
+        const mentionPromises = resolvedMentions.map(async (mention) => {
+          if (mention.userId) {
+            const mentionRecord = new MentionModel({
+              reply_id: new Types.ObjectId(replyId),
+              discussion_id: reply.discussion_id,
+              mentioned_by: new Types.ObjectId(user.id),
+              mentioned_user: mention.userId,
+              mention_text: mention.mentionText,
+            });
+            return mentionRecord.save();
+          }
+        });
+
+        await Promise.all(mentionPromises.filter(Boolean));
+      }
+
+      // Update the reply
+      const updatedReply = await ReplyModel.findOneAndUpdate(
+        { _id: replyId },
+        { $set: updateData },
+        { new: true, lean: true },
+      );
+
+      this.logger.log(`Reply updated successfully: ${replyId}`);
+
+      return {
+        message: this.errorMessageService.getMessageWithLanguage(
+          'COMMUNITY',
+          'REPLY_UPDATED_SUCCESSFULLY',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+        data: updatedReply,
+      };
+    } catch (error) {
+      this.logger.error(`Error updating reply: ${replyId}`, error);
+      if (
+        error instanceof NotFoundException ||
+        error instanceof ForbiddenException ||
+        error instanceof BadRequestException
+      ) {
+        throw error;
+      }
+      throw new BadRequestException(
+        this.errorMessageService.getMessageWithLanguage(
+          'COMMUNITY',
+          'UPDATE_REPLY_FAILED',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
+    }
+  }
+
+  /**
+   * Get a single reply by ID
+   */
+  async findReplyById(replyId: string, user: JWTUserPayload) {
+    this.logger.log(`Finding reply: ${replyId}`);
+
+    const resolvedSchoolId = this.resolveSchoolId(user);
+
+    // Validate school exists
+    const school = await this.schoolModel.findById(resolvedSchoolId);
+    if (!school) {
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'SCHOOL',
+          'NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
+    }
+
+    // Get tenant connection
+    const tenantConnection =
+      await this.tenantConnectionService.getTenantConnection(school.db_name);
+    const ReplyModel = tenantConnection.model(
+      ForumReply.name,
+      ForumReplySchema,
+    );
+    const LikeModel = tenantConnection.model(ForumLike.name, ForumLikeSchema);
+    const AttachmentModel = tenantConnection.model(
+      ForumAttachment.name,
+      ForumAttachmentSchema,
+    );
+    const MentionModel = tenantConnection.model(
+      ForumMention.name,
+      ForumMentionSchema,
+    );
+
+    try {
+      const reply = await ReplyModel.findOne({
+        _id: replyId,
+        deleted_at: null,
+      }).lean();
+
+      if (!reply) {
+        throw new NotFoundException(
+          this.errorMessageService.getMessageWithLanguage(
+            'COMMUNITY',
+            'REPLY_NOT_FOUND',
+            user?.preferred_language || DEFAULT_LANGUAGE,
+          ),
+        );
+      }
+
+      // Check if current user has liked this reply
+      const userLike = await LikeModel.findOne({
+        entity_type: LikeEntityTypeEnum.REPLY,
+        entity_id: new Types.ObjectId(replyId),
+        liked_by: new Types.ObjectId(user.id),
+      }).lean();
+
+      // Attach user details
+      const userDetails = await this.getUserDetails(
+        reply.created_by.toString(),
+        reply.created_by_role,
+        tenantConnection,
+      );
+
+      // Get attachments for this reply
+      const attachments = await AttachmentModel.find({
+        reply_id: new Types.ObjectId(replyId),
+        status: AttachmentStatusEnum.ACTIVE,
+        deleted_at: null,
+      })
+        .sort({ created_at: 1 })
+        .lean();
+
+      // Get mentions for this reply
+      const mentions = await MentionModel.find({
+        reply_id: new Types.ObjectId(replyId),
+      })
+        .sort({ created_at: 1 })
+        .lean();
+
+      // Populate mention users
+      const populatedMentions = await Promise.all(
+        mentions.map(async (mention) => {
+          const mentionedUser = await this.getUserDetails(
+            mention.mentioned_user.toString(),
+            'UNKNOWN', // We'll determine the role from the user data
+            tenantConnection,
+          );
+          return {
+            ...mention,
+            mentioned_user_details: mentionedUser,
+          };
+        }),
+      );
+
+      return {
+        message: this.errorMessageService.getMessageWithLanguage(
+          'COMMUNITY',
+          'REPLY_RETRIEVED_SUCCESSFULLY',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+        data: {
+          ...reply,
+          created_by_user: userDetails,
+          has_liked: !!userLike,
+          attachments,
+          mentions: populatedMentions,
+        },
+      };
+    } catch (error) {
+      this.logger.error(`Error finding reply: ${replyId}`, error);
+      if (
+        error instanceof NotFoundException ||
+        error instanceof ForbiddenException
+      ) {
+        throw error;
+      }
+      throw new BadRequestException(
+        this.errorMessageService.getMessageWithLanguage(
+          'COMMUNITY',
+          'GET_REPLY_FAILED',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
+    }
+  }
 }
