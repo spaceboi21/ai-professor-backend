@@ -80,13 +80,20 @@ export class AuthService {
 
     if (!isSuperAdminExists) {
       this.logger.warn(`Super Admin not found: ${email}`);
-      throw new NotFoundException(
-        this.errorMessageService.getMessageWithLanguage(
-          'USER',
-          'NOT_FOUND',
-          DEFAULT_LANGUAGE,
-        ),
-      );
+      throw new NotFoundException({
+        message: {
+          en: this.errorMessageService.getMessageWithLanguage(
+            'USER',
+            'NOT_FOUND',
+            LanguageEnum.ENGLISH,
+          ),
+          fr: this.errorMessageService.getMessageWithLanguage(
+            'USER',
+            'NOT_FOUND',
+            LanguageEnum.FRENCH,
+          ),
+        },
+      });
     }
 
     // Check user status
@@ -210,13 +217,20 @@ export class AuthService {
 
     if (!user) {
       this.logger.warn(`School Admin not found: ${email}`);
-      throw new NotFoundException(
-        this.errorMessageService.getMessageWithLanguage(
-          'USER',
-          'NOT_FOUND_WITH_EMAIL',
-          DEFAULT_LANGUAGE,
-        ),
-      );
+      throw new NotFoundException({
+        message: {
+          en: this.errorMessageService.getMessageWithLanguage(
+            'USER',
+            'NOT_FOUND_WITH_EMAIL',
+            LanguageEnum.ENGLISH,
+          ),
+          fr: this.errorMessageService.getMessageWithLanguage(
+            'USER',
+            'NOT_FOUND_WITH_EMAIL',
+            LanguageEnum.FRENCH,
+          ),
+        },
+      });
     }
 
     // Check user status
@@ -368,13 +382,20 @@ export class AuthService {
 
     if (!globalStudent) {
       this.logger.warn(`Global student not found: ${email}`);
-      throw new NotFoundException(
-        this.errorMessageService.getMessageWithLanguage(
-          'STUDENT',
-          'NOT_FOUND_WITH_EMAIL',
-          DEFAULT_LANGUAGE,
-        ),
-      );
+      throw new NotFoundException({
+        message: {
+          en: this.errorMessageService.getMessageWithLanguage(
+            'STUDENT',
+            'NOT_FOUND_WITH_EMAIL',
+            LanguageEnum.ENGLISH,
+          ),
+          fr: this.errorMessageService.getMessageWithLanguage(
+            'STUDENT',
+            'NOT_FOUND_WITH_EMAIL',
+            LanguageEnum.FRENCH,
+          ),
+        },
+      });
     }
 
     // Get the school information
@@ -415,13 +436,20 @@ export class AuthService {
 
     if (!student) {
       this.logger.warn(`Student not found in school DB: ${email}`);
-      throw new NotFoundException(
-        this.errorMessageService.getMessageWithLanguage(
-          'STUDENT',
-          'NOT_FOUND_IN_SCHOOL',
-          DEFAULT_LANGUAGE,
-        ),
-      );
+      throw new NotFoundException({
+        message: {
+          en: this.errorMessageService.getMessageWithLanguage(
+            'STUDENT',
+            'NOT_FOUND_IN_SCHOOL',
+            LanguageEnum.ENGLISH,
+          ),
+          fr: this.errorMessageService.getMessageWithLanguage(
+            'STUDENT',
+            'NOT_FOUND_IN_SCHOOL',
+            LanguageEnum.FRENCH,
+          ),
+        },
+      });
     }
 
     // Check student status
