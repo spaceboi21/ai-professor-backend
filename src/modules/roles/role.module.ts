@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
-import { Role, RoleSchema } from './role.schema';
+import { Role, RoleSchema } from '../../database/schemas/central/role.schema';
 
 @Module({
   imports: [

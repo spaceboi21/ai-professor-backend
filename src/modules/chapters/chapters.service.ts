@@ -1,0 +1,1455 @@
+import {
+  Injectable,
+  BadRequestException,
+  NotFoundException,
+  Logger,
+  ConflictException,
+} from '@nestjs/common';
+import { InjectModel } from '@nestjs/mongoose';
+import { Model, Types } from 'mongoose';
+import { User } from 'src/database/schemas/central/user.schema';
+import { School } from 'src/database/schemas/central/school.schema';
+import {
+  Module,
+  ModuleSchema,
+} from 'src/database/schemas/tenant/module.schema';
+import {
+  Chapter,
+  ChapterSchema,
+} from 'src/database/schemas/tenant/chapter.schema';
+
+import { BibliographyTypeEnum } from 'src/common/constants/bibliography-type.constant';
+import { ProgressStatusEnum } from 'src/common/constants/status.constant';
+import { TenantConnectionService } from 'src/database/tenant-connection.service';
+import { CreateChapterDto } from './dto/create-chapter.dto';
+import { UpdateChapterDto } from './dto/update-chapter.dto';
+import { ReorderChaptersDto } from './dto/reorder-chapters.dto';
+import { JWTUserPayload } from 'src/common/types/jwr-user.type';
+import { RoleEnum } from 'src/common/constants/roles.constant';
+import {
+  attachUserDetails,
+  attachUserDetailsToEntity,
+} from 'src/common/utils/user-details.util';
+import { PaginationDto } from 'src/common/dto/pagination.dto';
+import {
+  getPaginationOptions,
+  createPaginationResult,
+} from 'src/common/utils/pagination.util';
+import { ModulesService } from '../modules/modules.service';
+import {
+  Bibliography,
+  BibliographySchema,
+} from 'src/database/schemas/tenant/bibliography.schema';
+import { ProgressService } from '../progress/progress.service';
+import { ErrorMessageService } from 'src/common/services/error-message.service';
+import { DEFAULT_LANGUAGE } from 'src/common/constants/language.constant';
+
+@Injectable()
+export class ChaptersService {
+  private readonly logger = new Logger(ChaptersService.name);
+
+  constructor(
+    @InjectModel(User.name)
+    private readonly userModel: Model<User>,
+    @InjectModel(School.name)
+    private readonly schoolModel: Model<School>,
+    private readonly tenantConnectionService: TenantConnectionService,
+    private readonly modulesService: ModulesService,
+    private readonly progressService: ProgressService,
+    private readonly errorMessageService: ErrorMessageService,
+  ) {}
+
+  /**
+   * Helper method to resolve school_id based on user role
+   * For SUPER_ADMIN: school_id must be provided in the request body
+   * For other roles: use school_id from user context
+   */
+  private resolveSchoolId(
+    user: JWTUserPayload,
+    bodySchoolId?: string | Types.ObjectId,
+  ): string {
+    if (user.role.name === RoleEnum.SUPER_ADMIN) {
+      if (!bodySchoolId) {
+        throw new BadRequestException(
+          this.errorMessageService.getMessageWithLanguage(
+            'CHAPTER',
+            'SUPER_ADMIN_SCHOOL_ID_REQUIRED',
+            user?.preferred_language || DEFAULT_LANGUAGE,
+          ),
+        );
+      }
+      return bodySchoolId.toString();
+    } else {
+      // For other roles, use school_id from user context
+      if (!user.school_id) {
+        throw new BadRequestException(
+          this.errorMessageService.getMessageWithLanguage(
+            'SCHOOL',
+            'USER_SCHOOL_ID_NOT_FOUND',
+            user?.preferred_language || DEFAULT_LANGUAGE,
+          ),
+        );
+      }
+      return user.school_id.toString();
+    }
+  }
+
+  /**
+   * Helper method to check if a chapter title already exists in the same module
+   * @param module_id - The module ID
+   * @param title - The chapter title to check
+   * @param excludeChapterId - Optional chapter ID to exclude from check (for updates)
+   * @param user - User context for tenant connection
+   * @returns Promise<boolean> - true if title exists, false otherwise
+   */
+  private async checkChapterTitleExists(
+    module_id: string | Types.ObjectId,
+    title: string,
+    user: JWTUserPayload,
+    excludeChapterId?: string | Types.ObjectId,
+  ): Promise<boolean> {
+    // Validate school
+    const school = await this.schoolModel.findById(user.school_id);
+    if (!school) {
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'SCHOOL',
+          'NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
+    }
+
+    // Get tenant connection
+    const tenantConnection =
+      await this.tenantConnectionService.getTenantConnection(school.db_name);
+    const ChapterModel = tenantConnection.model(Chapter.name, ChapterSchema);
+
+    // Normalize input title (trim + lowercase)
+    const normalizedTitle = title.trim().toLowerCase();
+
+    // Build case-insensitive query using aggregation expression
+    const query: any = {
+      module_id: new Types.ObjectId(module_id.toString()),
+      deleted_at: null,
+      $expr: {
+        $eq: [{ $toLower: '$title' }, normalizedTitle],
+      },
+    };
+
+    // Exclude the chapter being updated
+    if (excludeChapterId) {
+      query._id = { $ne: new Types.ObjectId(excludeChapterId.toString()) };
+    }
+
+    const exists = await ChapterModel.exists(query);
+    return !!exists;
+  }
+
+  async createChapter(
+    createChapterDto: CreateChapterDto,
+    user: JWTUserPayload,
+  ) {
+    const { school_id, module_id, title, description } = createChapterDto;
+
+    this.logger.log(
+      `Creating chapter: ${title} for module: ${module_id} by user: ${user.id}`,
+    );
+
+    // Resolve school_id based on user role
+    const resolvedSchoolId = this.resolveSchoolId(user, school_id);
+
+    // Validate school exists
+    const school = await this.schoolModel.findById(resolvedSchoolId);
+    if (!school) {
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'SCHOOL',
+          'NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
+    }
+
+    // Get tenant connection for the school
+    const tenantConnection =
+      await this.tenantConnectionService.getTenantConnection(school.db_name);
+    const ChapterModel = tenantConnection.model(Chapter.name, ChapterSchema);
+    const ModuleModel = tenantConnection.model(Module.name, ModuleSchema);
+
+    try {
+      // Validate module exists
+      const module = await ModuleModel.findOne({
+        _id: module_id,
+        deleted_at: null,
+      });
+      if (!module) {
+        throw new NotFoundException(
+          this.errorMessageService.getMessageWithLanguage(
+            'MODULE',
+            'NOT_FOUND',
+            user?.preferred_language || DEFAULT_LANGUAGE,
+          ),
+        );
+      }
+
+      // Check if another chapter with the same (trimmed, case-insensitive) title exists in this module
+      const titleExists = await this.checkChapterTitleExists(
+        module_id,
+        title,
+        user,
+      );
+
+      if (titleExists) {
+        throw new ConflictException(
+          this.errorMessageService.getMessageWithLanguage(
+            'CHAPTER',
+            'CHAPTER_TITLE_ALREADY_EXISTS',
+            user?.preferred_language || DEFAULT_LANGUAGE,
+          ),
+        );
+      }
+
+      // Get next sequence number for this module
+      const nextSequence = await this.getNextSequence(module_id, user);
+      // Create chapter in tenant database
+      const newChapter = new ChapterModel({
+        module_id: new Types.ObjectId(module_id),
+        title,
+        description,
+        sequence: nextSequence,
+        created_by: new Types.ObjectId(user.id),
+        created_by_role: user.role.name as RoleEnum,
+      });
+
+      const savedChapter = await newChapter.save();
+
+      this.logger.log(`Chapter created in tenant DB: ${savedChapter._id}`);
+
+      return {
+        message: this.errorMessageService.getSuccessMessageWithLanguage(
+          'CHAPTER',
+          'CREATED_SUCCESSFULLY',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+        data: savedChapter,
+      };
+    } catch (error) {
+      this.logger.error('Error creating chapter', error?.stack || error);
+      if (
+        error instanceof NotFoundException ||
+        error instanceof ConflictException
+      ) {
+        throw error;
+      }
+      throw new BadRequestException(
+        this.errorMessageService.getMessageWithLanguage(
+          'CHAPTER',
+          'CREATE_FAILED',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
+    }
+  }
+
+  async findAllChapters(
+    user: JWTUserPayload,
+    module_id?: string | Types.ObjectId,
+    paginationDto?: PaginationDto,
+  ) {
+    this.logger.log(
+      `Finding chapters for user: ${user.id}${module_id ? ` in module: ${module_id}` : ''}`,
+    );
+
+    // Validate school exists
+    const school = await this.schoolModel.findById(user.school_id);
+    if (!school) {
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'SCHOOL',
+          'NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
+    }
+
+    // Get tenant connection for the school
+    const tenantConnection =
+      await this.tenantConnectionService.getTenantConnection(school.db_name);
+    const ChapterModel = tenantConnection.model(Chapter.name, ChapterSchema);
+
+    try {
+      // Get pagination options
+      const paginationOptions = getPaginationOptions(paginationDto || {});
+
+      // Build aggregation pipeline
+      const pipeline: any[] = [
+        // Stage 1: Match chapters that are not deleted
+        { $match: { deleted_at: null } },
+      ];
+
+      // Stage 2: Add module filter if provided
+      if (module_id) {
+        pipeline.push({
+          $match: { module_id: new Types.ObjectId(module_id.toString()) },
+        });
+      }
+
+      // Stage 3: Add content information for all users
+      // Lookup bibliography items
+      pipeline.push({
+        $lookup: {
+          from: 'bibliographies',
+          let: { chapterId: '$_id' },
+          pipeline: [
+            {
+              $match: {
+                $expr: {
+                  $and: [
+                    { $eq: ['$chapter_id', '$$chapterId'] },
+                    { $eq: ['$deleted_at', null] },
+                  ],
+                },
+              },
+            },
+          ],
+          as: 'bibliography',
+        },
+      });
+
+      // Lookup quiz groups
+      pipeline.push({
+        $lookup: {
+          from: 'quiz_group',
+          let: { chapterId: '$_id' },
+          pipeline: [
+            {
+              $match: {
+                $expr: {
+                  $and: [
+                    { $eq: ['$chapter_id', '$$chapterId'] },
+                    { $eq: ['$deleted_at', null] },
+                  ],
+                },
+              },
+            },
+          ],
+          as: 'quiz_groups',
+        },
+      });
+
+      // Stage 4: Add computed fields for all users
+      const addFieldsStage: any = {
+        // Check for video content
+        hasVideo: {
+          $gt: [
+            {
+              $size: {
+                $filter: {
+                  input: '$bibliography',
+                  cond: { $eq: ['$$this.type', BibliographyTypeEnum.VIDEO] },
+                },
+              },
+            },
+            0,
+          ],
+        },
+        // Check for ppt content
+        hasPpt: {
+          $gt: [
+            {
+              $size: {
+                $filter: {
+                  input: '$bibliography',
+                  cond: {
+                    $eq: ['$$this.type', BibliographyTypeEnum.POWERPOINT],
+                  },
+                },
+              },
+            },
+            0,
+          ],
+        },
+        // Check for PDF content
+        hasPdf: {
+          $gt: [
+            {
+              $size: {
+                $filter: {
+                  input: '$bibliography',
+                  cond: { $eq: ['$$this.type', BibliographyTypeEnum.PDF] },
+                },
+              },
+            },
+            0,
+          ],
+        },
+        // Check for quiz content
+        hasQuiz: { $gt: [{ $size: '$quiz_groups' }, 0] },
+        // Get bibliography count
+        bibliography_count: { $size: '$bibliography' },
+        // Get quiz count
+        quiz_count: { $size: '$quiz_groups' },
+      };
+
+      // Add student progress lookup and status field only for students
+      if (user.role.name === RoleEnum.STUDENT) {
+        // Lookup student progress
+        pipeline.push({
+          $lookup: {
+            from: 'student_chapter_progress',
+            let: { chapterId: '$_id' },
+            pipeline: [
+              {
+                $match: {
+                  $expr: {
+                    $and: [
+                      { $eq: ['$chapter_id', '$$chapterId'] },
+                      { $eq: ['$student_id', new Types.ObjectId(user.id)] },
+                    ],
+                  },
+                },
+              },
+            ],
+            as: 'progress',
+          },
+        });
+        pipeline.push({
+          $lookup: {
+            from: 'student_chapter_progress',
+            let: { chapterId: '$_id' },
+            pipeline: [
+              {
+                $match: {
+                  $expr: {
+                    $and: [
+                      { $eq: ['$chapter_id', '$$chapterId'] },
+                      { $eq: ['$student_id', new Types.ObjectId(user.id)] },
+                    ],
+                  },
+                },
+              },
+              {
+                $project: {
+                  status: 1,
+                  chapter_quiz_completed: 1,
+                },
+              },
+            ],
+            as: 'progress',
+          },
+        });
+
+        // Lookup quiz attempts
+        pipeline.push({
+          $lookup: {
+            from: 'student_quiz_attempts',
+            let: { chapterId: '$_id' },
+            pipeline: [
+              {
+                $match: {
+                  $expr: {
+                    $and: [
+                      { $eq: ['$chapter_id', '$$chapterId'] },
+                      { $eq: ['$student_id', new Types.ObjectId(user.id)] },
+                    ],
+                  },
+                },
+              },
+              {
+                $count: 'attempts',
+              },
+            ],
+            as: 'quiz_attempts',
+          },
+        });
+
+        // Add chapter_quiz_completed field
+        addFieldsStage.chapter_quiz_completed = {
+          $cond: {
+            if: { $gt: [{ $size: '$progress' }, 0] },
+            then: { $arrayElemAt: ['$progress.chapter_quiz_completed', 0] },
+            else: false,
+          },
+        };
+
+        // Add quiz_attempt_count field
+        addFieldsStage.quiz_attempt_count = {
+          $cond: {
+            if: { $gt: [{ $size: '$quiz_attempts' }, 0] },
+            then: { $arrayElemAt: ['$quiz_attempts.attempts', 0] },
+            else: 0,
+          },
+        };
+
+        // Add status field for students
+        addFieldsStage.status = {
+          $cond: {
+            if: { $gt: [{ $size: '$progress' }, 0] },
+            then: { $arrayElemAt: ['$progress.status', 0] },
+            else: ProgressStatusEnum.NOT_STARTED,
+          },
+        };
+      }
+
+      pipeline.push({ $addFields: addFieldsStage });
+
+      // Stage 5: Project final fields
+      const projectFields: any = {
+        _id: 1,
+        module_id: 1,
+        title: 1,
+        description: 1,
+        sequence: 1,
+        created_by: 1,
+        created_by_role: 1,
+        created_at: 1,
+        updated_at: 1,
+        hasVideo: 1,
+        hasPpt: 1,
+        hasPdf: 1,
+        hasQuiz: 1,
+        bibliography_count: 1,
+        quiz_count: 1,
+      };
+
+      // Add status field only for students
+      if (user.role.name === RoleEnum.STUDENT) {
+        projectFields.status = 1;
+        projectFields.chapter_quiz_completed = 1;
+        projectFields.quiz_attempt_count = 1;
+      }
+
+      pipeline.push({ $project: projectFields });
+
+      // Stage 6: Sort by sequence
+      pipeline.push({ $sort: { sequence: 1 } });
+
+      // Stage 7: Get total count for pagination
+      const countPipeline = [...pipeline, { $count: 'total' }];
+      const countResult = await ChapterModel.aggregate(countPipeline);
+      const total = countResult.length > 0 ? countResult[0].total : 0;
+
+      // Stage 8: Add pagination
+      pipeline.push(
+        { $skip: paginationOptions.skip },
+        { $limit: paginationOptions.limit },
+      );
+
+      // Execute aggregation
+      const chapters = await ChapterModel.aggregate(pipeline);
+
+      if (
+        user.role.name === RoleEnum.STUDENT &&
+        Array.isArray(chapters) &&
+        chapters.length > 0
+      ) {
+        for (let i = 0; i < chapters.length; i++) {
+          const chapter = chapters[i];
+          chapter.quiz_attempt_count = chapter.quiz_attempt_count || 0;
+
+          // Add "needs_quiz_retake" flag
+          chapter.needs_quiz_retake =
+            chapter.status === ProgressStatusEnum.COMPLETED &&
+            chapter.chapter_quiz_completed === false &&
+            chapter.quiz_attempt_count > 0;
+
+          // Lock logic
+          if (i === 0) {
+            chapter.is_locked = false;
+            chapter.locked_reason = null;
+          } else {
+            const prev = chapters[i - 1];
+            const isPrevCompleted =
+              prev.status === ProgressStatusEnum.COMPLETED;
+            const isPrevQuizCompleted = prev.chapter_quiz_completed === true;
+
+            chapter.is_locked = !(isPrevCompleted && isPrevQuizCompleted);
+
+            // Add locked reason
+            if (!isPrevCompleted) {
+              chapter.locked_reason =
+                this.errorMessageService.getMessageWithLanguage(
+                  'CHAPTER',
+                  'LOCKED_REASON_PREVIOUS_CHAPTER',
+                  user?.preferred_language || DEFAULT_LANGUAGE,
+                );
+            } else if (!isPrevQuizCompleted) {
+              chapter.locked_reason =
+                this.errorMessageService.getMessageWithLanguage(
+                  'CHAPTER',
+                  'LOCKED_REASON_QUIZ_REQUIRED',
+                  user?.preferred_language || DEFAULT_LANGUAGE,
+                );
+            } else {
+              chapter.locked_reason = null;
+            }
+          }
+        }
+      }
+
+      // Attach user details to chapters
+      const chaptersWithUsers = await attachUserDetails(
+        chapters,
+        this.userModel,
+      );
+
+      // Create pagination result
+      const result = createPaginationResult(
+        chaptersWithUsers,
+        total,
+        paginationOptions,
+      );
+
+      return {
+        message: this.errorMessageService.getSuccessMessageWithLanguage(
+          'CHAPTER',
+          'CHAPTERS_RETRIEVED_SUCCESSFULLY',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+        data: result.data,
+        pagination_data: result.pagination_data,
+      };
+    } catch (error) {
+      this.logger.error('Error finding chapters', error?.stack || error);
+      throw new BadRequestException(
+        this.errorMessageService.getMessageWithLanguage(
+          'CHAPTER',
+          'RETRIEVE_ALL_FAILED',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
+    }
+  }
+
+  async findChapterById(id: string | Types.ObjectId, user: JWTUserPayload) {
+    this.logger.log(`Finding chapter by id: ${id} for user: ${user.id}`);
+
+    // Validate school exists
+    const school = await this.schoolModel.findById(user.school_id);
+    if (!school) {
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'SCHOOL',
+          'NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
+    }
+
+    // Get tenant connection for the school
+    const tenantConnection =
+      await this.tenantConnectionService.getTenantConnection(school.db_name);
+    const ChapterModel = tenantConnection.model(Chapter.name, ChapterSchema);
+
+    const chapter = await ChapterModel.findById(id);
+
+    // Check if student can access this chapter (validate sequence)
+    if (user.role.name === RoleEnum.STUDENT) {
+      await this.progressService.validateChapterAccess(
+        user.id,
+        chapter,
+        tenantConnection,
+        user,
+      );
+    }
+
+    try {
+      // Build aggregation pipeline
+      const pipeline: any[] = [
+        // Stage 1: Match the specific chapter
+        {
+          $match: {
+            _id: new Types.ObjectId(id.toString()),
+            deleted_at: null,
+          },
+        },
+      ];
+
+      // Stage 2: Add content information for all users
+      // Lookup bibliography items
+      pipeline.push({
+        $lookup: {
+          from: 'bibliographies',
+          let: { chapterId: '$_id' },
+          pipeline: [
+            {
+              $match: {
+                $expr: {
+                  $and: [
+                    { $eq: ['$chapter_id', '$$chapterId'] },
+                    { $eq: ['$deleted_at', null] },
+                  ],
+                },
+              },
+            },
+          ],
+          as: 'bibliography',
+        },
+      });
+
+      // Lookup quiz groups
+      pipeline.push({
+        $lookup: {
+          from: 'quiz_group',
+          let: { chapterId: '$_id' },
+          pipeline: [
+            {
+              $match: {
+                $expr: {
+                  $and: [
+                    { $eq: ['$chapter_id', '$$chapterId'] },
+                    { $eq: ['$deleted_at', null] },
+                  ],
+                },
+              },
+            },
+          ],
+          as: 'quiz_groups',
+        },
+      });
+
+      // Stage 3: Add computed fields for all users
+      const addFieldsStage: any = {
+        // Check for video content
+        hasVideo: {
+          $gt: [
+            {
+              $size: {
+                $filter: {
+                  input: '$bibliography',
+                  cond: {
+                    $eq: ['$$this.type', BibliographyTypeEnum.VIDEO],
+                  },
+                },
+              },
+            },
+            0,
+          ],
+        },
+        // Check for video content
+        hasPpt: {
+          $gt: [
+            {
+              $size: {
+                $filter: {
+                  input: '$bibliography',
+                  cond: {
+                    $eq: ['$$this.type', BibliographyTypeEnum.POWERPOINT],
+                  },
+                },
+              },
+            },
+            0,
+          ],
+        },
+        // Check for PDF content
+        hasPdf: {
+          $gt: [
+            {
+              $size: {
+                $filter: {
+                  input: '$bibliography',
+                  cond: { $eq: ['$$this.type', BibliographyTypeEnum.PDF] },
+                },
+              },
+            },
+            0,
+          ],
+        },
+        // Check for quiz content
+        hasQuiz: { $gt: [{ $size: '$quiz_groups' }, 0] },
+        // Get bibliography count
+        bibliography_count: { $size: '$bibliography' },
+        // Get quiz count
+        quiz_count: { $size: '$quiz_groups' },
+      };
+
+      // Add student progress lookup and status field only for students
+      if (user.role.name === RoleEnum.STUDENT) {
+        // Lookup student progress
+        pipeline.push({
+          $lookup: {
+            from: 'student_chapter_progress',
+            let: { chapterId: '$_id' },
+            pipeline: [
+              {
+                $match: {
+                  $expr: {
+                    $and: [
+                      { $eq: ['$chapter_id', '$$chapterId'] },
+                      { $eq: ['$student_id', new Types.ObjectId(user.id)] },
+                    ],
+                  },
+                },
+              },
+            ],
+            as: 'progress',
+          },
+        });
+        pipeline.push({
+          $lookup: {
+            from: 'student_chapter_progress',
+            let: { chapterId: '$_id' },
+            pipeline: [
+              {
+                $match: {
+                  $expr: {
+                    $and: [
+                      { $eq: ['$chapter_id', '$$chapterId'] },
+                      { $eq: ['$student_id', new Types.ObjectId(user.id)] },
+                    ],
+                  },
+                },
+              },
+              {
+                $project: {
+                  status: 1,
+                  chapter_quiz_completed: 1,
+                },
+              },
+            ],
+            as: 'progress',
+          },
+        });
+
+        // Lookup quiz attempts
+        pipeline.push({
+          $lookup: {
+            from: 'student_quiz_attempts',
+            let: { chapterId: '$_id' },
+            pipeline: [
+              {
+                $match: {
+                  $expr: {
+                    $and: [
+                      { $eq: ['$chapter_id', '$$chapterId'] },
+                      { $eq: ['$student_id', new Types.ObjectId(user.id)] },
+                    ],
+                  },
+                },
+              },
+              {
+                $count: 'attempts',
+              },
+            ],
+            as: 'quiz_attempts',
+          },
+        });
+
+        // Add chapter_quiz_completed field
+        addFieldsStage.chapter_quiz_completed = {
+          $cond: {
+            if: { $gt: [{ $size: '$progress' }, 0] },
+            then: { $arrayElemAt: ['$progress.chapter_quiz_completed', 0] },
+            else: false,
+          },
+        };
+
+        // Add quiz_attempt_count field
+        addFieldsStage.quiz_attempt_count = {
+          $cond: {
+            if: { $gt: [{ $size: '$quiz_attempts' }, 0] },
+            then: { $arrayElemAt: ['$quiz_attempts.attempts', 0] },
+            else: 0,
+          },
+        };
+
+        // Add status field for students
+        addFieldsStage.status = {
+          $cond: {
+            if: { $gt: [{ $size: '$progress' }, 0] },
+            then: { $arrayElemAt: ['$progress.status', 0] },
+            else: ProgressStatusEnum.NOT_STARTED,
+          },
+        };
+      }
+
+      pipeline.push({ $addFields: addFieldsStage });
+
+      // Stage 4: Project final fields
+      const projectFields: any = {
+        _id: 1,
+        module_id: 1,
+        title: 1,
+        description: 1,
+        sequence: 1,
+        created_by: 1,
+        created_by_role: 1,
+        created_at: 1,
+        updated_at: 1,
+        hasVideo: 1,
+        hasPpt: 1,
+        hasPdf: 1,
+        hasQuiz: 1,
+        bibliography_count: 1,
+        quiz_count: 1,
+      };
+
+      // Add status field only for students
+      if (user.role.name === RoleEnum.STUDENT) {
+        projectFields.status = 1;
+        projectFields.chapter_quiz_completed = 1;
+        projectFields.quiz_attempt_count = 1;
+      }
+
+      pipeline.push({ $project: projectFields });
+
+      // Execute aggregation
+      const chapters = await ChapterModel.aggregate(pipeline);
+      if (
+        user.role.name === RoleEnum.STUDENT &&
+        Array.isArray(chapters) &&
+        chapters.length > 0
+      ) {
+        for (let i = 0; i < chapters.length; i++) {
+          const chapter = chapters[i];
+
+          chapter.quiz_attempt_count = chapter.quiz_attempt_count || 0;
+
+          // Add "needs_quiz_retake" flag
+          chapter.needs_quiz_retake =
+            chapter.status === ProgressStatusEnum.COMPLETED &&
+            chapter.chapter_quiz_completed === false &&
+            chapter.quiz_attempt_count > 0;
+
+          // Lock logic
+          if (i === 0) {
+            chapter.is_locked = false;
+            chapter.locked_reason = null;
+          } else {
+            const prev = chapters[i - 1];
+            const isPrevCompleted =
+              prev.status === ProgressStatusEnum.COMPLETED;
+            const isPrevQuizCompleted = prev.chapter_quiz_completed === true;
+
+            chapter.is_locked = !(isPrevCompleted && isPrevQuizCompleted);
+
+            // Add locked reason
+            if (!isPrevCompleted) {
+              chapter.locked_reason =
+                this.errorMessageService.getMessageWithLanguage(
+                  'CHAPTER',
+                  'LOCKED_REASON_PREVIOUS_CHAPTER',
+                  user?.preferred_language || DEFAULT_LANGUAGE,
+                );
+            } else if (!isPrevQuizCompleted) {
+              chapter.locked_reason =
+                this.errorMessageService.getMessageWithLanguage(
+                  'CHAPTER',
+                  'LOCKED_REASON_QUIZ_REQUIRED',
+                  user?.preferred_language || DEFAULT_LANGUAGE,
+                );
+            } else {
+              chapter.locked_reason = null;
+            }
+          }
+        }
+      }
+
+      if (chapters.length === 0) {
+        throw new NotFoundException(
+          this.errorMessageService.getMessageWithLanguage(
+            'CHAPTER',
+            'NOT_FOUND',
+            user?.preferred_language || DEFAULT_LANGUAGE,
+          ),
+        );
+      }
+
+      const chapter = chapters[0];
+
+      let previous_chapter_id: string | null = null;
+      let next_chapter_id: string | null = null;
+
+      if (chapter?.module_id && typeof chapter.sequence === 'number') {
+        // Fetch previous chapter by sequence - 1
+        const previousChapter = await ChapterModel.findOne({
+          module_id: chapter.module_id,
+          sequence: chapter.sequence - 1,
+          deleted_at: null,
+        }).select('_id');
+
+        if (previousChapter) {
+          previous_chapter_id = previousChapter._id.toString();
+        }
+
+        // Fetch next chapter by sequence + 1 only if current quiz is completed
+        const isQuizDone =
+          chapter.status === ProgressStatusEnum.COMPLETED &&
+          chapter.chapter_quiz_completed === true;
+
+        if (isQuizDone) {
+          const nextChapter = await ChapterModel.findOne({
+            module_id: chapter.module_id,
+            sequence: chapter.sequence + 1,
+            deleted_at: null,
+          }).select('_id');
+
+          if (nextChapter) {
+            next_chapter_id = nextChapter._id.toString();
+          }
+        }
+      }
+
+      // Attach user details to chapter
+      const chapterWithUser = await attachUserDetailsToEntity(
+        chapter,
+        this.userModel,
+      );
+
+      return {
+        message: this.errorMessageService.getSuccessMessageWithLanguage(
+          'CHAPTER',
+          'RETRIEVED_SUCCESSFULLY',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+        data: {
+          ...chapterWithUser,
+          previous_chapter_id,
+          next_chapter_id,
+        },
+      };
+    } catch (error) {
+      this.logger.error('Error finding chapter', error?.stack || error);
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
+      throw new BadRequestException(
+        this.errorMessageService.getMessageWithLanguage(
+          'CHAPTER',
+          'RETRIEVE_FAILED',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
+    }
+  }
+
+  async updateChapter(
+    id: string | Types.ObjectId,
+    updateChapterDto: UpdateChapterDto,
+    user: JWTUserPayload,
+  ) {
+    const { school_id, ...chapterUpdateData } = updateChapterDto;
+
+    this.logger.log(`Updating chapter: ${id} by user: ${user.id}`);
+
+    // Resolve school_id based on user role
+    const resolvedSchoolId = this.resolveSchoolId(user, school_id);
+
+    // Validate school exists
+    const school = await this.schoolModel.findById(resolvedSchoolId);
+    if (!school) {
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'SCHOOL',
+          'NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
+    }
+
+    // Get tenant connection for the school
+    const tenantConnection =
+      await this.tenantConnectionService.getTenantConnection(school.db_name);
+    const ChapterModel = tenantConnection.model(Chapter.name, ChapterSchema);
+
+    try {
+      // If title is being updated, check for duplicates
+      if (chapterUpdateData.title) {
+        // Get the current chapter to retrieve module_id
+        const currentChapter = await ChapterModel.findOne({
+          _id: id,
+          deleted_at: null,
+        });
+
+        if (!currentChapter) {
+          throw new NotFoundException(
+            this.errorMessageService.getMessageWithLanguage(
+              'CHAPTER',
+              'NOT_FOUND',
+              user?.preferred_language || DEFAULT_LANGUAGE,
+            ),
+          );
+        }
+
+        // Check if another chapter with the same (trimmed, case-insensitive) title exists in this module
+        const titleExists = await this.checkChapterTitleExists(
+          currentChapter.module_id,
+          chapterUpdateData.title,
+          user,
+          id, // Exclude current chapter from duplicate check
+        );
+
+        if (titleExists) {
+          throw new ConflictException(
+            this.errorMessageService.getMessageWithLanguage(
+              'CHAPTER',
+              'CHAPTER_TITLE_ALREADY_EXISTS',
+              user?.preferred_language || DEFAULT_LANGUAGE,
+            ),
+          );
+        }
+      }
+
+      const updatedChapter = await ChapterModel.findOneAndUpdate(
+        { _id: id, deleted_at: null },
+        {
+          title: chapterUpdateData.title,
+          ...chapterUpdateData,
+          updated_at: new Date(),
+        },
+        { new: true },
+      ).lean();
+
+      if (!updatedChapter) {
+        throw new NotFoundException(
+          this.errorMessageService.getMessageWithLanguage(
+            'CHAPTER',
+            'NOT_FOUND',
+            user?.preferred_language || DEFAULT_LANGUAGE,
+          ),
+        );
+      }
+
+      // Attach user details to chapter
+      const chapterWithUser = await attachUserDetailsToEntity(
+        updatedChapter,
+        this.userModel,
+      );
+
+      return {
+        message: this.errorMessageService.getSuccessMessageWithLanguage(
+          'CHAPTER',
+          'UPDATED_SUCCESSFULLY',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+        data: chapterWithUser,
+      };
+    } catch (error) {
+      this.logger.error('Error updating chapter', error?.stack || error);
+      if (
+        error instanceof NotFoundException ||
+        error instanceof ConflictException
+      ) {
+        throw error;
+      }
+      throw new BadRequestException(
+        this.errorMessageService.getMessageWithLanguage(
+          'CHAPTER',
+          'UPDATE_FAILED',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
+    }
+  }
+
+  async removeChapter(
+    id: string | Types.ObjectId,
+    user: JWTUserPayload,
+    school_id?: string,
+  ) {
+    this.logger.log(`Removing chapter: ${id} by user: ${user.id}`);
+
+    // Resolve school_id based on user role
+    const resolvedSchoolId = this.resolveSchoolId(user, school_id);
+
+    // Validate school exists
+    const school = await this.schoolModel.findById(resolvedSchoolId);
+    if (!school) {
+      throw new NotFoundException('School not found');
+    }
+
+    // Get tenant connection for the school
+    const tenantConnection =
+      await this.tenantConnectionService.getTenantConnection(school.db_name);
+    const ChapterModel = tenantConnection.model(Chapter.name, ChapterSchema);
+
+    try {
+      // Use a transaction to ensure atomic updates
+      const session = await tenantConnection.startSession();
+
+      try {
+        await session.withTransaction(async () => {
+          const chapterToDelete = await ChapterModel.findOne({
+            _id: id,
+            deleted_at: null,
+          }).session(session);
+
+          if (!chapterToDelete) {
+            throw new NotFoundException('Chapter not found');
+          }
+
+          const deletedSequence = chapterToDelete.sequence;
+          const module_id = chapterToDelete.module_id;
+
+          // ✅ Step 1: Soft delete and move sequence to -1 (avoid conflict)
+          const deletedChapter = await ChapterModel.findOneAndUpdate(
+            { _id: id, deleted_at: null },
+            {
+              deleted_at: new Date(),
+              sequence: -1, // ✅ Temporary number outside the normal sequence range
+            },
+            { new: true, session },
+          );
+
+          if (!deletedChapter) {
+            throw new NotFoundException('Chapter not found');
+          }
+
+          // ✅ Step 2: Reorder others by decrementing sequence
+          await ChapterModel.updateMany(
+            {
+              module_id,
+              sequence: { $gt: deletedSequence },
+              deleted_at: null,
+            },
+            {
+              $inc: { sequence: -1 },
+              updated_at: new Date(),
+            },
+          ).session(session);
+        });
+
+        return {
+          message: this.errorMessageService.getSuccessMessageWithLanguage(
+            'CHAPTER',
+            'CHAPTER_DELETED_SUCCESSFULLY',
+            user?.preferred_language || DEFAULT_LANGUAGE,
+          ),
+          data: { id },
+        };
+      } finally {
+        await session.endSession();
+      }
+    } catch (error) {
+      this.logger.error('Error removing chapter', error?.stack || error);
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
+      throw new BadRequestException('Failed to delete chapter');
+    }
+  }
+
+  async reorderChapters(
+    reorderChaptersDto: ReorderChaptersDto,
+    user: JWTUserPayload,
+  ) {
+    const { school_id, chapters } = reorderChaptersDto;
+
+    if (!chapters || !Array.isArray(chapters) || chapters.length === 0) {
+      throw new BadRequestException(
+        'Chapters array is required and must not be empty',
+      );
+    }
+
+    this.logger.log(`Reordering chapters by user: ${user.id}`);
+
+    // Resolve school_id based on user role
+    const resolvedSchoolId = this.resolveSchoolId(user, school_id);
+
+    // Validate school exists
+    const school = await this.schoolModel.findById(resolvedSchoolId);
+    if (!school) {
+      throw new NotFoundException('School not found');
+    }
+
+    // Get tenant connection for the school
+    const tenantConnection =
+      await this.tenantConnectionService.getTenantConnection(school.db_name);
+    const ChapterModel = tenantConnection.model(Chapter.name, ChapterSchema);
+
+    try {
+      // Validate all chapters exist and belong to the same module
+      const chapterIds = chapters.map((c) => c.chapter_id);
+      const existingChapters = await ChapterModel.find({
+        _id: { $in: chapterIds },
+        deleted_at: null,
+      }).lean();
+
+      if (existingChapters.length !== chapters.length) {
+        throw new NotFoundException('One or more chapters not found');
+      }
+
+      // Check if all chapters belong to the same module
+      const moduleIds = [
+        ...new Set(existingChapters.map((c) => c.module_id.toString())),
+      ];
+      if (moduleIds.length > 1) {
+        throw new BadRequestException(
+          'All chapters must belong to the same module',
+        );
+      }
+
+      // Check for duplicate sequences
+      const sequences = chapters.map((c) => c.new_sequence);
+      const uniqueSequences = [...new Set(sequences)];
+      if (sequences.length !== uniqueSequences.length) {
+        throw new BadRequestException(
+          'Duplicate sequence numbers are not allowed',
+        );
+      }
+
+      // Use a transaction to ensure atomic updates and avoid conflicts
+      const session = await tenantConnection.startSession();
+
+      try {
+        await session.withTransaction(async () => {
+          // First, temporarily set all sequences to negative values to avoid conflicts
+          for (const chapter of chapters) {
+            await ChapterModel.findByIdAndUpdate(
+              chapter.chapter_id,
+              { sequence: -chapter.new_sequence, updated_at: new Date() },
+              { session, new: true },
+            );
+          }
+
+          // Then, set the final sequences
+          for (const chapter of chapters) {
+            await ChapterModel.findByIdAndUpdate(
+              chapter.chapter_id,
+              { sequence: chapter.new_sequence, updated_at: new Date() },
+              { session, new: true },
+            );
+          }
+        });
+
+        // Fetch the updated chapters
+        const updatedChapters = await ChapterModel.find({
+          _id: { $in: chapters.map((c) => c.chapter_id) },
+          deleted_at: null,
+        }).lean();
+
+        return {
+          message: this.errorMessageService.getSuccessMessageWithLanguage(
+            'CHAPTER',
+            'REORDERED_SUCCESSFULLY',
+            user?.preferred_language || DEFAULT_LANGUAGE,
+          ),
+          data: updatedChapters
+            .filter((chapter) => chapter !== null)
+            .map((chapter) => ({
+              id: chapter._id,
+              title: chapter.title,
+              sequence: chapter.sequence,
+            })),
+        };
+      } catch (error) {
+        this.logger.error('Error reordering chapters', error?.stack || error);
+        if (
+          error instanceof NotFoundException ||
+          error instanceof BadRequestException
+        ) {
+          throw error;
+        }
+        throw new BadRequestException(
+          this.errorMessageService.getMessageWithLanguage(
+            'CHAPTER',
+            'REORDER_FAILED',
+            user?.preferred_language || DEFAULT_LANGUAGE,
+          ),
+        );
+      } finally {
+        await session.endSession();
+      }
+    } catch (error) {
+      this.logger.error('Error reordering chapters', error?.stack || error);
+      if (
+        error instanceof NotFoundException ||
+        error instanceof BadRequestException
+      ) {
+        throw error;
+      }
+      throw new BadRequestException(
+        this.errorMessageService.getMessageWithLanguage(
+          'CHAPTER',
+          'REORDER_FAILED',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
+    }
+  }
+
+  async getNextSequence(
+    module_id: string | Types.ObjectId,
+    user: JWTUserPayload,
+  ): Promise<number> {
+    // Validate school exists
+    const school = await this.schoolModel.findById(user.school_id);
+    if (!school) {
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'SCHOOL',
+          'NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
+    }
+
+    // Get tenant connection for the school
+    const tenantConnection =
+      await this.tenantConnectionService.getTenantConnection(school.db_name);
+    const ChapterModel = tenantConnection.model(Chapter.name, ChapterSchema);
+
+    try {
+      const lastChapter = await ChapterModel.findOne({
+        module_id: new Types.ObjectId(module_id),
+        deleted_at: null,
+      })
+        .sort({ sequence: -1 })
+        .select('sequence')
+        .lean();
+      return lastChapter ? lastChapter.sequence + 1 : 1;
+    } catch (error) {
+      this.logger.error('Error getting next sequence', error?.stack || error);
+      throw new BadRequestException(
+        this.errorMessageService.getMessageWithLanguage(
+          'CHAPTER',
+          'SEQUENCE_FAILED',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
+    }
+  }
+
+  // Helper to recalculate and update chapter duration
+  async recalculateChapterDuration(
+    chapterId: Types.ObjectId,
+    tenantConnection: any,
+  ) {
+    const BibliographyModel = tenantConnection.model(
+      Bibliography.name,
+      BibliographySchema,
+    );
+    const ChapterModel = tenantConnection.model(Chapter.name, ChapterSchema);
+    const bibliographies = await BibliographyModel.find({
+      chapter_id: chapterId,
+      deleted_at: null,
+    });
+
+    // Calculate total duration with proper unit conversion
+    const totalDuration = bibliographies.reduce((sum, b) => {
+      if (b.type === BibliographyTypeEnum.VIDEO) {
+        // Convert video duration from seconds to minutes
+        return sum + (b.duration || 0) / 60;
+      } else {
+        // Other content types (PDF, PowerPoint, etc.) are already in minutes
+        return sum + (b.duration || 0);
+      }
+    }, 0);
+
+    const chapter = await ChapterModel.findByIdAndUpdate(
+      chapterId,
+      { duration: totalDuration },
+      { new: true },
+    );
+    // After updating chapter duration, update parent module duration
+    if (chapter && chapter.module_id) {
+      await this.modulesService.recalculateModuleDuration(
+        chapter.module_id,
+        tenantConnection,
+      );
+    }
+    return totalDuration;
+  }
+}

@@ -1,0 +1,59 @@
+import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
+import { Document, Types } from 'mongoose';
+import { User } from '../central/user.schema';
+import { Module } from './module.schema';
+import { RoleEnum } from 'src/common/constants/roles.constant';
+
+@Schema({
+  timestamps: {
+    createdAt: 'created_at',
+    updatedAt: 'updated_at',
+  },
+})
+export class Chapter extends Document {
+  declare _id: Types.ObjectId;
+
+  @Prop({ type: Types.ObjectId, ref: Module.name, required: true })
+  module_id: Types.ObjectId;
+
+  @Prop({ required: true })
+  title: string;
+
+  @Prop()
+  description: string;
+
+  @Prop({ type: Types.ObjectId, ref: User.name, required: true })
+  created_by: Types.ObjectId;
+
+  @Prop({ required: true, enum: RoleEnum })
+  created_by_role: RoleEnum;
+
+  @Prop({ required: true, type: Number, min: 1 })
+  sequence: number;
+
+  @Prop({ type: Number, default: 0 })
+  duration: number; // in minutes, auto-calculated from bibliographies
+
+  @Prop({ type: Date, default: null })
+  deleted_at: Date;
+
+  readonly created_at?: Date;
+  readonly updated_at?: Date;
+}
+
+export const ChapterSchema = SchemaFactory.createForClass(Chapter);
+
+// Create compound index for module_id, sequence, and deleted_at to ensure unique sequence per module
+// Only active chapters (deleted_at is null) will be considered for uniqueness
+ChapterSchema.index(
+  { module_id: 1, sequence: 1, deleted_at: 1 },
+  { unique: true },
+);
+
+// Create compound index for module_id, title, and deleted_at to ensure unique titles per module
+// Only active chapters (deleted_at is null) will be considered for uniqueness
+// Note: Title uniqueness is enforced case-insensitively in the application layer
+ChapterSchema.index(
+  { module_id: 1, title: 1, deleted_at: 1 },
+  { unique: true },
+);

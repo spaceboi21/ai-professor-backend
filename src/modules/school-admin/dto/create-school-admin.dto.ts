@@ -1,0 +1,59 @@
+import { ApiProperty } from '@nestjs/swagger';
+import { Transform } from 'class-transformer';
+import {
+  IsEmail,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  IsUrl,
+  IsEnum,
+} from 'class-validator';
+import { LanguageEnum } from 'src/common/constants/language.constant';
+
+export class CreateSchoolAdminDto {
+  // School Admin Details
+  @IsString({ message: 'School name must be a string' })
+  @IsNotEmpty({ message: 'School name is required' })
+  @ApiProperty({ example: 'Springfield High' })
+  school_name: string;
+
+  @IsEmail({}, { message: 'Invalid email format' })
+  @IsNotEmpty({ message: 'Email is required' })
+  @Transform(({ value }) => value.toLowerCase())
+  @ApiProperty({ example: 'contact@springfieldhigh.edu' })
+  school_email: string;
+
+  @IsUrl({}, { message: 'Website URL must be a valid URL' })
+  @IsNotEmpty({ message: 'Website URL is required' })
+  @ApiProperty({ example: 'https://springfieldhigh.edu' })
+  school_website_url: string;
+
+  // School Admin User Details
+  @IsEmail({}, { message: 'Invalid email format' })
+  @IsNotEmpty({ message: 'Email is required' })
+  @Transform(({ value }) => value.toLowerCase())
+  @ApiProperty({ example: 'admin@springfieldhigh.edu' })
+  user_email: string;
+
+  @IsString({ message: 'First name must be a string' })
+  @IsNotEmpty({ message: 'First name is required' })
+  @ApiProperty({ example: 'Bob' })
+  user_first_name: string;
+
+  @IsString({ message: 'Last name must be a string' })
+  @IsNotEmpty({ message: 'Last name is required' })
+  @ApiProperty({ example: 'Johnson' })
+  user_last_name: string;
+
+  @IsOptional()
+  @IsEnum(LanguageEnum, {
+    message: 'Preferred language must be either "en" or "fr"',
+  })
+  @ApiProperty({
+    description: 'Preferred language for the user interface',
+    enum: LanguageEnum,
+    example: LanguageEnum.FRENCH,
+    required: false,
+  })
+  preferred_language?: LanguageEnum;
+}

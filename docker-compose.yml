@@ -1,0 +1,38 @@
+version: '3.8'
+
+services:
+  # AI Professor Backend API
+  backend:
+    build: .
+    ports:
+      - "${PORT:-5000}:${PORT:-5000}"
+    env_file:
+      - .env
+    environment:
+      # Override MongoDB URI for Docker internal networking
+      # - MONGODB_URI=mongodb://mongodb:27017/ai-professor-central
+    depends_on:
+      - mongodb
+    volumes:
+      - ./uploads:/app/uploads
+    networks:
+      - ai-professor-network
+
+  # MongoDB Database
+  mongodb:
+    image: mongo:7
+    ports:
+      - "27017:27017"
+    environment:
+      - MONGO_INITDB_DATABASE=ai-professor-central
+    volumes:
+      - mongodb_data:/data/db
+    networks:
+      - ai-professor-network
+
+volumes:
+  mongodb_data:
+
+networks:
+  ai-professor-network:
+    driver: bridge 

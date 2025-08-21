@@ -1,65 +1,62 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import * as jwt from 'jsonwebtoken';
-import { SignOptions } from 'jsonwebtoken';
+import { JwtService } from '@nestjs/jwt';
+import { RoleEnum } from '../constants/roles.constant';
 
 export interface JWTPayload {
-  userId: string;
+  id: string;
   email: string;
-  role: string;
-  schoolDbName?: string;
+  role_id: string;
+  role_name: RoleEnum;
+  school_id?: string;
   exp?: number;
-  iat?: number;
 }
 
 @Injectable()
 export class JwtUtil {
-  constructor(private readonly configService: ConfigService) {}
+  constructor(
+    private readonly jwtService: JwtService,
+    private readonly configService: ConfigService,
+  ) {}
 
-  private get jwtSecret(): string {
-    return this.configService.get<string>('JWT_SECRET') || 'your-secret-key';
+  generateToken(
+    payload: Omit<JWTPayload, 'exp' | 'iat'>,
+    expiresIn?: string,
+  ): string {
+    const defaultExpiresIn =
+      this.configService.get<string>('JWT_ACCESS_EXPIRY') || '24h';
+    const tokenExpiresIn = expiresIn || defaultExpiresIn;
+    const secret = this.configService.get<string>('JWT_SECRET');
+    if (!secret) {
+      throw new Error('JWT_SECRET is not configured');
+    }
+    return this.jwtService.sign(payload, {
+      expiresIn: tokenExpiresIn,
+      secret,
+    });
   }
 
-  private get jwtExpiry(): string {
-    return this.configService.get<string>('JWT_EXPIRY') || '24h';
-  }
-
-  /**
-   * Generate JWT token
-   */
-  generateToken(payload: Omit<JWTPayload, 'iat' | 'exp'>): string {
-    const options: SignOptions = {
-      expiresIn: this.jwtExpiry as any,
-    };
-
-    return jwt.sign(payload, this.jwtSecret, options);
-  }
-
-  /**
-   * Verify JWT token
-   */
   verifyToken(token: string): JWTPayload {
     try {
-      return jwt.verify(token, this.jwtSecret) as JWTPayload;
-    } catch (error: any) {
-      throw new Error(`Invalid token: ${error.message}`);
+      const secret = this.configService.get<string>('JWT_SECRET');
+
+      if (!secret) {
+        throw new Error('JWT_SECRET is not configured');
+      }
+      return this.jwtService.verify<JWTPayload>(token, { secret });
+    } catch (error) {
+      throw new UnauthorizedException(`Invalid token: ${error.message}`);
     }
   }
 
-  /**
-   * Decode token without verification (useful for expired tokens)
-   */
   decodeToken(token: string): JWTPayload | null {
     try {
-      return jwt.decode(token) as JWTPayload;
-    } catch (error) {
+      return this.jwtService.decode(token) as JWTPayload;
+    } catch {
       return null;
     }
   }
 
-  /**
-   * Extract token from Authorization header
-   */
   extractTokenFromHeader(authHeader?: string): string | null {
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return null;

@@ -35,13 +35,38 @@ export class BcryptUtil {
   /**
    * Generate a random password
    */
-  generateRandomPassword(length: number = 12): string {
-    const charset =
-      'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*';
-    let password = '';
-    for (let i = 0; i < length; i++) {
-      password += charset.charAt(Math.floor(Math.random() * charset.length));
+  generateStrongPassword(length: number = 12): string {
+    const upperCase = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    const lowerCase = 'abcdefghijklmnopqrstuvwxyz';
+    const numbers = '0123456789';
+    const symbols = '!@#$%^&*()-_=+[]{}|;:,.<>?';
+
+    // Ensure password includes at least one of each type
+    const getRandom = (str: string) =>
+      str[Math.floor(Math.random() * str.length)];
+
+    if (length < 8) {
+      throw new Error(
+        'Password length should be at least 8 characters for strength',
+      );
     }
-    return password;
+
+    let password = [
+      getRandom(upperCase),
+      getRandom(lowerCase),
+      getRandom(numbers),
+      getRandom(symbols),
+    ];
+
+    const allChars = upperCase + lowerCase + numbers + symbols;
+
+    for (let i = password.length; i < length; i++) {
+      password.push(getRandom(allChars));
+    }
+
+    // Shuffle the password to avoid predictable order
+    password = password.sort(() => Math.random() - 0.5);
+
+    return password.join('');
   }
 }
