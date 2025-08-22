@@ -6370,4 +6370,77 @@ export class CommunityService {
 
     return allSubReplies;
   }
+
+  /**
+   * Get all available tags for forum discussions
+   */
+  async getAllTags(user: JWTUserPayload) {
+    this.logger.log(`Getting all tags for user: ${user.id}`);
+
+    try {
+      const resolvedSchoolId = this.resolveSchoolId(user);
+
+      // Validate school exists
+      const school = await this.schoolModel.findById(resolvedSchoolId);
+      if (!school) {
+        throw new NotFoundException(
+          this.errorMessageService.getMessageWithLanguage(
+            'SCHOOL',
+            'NOT_FOUND',
+            user?.preferred_language || DEFAULT_LANGUAGE,
+          ),
+        );
+      }
+
+      // Get tenant connection
+      const tenantConnection =
+        await this.tenantConnectionService.getTenantConnection(school.db_name);
+      const DiscussionModel = tenantConnection.model(
+        ForumDiscussion.name,
+        ForumDiscussionSchema,
+      );
+
+      // Get all unique tags from active discussions
+      const discussions = await DiscussionModel.find(
+        {
+          deleted_at: null,
+          status: DiscussionStatusEnum.ACTIVE,
+        },
+        { tags: 1 },
+      ).lean();
+
+      // Extract all tags and flatten the array
+      const allTags = discussions
+        .map((discussion) => discussion.tags || [])
+        .flat()
+        .filter((tag) => tag && tag.trim() !== ''); // Filter out empty tags
+
+      // Get unique tags and sort them alphabetically
+      const uniqueTags = [...new Set(allTags)].sort();
+
+      this.logger.log(`Retrieved ${uniqueTags.length} unique tags`);
+
+      return {
+        message: this.errorMessageService.getMessageWithLanguage(
+          'COMMUNITY',
+          'TAGS_RETRIEVED_SUCCESSFULLY',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+        data: uniqueTags,
+        total: uniqueTags.length,
+      };
+    } catch (error) {
+      this.logger.error('Error getting all tags', error);
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
+      throw new BadRequestException(
+        this.errorMessageService.getMessageWithLanguage(
+          'COMMUNITY',
+          'ERROR_GETTING_TAGS',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
+    }
+  }
 }

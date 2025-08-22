@@ -1023,6 +1023,14 @@ export const ERROR_MESSAGES: {
       [LanguageEnum.ENGLISH]: 'Reports retrieved successfully',
       [LanguageEnum.FRENCH]: 'Signalements récupérés avec succès',
     },
+    TAGS_RETRIEVED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'Tags retrieved successfully',
+      [LanguageEnum.FRENCH]: 'Tags récupérés avec succès',
+    },
+    ERROR_GETTING_TAGS: {
+      [LanguageEnum.ENGLISH]: 'Failed to retrieve tags',
+      [LanguageEnum.FRENCH]: 'Échec de la récupération des tags',
+    },
   },
 
   // Chat Related
@@ -2078,6 +2086,14 @@ export const SUCCESS_MESSAGES: {
     REPORTS_RETRIEVED_SUCCESSFULLY: {
       [LanguageEnum.ENGLISH]: 'Reports retrieved successfully',
       [LanguageEnum.FRENCH]: 'Signalements récupérés avec succès',
+    },
+    TAGS_RETRIEVED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'Tags retrieved successfully',
+      [LanguageEnum.FRENCH]: 'Tags récupérés avec succès',
+    },
+    ERROR_GETTING_TAGS: {
+      [LanguageEnum.ENGLISH]: 'Failed to retrieve tags',
+      [LanguageEnum.FRENCH]: 'Échec de la récupération des tags',
     },
   },
   // Learning Logs Related Success Messages

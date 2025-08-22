@@ -917,6 +917,56 @@ export class CommunityController {
     }
   }
 
+  @Get('tags')
+  @Roles(
+    RoleEnum.STUDENT,
+    RoleEnum.PROFESSOR,
+    RoleEnum.SCHOOL_ADMIN,
+    RoleEnum.SUPER_ADMIN,
+  )
+  @ApiOperation({
+    summary: 'Get all available tags for forum discussions',
+    description:
+      'Retrieve all unique tags used in forum discussions for dropdown filtering and tag suggestions.',
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Tags retrieved successfully',
+    schema: {
+      type: 'object',
+      properties: {
+        message: {
+          type: 'string',
+          example: 'Tags retrieved successfully',
+        },
+        data: {
+          type: 'array',
+          items: {
+            type: 'string',
+          },
+          example: [
+            'trauma',
+            'resistance',
+            'therapy',
+            'group-session',
+            'weekly',
+          ],
+        },
+        total: {
+          type: 'number',
+          example: 5,
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: HttpStatus.FORBIDDEN,
+    description: 'Access denied - insufficient permissions',
+  })
+  async getAllTags(@Request() req: any) {
+    return this.communityService.getAllTags(req.user as JWTUserPayload);
+  }
+
   // Forum Attachment Endpoints
 
   @Post('discussions/:id/attachments')
