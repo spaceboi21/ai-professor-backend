@@ -16,6 +16,7 @@ export interface ConversionResponse {
   conversionTime: number;
   fileUrl: string; // Primary PDF URL (for database storage)
   originalFileUrl: string; // Original PPT URL (for reference)
+  url: string
 }
 
 @Injectable()
@@ -75,6 +76,8 @@ export class ConversionService {
       const fileUrl = this.generateFileUrl(savedFiles.pdfFileName);
       const originalFileUrl = this.generateFileUrl(savedFiles.pptFileName);
 
+      const urlToStoreinDB = process.env.NODE_ENV === 'production' ? savedFiles.pdfFileName : 'uploads/bibliography/' + savedFiles.pdfFileName;
+
       this.logger.log(`✅ Direct conversion completed in ${totalTime}ms`);
       this.logger.log(`📄 ${file.originalname} → ${savedFiles.pdfFileName} (${result.pageCount} slides)`);
       this.logger.log(`📁 Original stored: ${savedFiles.pptFileName}`);
@@ -92,6 +95,7 @@ export class ConversionService {
         conversionTime: totalTime,
         fileUrl,
         originalFileUrl,
+        url: urlToStoreinDB
       };
 
     } catch (error) {
@@ -150,7 +154,7 @@ export class ConversionService {
     } else {
       // In development, return local server URL to bibliography folder
       const port = this.configService.get('PORT') || 3000;
-      return `http://localhost:${port}/uploads/bibliography/${fileName}`;
+      return `${process.env.BACKEND_URL}/uploads/bibliography/${fileName}`;
     }
   }
 
