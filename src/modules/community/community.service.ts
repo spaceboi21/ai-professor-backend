@@ -450,8 +450,16 @@ export class CommunityService {
         ];
       }
 
-      if (filterDto?.tags && filterDto.tags.length > 0) {
-        filter.tags = { $in: filterDto.tags };
+      if (filterDto?.tags && filterDto.tags.trim() !== '') {
+        // Parse tags string (comma-separated or pipe-separated)
+        const tagArray = filterDto.tags
+          .split(/[,|]/) // Split by comma or pipe
+          .map((tag) => tag.trim()) // Trim whitespace
+          .filter((tag) => tag !== ''); // Remove empty tags
+
+        if (tagArray.length > 0) {
+          filter.tags = { $in: tagArray };
+        }
       }
 
       if (filterDto?.author_id) {
@@ -4585,8 +4593,16 @@ export class CommunityService {
         ];
       }
 
-      if (exportDto.tags && exportDto.tags.length > 0) {
-        filter.tags = { $in: exportDto.tags };
+      if (exportDto.tags && exportDto.tags.trim() !== '') {
+        // Parse tags string (comma-separated or pipe-separated)
+        const tagArray = exportDto.tags
+          .split(/[,|]/) // Split by comma or pipe
+          .map((tag) => tag.trim()) // Trim whitespace
+          .filter((tag) => tag !== ''); // Remove empty tags
+
+        if (tagArray.length > 0) {
+          filter.tags = { $in: tagArray };
+        }
       }
 
       if (exportDto.author_id) {
@@ -4809,8 +4825,16 @@ export class CommunityService {
         ];
       }
 
-      if (exportDto.tags && exportDto.tags.length > 0) {
-        filter.tags = { $in: exportDto.tags };
+      if (exportDto.tags && exportDto.tags.trim() !== '') {
+        // Parse tags string (comma-separated or pipe-separated)
+        const tagArray = exportDto.tags
+          .split(/[,|]/) // Split by comma or pipe
+          .map((tag) => tag.trim()) // Trim whitespace
+          .filter((tag) => tag !== ''); // Remove empty tags
+
+        if (tagArray.length > 0) {
+          filter.tags = { $in: tagArray };
+        }
       }
 
       if (exportDto.author_id) {
@@ -5049,8 +5073,16 @@ export class CommunityService {
         ];
       }
 
-      if (exportDto.tags && exportDto.tags.length > 0) {
-        filter.tags = { $in: exportDto.tags };
+      if (exportDto.tags && exportDto.tags.trim() !== '') {
+        // Parse tags string (comma-separated or pipe-separated)
+        const tagArray = exportDto.tags
+          .split(/[,|]/) // Split by comma or pipe
+          .map((tag) => tag.trim()) // Trim whitespace
+          .filter((tag) => tag !== ''); // Remove empty tags
+
+        if (tagArray.length > 0) {
+          filter.tags = { $in: tagArray };
+        }
       }
 
       if (exportDto.author_id) {

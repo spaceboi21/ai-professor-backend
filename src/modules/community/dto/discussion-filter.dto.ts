@@ -36,15 +36,13 @@ export class DiscussionFilterDto {
   search?: string;
 
   @IsOptional()
-  @IsArray()
-  @IsString({ each: true })
+  @IsString()
   @ApiProperty({
-    example: ['trauma', 'resistance'],
-    description: 'Filter by tags',
+    example: 'trauma,resistance,therapy',
+    description: 'Filter by tags (comma-separated or pipe-separated)',
     required: false,
-    type: [String],
   })
-  tags?: string[];
+  tags?: string;
 
   @IsOptional()
   @IsString()

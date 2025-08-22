@@ -117,7 +117,13 @@ export class CommunityController {
               title: 'Weekly Therapy Session',
               content: 'Join us for our weekly group therapy session...',
               type: 'meeting',
-              tags: ['therapy', 'group-session', 'weekly'],
+              tags: [
+                'trauma',
+                'resistance',
+                'therapy',
+                'group-session',
+                'weekly',
+              ],
               meeting_link: 'https://meet.google.com/abc-defg-hij',
               meeting_platform: 'google_meet',
               meeting_scheduled_at: '2024-01-15T10:00:00.000Z',
@@ -170,7 +176,13 @@ export class CommunityController {
     enum: ['active', 'archived', 'reported', 'deleted'],
   })
   @ApiQuery({ name: 'search', required: false, type: String })
-  @ApiQuery({ name: 'tags', required: false, type: [String] })
+  @ApiQuery({
+    name: 'tags',
+    required: false,
+    type: String,
+    description:
+      'Filter by tags (comma-separated or pipe-separated, e.g., "trauma,resistance" or "trauma|resistance")',
+  })
   @ApiQuery({ name: 'author_id', required: false, type: String })
   @ApiQuery({ name: 'page', required: false, type: Number })
   @ApiQuery({ name: 'limit', required: false, type: Number })
