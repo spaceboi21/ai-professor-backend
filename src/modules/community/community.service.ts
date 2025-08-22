@@ -6177,4 +6177,197 @@ export class CommunityService {
       );
     }
   }
+
+  /**
+   * Delete a forum reply (soft delete)
+   */
+  async deleteReply(replyId: string, user: JWTUserPayload) {
+    this.logger.log(`Deleting reply: ${replyId} by user: ${user.id}`);
+
+    const resolvedSchoolId = this.resolveSchoolId(user);
+
+    // Validate school exists
+    const school = await this.schoolModel.findById(resolvedSchoolId);
+    if (!school) {
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'SCHOOL',
+          'NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
+    }
+
+    // Get tenant connection
+    const tenantConnection =
+      await this.tenantConnectionService.getTenantConnection(school.db_name);
+    const ReplyModel = tenantConnection.model(
+      ForumReply.name,
+      ForumReplySchema,
+    );
+    const LikeModel = tenantConnection.model(ForumLike.name, ForumLikeSchema);
+    const MentionModel = tenantConnection.model(
+      ForumMention.name,
+      ForumMentionSchema,
+    );
+    const AttachmentModel = tenantConnection.model(
+      ForumAttachment.name,
+      ForumAttachmentSchema,
+    );
+    const ReportModel = tenantConnection.model(
+      ForumReport.name,
+      ForumReportSchema,
+    );
+
+    try {
+      // Find the reply to delete
+      const reply = await ReplyModel.findOne({
+        _id: replyId,
+        deleted_at: null,
+      });
+
+      if (!reply) {
+        throw new NotFoundException(
+          this.errorMessageService.getMessageWithLanguage(
+            'COMMUNITY',
+            'REPLY_NOT_FOUND',
+            user?.preferred_language || DEFAULT_LANGUAGE,
+          ),
+        );
+      }
+
+      // Check if user has permission to delete this reply
+      const isAdmin = [RoleEnum.SCHOOL_ADMIN, RoleEnum.SUPER_ADMIN].includes(
+        user.role.name as RoleEnum,
+      );
+      const isOwner = reply.created_by.toString() === user.id;
+
+      if (!isAdmin && !isOwner) {
+        throw new ForbiddenException(
+          this.errorMessageService.getMessageWithLanguage(
+            'COMMUNITY',
+            'ONLY_CREATOR_OR_ADMIN_CAN_DELETE',
+            user?.preferred_language || DEFAULT_LANGUAGE,
+          ),
+        );
+      }
+
+      // Get all sub-replies (recursively) to delete them too
+      const subReplies = await this.getSubRepliesRecursively(
+        ReplyModel,
+        replyId,
+      );
+      const allReplyIds = [replyId, ...subReplies.map((r) => r._id.toString())];
+
+      // Soft delete the reply and all its sub-replies
+      await ReplyModel.updateMany(
+        { _id: { $in: allReplyIds } },
+        {
+          deleted_at: new Date(),
+          deleted_by: new Types.ObjectId(user.id),
+        },
+      );
+
+      // If this reply has a parent, decrease the parent's sub_reply_count
+      if (reply.parent_reply_id) {
+        await ReplyModel.updateOne(
+          { _id: reply.parent_reply_id },
+          { $inc: { sub_reply_count: -1 } },
+        );
+      }
+
+      // For each deleted sub-reply, decrease their parent's sub_reply_count
+      for (const subReply of subReplies) {
+        if (subReply.parent_reply_id) {
+          await ReplyModel.updateOne(
+            { _id: subReply.parent_reply_id },
+            { $inc: { sub_reply_count: -1 } },
+          );
+        }
+      }
+
+      // Delete all related likes for all affected replies
+      await LikeModel.deleteMany({
+        entity_type: LikeEntityTypeEnum.REPLY,
+        entity_id: { $in: allReplyIds.map((id) => new Types.ObjectId(id)) },
+      });
+
+      // Delete all related mentions for all affected replies
+      await MentionModel.deleteMany({
+        reply_id: { $in: allReplyIds.map((id) => new Types.ObjectId(id)) },
+      });
+
+      // Soft delete all related attachments for all affected replies
+      await AttachmentModel.updateMany(
+        { reply_id: { $in: allReplyIds.map((id) => new Types.ObjectId(id)) } },
+        {
+          deleted_at: new Date(),
+          deleted_by: new Types.ObjectId(user.id),
+        },
+      );
+
+      // Delete all related reports for all affected replies
+      await ReportModel.deleteMany({
+        entity_type: ReportEntityTypeEnum.REPLY,
+        entity_id: { $in: allReplyIds.map((id) => new Types.ObjectId(id)) },
+      });
+
+      this.logger.log(
+        `Reply and ${subReplies.length} sub-replies deleted: ${replyId}`,
+      );
+
+      return {
+        message: this.errorMessageService.getMessageWithLanguage(
+          'COMMUNITY',
+          'REPLY_DELETED_SUCCESSFULLY',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+        data: {
+          deleted_reply_id: replyId,
+          deleted_sub_replies_count: subReplies.length,
+        },
+      };
+    } catch (error) {
+      this.logger.error(`Error deleting reply: ${replyId}`, error);
+      if (
+        error instanceof NotFoundException ||
+        error instanceof ForbiddenException
+      ) {
+        throw error;
+      }
+      throw new BadRequestException(
+        this.errorMessageService.getMessageWithLanguage(
+          'COMMUNITY',
+          'ERROR_DELETING_REPLY',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
+    }
+  }
+
+  /**
+   * Recursively get all sub-replies for a given reply
+   */
+  private async getSubRepliesRecursively(
+    ReplyModel: any,
+    parentReplyId: string,
+  ): Promise<any[]> {
+    const subReplies = await ReplyModel.find({
+      parent_reply_id: new Types.ObjectId(parentReplyId),
+      deleted_at: null,
+    }).lean();
+
+    const allSubReplies = [...subReplies];
+
+    // Recursively get sub-replies of sub-replies
+    for (const subReply of subReplies) {
+      const nestedSubReplies = await this.getSubRepliesRecursively(
+        ReplyModel,
+        subReply._id.toString(),
+      );
+      allSubReplies.push(...nestedSubReplies);
+    }
+
+    return allSubReplies;
+  }
 }

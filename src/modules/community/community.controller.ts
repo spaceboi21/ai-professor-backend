@@ -360,6 +360,39 @@ export class CommunityController {
     );
   }
 
+  @Delete('replies/:id')
+  @Roles(
+    RoleEnum.STUDENT,
+    RoleEnum.PROFESSOR,
+    RoleEnum.SCHOOL_ADMIN,
+    RoleEnum.SUPER_ADMIN,
+  )
+  @ApiOperation({
+    summary: 'Delete a forum reply',
+    description:
+      'Delete a reply (or sub-reply). Only the creator or admins can delete a reply. This will also delete all sub-replies and related data.',
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Reply deleted successfully',
+  })
+  @ApiResponse({
+    status: HttpStatus.BAD_REQUEST,
+    description: 'Invalid input data',
+  })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'Reply not found',
+  })
+  @ApiResponse({
+    status: HttpStatus.FORBIDDEN,
+    description: 'Access denied - only creator or admins can delete',
+  })
+  @ApiParam({ name: 'id', description: 'Reply ID' })
+  async deleteReply(@Param('id') id: string, @Request() req: any) {
+    return this.communityService.deleteReply(id, req.user as JWTUserPayload);
+  }
+
   @Get('discussions/:id/replies')
   @Roles(
     RoleEnum.STUDENT,
