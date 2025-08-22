@@ -15,6 +15,19 @@ async function bootstrap() {
     const app = await NestFactory.create<NestExpressApplication>(AppModule);
     const configService = app.get(ConfigService);
 
+    // Validate LibreOffice availability for PPT to PDF conversion
+    logger.log('🔍 Validating LibreOffice installation...');
+    try {
+      const { LibreOfficeDetectorService } = await import('./modules/conversion/services/libreoffice-detector.service');
+      const libreOfficeDetector = new LibreOfficeDetectorService(configService);
+      await libreOfficeDetector.validateLibreOfficeOrThrow();
+    } catch (error) {
+      logger.error('❌ LibreOffice validation failed:', error.message);
+      logger.error('💡 Please install LibreOffice to enable PPT to PDF conversion functionality.');
+      logger.error('📥 Download from: https://www.libreoffice.org/download/');
+      throw error;
+    }
+
     // Apply global interceptor for activity logging
     const activityLogInterceptor = app.get(ActivityLogInterceptor);
     app.useGlobalInterceptors(activityLogInterceptor);
