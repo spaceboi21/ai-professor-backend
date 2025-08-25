@@ -956,13 +956,9 @@ export class ActivityLogService {
           target_user_role: log.target_user_role || 'N/A',
           module: log.module_name || 'N/A',
           chapter: log.chapter_name || 'N/A',
-          is_success: log.is_success ? 'Success' : 'Failed',
           error_message: log.error_message || 'N/A',
           execution_time_ms: log.execution_time_ms || 'N/A',
           ip_address: log.ip_address || 'N/A',
-          endpoint: log.endpoint || 'N/A',
-          http_method: log.http_method || 'N/A',
-          http_status_code: log.http_status_code || 'N/A',
           status: log.status,
         };
       }),

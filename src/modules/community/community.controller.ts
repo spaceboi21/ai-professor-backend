@@ -11,6 +11,7 @@ import {
   Res,
   NotFoundException,
   Delete,
+  Patch,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -27,6 +28,8 @@ import { RoleEnum } from 'src/common/constants/roles.constant';
 import { CommunityService } from './community.service';
 import { CreateDiscussionDto } from './dto/create-discussion.dto';
 import { CreateReplyDto } from './dto/create-reply.dto';
+import { UpdateDiscussionDto } from './dto/update-discussion.dto';
+import { UpdateReplyDto } from './dto/update-reply.dto';
 import { ReportContentDto } from './dto/report-content.dto';
 import { DiscussionFilterDto } from './dto/discussion-filter.dto';
 import { CreateForumAttachmentDto } from './dto/forum-attachment.dto';
@@ -114,7 +117,13 @@ export class CommunityController {
               title: 'Weekly Therapy Session',
               content: 'Join us for our weekly group therapy session...',
               type: 'meeting',
-              tags: ['therapy', 'group-session', 'weekly'],
+              tags: [
+                'trauma',
+                'resistance',
+                'therapy',
+                'group-session',
+                'weekly',
+              ],
               meeting_link: 'https://meet.google.com/abc-defg-hij',
               meeting_platform: 'google_meet',
               meeting_scheduled_at: '2024-01-15T10:00:00.000Z',
@@ -167,7 +176,13 @@ export class CommunityController {
     enum: ['active', 'archived', 'reported', 'deleted'],
   })
   @ApiQuery({ name: 'search', required: false, type: String })
-  @ApiQuery({ name: 'tags', required: false, type: [String] })
+  @ApiQuery({
+    name: 'tags',
+    required: false,
+    type: String,
+    description:
+      'Filter by tags (comma-separated or pipe-separated, e.g., "trauma,resistance" or "trauma|resistance")',
+  })
   @ApiQuery({ name: 'author_id', required: false, type: String })
   @ApiQuery({ name: 'page', required: false, type: Number })
   @ApiQuery({ name: 'limit', required: false, type: Number })
@@ -244,6 +259,150 @@ export class CommunityController {
       createReplyDto,
       req.user as JWTUserPayload,
     );
+  }
+
+  @Patch('discussions/:id')
+  @Roles(
+    RoleEnum.STUDENT,
+    RoleEnum.PROFESSOR,
+    RoleEnum.SCHOOL_ADMIN,
+    RoleEnum.SUPER_ADMIN,
+  )
+  @ApiOperation({
+    summary: 'Update a forum discussion',
+    description:
+      'Update discussion details including title, content, tags, and meeting details (for meeting type). Only the creator or admins can edit a discussion.',
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Discussion updated successfully',
+  })
+  @ApiResponse({
+    status: HttpStatus.BAD_REQUEST,
+    description: 'Invalid input data',
+  })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'Discussion not found',
+  })
+  @ApiResponse({
+    status: HttpStatus.FORBIDDEN,
+    description: 'Access denied - only creator or admins can edit',
+  })
+  @ApiParam({ name: 'id', description: 'Discussion ID' })
+  async updateDiscussion(
+    @Param('id') id: string,
+    @Body() updateDiscussionDto: UpdateDiscussionDto,
+    @Request() req: any,
+  ) {
+    return this.communityService.updateDiscussion(
+      id,
+      updateDiscussionDto,
+      req.user as JWTUserPayload,
+    );
+  }
+
+  @Get('replies/:id')
+  @Roles(
+    RoleEnum.STUDENT,
+    RoleEnum.PROFESSOR,
+    RoleEnum.SCHOOL_ADMIN,
+    RoleEnum.SUPER_ADMIN,
+  )
+  @ApiOperation({
+    summary: 'Get a single reply by ID',
+    description:
+      'Retrieve detailed reply information including attachments, mentions, and user interaction status.',
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Reply retrieved successfully',
+  })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'Reply not found',
+  })
+  @ApiResponse({
+    status: HttpStatus.FORBIDDEN,
+    description: 'Access denied - insufficient permissions',
+  })
+  @ApiParam({ name: 'id', description: 'Reply ID' })
+  async findReplyById(@Param('id') id: string, @Request() req: any) {
+    return this.communityService.findReplyById(id, req.user as JWTUserPayload);
+  }
+
+  @Patch('replies/:id')
+  @Roles(
+    RoleEnum.STUDENT,
+    RoleEnum.PROFESSOR,
+    RoleEnum.SCHOOL_ADMIN,
+    RoleEnum.SUPER_ADMIN,
+  )
+  @ApiOperation({
+    summary: 'Update a forum reply',
+    description:
+      'Update reply content and mentions. Only the creator or admins can edit a reply.',
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Reply updated successfully',
+  })
+  @ApiResponse({
+    status: HttpStatus.BAD_REQUEST,
+    description: 'Invalid input data',
+  })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'Reply not found',
+  })
+  @ApiResponse({
+    status: HttpStatus.FORBIDDEN,
+    description: 'Access denied - only creator or admins can edit',
+  })
+  @ApiParam({ name: 'id', description: 'Reply ID' })
+  async updateReply(
+    @Param('id') id: string,
+    @Body() updateReplyDto: UpdateReplyDto,
+    @Request() req: any,
+  ) {
+    return this.communityService.updateReply(
+      id,
+      updateReplyDto,
+      req.user as JWTUserPayload,
+    );
+  }
+
+  @Delete('replies/:id')
+  @Roles(
+    RoleEnum.STUDENT,
+    RoleEnum.PROFESSOR,
+    RoleEnum.SCHOOL_ADMIN,
+    RoleEnum.SUPER_ADMIN,
+  )
+  @ApiOperation({
+    summary: 'Delete a forum reply',
+    description:
+      'Delete a reply (or sub-reply). Only the creator or admins can delete a reply. This will also delete all sub-replies and related data.',
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Reply deleted successfully',
+  })
+  @ApiResponse({
+    status: HttpStatus.BAD_REQUEST,
+    description: 'Invalid input data',
+  })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'Reply not found',
+  })
+  @ApiResponse({
+    status: HttpStatus.FORBIDDEN,
+    description: 'Access denied - only creator or admins can delete',
+  })
+  @ApiParam({ name: 'id', description: 'Reply ID' })
+  async deleteReply(@Param('id') id: string, @Request() req: any) {
+    return this.communityService.deleteReply(id, req.user as JWTUserPayload);
   }
 
   @Get('discussions/:id/replies')
@@ -768,6 +927,56 @@ export class CommunityController {
     } catch (error) {
       throw new NotFoundException('File not found or could not be downloaded');
     }
+  }
+
+  @Get('tags')
+  @Roles(
+    RoleEnum.STUDENT,
+    RoleEnum.PROFESSOR,
+    RoleEnum.SCHOOL_ADMIN,
+    RoleEnum.SUPER_ADMIN,
+  )
+  @ApiOperation({
+    summary: 'Get all available tags for forum discussions',
+    description:
+      'Retrieve all unique tags used in forum discussions for dropdown filtering and tag suggestions.',
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Tags retrieved successfully',
+    schema: {
+      type: 'object',
+      properties: {
+        message: {
+          type: 'string',
+          example: 'Tags retrieved successfully',
+        },
+        data: {
+          type: 'array',
+          items: {
+            type: 'string',
+          },
+          example: [
+            'trauma',
+            'resistance',
+            'therapy',
+            'group-session',
+            'weekly',
+          ],
+        },
+        total: {
+          type: 'number',
+          example: 5,
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: HttpStatus.FORBIDDEN,
+    description: 'Access denied - insufficient permissions',
+  })
+  async getAllTags(@Request() req: any) {
+    return this.communityService.getAllTags(req.user as JWTUserPayload);
   }
 
   // Forum Attachment Endpoints

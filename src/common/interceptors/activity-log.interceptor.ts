@@ -173,11 +173,10 @@ export class ActivityLogInterceptor implements NestInterceptor {
 
       const createActivityLogDto: CreateActivityLogDto = {
         activity_type: activityType,
-        description,
+        description: description,
         performed_by: this.safeObjectIdConversion(user.id?.toString()) as any,
         performed_by_role: user.role.name as RoleEnum,
         school_id: this.safeObjectIdConversion(user.school_id?.toString()),
-        school_name: metadata.school_name,
         target_user_id: this.safeObjectIdConversion(
           metadata.target_user_id?.toString(),
         ),
@@ -341,8 +340,26 @@ export class ActivityLogInterceptor implements NestInterceptor {
       if (method === 'DELETE') return ActivityTypeEnum.USER_DELETED;
     }
 
+    // Student management activities
+    if (path.includes('/students')) {
+      if (method === 'POST') return ActivityTypeEnum.STUDENT_CREATED;
+      if (method === 'PATCH' || method === 'PUT')
+        return ActivityTypeEnum.STUDENT_UPDATED;
+      if (method === 'DELETE') return ActivityTypeEnum.STUDENT_DELETED;
+      if (path.includes('/bulk-import'))
+        return ActivityTypeEnum.STUDENT_BULK_IMPORT;
+    }
+
+    // Professor management activities
+    if (path.includes('/professor')) {
+      if (method === 'POST') return ActivityTypeEnum.PROFESSOR_CREATED;
+      if (method === 'PATCH' || method === 'PUT')
+        return ActivityTypeEnum.PROFESSOR_UPDATED;
+      if (method === 'DELETE') return ActivityTypeEnum.PROFESSOR_DELETED;
+    }
+
     // School management activities
-    if (path.includes('/schools')) {
+    if (path.includes('/schools') || path.includes('/school-admin')) {
       if (method === 'POST') return ActivityTypeEnum.SCHOOL_CREATED;
       if (method === 'PATCH' || method === 'PUT')
         return ActivityTypeEnum.SCHOOL_UPDATED;
@@ -355,8 +372,8 @@ export class ActivityLogInterceptor implements NestInterceptor {
       if (method === 'PATCH' || method === 'PUT')
         return ActivityTypeEnum.MODULE_UPDATED;
       if (method === 'DELETE') return ActivityTypeEnum.MODULE_DELETED;
-      if (path.includes('/assignments'))
-        return ActivityTypeEnum.MODULE_ASSIGNED;
+      if (path.includes('/assign')) return ActivityTypeEnum.MODULE_ASSIGNED;
+      if (path.includes('/unassign')) return ActivityTypeEnum.MODULE_UNASSIGNED;
     }
 
     // Chapter management activities
@@ -370,7 +387,8 @@ export class ActivityLogInterceptor implements NestInterceptor {
 
     // Quiz activities
     if (path.includes('/quiz')) {
-      if (method === 'POST') return ActivityTypeEnum.QUIZ_CREATED;
+      if (method === 'POST' && path.includes('/groups'))
+        return ActivityTypeEnum.QUIZ_CREATED;
       if (method === 'PATCH' || method === 'PUT')
         return ActivityTypeEnum.QUIZ_UPDATED;
       if (method === 'DELETE') return ActivityTypeEnum.QUIZ_DELETED;
@@ -379,9 +397,9 @@ export class ActivityLogInterceptor implements NestInterceptor {
 
     // AI Chat activities
     if (path.includes('/ai-chat')) {
-      if (method === 'POST' && path.includes('/start'))
+      if (method === 'POST' && path.includes('/sessions'))
         return ActivityTypeEnum.AI_CHAT_STARTED;
-      if (method === 'POST' && path.includes('/message'))
+      if (method === 'POST' && path.includes('/messages'))
         return ActivityTypeEnum.AI_CHAT_MESSAGE_SENT;
       if (method === 'POST' && path.includes('/feedback'))
         return ActivityTypeEnum.AI_FEEDBACK_GIVEN;
@@ -447,6 +465,9 @@ export class ActivityLogInterceptor implements NestInterceptor {
         }
         if (request.body?.module_name) {
           metadata.module_name = request.body.module_name;
+        }
+        if (request.query?.module_id) {
+          metadata.module_id = request.query.module_id;
         }
       }
 
@@ -546,6 +567,7 @@ export class ActivityLogInterceptor implements NestInterceptor {
       ActivityTypeEnum.MODULE_UPDATED,
       ActivityTypeEnum.MODULE_DELETED,
       ActivityTypeEnum.MODULE_ASSIGNED,
+      ActivityTypeEnum.MODULE_UNASSIGNED,
       ActivityTypeEnum.CHAPTER_CREATED,
       ActivityTypeEnum.CHAPTER_UPDATED,
       ActivityTypeEnum.CHAPTER_DELETED,
@@ -616,6 +638,11 @@ export class ActivityLogInterceptor implements NestInterceptor {
         'secret',
         'key',
         'authorization',
+        'access_token',
+        'refresh_token',
+        'api_key',
+        'private_key',
+        'secret_key',
       ];
       sensitiveFields.forEach((field) => {
         if (sanitized[field]) {
@@ -637,6 +664,8 @@ export class ActivityLogInterceptor implements NestInterceptor {
         request.ip ||
         (request.connection as any).remoteAddress ||
         (request.socket as any).remoteAddress ||
+        request.headers['x-forwarded-for'] ||
+        request.headers['x-real-ip'] ||
         'unknown'
       );
     } catch (error) {

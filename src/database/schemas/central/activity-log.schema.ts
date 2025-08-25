@@ -53,6 +53,12 @@ export class ActivityLog extends Document {
   })
   description: MultiLanguageDescription;
 
+  @Prop({ type: String })
+  description_en: string;
+
+  @Prop({ type: String })
+  description_fr: string;
+
   @Prop({ type: Types.ObjectId, ref: User.name, required: true, index: true })
   performed_by: Types.ObjectId;
 

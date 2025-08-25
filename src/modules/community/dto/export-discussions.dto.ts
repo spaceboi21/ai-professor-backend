@@ -37,15 +37,14 @@ export class ExportDiscussionsDto {
   search?: string;
 
   @ApiProperty({
-    type: [String],
+    type: String,
     required: false,
-    description: 'Filter by tags',
-    example: ['programming', 'javascript'],
+    description: 'Filter by tags (comma-separated or pipe-separated)',
+    example: 'programming,javascript',
   })
   @IsOptional()
-  @IsArray()
-  @IsString({ each: true })
-  tags?: string[];
+  @IsString()
+  tags?: string;
 
   @ApiProperty({
     type: String,

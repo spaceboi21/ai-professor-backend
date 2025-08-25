@@ -246,6 +246,49 @@ GET /api/community/discussions/:id/replies?page=1&limit=20
 Authorization: Bearer <token>
 ```
 
+#### Update Discussion
+
+```http
+PATCH /api/community/discussions/:id
+Authorization: Bearer <token>
+Content-Type: application/json
+
+{
+  "title": "Updated: Best practices for handling resistant patients",
+  "content": "Updated content with new insights...",
+  "tags": ["trauma", "resistance", "therapy", "updated"],
+  "mentions": ["john.doe", "jane.smith"],
+  "meeting_link": "https://meet.google.com/updated-link", // For meeting type only
+  "meeting_platform": "zoom", // For meeting type only
+  "meeting_scheduled_at": "2024-01-15T14:00:00.000Z", // For meeting type only
+  "meeting_duration_minutes": 90 // For meeting type only
+}
+```
+
+**Note:** Only the discussion creator or admins (SCHOOL_ADMIN, SUPER_ADMIN) can update discussions. All fields are optional - only provide the fields you want to update.
+
+#### Get Single Reply
+
+```http
+GET /api/community/replies/:id
+Authorization: Bearer <token>
+```
+
+#### Update Reply
+
+```http
+PATCH /api/community/replies/:id
+Authorization: Bearer <token>
+Content-Type: application/json
+
+{
+  "content": "Updated reply content with new information...",
+  "mentions": ["john.doe", "jane.smith", "new.user"]
+}
+```
+
+**Note:** Only the reply creator or admins (SCHOOL_ADMIN, SUPER_ADMIN) can update replies. All fields are optional - only provide the fields you want to update.
+
 ### Mentions
 
 #### Get User Mentions

@@ -932,6 +932,105 @@ export const ERROR_MESSAGES: {
       [LanguageEnum.FRENCH]:
         'Échec de la récupération des statistiques des pièces jointes',
     },
+    // Reply Operation Related Error Messages
+    ONLY_CREATOR_OR_ADMIN_CAN_DELETE: {
+      [LanguageEnum.ENGLISH]:
+        'Only the creator or administrators can delete this content',
+      [LanguageEnum.FRENCH]:
+        'Seul le créateur ou les administrateurs peuvent supprimer ce contenu',
+    },
+    ERROR_DELETING_REPLY: {
+      [LanguageEnum.ENGLISH]: 'Failed to delete reply',
+      [LanguageEnum.FRENCH]: 'Échec de la suppression de la réponse',
+    },
+    UPDATE_REPLY_FAILED: {
+      [LanguageEnum.ENGLISH]: 'Failed to update reply',
+      [LanguageEnum.FRENCH]: 'Échec de la mise à jour de la réponse',
+    },
+    CANNOT_EDIT_REPLY: {
+      [LanguageEnum.ENGLISH]: 'You cannot edit this reply',
+      [LanguageEnum.FRENCH]: 'Vous ne pouvez pas modifier cette réponse',
+    },
+    CANNOT_EDIT_DISCUSSION: {
+      [LanguageEnum.ENGLISH]: 'You cannot edit this discussion',
+      [LanguageEnum.FRENCH]: 'Vous ne pouvez pas modifier cette discussion',
+    },
+    DELETE_DISCUSSION_FAILED: {
+      [LanguageEnum.ENGLISH]: 'Failed to delete discussion',
+      [LanguageEnum.FRENCH]: 'Échec de la suppression de la discussion',
+    },
+    GET_REPLY_FAILED: {
+      [LanguageEnum.ENGLISH]: 'Failed to retrieve reply',
+      [LanguageEnum.FRENCH]: 'Échec de la récupération de la réponse',
+    },
+    DISCUSSIONS_EXPORTED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'Discussions exported successfully',
+      [LanguageEnum.FRENCH]: 'Discussions exportées avec succès',
+    },
+    LIKED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'Content liked successfully',
+      [LanguageEnum.FRENCH]: 'Contenu aimé avec succès',
+    },
+    UNLIKED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'Content unliked successfully',
+      [LanguageEnum.FRENCH]: 'Contenu retiré des likes avec succès',
+    },
+    PINNED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'Discussion pinned successfully',
+      [LanguageEnum.FRENCH]: 'Discussion épinglée avec succès',
+    },
+    UNPINNED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'Discussion unpinned successfully',
+      [LanguageEnum.FRENCH]: 'Discussion désépinglée avec succès',
+    },
+    DISCUSSION_ARCHIVED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'Discussion archived successfully',
+      [LanguageEnum.FRENCH]: 'Discussion archivée avec succès',
+    },
+    UNREAD_COUNTS_RETRIEVED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'Unread counts retrieved successfully',
+      [LanguageEnum.FRENCH]: 'Compteurs de non lus récupérés avec succès',
+    },
+    PIN_STATUS_RETRIEVED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'Pin status retrieved successfully',
+      [LanguageEnum.FRENCH]: "Statut d'épinglage récupéré avec succès",
+    },
+    LIKE_STATUS_RETRIEVED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'Like status retrieved successfully',
+      [LanguageEnum.FRENCH]: 'Statut de like récupéré avec succès',
+    },
+    LIKED_BY_USERS_RETRIEVED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'Liked by users retrieved successfully',
+      [LanguageEnum.FRENCH]: 'Utilisateurs ayant aimé récupérés avec succès',
+    },
+    SCHOOL_MEMBERS_RETRIEVED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'School members retrieved successfully',
+      [LanguageEnum.FRENCH]: "Membres de l'école récupérés avec succès",
+    },
+    FORUM_ATTACHMENT_CREATED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'Forum attachment created successfully',
+      [LanguageEnum.FRENCH]: 'Pièce jointe du forum créée avec succès',
+    },
+    FORUM_ATTACHMENTS_RETRIEVED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'Forum attachments retrieved successfully',
+      [LanguageEnum.FRENCH]: 'Pièces jointes du forum récupérées avec succès',
+    },
+    FORUM_ATTACHMENT_DELETED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'Forum attachment deleted successfully',
+      [LanguageEnum.FRENCH]: 'Pièce jointe du forum supprimée avec succès',
+    },
+    REPORTS_RETRIEVED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'Reports retrieved successfully',
+      [LanguageEnum.FRENCH]: 'Signalements récupérés avec succès',
+    },
+    TAGS_RETRIEVED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'Tags retrieved successfully',
+      [LanguageEnum.FRENCH]: 'Tags récupérés avec succès',
+    },
+    ERROR_GETTING_TAGS: {
+      [LanguageEnum.ENGLISH]: 'Failed to retrieve tags',
+      [LanguageEnum.FRENCH]: 'Échec de la récupération des tags',
+    },
   },
 
   // Chat Related
@@ -1908,6 +2007,14 @@ export const SUCCESS_MESSAGES: {
       [LanguageEnum.ENGLISH]: 'Replies retrieved successfully',
       [LanguageEnum.FRENCH]: 'Réponses récupérées avec succès',
     },
+    SUB_REPLIES_RETRIEVED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'Sub-replies retrieved successfully',
+      [LanguageEnum.FRENCH]: 'Sous-réponses récupérées avec succès',
+    },
+    REPLY_RETRIEVED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'Reply retrieved successfully',
+      [LanguageEnum.FRENCH]: 'Réponse récupérée avec succès',
+    },
     LIKE_TOGGLED_SUCCESSFULLY: {
       [LanguageEnum.ENGLISH]: 'Like toggled successfully',
       [LanguageEnum.FRENCH]: 'Like basculé avec succès',
@@ -1923,6 +2030,70 @@ export const SUCCESS_MESSAGES: {
     DISCUSSIONS_EXPORTED_SUCCESSFULLY: {
       [LanguageEnum.ENGLISH]: 'Discussions exported successfully',
       [LanguageEnum.FRENCH]: 'Discussions exportées avec succès',
+    },
+    LIKED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'Content liked successfully',
+      [LanguageEnum.FRENCH]: 'Contenu aimé avec succès',
+    },
+    UNLIKED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'Content unliked successfully',
+      [LanguageEnum.FRENCH]: 'Contenu retiré des likes avec succès',
+    },
+    PINNED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'Discussion pinned successfully',
+      [LanguageEnum.FRENCH]: 'Discussion épinglée avec succès',
+    },
+    UNPINNED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'Discussion unpinned successfully',
+      [LanguageEnum.FRENCH]: 'Discussion désépinglée avec succès',
+    },
+    DISCUSSION_ARCHIVED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'Discussion archived successfully',
+      [LanguageEnum.FRENCH]: 'Discussion archivée avec succès',
+    },
+    UNREAD_COUNTS_RETRIEVED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'Unread counts retrieved successfully',
+      [LanguageEnum.FRENCH]: 'Compteurs de non lus récupérés avec succès',
+    },
+    PIN_STATUS_RETRIEVED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'Pin status retrieved successfully',
+      [LanguageEnum.FRENCH]: "Statut d'épinglage récupéré avec succès",
+    },
+    LIKE_STATUS_RETRIEVED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'Like status retrieved successfully',
+      [LanguageEnum.FRENCH]: 'Statut de like récupéré avec succès',
+    },
+    LIKED_BY_USERS_RETRIEVED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'Liked by users retrieved successfully',
+      [LanguageEnum.FRENCH]: 'Utilisateurs ayant aimé récupérés avec succès',
+    },
+    SCHOOL_MEMBERS_RETRIEVED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'School members retrieved successfully',
+      [LanguageEnum.FRENCH]: "Membres de l'école récupérés avec succès",
+    },
+    FORUM_ATTACHMENT_CREATED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'Forum attachment created successfully',
+      [LanguageEnum.FRENCH]: 'Pièce jointe du forum créée avec succès',
+    },
+    FORUM_ATTACHMENTS_RETRIEVED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'Forum attachments retrieved successfully',
+      [LanguageEnum.FRENCH]: 'Pièces jointes du forum récupérées avec succès',
+    },
+    FORUM_ATTACHMENT_DELETED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'Forum attachment deleted successfully',
+      [LanguageEnum.FRENCH]: 'Pièce jointe du forum supprimée avec succès',
+    },
+    REPORTS_RETRIEVED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'Reports retrieved successfully',
+      [LanguageEnum.FRENCH]: 'Signalements récupérés avec succès',
+    },
+    TAGS_RETRIEVED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'Tags retrieved successfully',
+      [LanguageEnum.FRENCH]: 'Tags récupérés avec succès',
+    },
+    ERROR_GETTING_TAGS: {
+      [LanguageEnum.ENGLISH]: 'Failed to retrieve tags',
+      [LanguageEnum.FRENCH]: 'Échec de la récupération des tags',
     },
   },
   // Learning Logs Related Success Messages

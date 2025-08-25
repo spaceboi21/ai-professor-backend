@@ -115,21 +115,29 @@ export class UploadService {
         expiresIn,
       });
 
-      // Get max file size based on folder
-      let maxSize = 5 * 1024 * 1024; // Default 5MB
-      if (folder === 'bibliography') {
-        maxSize =
-          (this.configService.get<number>('MAXIMUM_BIBLIOGRAPHY_FILE_SIZE') ??
-            100) *
-          1024 *
-          1024;
-      } else if (folder === 'forum-attachments') {
-        maxSize =
-          (this.configService.get<number>(
-            'MAXIMUM_FORUM_ATTACHMENT_FILE_SIZE',
-          ) ?? 10) *
-          1024 *
-          1024;
+      // Get max file size based on folder and environment
+      let maxSize: number;
+      
+      // In production, allow unlimited file size
+      if (process.env.NODE_ENV === 'production') {
+        maxSize = Number.MAX_SAFE_INTEGER; // No limit in production
+      } else {
+        // In development, use configured limits
+        maxSize = 5 * 1024 * 1024; // Default 5MB
+        if (folder === 'bibliography') {
+          maxSize =
+            (this.configService.get<number>('MAXIMUM_BIBLIOGRAPHY_FILE_SIZE') ??
+              100) *
+            1024 *
+            1024;
+        } else if (folder === 'forum-attachments') {
+          maxSize =
+            (this.configService.get<number>(
+              'MAXIMUM_FORUM_ATTACHMENT_FILE_SIZE',
+            ) ?? 10) *
+            1024 *
+            1024;
+        }
       }
 
       return {
