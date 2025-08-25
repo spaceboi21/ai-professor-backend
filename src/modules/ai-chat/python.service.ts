@@ -74,7 +74,7 @@ export class PythonService {
   ) {
     return this._post('/chat/professor/resources', {
       keywords,
-      module_context: module_title,
+      module_title: module_title,
       feedback,
     });
   }

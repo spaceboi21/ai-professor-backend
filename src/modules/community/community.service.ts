@@ -38,6 +38,12 @@ import {
   ForumMention,
   ForumMentionSchema,
 } from 'src/database/schemas/tenant/forum-mention.schema';
+import {
+  ForumAttachment,
+  ForumAttachmentSchema,
+  AttachmentEntityTypeEnum,
+  AttachmentStatusEnum,
+} from 'src/database/schemas/tenant/forum-attachment.schema';
 import { PinDiscussionDto } from './dto/pin-discussion.dto';
 
 import {
@@ -49,6 +55,8 @@ import { CreateDiscussionDto } from './dto/create-discussion.dto';
 import { CreateReplyDto } from './dto/create-reply.dto';
 import { ReportContentDto } from './dto/report-content.dto';
 import { DiscussionFilterDto } from './dto/discussion-filter.dto';
+import { CreateForumAttachmentDto } from './dto/forum-attachment.dto';
+import { DeleteForumAttachmentDto } from './dto/delete-forum-attachment.dto';
 import { PaginationDto } from 'src/common/dto/pagination.dto';
 import {
   getPaginationOptions,
@@ -86,6 +94,7 @@ import { DEFAULT_LANGUAGE } from 'src/common/constants/language.constant';
 import { CSVUtil } from 'src/common/utils/csv.util';
 import { ExportDiscussionsDto } from './dto/export-discussions.dto';
 import { ExportDiscussionsResponseDto } from './dto/export-discussions-response.dto';
+import { EmailEncryptionService } from 'src/common/services/email-encryption.service';
 
 @Injectable()
 export class CommunityService {
@@ -100,6 +109,7 @@ export class CommunityService {
     private readonly notificationsService: NotificationsService,
     private readonly errorMessageService: ErrorMessageService,
     private readonly csvUtil: CSVUtil,
+    private readonly emailEncryptionService: EmailEncryptionService,
   ) {}
 
   /**
@@ -138,7 +148,7 @@ export class CommunityService {
    * Create a new forum discussion
    */
   async createDiscussion(
-    createDiscussionDto: CreateDiscussionDto,
+    createDiscussionDto: CreateDiscussionDto | any, // Allow both DTOs
     user: JWTUserPayload,
   ) {
     const {
@@ -147,6 +157,8 @@ export class CommunityService {
       content,
       type,
       tags,
+      attachments,
+      mentions,
       meeting_link,
       meeting_platform,
       meeting_scheduled_at,
@@ -210,10 +222,26 @@ export class CommunityService {
         }
       }
 
+      // Extract mentions from content if not provided
+      const extractedMentions = mentions || extractMentions(content);
+
+      // Resolve mentions to user IDs
+      const resolvedMentions = await resolveMentions(
+        extractedMentions,
+        tenantConnection,
+        this.userModel,
+      );
+
+      // Format content with mention links
+      const formattedContent = formatMentionsInContent(
+        content,
+        resolvedMentions,
+      );
+
       // Create discussion
       const newDiscussion = new DiscussionModel({
         title,
-        content,
+        content: formattedContent,
         type,
         tags: tags || [],
         created_by: new Types.ObjectId(user.id),
@@ -230,23 +258,78 @@ export class CommunityService {
 
       const savedDiscussion = await newDiscussion.save();
 
-      // Send notifications to all school members about new discussion
-      await this.notifyNewDiscussion(
-        savedDiscussion,
-        user,
-        resolvedSchoolId,
-        tenantConnection,
+      // If there are attachments, create them
+      if (attachments && attachments.length > 0) {
+        const AttachmentModel = tenantConnection.model(
+          ForumAttachment.name,
+          ForumAttachmentSchema,
+        );
+
+        for (const attachment of attachments) {
+          await this.createForumAttachment(
+            {
+              discussion_id: savedDiscussion._id,
+              reply_id: undefined, // No reply for discussion attachments
+              entity_type: AttachmentEntityTypeEnum.DISCUSSION,
+              original_filename: attachment.original_filename,
+              stored_filename: attachment.stored_filename,
+              file_url: attachment.file_url,
+              mime_type: attachment.mime_type,
+              file_size: attachment.file_size,
+            },
+            user,
+          );
+        }
+      }
+
+      // Create mention records
+      const MentionModel = tenantConnection.model(
+        ForumMention.name,
+        ForumMentionSchema,
       );
 
-      // Attach user details to the response
+      const mentionPromises = resolvedMentions.map(async (mention) => {
+        if (mention.userId) {
+          const mentionRecord = new MentionModel({
+            discussion_id: savedDiscussion._id,
+            mentioned_by: new Types.ObjectId(user.id),
+            mentioned_user: mention.userId,
+            mention_text: mention.mentionText,
+          });
+          return mentionRecord.save();
+        }
+      });
+
+      await Promise.all(mentionPromises.filter(Boolean));
+
+      // Get user details for notifications
       const userDetails = await this.getUserDetails(
         user.id.toString(),
         user.role.name,
         tenantConnection,
       );
+
+      // Send notifications to all school members about new discussion
+      await this.notifyNewDiscussion(
+        savedDiscussion,
+        userDetails,
+        resolvedSchoolId,
+        tenantConnection,
+      );
+
+      // Send notifications to mentioned users
+      await this.notifyMentionedUsersInDiscussion(
+        savedDiscussion,
+        userDetails,
+        resolvedMentions,
+        resolvedSchoolId,
+      );
+
+      // Attach user details to the response
       const discussionWithUser = {
         ...savedDiscussion.toObject(),
         created_by_user: userDetails || null,
+        mentions: resolvedMentions,
       };
 
       this.logger.log(`Discussion created: ${savedDiscussion._id}`);
@@ -318,28 +401,46 @@ export class CommunityService {
         deleted_at: null,
       };
 
-      // Simple role-based filtering
-      if (user.role.name === RoleEnum.STUDENT) {
+      // Apply status filtering logic
+      if (filterDto?.status) {
+        // If a specific status is requested, apply it based on user permissions
+        if (user.role.name === RoleEnum.STUDENT) {
+          // Students can only see ACTIVE discussions
+          if (filterDto.status === DiscussionStatusEnum.ACTIVE) {
+            filter.status = DiscussionStatusEnum.ACTIVE;
+          } else {
+            // If student requests non-ACTIVE status, still only show ACTIVE
+            filter.status = DiscussionStatusEnum.ACTIVE;
+          }
+        } else if (user.role.name === RoleEnum.PROFESSOR) {
+          // Professors can see ACTIVE and ARCHIVED discussions
+          if (
+            [
+              DiscussionStatusEnum.ACTIVE,
+              DiscussionStatusEnum.ARCHIVED,
+            ].includes(filterDto.status)
+          ) {
+            filter.status = filterDto.status;
+          } else {
+            // If professor requests other status, fall back to ACTIVE
+            filter.status = DiscussionStatusEnum.ACTIVE;
+          }
+        } else if (
+          [RoleEnum.SCHOOL_ADMIN, RoleEnum.SUPER_ADMIN].includes(
+            user.role.name as RoleEnum,
+          )
+        ) {
+          // Admins can see all statuses
+          filter.status = filterDto.status;
+        }
+      } else {
+        // If no status is specified, default to ACTIVE for all users
         filter.status = DiscussionStatusEnum.ACTIVE;
-      } else if (user.role.name === RoleEnum.PROFESSOR) {
-        filter.status = {
-          $in: [DiscussionStatusEnum.ACTIVE, DiscussionStatusEnum.ARCHIVED],
-        };
       }
-      // Admins can see all content
 
       // Apply additional filters
       if (filterDto?.type) {
         filter.type = filterDto.type;
-      }
-
-      if (
-        filterDto?.status &&
-        [RoleEnum.SCHOOL_ADMIN, RoleEnum.SUPER_ADMIN].includes(
-          user.role.name as RoleEnum,
-        )
-      ) {
-        filter.status = filterDto.status;
       }
 
       if (filterDto?.search) {
@@ -349,8 +450,16 @@ export class CommunityService {
         ];
       }
 
-      if (filterDto?.tags && filterDto.tags.length > 0) {
-        filter.tags = { $in: filterDto.tags };
+      if (filterDto?.tags && filterDto.tags.trim() !== '') {
+        // Parse tags string (comma-separated or pipe-separated)
+        const tagArray = filterDto.tags
+          .split(/[,|]/) // Split by comma or pipe
+          .map((tag) => tag.trim()) // Trim whitespace
+          .filter((tag) => tag !== ''); // Remove empty tags
+
+        if (tagArray.length > 0) {
+          filter.tags = { $in: tagArray };
+        }
       }
 
       if (filterDto?.author_id) {
@@ -411,14 +520,6 @@ export class CommunityService {
                 },
               },
               {
-                $lookup: {
-                  from: 'users',
-                  localField: 'created_by',
-                  foreignField: '_id',
-                  as: 'lastReplyUserCentral',
-                },
-              },
-              {
                 $addFields: {
                   last_reply_user: {
                     $cond: {
@@ -435,27 +536,7 @@ export class CommunityService {
                         image: { $arrayElemAt: ['$lastReplyUser.image', 0] },
                         role: 'STUDENT',
                       },
-                      else: {
-                        _id: { $arrayElemAt: ['$lastReplyUserCentral._id', 0] },
-                        first_name: {
-                          $arrayElemAt: ['$lastReplyUserCentral.first_name', 0],
-                        },
-                        last_name: {
-                          $arrayElemAt: ['$lastReplyUserCentral.last_name', 0],
-                        },
-                        email: {
-                          $arrayElemAt: ['$lastReplyUserCentral.email', 0],
-                        },
-                        image: {
-                          $arrayElemAt: [
-                            '$lastReplyUserCentral.profile_pic',
-                            0,
-                          ],
-                        },
-                        role: {
-                          $arrayElemAt: ['$lastReplyUserCentral.role', 0],
-                        },
-                      },
+                      else: null, // Will be populated later for professors/admins
                     },
                   },
                 },
@@ -476,7 +557,9 @@ export class CommunityService {
         },
         {
           $addFields: {
-            last_reply: { $arrayElemAt: ['$lastReply', 0] },
+            last_reply_date: {
+              $ifNull: ['$last_reply.created_at', '$created_at'],
+            },
           },
         },
         {
@@ -485,14 +568,6 @@ export class CommunityService {
             localField: 'created_by',
             foreignField: '_id',
             as: 'createdByStudent',
-          },
-        },
-        {
-          $lookup: {
-            from: 'users',
-            localField: 'created_by',
-            foreignField: '_id',
-            as: 'createdByUser',
           },
         },
         {
@@ -510,18 +585,12 @@ export class CommunityService {
                   },
                   email: { $arrayElemAt: ['$createdByStudent.email', 0] },
                   image: { $arrayElemAt: ['$createdByStudent.image', 0] },
+                  profile_pic: {
+                    $arrayElemAt: ['$createdByStudent.profile_pic', 0],
+                  },
                   role: 'STUDENT',
                 },
-                else: {
-                  _id: { $arrayElemAt: ['$createdByUser._id', 0] },
-                  first_name: {
-                    $arrayElemAt: ['$createdByUser.first_name', 0],
-                  },
-                  last_name: { $arrayElemAt: ['$createdByUser.last_name', 0] },
-                  email: { $arrayElemAt: ['$createdByUser.email', 0] },
-                  image: { $arrayElemAt: ['$createdByUser.profile_pic', 0] },
-                  role: { $arrayElemAt: ['$createdByUser.role', 0] },
-                },
+                else: null, // Will be populated later for professors/admins
               },
             },
           },
@@ -562,10 +631,100 @@ export class CommunityService {
           },
         },
         {
+          $lookup: {
+            from: 'forum_likes',
+            let: { discussionId: '$_id', userId: new Types.ObjectId(user.id) },
+            pipeline: [
+              {
+                $match: {
+                  $expr: {
+                    $and: [
+                      { $eq: ['$entity_id', '$$discussionId'] },
+                      { $eq: ['$entity_type', 'DISCUSSION'] },
+                      { $eq: ['$liked_by', '$$userId'] },
+                    ],
+                  },
+                },
+              },
+            ],
+            as: 'userLike',
+          },
+        },
+        {
+          $addFields: {
+            has_liked: { $gt: [{ $size: '$userLike' }, 0] },
+            liked_at: { $arrayElemAt: ['$userLike.created_at', 0] },
+          },
+        },
+        {
           $addFields: {
             last_reply_date: {
               $ifNull: ['$last_reply.created_at', '$created_at'],
             },
+          },
+        },
+        {
+          $lookup: {
+            from: 'forum_attachments',
+            let: { discussionId: '$_id' },
+            pipeline: [
+              {
+                $match: {
+                  $expr: { $eq: ['$discussion_id', '$$discussionId'] },
+                  reply_id: null, // Only discussion attachments
+                  status: AttachmentStatusEnum.ACTIVE,
+                  deleted_at: null,
+                },
+              },
+              { $sort: { created_at: 1 } },
+              {
+                $lookup: {
+                  from: 'students',
+                  localField: 'uploaded_by',
+                  foreignField: '_id',
+                  as: 'uploadedByStudent',
+                },
+              },
+              {
+                $addFields: {
+                  uploaded_by_user: {
+                    $cond: {
+                      if: { $gt: [{ $size: '$uploadedByStudent' }, 0] },
+                      then: {
+                        _id: { $arrayElemAt: ['$uploadedByStudent._id', 0] },
+                        first_name: {
+                          $arrayElemAt: ['$uploadedByStudent.first_name', 0],
+                        },
+                        last_name: {
+                          $arrayElemAt: ['$uploadedByStudent.last_name', 0],
+                        },
+                        email: {
+                          $arrayElemAt: ['$uploadedByStudent.email', 0],
+                        },
+                        image: {
+                          $arrayElemAt: ['$uploadedByStudent.image', 0],
+                        },
+                        role: 'STUDENT',
+                      },
+                      else: null, // Will be populated later for professors/admins
+                    },
+                  },
+                },
+              },
+              {
+                $project: {
+                  _id: 1,
+                  original_filename: 1,
+                  stored_filename: 1,
+                  file_url: 1,
+                  mime_type: 1,
+                  file_size: 1,
+                  created_at: 1,
+                  uploaded_by_user: 1,
+                },
+              },
+            ],
+            as: 'attachments',
           },
         },
         {
@@ -578,12 +737,47 @@ export class CommunityService {
         { $limit: options.limit },
         {
           $project: {
-            userPin: 0,
-            createdByStudent: 0,
-            createdByUser: 0,
-            userView: 0,
-            last_reply_date: 0,
-            lastReply: 0, // Remove the array version
+            // Include all base discussion fields
+            _id: 1,
+            title: 1,
+            content: 1,
+            type: 1,
+            tags: 1,
+            created_by: 1,
+            created_by_role: 1,
+            reply_count: 1,
+            view_count: 1,
+            like_count: 1,
+            status: 1,
+            created_at: 1,
+            updated_at: 1,
+            archived_at: 1,
+            archived_by: 1,
+            deleted_at: 1,
+            deleted_by: 1,
+            last_reply_at: 1,
+
+            // Explicitly include meeting fields
+            meeting_link: 1,
+            meeting_platform: 1,
+            meeting_scheduled_at: 1,
+            meeting_duration_minutes: 1,
+
+            // Include computed fields
+            is_pinned: 1,
+            pinned_at: 1,
+            last_reply: 1,
+            created_by_user: 1,
+            is_unread: 1,
+            has_liked: 1,
+            liked_at: 1,
+            is_upcoming_meeting: 1,
+            meeting_priority: 1,
+            meeting_status: 1,
+            meeting_time_until: 1,
+            meeting_end_time: 1,
+            is_meeting_ongoing: 1,
+            attachments: 1,
           },
         },
       ];
@@ -595,6 +789,91 @@ export class CommunityService {
       ]);
 
       this.logger.debug(`Found ${discussions.length} discussions`);
+      console.log(discussions);
+
+      // Process discussions and populate user details
+      for (const discussion of discussions) {
+        // If created_by_user is null (professor/admin), populate it using getUserDetails
+        if (
+          !discussion.created_by_user &&
+          discussion.created_by &&
+          discussion.created_by_role
+        ) {
+          this.logger.debug(
+            `Populating user details for discussion ${discussion._id} created by ${discussion.created_by}`,
+          );
+          discussion.created_by_user = await this.getUserDetails(
+            discussion.created_by.toString(),
+            discussion.created_by_role,
+            tenantConnection,
+          );
+        }
+
+        // If last_reply_user is null (professor/admin), populate it using getUserDetails
+        if (
+          !discussion.last_reply_user &&
+          discussion.last_reply &&
+          discussion.last_reply.created_by &&
+          discussion.last_reply.created_by_role
+        ) {
+          this.logger.debug(
+            `Populating last reply user details for discussion ${discussion._id}`,
+          );
+          discussion.last_reply_user = await this.getUserDetails(
+            discussion.last_reply.created_by.toString(),
+            discussion.last_reply.created_by_role,
+            tenantConnection,
+          );
+        }
+
+        // Decrypt email in created_by_user
+        if (discussion.created_by_user && discussion.created_by_user.email) {
+          discussion.created_by_user.email =
+            this.emailEncryptionService.decryptEmail(
+              discussion.created_by_user.email,
+            );
+        }
+
+        // Decrypt email in last_reply_user if it exists
+        if (discussion.last_reply_user && discussion.last_reply_user.email) {
+          discussion.last_reply_user.email =
+            this.emailEncryptionService.decryptEmail(
+              discussion.last_reply_user.email,
+            );
+        }
+
+        // Process attachments and populate professor details
+        if (discussion.attachments && Array.isArray(discussion.attachments)) {
+          for (const attachment of discussion.attachments) {
+            // If uploaded_by_user is null (professor/admin), populate it using getUserDetails
+            if (
+              !attachment.uploaded_by_user &&
+              attachment.uploaded_by &&
+              attachment.uploaded_by_role
+            ) {
+              this.logger.debug(
+                `Populating uploaded_by_user for attachment ${attachment._id}`,
+              );
+              attachment.uploaded_by_user = await this.getUserDetails(
+                attachment.uploaded_by.toString(),
+                attachment.uploaded_by_role,
+                tenantConnection,
+              );
+            }
+
+            // Decrypt email in uploaded_by_user if it exists
+            if (
+              attachment.uploaded_by_user &&
+              attachment.uploaded_by_user.email
+            ) {
+              attachment.uploaded_by_user.email =
+                this.emailEncryptionService.decryptEmail(
+                  attachment.uploaded_by_user.email,
+                );
+            }
+          }
+        }
+      }
 
       const result = createPaginationResult(discussions, total, options);
 
@@ -675,15 +954,121 @@ export class CommunityService {
         tenantConnection,
       );
 
+      // Check if current user has liked this discussion
+      const LikeModel = tenantConnection.model(ForumLike.name, ForumLikeSchema);
+      const userLike = await LikeModel.findOne({
+        entity_type: LikeEntityTypeEnum.DISCUSSION,
+        entity_id: new Types.ObjectId(discussionId),
+        liked_by: new Types.ObjectId(user.id),
+      }).lean();
+
       // Attach user details
       const userDetails = await this.getUserDetails(
         discussion.created_by.toString(),
         discussion.created_by_role,
         tenantConnection,
       );
+
+      // Get attachments for this discussion
+      const AttachmentModel = tenantConnection.model(
+        ForumAttachment.name,
+        ForumAttachmentSchema,
+      );
+      const attachments = await AttachmentModel.find({
+        discussion_id: new Types.ObjectId(discussionId),
+        reply_id: null, // Only discussion attachments
+        status: AttachmentStatusEnum.ACTIVE,
+        deleted_at: null,
+      })
+        .sort({ created_at: 1 })
+        .lean();
+
+      // Get mentions for this discussion
+      const MentionModel = tenantConnection.model(
+        ForumMention.name,
+        ForumMentionSchema,
+      );
+      const mentions = await MentionModel.find({
+        discussion_id: new Types.ObjectId(discussionId),
+        reply_id: null, // Only discussion-level mentions
+      })
+        .populate(
+          'mentioned_user',
+          'first_name last_name email role profile_pic',
+        )
+        .populate('mentioned_by', 'first_name last_name email role profile_pic')
+        .sort({ created_at: 1 })
+        .lean();
+
+      // Format mentions
+      const formattedMentions = mentions.map((mention) => {
+        const mentionedUser = mention.mentioned_user as any;
+        const mentionedBy = mention.mentioned_by as any;
+
+        return {
+          _id: mention._id,
+          mentioned_user: mentionedUser
+            ? {
+                _id: mentionedUser._id,
+                first_name: mentionedUser.first_name,
+                last_name: mentionedUser.last_name,
+                email: this.emailEncryptionService.decryptEmail(
+                  mentionedUser.email,
+                ),
+                role: mentionedUser.role,
+                image:
+                  mentionedUser.role === RoleEnum.STUDENT
+                    ? mentionedUser.image
+                    : mentionedUser.profile_pic,
+              }
+            : null,
+          mentioned_by: mentionedBy
+            ? {
+                _id: mentionedBy._id,
+                first_name: mentionedBy.first_name,
+                last_name: mentionedBy.last_name,
+                email: this.emailEncryptionService.decryptEmail(
+                  mentionedBy.email,
+                ),
+                role: mentionedBy.role,
+                image:
+                  mentionedBy.role === RoleEnum.STUDENT
+                    ? mentionedBy.image
+                    : mentionedBy.profile_pic,
+              }
+            : null,
+          mention_text: mention.mention_text,
+          created_at: mention.created_at,
+        };
+      });
+
+      const formattedAttachments = await Promise.all(
+        attachments.map(async (attachment) => {
+          // Get user details for the uploader using getUserDetails
+          let uploadedByUser: any = null;
+          if (attachment.uploaded_by) {
+            // Use the actual role from the attachment schema
+            uploadedByUser = await this.getUserDetails(
+              attachment.uploaded_by.toString(),
+              attachment.uploaded_by_role,
+              tenantConnection,
+            );
+          }
+
+          return {
+            ...attachment,
+            uploaded_by_user: uploadedByUser,
+          };
+        }),
+      );
+
       const discussionWithUser = {
         ...discussion,
         created_by_user: userDetails || null,
+        attachments: formattedAttachments,
+        mentions: formattedMentions,
+        has_liked: !!userLike,
+        liked_at: userLike?.created_at || null,
       };
 
       return {
@@ -712,9 +1097,18 @@ export class CommunityService {
   /**
    * Create a reply to a discussion
    */
-  async createReply(createReplyDto: CreateReplyDto, user: JWTUserPayload) {
-    const { school_id, discussion_id, content, parent_reply_id, mentions } =
-      createReplyDto;
+  async createReply(
+    createReplyDto: CreateReplyDto | any,
+    user: JWTUserPayload,
+  ) {
+    const {
+      school_id,
+      discussion_id,
+      content,
+      parent_reply_id,
+      mentions,
+      attachments,
+    } = createReplyDto;
 
     this.logger.log(
       `Creating reply to discussion: ${discussion_id} by user: ${user.id}`,
@@ -816,6 +1210,21 @@ export class CommunityService {
       });
 
       const savedReply = await newReply.save();
+
+      // If there are attachments, create them
+      if (attachments && attachments.length > 0) {
+        for (const attachment of attachments) {
+          await this.createForumAttachment(
+            {
+              ...attachment,
+              discussion_id,
+              reply_id: savedReply._id,
+              entity_type: AttachmentEntityTypeEnum.REPLY,
+            },
+            user,
+          );
+        }
+      }
 
       // Create mention records
       const mentionPromises = resolvedMentions.map(async (mention) => {
@@ -1028,14 +1437,6 @@ export class CommunityService {
                 },
               },
               {
-                $lookup: {
-                  from: 'users',
-                  localField: 'mentioned_user',
-                  foreignField: '_id',
-                  as: 'mentionedUser',
-                },
-              },
-              {
                 $addFields: {
                   mentioned_user_details: {
                     $cond: {
@@ -1052,20 +1453,7 @@ export class CommunityService {
                         image: { $arrayElemAt: ['$mentionedStudent.image', 0] },
                         role: 'STUDENT',
                       },
-                      else: {
-                        _id: { $arrayElemAt: ['$mentionedUser._id', 0] },
-                        first_name: {
-                          $arrayElemAt: ['$mentionedUser.first_name', 0],
-                        },
-                        last_name: {
-                          $arrayElemAt: ['$mentionedUser.last_name', 0],
-                        },
-                        email: { $arrayElemAt: ['$mentionedUser.email', 0] },
-                        image: {
-                          $arrayElemAt: ['$mentionedUser.profile_pic', 0],
-                        },
-                        role: { $arrayElemAt: ['$mentionedUser.role', 0] },
-                      },
+                      else: null, // Will be populated later for professors/admins
                     },
                   },
                 },
@@ -1091,14 +1479,6 @@ export class CommunityService {
           },
         },
         {
-          $lookup: {
-            from: 'users',
-            localField: 'created_by',
-            foreignField: '_id',
-            as: 'createdByUser',
-          },
-        },
-        {
           $addFields: {
             created_by_user: {
               $cond: {
@@ -1113,22 +1493,14 @@ export class CommunityService {
                   },
                   email: { $arrayElemAt: ['$createdByStudent.email', 0] },
                   image: { $arrayElemAt: ['$createdByStudent.image', 0] },
+                  profile_pic: {
+                    $arrayElemAt: ['$createdByStudent.profile_pic', 0],
+                  },
                   role: 'STUDENT',
                 },
-                else: {
-                  _id: { $arrayElemAt: ['$createdByUser._id', 0] },
-                  first_name: {
-                    $arrayElemAt: ['$createdByUser.first_name', 0],
-                  },
-                  last_name: { $arrayElemAt: ['$createdByUser.last_name', 0] },
-                  email: { $arrayElemAt: ['$createdByUser.email', 0] },
-                  image: { $arrayElemAt: ['$createdByUser.profile_pic', 0] },
-                  role: { $arrayElemAt: ['$createdByUser.role', 0] },
-                },
+                else: null, // Will be populated later for professors/admins
               },
             },
-            has_sub_replies: { $gt: ['$sub_reply_count', 0] },
-            sub_reply_count: { $ifNull: ['$sub_reply_count', 0] },
           },
         },
         {
@@ -1170,15 +1542,51 @@ export class CommunityService {
           },
         },
         {
+          $lookup: {
+            from: 'forum_likes',
+            let: { replyId: '$_id', userId: new Types.ObjectId(user.id) },
+            pipeline: [
+              {
+                $match: {
+                  $expr: {
+                    $and: [
+                      { $eq: ['$entity_id', '$$replyId'] },
+                      { $eq: ['$entity_type', 'REPLY'] },
+                      { $eq: ['$liked_by', '$$userId'] },
+                    ],
+                  },
+                },
+              },
+            ],
+            as: 'userLike',
+          },
+        },
+        {
+          $addFields: {
+            has_liked: { $gt: [{ $size: '$userLike' }, 0] },
+            liked_at: { $arrayElemAt: ['$userLike.created_at', 0] },
+          },
+        },
+        {
+          $addFields: {
+            last_reply_date: {
+              $ifNull: ['$last_reply.created_at', '$created_at'],
+            },
+          },
+        },
+        {
           $sort: { created_at: 1 },
         },
         { $skip: options.skip },
         { $limit: options.limit },
         {
           $project: {
+            userPin: 0,
             createdByStudent: 0,
             createdByUser: 0,
             userView: 0,
+            last_reply_date: 0,
+            lastReply: 0,
           },
         },
       ];
@@ -1195,6 +1603,91 @@ export class CommunityService {
       ]);
 
       this.logger.debug(`Found ${replies.length} replies`);
+
+      // Process replies and populate user details
+      for (const reply of replies) {
+        // If created_by_user is null (professor/admin), populate it using getUserDetails
+        if (
+          !reply.created_by_user &&
+          reply.created_by &&
+          reply.created_by_role
+        ) {
+          this.logger.debug(
+            `Populating user details for reply ${reply._id} created by ${reply.created_by}`,
+          );
+          reply.created_by_user = await this.getUserDetails(
+            reply.created_by.toString(),
+            reply.created_by_role,
+            tenantConnection,
+          );
+        }
+
+        // Decrypt email in created_by_user
+        if (reply.created_by_user && reply.created_by_user.email) {
+          reply.created_by_user.email =
+            this.emailEncryptionService.decryptEmail(
+              reply.created_by_user.email,
+            );
+        }
+
+        // Decrypt emails in mentions
+        if (reply.mentions && Array.isArray(reply.mentions)) {
+          for (const mention of reply.mentions) {
+            if (
+              mention.mentioned_user_details &&
+              mention.mentioned_user_details.email
+            ) {
+              mention.mentioned_user_details.email =
+                this.emailEncryptionService.decryptEmail(
+                  mention.mentioned_user_details.email,
+                );
+            }
+          }
+        }
+      }
+
+      // Get attachments for each reply
+      const AttachmentModel = tenantConnection.model(
+        ForumAttachment.name,
+        ForumAttachmentSchema,
+      );
+
+      for (const reply of replies) {
+        const attachments = await AttachmentModel.find({
+          reply_id: reply._id,
+          status: AttachmentStatusEnum.ACTIVE,
+          deleted_at: null,
+        })
+          .populate(
+            'uploaded_by',
+            'first_name last_name email role profile_pic',
+          )
+          .sort({ created_at: 1 })
+          .lean();
+
+        // Format attachment user details
+        const formattedAttachments = await Promise.all(
+          attachments.map(async (attachment) => {
+            // Get user details for the uploader using getUserDetails
+            let uploadedByUser: any = null;
+            if (attachment.uploaded_by) {
+              // Use the actual role from the attachment schema
+              uploadedByUser = await this.getUserDetails(
+                attachment.uploaded_by.toString(),
+                attachment.uploaded_by_role,
+                tenantConnection,
+              );
+            }
+
+            return {
+              ...attachment,
+              uploaded_by_user: uploadedByUser,
+            };
+          }),
+        );
+
+        reply.attachments = formattedAttachments;
+      }
 
       // Mark forum as viewed by this user
       await this.markContentAsViewed(
@@ -1312,14 +1805,6 @@ export class CommunityService {
                 },
               },
               {
-                $lookup: {
-                  from: 'users',
-                  localField: 'mentioned_user',
-                  foreignField: '_id',
-                  as: 'mentionedUser',
-                },
-              },
-              {
                 $addFields: {
                   mentioned_user_details: {
                     $cond: {
@@ -1336,20 +1821,7 @@ export class CommunityService {
                         image: { $arrayElemAt: ['$mentionedStudent.image', 0] },
                         role: 'STUDENT',
                       },
-                      else: {
-                        _id: { $arrayElemAt: ['$mentionedUser._id', 0] },
-                        first_name: {
-                          $arrayElemAt: ['$mentionedUser.first_name', 0],
-                        },
-                        last_name: {
-                          $arrayElemAt: ['$mentionedUser.last_name', 0],
-                        },
-                        email: { $arrayElemAt: ['$mentionedUser.email', 0] },
-                        image: {
-                          $arrayElemAt: ['$mentionedUser.profile_pic', 0],
-                        },
-                        role: { $arrayElemAt: ['$mentionedUser.role', 0] },
-                      },
+                      else: null, // Will be populated later for professors/admins
                     },
                   },
                 },
@@ -1375,14 +1847,6 @@ export class CommunityService {
           },
         },
         {
-          $lookup: {
-            from: 'users',
-            localField: 'created_by',
-            foreignField: '_id',
-            as: 'createdByUser',
-          },
-        },
-        {
           $addFields: {
             created_by_user: {
               $cond: {
@@ -1397,19 +1861,46 @@ export class CommunityService {
                   },
                   email: { $arrayElemAt: ['$createdByStudent.email', 0] },
                   image: { $arrayElemAt: ['$createdByStudent.image', 0] },
+                  profile_pic: {
+                    $arrayElemAt: ['$createdByStudent.profile_pic', 0],
+                  },
                   role: 'STUDENT',
                 },
-                else: {
-                  _id: { $arrayElemAt: ['$createdByUser._id', 0] },
-                  first_name: {
-                    $arrayElemAt: ['$createdByUser.first_name', 0],
+                else: null, // Will be populated later for professors/admins
+              },
+            },
+          },
+        },
+        {
+          $lookup: {
+            from: 'forum_likes',
+            let: { replyId: '$_id', userId: new Types.ObjectId(user.id) },
+            pipeline: [
+              {
+                $match: {
+                  $expr: {
+                    $and: [
+                      { $eq: ['$entity_id', '$$replyId'] },
+                      { $eq: ['$entity_type', 'REPLY'] },
+                      { $eq: ['$liked_by', '$$userId'] },
+                    ],
                   },
-                  last_name: { $arrayElemAt: ['$createdByUser.last_name', 0] },
-                  email: { $arrayElemAt: ['$createdByUser.email', 0] },
-                  image: { $arrayElemAt: ['$createdByUser.profile_pic', 0] },
-                  role: { $arrayElemAt: ['$createdByUser.role', 0] },
                 },
               },
+            ],
+            as: 'userLike',
+          },
+        },
+        {
+          $addFields: {
+            has_liked: { $gt: [{ $size: '$userLike' }, 0] },
+            liked_at: { $arrayElemAt: ['$userLike.created_at', 0] },
+          },
+        },
+        {
+          $addFields: {
+            last_reply_date: {
+              $ifNull: ['$last_reply.created_at', '$created_at'],
             },
           },
         },
@@ -1420,8 +1911,12 @@ export class CommunityService {
         { $limit: options.limit },
         {
           $project: {
+            userPin: 0,
             createdByStudent: 0,
             createdByUser: 0,
+            userView: 0,
+            last_reply_date: 0,
+            lastReply: 0,
           },
         },
       ];
@@ -1437,6 +1932,75 @@ export class CommunityService {
       ]);
 
       this.logger.debug(`Found ${subReplies.length} sub-replies`);
+
+      // Decrypt emails in the aggregation results
+      for (const subReply of subReplies) {
+        // Decrypt email in created_by_user
+        if (subReply.created_by_user && subReply.created_by_user.email) {
+          subReply.created_by_user.email =
+            this.emailEncryptionService.decryptEmail(
+              subReply.created_by_user.email,
+            );
+        }
+
+        // Decrypt emails in mentions
+        if (subReply.mentions && Array.isArray(subReply.mentions)) {
+          for (const mention of subReply.mentions) {
+            if (
+              mention.mentioned_user_details &&
+              mention.mentioned_user_details.email
+            ) {
+              mention.mentioned_user_details.email =
+                this.emailEncryptionService.decryptEmail(
+                  mention.mentioned_user_details.email,
+                );
+            }
+          }
+        }
+      }
+
+      // Get attachments for each sub-reply
+      const AttachmentModel = tenantConnection.model(
+        ForumAttachment.name,
+        ForumAttachmentSchema,
+      );
+
+      for (const subReply of subReplies) {
+        const attachments = await AttachmentModel.find({
+          reply_id: subReply._id,
+          status: AttachmentStatusEnum.ACTIVE,
+          deleted_at: null,
+        })
+          .populate(
+            'uploaded_by',
+            'first_name last_name email role profile_pic',
+          )
+          .sort({ created_at: 1 })
+          .lean();
+
+        // Format attachment user details
+        const formattedAttachments = await Promise.all(
+          attachments.map(async (attachment) => {
+            // Get user details for the uploader using getUserDetails
+            let uploadedByUser: any = null;
+            if (attachment.uploaded_by) {
+              // Use the actual role from the attachment schema
+              uploadedByUser = await this.getUserDetails(
+                attachment.uploaded_by.toString(),
+                attachment.uploaded_by_role,
+                tenantConnection,
+              );
+            }
+
+            return {
+              ...attachment,
+              uploaded_by_user: uploadedByUser,
+            };
+          }),
+        );
+
+        subReply.attachments = formattedAttachments;
+      }
 
       const result = createPaginationResult(subReplies, total, options);
       return {
@@ -1506,6 +2070,13 @@ export class CommunityService {
         await LikeModel.deleteOne({ _id: existingLike._id });
         await this.updateLikeCount(entityType, entityId, -1, tenantConnection);
 
+        // Get updated like count
+        const updatedLikeCount = await this.getLikeCount(
+          entityType,
+          entityId,
+          tenantConnection,
+        );
+
         // Get user details for response
         const userDetails = await this.getUserDetails(
           user.id.toString(),
@@ -1519,8 +2090,13 @@ export class CommunityService {
             'UNLIKED_SUCCESSFULLY',
             user?.preferred_language || DEFAULT_LANGUAGE,
           ),
-          liked: false,
-          liked_by_user: userDetails || null,
+          data: {
+            liked: false,
+            has_liked: false,
+            like_count: updatedLikeCount,
+            liked_by_user: userDetails || null,
+            action: 'unliked',
+          },
         };
       } else {
         // Like
@@ -1532,6 +2108,13 @@ export class CommunityService {
 
         await newLike.save();
         await this.updateLikeCount(entityType, entityId, 1, tenantConnection);
+
+        // Get updated like count
+        const updatedLikeCount = await this.getLikeCount(
+          entityType,
+          entityId,
+          tenantConnection,
+        );
 
         // Send notification for new like
         const liker = await this.getUserDetails(
@@ -1641,6 +2224,36 @@ export class CommunityService {
         { $inc: { like_count: increment } },
       );
     }
+  }
+
+  /**
+   * Helper method to get current like count
+   */
+  private async getLikeCount(
+    entityType: LikeEntityTypeEnum,
+    entityId: string,
+    tenantConnection: any,
+  ): Promise<number> {
+    if (entityType === LikeEntityTypeEnum.DISCUSSION) {
+      const DiscussionModel = tenantConnection.model(
+        ForumDiscussion.name,
+        ForumDiscussionSchema,
+      );
+      const discussion = await DiscussionModel.findById(entityId)
+        .select('like_count')
+        .lean();
+      return discussion?.like_count || 0;
+    } else if (entityType === LikeEntityTypeEnum.REPLY) {
+      const ReplyModel = tenantConnection.model(
+        ForumReply.name,
+        ForumReplySchema,
+      );
+      const reply = await ReplyModel.findById(entityId)
+        .select('like_count')
+        .lean();
+      return reply?.like_count || 0;
+    }
+    return 0;
   }
 
   /**
@@ -1971,9 +2584,11 @@ export class CommunityService {
   async archiveDiscussion(discussionId: string, user: JWTUserPayload) {
     // Only school admins and super admins can archive discussions
     if (
-      ![RoleEnum.SCHOOL_ADMIN, RoleEnum.SUPER_ADMIN].includes(
-        user.role.name as RoleEnum,
-      )
+      ![
+        RoleEnum.SCHOOL_ADMIN,
+        RoleEnum.SUPER_ADMIN,
+        RoleEnum.PROFESSOR,
+      ].includes(user.role.name as RoleEnum)
     ) {
       throw new ForbiddenException(
         this.errorMessageService.getMessageWithLanguage(
@@ -2058,6 +2673,167 @@ export class CommunityService {
   }
 
   /**
+   * Delete discussion (admin only)
+   */
+  async deleteDiscussion(discussionId: string, user: JWTUserPayload) {
+    // Only school admins and super admins can delete discussions
+    if (
+      ![RoleEnum.SCHOOL_ADMIN, RoleEnum.SUPER_ADMIN].includes(
+        user.role.name as RoleEnum,
+      )
+    ) {
+      throw new ForbiddenException(
+        this.errorMessageService.getMessageWithLanguage(
+          'COMMUNITY',
+          'ACCESS_DENIED',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
+    }
+
+    this.logger.log(`Deleting discussion: ${discussionId} by user: ${user.id}`);
+
+    const resolvedSchoolId = this.resolveSchoolId(user);
+
+    // Validate school exists
+    const school = await this.schoolModel.findById(resolvedSchoolId);
+    if (!school) {
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'SCHOOL',
+          'NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
+    }
+
+    // Get tenant connection
+    const tenantConnection =
+      await this.tenantConnectionService.getTenantConnection(school.db_name);
+    const DiscussionModel = tenantConnection.model(
+      ForumDiscussion.name,
+      ForumDiscussionSchema,
+    );
+    const ReplyModel = tenantConnection.model(
+      ForumReply.name,
+      ForumReplySchema,
+    );
+    const LikeModel = tenantConnection.model(ForumLike.name, ForumLikeSchema);
+    const PinModel = tenantConnection.model(ForumPin.name, ForumPinSchema);
+    const MentionModel = tenantConnection.model(
+      ForumMention.name,
+      ForumMentionSchema,
+    );
+    const AttachmentModel = tenantConnection.model(
+      ForumAttachment.name,
+      ForumAttachmentSchema,
+    );
+    const ReportModel = tenantConnection.model(
+      ForumReport.name,
+      ForumReportSchema,
+    );
+    const ViewModel = tenantConnection.model(ForumView.name, ForumViewSchema);
+
+    try {
+      const discussion = await DiscussionModel.findOne({
+        _id: discussionId,
+        deleted_at: null,
+      });
+
+      if (!discussion) {
+        throw new NotFoundException(
+          this.errorMessageService.getMessageWithLanguage(
+            'COMMUNITY',
+            'DISCUSSION_NOT_FOUND',
+            user?.preferred_language || DEFAULT_LANGUAGE,
+          ),
+        );
+      }
+
+      // Soft delete the discussion
+      await DiscussionModel.updateOne(
+        { _id: discussionId },
+        {
+          deleted_at: new Date(),
+          deleted_by: new Types.ObjectId(user.id),
+        },
+      );
+
+      // Soft delete all related replies
+      await ReplyModel.updateMany(
+        { discussion_id: new Types.ObjectId(discussionId) },
+        {
+          deleted_at: new Date(),
+          deleted_by: new Types.ObjectId(user.id),
+        },
+      );
+
+      // Delete all related likes
+      await LikeModel.deleteMany({
+        entity_type: LikeEntityTypeEnum.DISCUSSION,
+        entity_id: new Types.ObjectId(discussionId),
+      });
+
+      // Delete all related pins
+      await PinModel.deleteMany({
+        discussion_id: new Types.ObjectId(discussionId),
+      });
+
+      // Delete all related mentions
+      await MentionModel.deleteMany({
+        discussion_id: new Types.ObjectId(discussionId),
+      });
+
+      // Soft delete all related attachments
+      await AttachmentModel.updateMany(
+        { discussion_id: new Types.ObjectId(discussionId) },
+        {
+          deleted_at: new Date(),
+          deleted_by: new Types.ObjectId(user.id),
+        },
+      );
+
+      // Delete all related reports
+      await ReportModel.deleteMany({
+        entity_type: ReportEntityTypeEnum.DISCUSSION,
+        entity_id: new Types.ObjectId(discussionId),
+      });
+
+      // Delete all related views
+      await ViewModel.deleteMany({
+        discussion_id: new Types.ObjectId(discussionId),
+      });
+
+      this.logger.log(`Discussion deleted: ${discussionId}`);
+
+      return {
+        message: this.errorMessageService.getSuccessMessageWithLanguage(
+          'COMMUNITY',
+          'DISCUSSION_DELETED_SUCCESSFULLY',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+        data: {
+          discussion_id: discussionId,
+          deleted_at: new Date(),
+          deleted_by: user.id,
+        },
+      };
+    } catch (error) {
+      this.logger.error('Error deleting discussion', error?.stack || error);
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
+      throw new BadRequestException(
+        this.errorMessageService.getMessageWithLanguage(
+          'COMMUNITY',
+          'DELETE_DISCUSSION_FAILED',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
+    }
+  }
+
+  /**
    * Helper method to get last reply information for a discussion
    */
   private async getLastReplyInfo(discussionId: string, tenantConnection: any) {
@@ -2106,48 +2882,128 @@ export class CommunityService {
     tenantConnection?: any,
   ) {
     try {
-      if (userRole === RoleEnum.STUDENT && tenantConnection) {
+      this.logger.debug(
+        `Getting user details for userId: ${userId}, userRole: ${userRole}`,
+      );
+
+      // Normalize role comparison - handle both string and enum values
+      const normalizedRole = userRole?.toString()?.toUpperCase();
+      this.logger.debug(`Normalized role: ${normalizedRole}`);
+
+      if (normalizedRole === RoleEnum.STUDENT && tenantConnection) {
         // Students are stored in tenant database - use the tenant connection
+        this.logger.debug(`Fetching student details from tenant database`);
         const StudentModel = tenantConnection.model(
           Student.name,
           StudentSchema,
         );
         const student = await StudentModel.findById(userId)
-          .select('first_name last_name email image')
+          .select('first_name last_name email image profile_pic')
           .lean();
 
         if (student) {
+          this.logger.debug(
+            `Student found: ${student.first_name} ${student.last_name}`,
+          );
           return {
             _id: student._id,
             first_name: student.first_name,
             last_name: student.last_name,
-            email: student.email,
-            image: student.image || null,
+            email: this.emailEncryptionService.decryptEmail(student.email),
+            image: student.image || student.profile_pic || null,
+            profile_pic: student.profile_pic || student.image || null,
             role: RoleEnum.STUDENT,
           };
+        } else {
+          this.logger.warn(`Student not found in tenant database: ${userId}`);
         }
       } else {
         // Professors, admins, etc. are stored in central database
+        this.logger.debug(
+          `Fetching user details from central database for role: ${userRole}`,
+        );
+        this.logger.debug(`Converting userId to ObjectId: ${userId}`);
+
+        const objectId = new Types.ObjectId(userId);
+        this.logger.debug(`ObjectId created: ${objectId}`);
+
         const user = await this.userModel
-          .findById(userId)
+          .findById(objectId)
           .select('first_name last_name email role profile_pic')
+          .populate('role', 'name')
           .lean();
 
-        if (user) {
+        // Try without population as fallback if populated query fails
+        let userWithoutPopulate: any = null;
+        if (!user) {
+          this.logger.debug(
+            `User not found with population, trying without population`,
+          );
+          userWithoutPopulate = await this.userModel
+            .findById(objectId)
+            .select('first_name last_name email role profile_pic')
+            .lean();
+        }
+
+        // Use either populated or non-populated user data
+        const userData = user || userWithoutPopulate;
+
+        if (userData) {
+          this.logger.debug(
+            `User found: ${userData.first_name} ${userData.last_name}`,
+          );
+          this.logger.debug(
+            `User role field: ${JSON.stringify(userData.role)}`,
+          );
+
+          // Handle both populated role object and ObjectId
+          let roleName = userRole;
+          if (
+            userData.role &&
+            typeof userData.role === 'object' &&
+            'name' in userData.role
+          ) {
+            roleName = (userData.role as any).name;
+            this.logger.debug(`Using populated role name: ${roleName}`);
+          } else {
+            this.logger.debug(`Using passed role name: ${roleName}`);
+          }
+
+          // Handle email decryption safely
+          let decryptedEmail = '';
+          try {
+            decryptedEmail = this.emailEncryptionService.decryptEmail(
+              userData.email,
+            );
+            this.logger.debug(`Email decrypted successfully`);
+          } catch (emailError) {
+            this.logger.error(`Error decrypting email: ${emailError}`);
+            decryptedEmail = userData.email; // Fallback to encrypted email
+          }
+
           return {
-            _id: user._id,
-            first_name: user.first_name,
-            last_name: user.last_name,
-            email: user.email,
-            image: user.profile_pic || null,
-            role: user.role,
+            _id: userData._id,
+            first_name: userData.first_name,
+            last_name: userData.last_name,
+            email: decryptedEmail,
+            image: userData.profile_pic || null,
+            profile_pic: userData.profile_pic || null,
+            role: roleName,
           };
+        } else {
+          this.logger.warn(`User not found in central database: ${userId}`);
         }
       }
 
+      this.logger.warn(
+        `No user details found for userId: ${userId}, userRole: ${userRole}`,
+      );
       return null;
     } catch (error) {
-      this.logger.error('Error fetching user details', error);
+      this.logger.error(
+        `Error fetching user details for userId: ${userId}, userRole: ${userRole}`,
+        error?.stack || error,
+      );
       return null;
     }
   }
@@ -2386,7 +3242,9 @@ export class CommunityService {
       const titleFr = 'Nouveau Like sur Votre Contenu';
       const messageEn = `${liker.first_name} ${liker.last_name} liked your ${entityType}: "${entityTitle}"`;
       const messageFr = `${liker.first_name} ${liker.last_name} a aimé votre ${entityType}: "${entityTitle}"`;
-      const metadata = {
+
+      // Base metadata
+      const metadata: any = {
         entity_type: entityType,
         entity_id: entity._id,
         entity_title: entityTitle,
@@ -2394,6 +3252,11 @@ export class CommunityService {
         liker_name: `${liker.first_name} ${liker.last_name}`,
         liker_role: liker.role,
       };
+
+      // Add discussion_id to metadata if entity type is reply
+      if (entityType === 'reply' && entity.discussion_id) {
+        metadata.discussion_id = new Types.ObjectId(entity.discussion_id);
+      }
 
       const recipientType =
         entity.created_by_role === RoleEnum.STUDENT
@@ -2473,7 +3336,7 @@ export class CommunityService {
   }
 
   /**
-   * Helper method to notify mentioned users about new reply
+   * Notify users mentioned in a reply
    */
   private async notifyMentionedUsers(
     reply: any,
@@ -2536,6 +3399,71 @@ export class CommunityService {
       await Promise.all(mentionPromises);
     } catch (error) {
       this.logger.error('Error notifying mentioned users', error);
+    }
+  }
+
+  /**
+   * Notify users mentioned in a discussion
+   */
+  private async notifyMentionedUsersInDiscussion(
+    discussion: any,
+    discussionCreator: any,
+    mentionedUsers: MentionInfo[],
+    schoolId: string,
+  ) {
+    try {
+      const tenantConnection =
+        await this.tenantConnectionService.getTenantConnection(schoolId);
+      const MentionModel = tenantConnection.model(
+        ForumMention.name,
+        ForumMentionSchema,
+      );
+
+      const mentionPromises = mentionedUsers.map(async (mention) => {
+        if (mention.userId) {
+          const mentionedUser = await this.getUserDetails(
+            mention.userId.toString(),
+            mention.userRole || 'STUDENT',
+            tenantConnection,
+          );
+
+          if (mentionedUser) {
+            const titleEn = 'New Mention in Discussion';
+            const titleFr = 'Nouvelle Mention dans la Discussion';
+            const messageEn = `${discussionCreator.first_name} ${discussionCreator.last_name} mentioned you in "${discussion.title}": "${mention.mentionText}"`;
+            const messageFr = `${discussionCreator.first_name} ${discussionCreator.last_name} vous a mentionné dans "${discussion.title}": "${mention.mentionText}"`;
+            const metadata = {
+              discussion_id: discussion._id,
+              discussion_title: discussion.title,
+              discussion_creator_id: discussion.created_by,
+              discussion_creator_name: `${discussionCreator.first_name} ${discussionCreator.last_name}`,
+              discussion_creator_role: discussion.created_by_role,
+              mention_text: mention.mentionText,
+            };
+
+            const recipientType =
+              mention.userRole === 'STUDENT'
+                ? RecipientTypeEnum.STUDENT
+                : RecipientTypeEnum.PROFESSOR;
+
+            await this.createForumNotification(
+              new Types.ObjectId(mention.userId),
+              recipientType,
+              titleEn,
+              titleFr,
+              messageEn,
+              messageFr,
+              NotificationTypeEnum.FORUM_MENTION,
+              metadata,
+              schoolId,
+            );
+          }
+        }
+      });
+
+      await Promise.all(mentionPromises);
+    } catch (error) {
+      this.logger.error('Error notifying mentioned users in discussion', error);
     }
   }
 
@@ -2917,14 +3845,6 @@ export class CommunityService {
           },
         },
         {
-          $lookup: {
-            from: 'users',
-            localField: 'discussion.created_by',
-            foreignField: '_id',
-            as: 'createdByUser',
-          },
-        },
-        {
           $addFields: {
             created_by_details: {
               $cond: {
@@ -2941,20 +3861,75 @@ export class CommunityService {
                   image: { $arrayElemAt: ['$createdByStudent.image', 0] },
                   role: 'STUDENT',
                 },
-                else: {
-                  _id: { $arrayElemAt: ['$createdByUser._id', 0] },
-                  first_name: {
-                    $arrayElemAt: ['$createdByUser.first_name', 0],
-                  },
-                  last_name: { $arrayElemAt: ['$createdByUser.last_name', 0] },
-                  email: { $arrayElemAt: ['$createdByUser.email', 0] },
-                  image: { $arrayElemAt: ['$createdByUser.profile_pic', 0] },
-                  role: { $arrayElemAt: ['$createdByUser.role', 0] },
-                },
+                else: null, // Will be populated later for professors/admins
               },
             },
             is_pinned: true,
             pinned_at: '$created_at',
+          },
+        },
+        {
+          $lookup: {
+            from: 'forum_attachments',
+            let: { discussionId: '$_id' },
+            pipeline: [
+              {
+                $match: {
+                  $expr: { $eq: ['$discussion_id', '$$discussionId'] },
+                  reply_id: null, // Only discussion attachments
+                  status: AttachmentStatusEnum.ACTIVE,
+                  deleted_at: null,
+                },
+              },
+              { $sort: { created_at: 1 } },
+              {
+                $lookup: {
+                  from: 'students',
+                  localField: 'uploaded_by',
+                  foreignField: '_id',
+                  as: 'uploadedByStudent',
+                },
+              },
+              {
+                $addFields: {
+                  uploaded_by_user: {
+                    $cond: {
+                      if: { $gt: [{ $size: '$uploadedByStudent' }, 0] },
+                      then: {
+                        _id: { $arrayElemAt: ['$uploadedByStudent._id', 0] },
+                        first_name: {
+                          $arrayElemAt: ['$uploadedByStudent.first_name', 0],
+                        },
+                        last_name: {
+                          $arrayElemAt: ['$uploadedByStudent.last_name', 0],
+                        },
+                        email: {
+                          $arrayElemAt: ['$uploadedByStudent.email', 0],
+                        },
+                        image: {
+                          $arrayElemAt: ['$uploadedByStudent.image', 0],
+                        },
+                        role: 'STUDENT',
+                      },
+                      else: null, // Will be populated later for professors/admins
+                    },
+                  },
+                },
+              },
+              {
+                $project: {
+                  _id: 1,
+                  original_filename: 1,
+                  stored_filename: 1,
+                  file_url: 1,
+                  mime_type: 1,
+                  file_size: 1,
+                  created_at: 1,
+                  uploaded_by_user: 1,
+                },
+              },
+            ],
+            as: 'attachments',
           },
         },
         {
@@ -2966,6 +3941,7 @@ export class CommunityService {
                   created_by_details: '$created_by_details',
                   is_pinned: '$is_pinned',
                   pinned_at: '$pinned_at',
+                  attachments: '$attachments',
                 },
               ],
             },
@@ -2993,6 +3969,68 @@ export class CommunityService {
           pinned_by: new Types.ObjectId(user.id),
         }),
       ]);
+
+      // Decrypt emails in the aggregation results
+      for (const discussion of discussions) {
+        // If created_by_details is null (professor/admin), populate it using getUserDetails
+        if (
+          !discussion.created_by_details &&
+          discussion.created_by &&
+          discussion.created_by_role
+        ) {
+          this.logger.debug(
+            `Populating created_by_details for pinned discussion ${discussion._id}`,
+          );
+          discussion.created_by_details = await this.getUserDetails(
+            discussion.created_by.toString(),
+            discussion.created_by_role,
+            tenantConnection,
+          );
+        }
+
+        // Decrypt email in created_by_details
+        if (
+          discussion.created_by_details &&
+          discussion.created_by_details.email
+        ) {
+          discussion.created_by_details.email =
+            this.emailEncryptionService.decryptEmail(
+              discussion.created_by_details.email,
+            );
+        }
+
+        // Process attachments and populate professor details
+        if (discussion.attachments && Array.isArray(discussion.attachments)) {
+          for (const attachment of discussion.attachments) {
+            // If uploaded_by_user is null (professor/admin), populate it using getUserDetails
+            if (
+              !attachment.uploaded_by_user &&
+              attachment.uploaded_by &&
+              attachment.uploaded_by_role
+            ) {
+              this.logger.debug(
+                `Populating uploaded_by_user for attachment ${attachment._id}`,
+              );
+              attachment.uploaded_by_user = await this.getUserDetails(
+                attachment.uploaded_by.toString(),
+                attachment.uploaded_by_role,
+                tenantConnection,
+              );
+            }
+
+            // Decrypt email in uploaded_by_user if it exists
+            if (
+              attachment.uploaded_by_user &&
+              attachment.uploaded_by_user.email
+            ) {
+              attachment.uploaded_by_user.email =
+                this.emailEncryptionService.decryptEmail(
+                  attachment.uploaded_by_user.email,
+                );
+            }
+          }
+        }
+      }
 
       return createPaginationResult(discussions, total, options);
     } catch (error) {
@@ -3152,14 +4190,6 @@ export class CommunityService {
           },
         },
         {
-          $lookup: {
-            from: 'users',
-            localField: 'mentioned_by',
-            foreignField: '_id',
-            as: 'mentionedByUser',
-          },
-        },
-        {
           $addFields: {
             mentioned_by_user: {
               $cond: {
@@ -3228,6 +4258,33 @@ export class CommunityService {
           mentioned_user: new Types.ObjectId(user.id),
         }),
       ]);
+
+      // Decrypt emails in the aggregation results
+      for (const mention of mentions) {
+        // If mentioned_by_user is null (professor/admin), populate it using getUserDetails
+        if (
+          !mention.mentioned_by_user &&
+          mention.mentioned_by &&
+          mention.mentioned_by_role
+        ) {
+          this.logger.debug(
+            `Populating mentioned_by_user for mention ${mention._id}`,
+          );
+          mention.mentioned_by_user = await this.getUserDetails(
+            mention.mentioned_by.toString(),
+            mention.mentioned_by_role,
+            tenantConnection,
+          );
+        }
+
+        // Decrypt email in mentioned_by_user
+        if (mention.mentioned_by_user && mention.mentioned_by_user.email) {
+          mention.mentioned_by_user.email =
+            this.emailEncryptionService.decryptEmail(
+              mention.mentioned_by_user.email,
+            );
+        }
+      }
 
       return createPaginationResult(mentions, total, options);
     } catch (error) {
@@ -3403,18 +4460,25 @@ export class CommunityService {
       .select('first_name last_name email image')
       .lean();
 
-    return students.map((student: any) => ({
-      id: student._id?.toString() || '',
-      name: `${student.first_name || ''} ${student.last_name || ''}`.trim(),
-      email: student.email || '',
-      image: student.image || null,
-      role: 'STUDENT',
-      mention_text: `@${student.email || ''}`,
-      display_name:
-        `${student.first_name || ''} ${student.last_name || ''} (@${student.email || ''})`.trim(),
-      search_text:
-        `${student.first_name || ''} ${student.last_name || ''} ${student.email || ''}`.toLowerCase(),
-    }));
+    return students.map((student: any) => {
+      // Decrypt the email before returning
+      const decryptedEmail = this.emailEncryptionService.decryptEmail(
+        student.email || '',
+      );
+
+      return {
+        id: student._id?.toString() || '',
+        name: `${student.first_name || ''} ${student.last_name || ''}`.trim(),
+        email: decryptedEmail,
+        image: student.image || null,
+        role: 'STUDENT',
+        mention_text: `@${decryptedEmail}`,
+        display_name:
+          `${student.first_name || ''} ${student.last_name || ''} (@${decryptedEmail})`.trim(),
+        search_text:
+          `${student.first_name || ''} ${student.last_name || ''} ${decryptedEmail}`.toLowerCase(),
+      };
+    });
   }
 
   /**
@@ -3430,18 +4494,25 @@ export class CommunityService {
       .select('first_name last_name email profile_pic role')
       .lean();
 
-    return professors.map((professor: any) => ({
-      id: professor._id?.toString() || '',
-      name: `${professor.first_name || ''} ${professor.last_name || ''}`.trim(),
-      email: professor.email || '',
-      image: professor.profile_pic || null,
-      role: professor.role || 'PROFESSOR',
-      mention_text: `@${professor.email || ''}`,
-      display_name:
-        `${professor.first_name || ''} ${professor.last_name || ''} (@${professor.email || ''})`.trim(),
-      search_text:
-        `${professor.first_name || ''} ${professor.last_name || ''} ${professor.email || ''}`.toLowerCase(),
-    }));
+    return professors.map((professor: any) => {
+      // Decrypt the email before returning
+      const decryptedEmail = this.emailEncryptionService.decryptEmail(
+        professor.email || '',
+      );
+
+      return {
+        id: professor._id?.toString() || '',
+        name: `${professor.first_name || ''} ${professor.last_name || ''}`.trim(),
+        email: decryptedEmail,
+        image: professor.profile_pic || null,
+        role: professor.role || 'PROFESSOR',
+        mention_text: `@${decryptedEmail}`,
+        display_name:
+          `${professor.first_name || ''} ${professor.last_name || ''} (@${decryptedEmail})`.trim(),
+        search_text:
+          `${professor.first_name || ''} ${professor.last_name || ''} ${decryptedEmail}`.toLowerCase(),
+      };
+    });
   }
 
   /**
@@ -3522,8 +4593,16 @@ export class CommunityService {
         ];
       }
 
-      if (exportDto.tags && exportDto.tags.length > 0) {
-        filter.tags = { $in: exportDto.tags };
+      if (exportDto.tags && exportDto.tags.trim() !== '') {
+        // Parse tags string (comma-separated or pipe-separated)
+        const tagArray = exportDto.tags
+          .split(/[,|]/) // Split by comma or pipe
+          .map((tag) => tag.trim()) // Trim whitespace
+          .filter((tag) => tag !== ''); // Remove empty tags
+
+        if (tagArray.length > 0) {
+          filter.tags = { $in: tagArray };
+        }
       }
 
       if (exportDto.author_id) {
@@ -3746,8 +4825,16 @@ export class CommunityService {
         ];
       }
 
-      if (exportDto.tags && exportDto.tags.length > 0) {
-        filter.tags = { $in: exportDto.tags };
+      if (exportDto.tags && exportDto.tags.trim() !== '') {
+        // Parse tags string (comma-separated or pipe-separated)
+        const tagArray = exportDto.tags
+          .split(/[,|]/) // Split by comma or pipe
+          .map((tag) => tag.trim()) // Trim whitespace
+          .filter((tag) => tag !== ''); // Remove empty tags
+
+        if (tagArray.length > 0) {
+          filter.tags = { $in: tagArray };
+        }
       }
 
       if (exportDto.author_id) {
@@ -3986,8 +5073,16 @@ export class CommunityService {
         ];
       }
 
-      if (exportDto.tags && exportDto.tags.length > 0) {
-        filter.tags = { $in: exportDto.tags };
+      if (exportDto.tags && exportDto.tags.trim() !== '') {
+        // Parse tags string (comma-separated or pipe-separated)
+        const tagArray = exportDto.tags
+          .split(/[,|]/) // Split by comma or pipe
+          .map((tag) => tag.trim()) // Trim whitespace
+          .filter((tag) => tag !== ''); // Remove empty tags
+
+        if (tagArray.length > 0) {
+          filter.tags = { $in: tagArray };
+        }
       }
 
       if (exportDto.author_id) {
@@ -4035,6 +5130,1349 @@ export class CommunityService {
     } catch (error) {
       this.logger.error('Error exporting discussions', error?.stack || error);
       throw error;
+    }
+  }
+
+  /**
+   * Create a forum attachment
+   */
+  async createForumAttachment(
+    createAttachmentDto: CreateForumAttachmentDto,
+    user: JWTUserPayload,
+  ) {
+    const {
+      discussion_id,
+      reply_id,
+      entity_type,
+      original_filename,
+      stored_filename,
+      file_url,
+      mime_type,
+      file_size,
+    } = createAttachmentDto;
+
+    this.logger.log(
+      `Creating forum attachment: ${original_filename} by user: ${user.id}`,
+    );
+
+    const resolvedSchoolId = this.resolveSchoolId(user);
+
+    // Validate school exists
+    const school = await this.schoolModel.findById(resolvedSchoolId);
+    if (!school) {
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'SCHOOL',
+          'NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
+    }
+
+    // Get tenant connection
+    const tenantConnection =
+      await this.tenantConnectionService.getTenantConnection(school.db_name);
+    const DiscussionModel = tenantConnection.model(
+      ForumDiscussion.name,
+      ForumDiscussionSchema,
+    );
+    const ReplyModel = tenantConnection.model(
+      ForumReply.name,
+      ForumReplySchema,
+    );
+    const AttachmentModel = tenantConnection.model(
+      ForumAttachment.name,
+      ForumAttachmentSchema,
+    );
+
+    try {
+      // Validate discussion exists
+      const discussion = await DiscussionModel.findOne({
+        _id: discussion_id,
+        deleted_at: null,
+        status: DiscussionStatusEnum.ACTIVE,
+      });
+
+      if (!discussion) {
+        throw new NotFoundException(
+          this.errorMessageService.getMessageWithLanguage(
+            'COMMUNITY',
+            'DISCUSSION_NOT_FOUND_OR_NOT_ACTIVE',
+            user?.preferred_language || DEFAULT_LANGUAGE,
+          ),
+        );
+      }
+
+      // Validate reply if provided
+      if (reply_id && entity_type === AttachmentEntityTypeEnum.REPLY) {
+        const reply = await ReplyModel.findOne({
+          _id: reply_id,
+          discussion_id: new Types.ObjectId(discussion_id),
+          deleted_at: null,
+          status: ReplyStatusEnum.ACTIVE,
+        });
+
+        if (!reply) {
+          throw new NotFoundException(
+            this.errorMessageService.getMessageWithLanguage(
+              'COMMUNITY',
+              'REPLY_NOT_FOUND_OR_NOT_ACTIVE',
+              user?.preferred_language || DEFAULT_LANGUAGE,
+            ),
+          );
+        }
+      }
+
+      // Create attachment
+      const newAttachment = new AttachmentModel({
+        discussion_id: new Types.ObjectId(discussion_id),
+        reply_id: reply_id ? new Types.ObjectId(reply_id) : null,
+        entity_type,
+        original_filename,
+        stored_filename,
+        file_url,
+        mime_type,
+        file_size,
+        uploaded_by: new Types.ObjectId(user.id),
+        uploaded_by_role: user.role.name as RoleEnum,
+      });
+
+      const savedAttachment = await newAttachment.save();
+
+      // Attach user details to the response
+      const userDetails = await this.getUserDetails(
+        user.id.toString(),
+        user.role.name,
+        tenantConnection,
+      );
+      const attachmentWithUser = {
+        ...savedAttachment.toObject(),
+        uploaded_by_user: userDetails || null,
+      };
+
+      this.logger.log(`Forum attachment created: ${savedAttachment._id}`);
+
+      return {
+        message: this.errorMessageService.getSuccessMessageWithLanguage(
+          'COMMUNITY',
+          'FORUM_ATTACHMENT_CREATED_SUCCESSFULLY',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+        data: attachmentWithUser,
+      };
+    } catch (error) {
+      this.logger.error(
+        'Error creating forum attachment',
+        error?.stack || error,
+      );
+      if (
+        error instanceof NotFoundException ||
+        error instanceof BadRequestException
+      ) {
+        throw error;
+      }
+      throw new BadRequestException(
+        this.errorMessageService.getMessageWithLanguage(
+          'COMMUNITY',
+          'CREATE_FORUM_ATTACHMENT_FAILED',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
+    }
+  }
+
+  /**
+   * Get attachments for a discussion
+   */
+  async getDiscussionAttachments(discussionId: string, user: JWTUserPayload) {
+    this.logger.log(`Getting attachments for discussion: ${discussionId}`);
+
+    const resolvedSchoolId = this.resolveSchoolId(user);
+
+    // Validate school exists
+    const school = await this.schoolModel.findById(resolvedSchoolId);
+    if (!school) {
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'SCHOOL',
+          'NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
+    }
+
+    // Get tenant connection
+    const tenantConnection =
+      await this.tenantConnectionService.getTenantConnection(school.db_name);
+    const AttachmentModel = tenantConnection.model(
+      ForumAttachment.name,
+      ForumAttachmentSchema,
+    );
+
+    try {
+      const attachments = await AttachmentModel.find({
+        discussion_id: new Types.ObjectId(discussionId),
+        status: AttachmentStatusEnum.ACTIVE,
+        deleted_at: null,
+      })
+        .populate('uploaded_by', 'first_name last_name email role profile_pic')
+        .sort({ created_at: 1 })
+        .lean();
+
+      // Format user details
+      const formattedAttachments = await Promise.all(
+        attachments.map(async (attachment) => {
+          // Get user details for the uploader using getUserDetails
+          let uploadedByUser: any = null;
+          if (attachment.uploaded_by) {
+            // Use the actual role from the attachment schema
+            uploadedByUser = await this.getUserDetails(
+              attachment.uploaded_by.toString(),
+              attachment.uploaded_by_role,
+              tenantConnection,
+            );
+          }
+
+          return {
+            ...attachment,
+            uploaded_by_user: uploadedByUser,
+          };
+        }),
+      );
+
+      return {
+        message: this.errorMessageService.getSuccessMessageWithLanguage(
+          'COMMUNITY',
+          'FORUM_ATTACHMENTS_RETRIEVED_SUCCESSFULLY',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+        data: formattedAttachments,
+      };
+    } catch (error) {
+      this.logger.error(
+        'Error getting discussion attachments',
+        error?.stack || error,
+      );
+      throw new BadRequestException(
+        this.errorMessageService.getMessageWithLanguage(
+          'COMMUNITY',
+          'GET_FORUM_ATTACHMENTS_FAILED',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
+    }
+  }
+
+  /**
+   * Get attachments for a reply
+   */
+  async getReplyAttachments(replyId: string, user: JWTUserPayload) {
+    this.logger.log(`Getting attachments for reply: ${replyId}`);
+
+    const resolvedSchoolId = this.resolveSchoolId(user);
+
+    // Validate school exists
+    const school = await this.schoolModel.findById(resolvedSchoolId);
+    if (!school) {
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'SCHOOL',
+          'NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
+    }
+
+    // Get tenant connection
+    const tenantConnection =
+      await this.tenantConnectionService.getTenantConnection(school.db_name);
+    const AttachmentModel = tenantConnection.model(
+      ForumAttachment.name,
+      ForumAttachmentSchema,
+    );
+
+    try {
+      const attachments = await AttachmentModel.find({
+        reply_id: new Types.ObjectId(replyId),
+        status: AttachmentStatusEnum.ACTIVE,
+        deleted_at: null,
+      })
+        .populate('uploaded_by', 'first_name last_name email role profile_pic')
+        .sort({ created_at: 1 })
+        .lean();
+
+      // Format user details
+      const formattedAttachments = await Promise.all(
+        attachments.map(async (attachment) => {
+          // Get user details for the uploader using getUserDetails
+          let uploadedByUser: any = null;
+          if (attachment.uploaded_by) {
+            // Use the actual role from the attachment schema
+            uploadedByUser = await this.getUserDetails(
+              attachment.uploaded_by.toString(),
+              attachment.uploaded_by_role,
+              tenantConnection,
+            );
+          }
+
+          return {
+            ...attachment,
+            uploaded_by_user: uploadedByUser,
+          };
+        }),
+      );
+
+      return {
+        message: this.errorMessageService.getSuccessMessageWithLanguage(
+          'COMMUNITY',
+          'FORUM_ATTACHMENTS_RETRIEVED_SUCCESSFULLY',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+        data: formattedAttachments,
+      };
+    } catch (error) {
+      this.logger.error(
+        'Error getting reply attachments',
+        error?.stack || error,
+      );
+      throw new BadRequestException(
+        this.errorMessageService.getMessageWithLanguage(
+          'COMMUNITY',
+          'GET_FORUM_ATTACHMENTS_FAILED',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
+    }
+  }
+
+  /**
+   * Delete a forum attachment
+   */
+  async deleteForumAttachment(
+    deleteAttachmentDto: DeleteForumAttachmentDto,
+    user: JWTUserPayload,
+  ) {
+    const { attachment_id } = deleteAttachmentDto;
+
+    this.logger.log(
+      `Deleting forum attachment: ${attachment_id} by user: ${user.id}`,
+    );
+
+    const resolvedSchoolId = this.resolveSchoolId(user);
+
+    // Validate school exists
+    const school = await this.schoolModel.findById(resolvedSchoolId);
+    if (!school) {
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'SCHOOL',
+          'NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
+    }
+
+    // Get tenant connection
+    const tenantConnection =
+      await this.tenantConnectionService.getTenantConnection(school.db_name);
+    const AttachmentModel = tenantConnection.model(
+      ForumAttachment.name,
+      ForumAttachmentSchema,
+    );
+
+    try {
+      // Find attachment
+      const attachment = await AttachmentModel.findOne({
+        _id: attachment_id,
+        deleted_at: null,
+        status: AttachmentStatusEnum.ACTIVE,
+      });
+
+      if (!attachment) {
+        throw new NotFoundException(
+          this.errorMessageService.getMessageWithLanguage(
+            'COMMUNITY',
+            'FORUM_ATTACHMENT_NOT_FOUND',
+            user?.preferred_language || DEFAULT_LANGUAGE,
+          ),
+        );
+      }
+
+      // Check if user can delete this attachment (only uploader or admin)
+      if (
+        attachment.uploaded_by.toString() !== user.id &&
+        ![RoleEnum.SCHOOL_ADMIN, RoleEnum.SUPER_ADMIN].includes(
+          user.role.name as RoleEnum,
+        )
+      ) {
+        throw new ForbiddenException(
+          this.errorMessageService.getMessageWithLanguage(
+            'COMMUNITY',
+            'CANNOT_DELETE_FORUM_ATTACHMENT',
+            user?.preferred_language || DEFAULT_LANGUAGE,
+          ),
+        );
+      }
+
+      // Soft delete attachment
+      await AttachmentModel.updateOne(
+        { _id: attachment_id },
+        {
+          status: AttachmentStatusEnum.DELETED,
+          deleted_at: new Date(),
+          deleted_by: new Types.ObjectId(user.id),
+        },
+      );
+
+      this.logger.log(`Forum attachment deleted: ${attachment_id}`);
+
+      return {
+        message: this.errorMessageService.getSuccessMessageWithLanguage(
+          'COMMUNITY',
+          'FORUM_ATTACHMENT_DELETED_SUCCESSFULLY',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      };
+    } catch (error) {
+      this.logger.error(
+        'Error deleting forum attachment',
+        error?.stack || error,
+      );
+      if (
+        error instanceof NotFoundException ||
+        error instanceof ForbiddenException
+      ) {
+        throw error;
+      }
+      throw new BadRequestException(
+        this.errorMessageService.getMessageWithLanguage(
+          'COMMUNITY',
+          'DELETE_FORUM_ATTACHMENT_FAILED',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
+    }
+  }
+
+  /**
+   * Check if current user has liked a specific entity
+   */
+  async hasUserLiked(
+    entityType: LikeEntityTypeEnum,
+    entityId: string,
+    user: JWTUserPayload,
+  ) {
+    this.logger.log(
+      `Checking if user ${user.id} liked ${entityType}: ${entityId}`,
+    );
+
+    const resolvedSchoolId = this.resolveSchoolId(user);
+
+    // Validate school exists
+    const school = await this.schoolModel.findById(resolvedSchoolId);
+    if (!school) {
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'SCHOOL',
+          'NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
+    }
+
+    // Get tenant connection
+    const tenantConnection =
+      await this.tenantConnectionService.getTenantConnection(school.db_name);
+    const LikeModel = tenantConnection.model(ForumLike.name, ForumLikeSchema);
+
+    try {
+      const like = await LikeModel.findOne({
+        entity_type: entityType,
+        entity_id: new Types.ObjectId(entityId),
+        liked_by: new Types.ObjectId(user.id),
+      }).lean();
+
+      return {
+        message: this.errorMessageService.getSuccessMessageWithLanguage(
+          'COMMUNITY',
+          'LIKE_STATUS_RETRIEVED_SUCCESSFULLY',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+        data: {
+          entity_type: entityType,
+          entity_id: entityId,
+          has_liked: !!like,
+          liked_at: like?.created_at || null,
+        },
+      };
+    } catch (error) {
+      this.logger.error('Error checking like status', error?.stack || error);
+      throw new BadRequestException(
+        this.errorMessageService.getMessageWithLanguage(
+          'COMMUNITY',
+          'CHECK_LIKE_STATUS_FAILED',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
+    }
+  }
+
+  /**
+   * Get list of users who liked a specific entity
+   */
+  async getLikedByUsers(
+    entityType: LikeEntityTypeEnum,
+    entityId: string,
+    user: JWTUserPayload,
+    paginationDto?: PaginationDto,
+  ) {
+    this.logger.log(`Getting users who liked ${entityType}: ${entityId}`);
+
+    const resolvedSchoolId = this.resolveSchoolId(user);
+
+    // Validate school exists
+    const school = await this.schoolModel.findById(resolvedSchoolId);
+    if (!school) {
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'SCHOOL',
+          'NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
+    }
+
+    // Get tenant connection
+    const tenantConnection =
+      await this.tenantConnectionService.getTenantConnection(school.db_name);
+    const LikeModel = tenantConnection.model(ForumLike.name, ForumLikeSchema);
+
+    try {
+      const options = getPaginationOptions(paginationDto || {});
+
+      // Use aggregation pipeline for better performance
+      const aggregationPipeline: any[] = [
+        {
+          $match: {
+            entity_type: entityType,
+            entity_id: new Types.ObjectId(entityId),
+          },
+        },
+        {
+          $lookup: {
+            from: 'students',
+            localField: 'liked_by',
+            foreignField: '_id',
+            as: 'likedByStudent',
+          },
+        },
+        {
+          $addFields: {
+            liked_by_user: {
+              $cond: {
+                if: { $gt: [{ $size: '$likedByStudent' }, 0] },
+                then: {
+                  _id: { $arrayElemAt: ['$likedByStudent._id', 0] },
+                  first_name: {
+                    $arrayElemAt: ['$likedByStudent.first_name', 0],
+                  },
+                  last_name: {
+                    $arrayElemAt: ['$likedByStudent.last_name', 0],
+                  },
+                  email: { $arrayElemAt: ['$likedByStudent.email', 0] },
+                  image: { $arrayElemAt: ['$likedByStudent.image', 0] },
+                  role: 'STUDENT',
+                },
+                else: null, // Will be populated later for professors/admins
+              },
+            },
+          },
+        },
+        {
+          $sort: { created_at: -1 },
+        },
+        { $skip: options.skip },
+        { $limit: options.limit },
+        {
+          $project: {
+            likedByStudent: 0,
+          },
+        },
+      ];
+
+      // Execute aggregation pipeline
+      const [likes, total] = await Promise.all([
+        LikeModel.aggregate(aggregationPipeline),
+        LikeModel.countDocuments({
+          entity_type: entityType,
+          entity_id: new Types.ObjectId(entityId),
+        }),
+      ]);
+
+      // Decrypt emails in the aggregation results
+      for (const like of likes) {
+        // If liked_by_user is null (professor/admin), populate it using getUserDetails
+        if (!like.liked_by_user && like.liked_by && like.liked_by_role) {
+          this.logger.debug(`Populating liked_by_user for like ${like._id}`);
+          like.liked_by_user = await this.getUserDetails(
+            like.liked_by.toString(),
+            like.liked_by_role,
+            tenantConnection,
+          );
+        }
+
+        // Decrypt email in liked_by_user
+        if (like.liked_by_user && like.liked_by_user.email) {
+          like.liked_by_user.email = this.emailEncryptionService.decryptEmail(
+            like.liked_by_user.email,
+          );
+        }
+      }
+
+      const result = createPaginationResult(likes, total, options);
+
+      return {
+        message: this.errorMessageService.getSuccessMessageWithLanguage(
+          'COMMUNITY',
+          'LIKED_BY_USERS_RETRIEVED_SUCCESSFULLY',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+        ...result,
+      };
+    } catch (error) {
+      this.logger.error('Error getting liked by users', error?.stack || error);
+      throw new BadRequestException(
+        this.errorMessageService.getMessageWithLanguage(
+          'COMMUNITY',
+          'GET_LIKED_BY_USERS_FAILED',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
+    }
+  }
+
+  /**
+   * Update a forum discussion
+   */
+  async updateDiscussion(
+    discussionId: string,
+    updateDiscussionDto: any,
+    user: JWTUserPayload,
+  ) {
+    const {
+      title,
+      content,
+      tags,
+      mentions,
+      meeting_link,
+      meeting_platform,
+      meeting_scheduled_at,
+      meeting_duration_minutes,
+    } = updateDiscussionDto;
+
+    this.logger.log(`Updating discussion: ${discussionId} by user: ${user.id}`);
+
+    const resolvedSchoolId = this.resolveSchoolId(user);
+
+    // Validate school exists
+    const school = await this.schoolModel.findById(resolvedSchoolId);
+    if (!school) {
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'SCHOOL',
+          'NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
+    }
+
+    // Get tenant connection
+    const tenantConnection =
+      await this.tenantConnectionService.getTenantConnection(school.db_name);
+    const DiscussionModel = tenantConnection.model(
+      ForumDiscussion.name,
+      ForumDiscussionSchema,
+    );
+    const MentionModel = tenantConnection.model(
+      ForumMention.name,
+      ForumMentionSchema,
+    );
+
+    try {
+      // Find the discussion and check permissions
+      const discussion = await DiscussionModel.findOne({
+        _id: discussionId,
+        deleted_at: null,
+      });
+
+      if (!discussion) {
+        throw new NotFoundException(
+          this.errorMessageService.getMessageWithLanguage(
+            'COMMUNITY',
+            'DISCUSSION_NOT_FOUND',
+            user?.preferred_language || DEFAULT_LANGUAGE,
+          ),
+        );
+      }
+
+      // Check if user can edit this discussion (only creator or admins)
+      const canEdit =
+        discussion.created_by.toString() === user.id ||
+        [RoleEnum.SCHOOL_ADMIN, RoleEnum.SUPER_ADMIN].includes(
+          user.role.name as RoleEnum,
+        );
+
+      if (!canEdit) {
+        throw new ForbiddenException(
+          this.errorMessageService.getMessageWithLanguage(
+            'COMMUNITY',
+            'CANNOT_EDIT_DISCUSSION',
+            user?.preferred_language || DEFAULT_LANGUAGE,
+          ),
+        );
+      }
+
+      // Prepare update data
+      const updateData: any = {};
+
+      if (title !== undefined) updateData.title = title;
+      if (tags !== undefined) updateData.tags = tags || [];
+
+      // Handle content and mentions
+      if (content !== undefined) {
+        const extractedMentions = mentions || extractMentions(content);
+
+        // Resolve mentions to user IDs
+        const resolvedMentions = await resolveMentions(
+          extractedMentions,
+          tenantConnection,
+          this.userModel,
+        );
+
+        // Format content with mention links
+        const formattedContent = formatMentionsInContent(
+          content,
+          resolvedMentions,
+        );
+        updateData.content = formattedContent;
+
+        // Update mention records for this discussion
+        await MentionModel.deleteMany({
+          discussion_id: new Types.ObjectId(discussionId),
+          reply_id: null, // Only discussion mentions, not reply mentions
+        });
+
+        // Create new mention records
+        const mentionPromises = resolvedMentions.map(async (mention) => {
+          if (mention.userId) {
+            const mentionRecord = new MentionModel({
+              discussion_id: new Types.ObjectId(discussionId),
+              mentioned_by: new Types.ObjectId(user.id),
+              mentioned_user: mention.userId,
+              mention_text: mention.mentionText,
+            });
+            return mentionRecord.save();
+          }
+        });
+
+        await Promise.all(mentionPromises.filter(Boolean));
+      }
+
+      // Handle meeting fields for meeting type discussions
+      if (discussion.type === DiscussionTypeEnum.MEETING) {
+        if (meeting_link !== undefined) updateData.meeting_link = meeting_link;
+        if (meeting_platform !== undefined)
+          updateData.meeting_platform = meeting_platform;
+        if (meeting_scheduled_at !== undefined) {
+          updateData.meeting_scheduled_at = meeting_scheduled_at
+            ? new Date(meeting_scheduled_at)
+            : null;
+        }
+        if (meeting_duration_minutes !== undefined) {
+          updateData.meeting_duration_minutes = meeting_duration_minutes;
+        }
+      }
+
+      // Update the discussion
+      const updatedDiscussion = await DiscussionModel.findOneAndUpdate(
+        { _id: discussionId },
+        { $set: updateData },
+        { new: true, lean: true },
+      );
+
+      this.logger.log(`Discussion updated successfully: ${discussionId}`);
+
+      return {
+        message: this.errorMessageService.getMessageWithLanguage(
+          'COMMUNITY',
+          'DISCUSSION_UPDATED_SUCCESSFULLY',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+        data: updatedDiscussion,
+      };
+    } catch (error) {
+      this.logger.error(`Error updating discussion: ${discussionId}`, error);
+      if (
+        error instanceof NotFoundException ||
+        error instanceof ForbiddenException ||
+        error instanceof BadRequestException
+      ) {
+        throw error;
+      }
+      throw new BadRequestException(
+        this.errorMessageService.getMessageWithLanguage(
+          'COMMUNITY',
+          'UPDATE_DISCUSSION_FAILED',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
+    }
+  }
+
+  /**
+   * Update a forum reply
+   */
+  async updateReply(
+    replyId: string,
+    updateReplyDto: any,
+    user: JWTUserPayload,
+  ) {
+    const { content, mentions } = updateReplyDto;
+
+    this.logger.log(`Updating reply: ${replyId} by user: ${user.id}`);
+
+    const resolvedSchoolId = this.resolveSchoolId(user);
+
+    // Validate school exists
+    const school = await this.schoolModel.findById(resolvedSchoolId);
+    if (!school) {
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'SCHOOL',
+          'NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
+    }
+
+    // Get tenant connection
+    const tenantConnection =
+      await this.tenantConnectionService.getTenantConnection(school.db_name);
+    const ReplyModel = tenantConnection.model(
+      ForumReply.name,
+      ForumReplySchema,
+    );
+    const MentionModel = tenantConnection.model(
+      ForumMention.name,
+      ForumMentionSchema,
+    );
+
+    try {
+      // Find the reply and check permissions
+      const reply = await ReplyModel.findOne({
+        _id: replyId,
+        deleted_at: null,
+      });
+
+      if (!reply) {
+        throw new NotFoundException(
+          this.errorMessageService.getMessageWithLanguage(
+            'COMMUNITY',
+            'REPLY_NOT_FOUND',
+            user?.preferred_language || DEFAULT_LANGUAGE,
+          ),
+        );
+      }
+
+      // Check if user can edit this reply (only creator or admins)
+      const canEdit =
+        reply.created_by.toString() === user.id ||
+        [RoleEnum.SCHOOL_ADMIN, RoleEnum.SUPER_ADMIN].includes(
+          user.role.name as RoleEnum,
+        );
+
+      if (!canEdit) {
+        throw new ForbiddenException(
+          this.errorMessageService.getMessageWithLanguage(
+            'COMMUNITY',
+            'CANNOT_EDIT_REPLY',
+            user?.preferred_language || DEFAULT_LANGUAGE,
+          ),
+        );
+      }
+
+      // Prepare update data
+      const updateData: any = {};
+
+      // Handle content and mentions
+      if (content !== undefined) {
+        const extractedMentions = mentions || extractMentions(content);
+
+        // Resolve mentions to user IDs
+        const resolvedMentions = await resolveMentions(
+          extractedMentions,
+          tenantConnection,
+          this.userModel,
+        );
+
+        // Format content with mention links
+        const formattedContent = formatMentionsInContent(
+          content,
+          resolvedMentions,
+        );
+        updateData.content = formattedContent;
+
+        // Update mention records for this reply
+        await MentionModel.deleteMany({
+          reply_id: new Types.ObjectId(replyId),
+        });
+
+        // Create new mention records
+        const mentionPromises = resolvedMentions.map(async (mention) => {
+          if (mention.userId) {
+            const mentionRecord = new MentionModel({
+              reply_id: new Types.ObjectId(replyId),
+              discussion_id: reply.discussion_id,
+              mentioned_by: new Types.ObjectId(user.id),
+              mentioned_user: mention.userId,
+              mention_text: mention.mentionText,
+            });
+            return mentionRecord.save();
+          }
+        });
+
+        await Promise.all(mentionPromises.filter(Boolean));
+      }
+
+      // Update the reply
+      const updatedReply = await ReplyModel.findOneAndUpdate(
+        { _id: replyId },
+        { $set: updateData },
+        { new: true, lean: true },
+      );
+
+      this.logger.log(`Reply updated successfully: ${replyId}`);
+
+      return {
+        message: this.errorMessageService.getMessageWithLanguage(
+          'COMMUNITY',
+          'REPLY_UPDATED_SUCCESSFULLY',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+        data: updatedReply,
+      };
+    } catch (error) {
+      this.logger.error(`Error updating reply: ${replyId}`, error);
+      if (
+        error instanceof NotFoundException ||
+        error instanceof ForbiddenException ||
+        error instanceof BadRequestException
+      ) {
+        throw error;
+      }
+      throw new BadRequestException(
+        this.errorMessageService.getMessageWithLanguage(
+          'COMMUNITY',
+          'UPDATE_REPLY_FAILED',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
+    }
+  }
+
+  /**
+   * Get a single reply by ID
+   */
+  async findReplyById(replyId: string, user: JWTUserPayload) {
+    this.logger.log(`Finding reply: ${replyId}`);
+
+    const resolvedSchoolId = this.resolveSchoolId(user);
+
+    // Validate school exists
+    const school = await this.schoolModel.findById(resolvedSchoolId);
+    if (!school) {
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'SCHOOL',
+          'NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
+    }
+
+    // Get tenant connection
+    const tenantConnection =
+      await this.tenantConnectionService.getTenantConnection(school.db_name);
+    const ReplyModel = tenantConnection.model(
+      ForumReply.name,
+      ForumReplySchema,
+    );
+    const LikeModel = tenantConnection.model(ForumLike.name, ForumLikeSchema);
+    const AttachmentModel = tenantConnection.model(
+      ForumAttachment.name,
+      ForumAttachmentSchema,
+    );
+    const MentionModel = tenantConnection.model(
+      ForumMention.name,
+      ForumMentionSchema,
+    );
+
+    try {
+      const reply = await ReplyModel.findOne({
+        _id: replyId,
+        deleted_at: null,
+      }).lean();
+
+      if (!reply) {
+        throw new NotFoundException(
+          this.errorMessageService.getMessageWithLanguage(
+            'COMMUNITY',
+            'REPLY_NOT_FOUND',
+            user?.preferred_language || DEFAULT_LANGUAGE,
+          ),
+        );
+      }
+
+      // Check if current user has liked this reply
+      const userLike = await LikeModel.findOne({
+        entity_type: LikeEntityTypeEnum.REPLY,
+        entity_id: new Types.ObjectId(replyId),
+        liked_by: new Types.ObjectId(user.id),
+      }).lean();
+
+      // Attach user details
+      const userDetails = await this.getUserDetails(
+        reply.created_by.toString(),
+        reply.created_by_role,
+        tenantConnection,
+      );
+
+      // Get attachments for this reply
+      const attachments = await AttachmentModel.find({
+        reply_id: new Types.ObjectId(replyId),
+        status: AttachmentStatusEnum.ACTIVE,
+        deleted_at: null,
+      })
+        .sort({ created_at: 1 })
+        .lean();
+
+      // Get mentions for this reply
+      const mentions = await MentionModel.find({
+        reply_id: new Types.ObjectId(replyId),
+      })
+        .sort({ created_at: 1 })
+        .lean();
+
+      // Populate mention users
+      const populatedMentions = await Promise.all(
+        mentions.map(async (mention) => {
+          const mentionedUser = await this.getUserDetails(
+            mention.mentioned_user.toString(),
+            'UNKNOWN', // We'll determine the role from the user data
+            tenantConnection,
+          );
+          return {
+            ...mention,
+            mentioned_user_details: mentionedUser,
+          };
+        }),
+      );
+
+      return {
+        message: this.errorMessageService.getMessageWithLanguage(
+          'COMMUNITY',
+          'REPLY_RETRIEVED_SUCCESSFULLY',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+        data: {
+          ...reply,
+          created_by_user: userDetails,
+          has_liked: !!userLike,
+          attachments,
+          mentions: populatedMentions,
+        },
+      };
+    } catch (error) {
+      this.logger.error(`Error finding reply: ${replyId}`, error);
+      if (
+        error instanceof NotFoundException ||
+        error instanceof ForbiddenException
+      ) {
+        throw error;
+      }
+      throw new BadRequestException(
+        this.errorMessageService.getMessageWithLanguage(
+          'COMMUNITY',
+          'GET_REPLY_FAILED',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
+    }
+  }
+
+  /**
+   * Delete a forum reply (soft delete)
+   */
+  async deleteReply(replyId: string, user: JWTUserPayload) {
+    this.logger.log(`Deleting reply: ${replyId} by user: ${user.id}`);
+
+    const resolvedSchoolId = this.resolveSchoolId(user);
+
+    // Validate school exists
+    const school = await this.schoolModel.findById(resolvedSchoolId);
+    if (!school) {
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'SCHOOL',
+          'NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
+    }
+
+    // Get tenant connection
+    const tenantConnection =
+      await this.tenantConnectionService.getTenantConnection(school.db_name);
+    const ReplyModel = tenantConnection.model(
+      ForumReply.name,
+      ForumReplySchema,
+    );
+    const LikeModel = tenantConnection.model(ForumLike.name, ForumLikeSchema);
+    const MentionModel = tenantConnection.model(
+      ForumMention.name,
+      ForumMentionSchema,
+    );
+    const AttachmentModel = tenantConnection.model(
+      ForumAttachment.name,
+      ForumAttachmentSchema,
+    );
+    const ReportModel = tenantConnection.model(
+      ForumReport.name,
+      ForumReportSchema,
+    );
+
+    try {
+      // Find the reply to delete
+      const reply = await ReplyModel.findOne({
+        _id: replyId,
+        deleted_at: null,
+      });
+
+      if (!reply) {
+        throw new NotFoundException(
+          this.errorMessageService.getMessageWithLanguage(
+            'COMMUNITY',
+            'REPLY_NOT_FOUND',
+            user?.preferred_language || DEFAULT_LANGUAGE,
+          ),
+        );
+      }
+
+      // Check if user has permission to delete this reply
+      const isAdmin = [RoleEnum.SCHOOL_ADMIN, RoleEnum.SUPER_ADMIN].includes(
+        user.role.name as RoleEnum,
+      );
+      const isOwner = reply.created_by.toString() === user.id;
+
+      if (!isAdmin && !isOwner) {
+        throw new ForbiddenException(
+          this.errorMessageService.getMessageWithLanguage(
+            'COMMUNITY',
+            'ONLY_CREATOR_OR_ADMIN_CAN_DELETE',
+            user?.preferred_language || DEFAULT_LANGUAGE,
+          ),
+        );
+      }
+
+      // Get all sub-replies (recursively) to delete them too
+      const subReplies = await this.getSubRepliesRecursively(
+        ReplyModel,
+        replyId,
+      );
+      const allReplyIds = [replyId, ...subReplies.map((r) => r._id.toString())];
+
+      // Soft delete the reply and all its sub-replies
+      await ReplyModel.updateMany(
+        { _id: { $in: allReplyIds } },
+        {
+          deleted_at: new Date(),
+          deleted_by: new Types.ObjectId(user.id),
+        },
+      );
+
+      // If this reply has a parent, decrease the parent's sub_reply_count
+      if (reply.parent_reply_id) {
+        await ReplyModel.updateOne(
+          { _id: reply.parent_reply_id },
+          { $inc: { sub_reply_count: -1 } },
+        );
+      }
+
+      // For each deleted sub-reply, decrease their parent's sub_reply_count
+      for (const subReply of subReplies) {
+        if (subReply.parent_reply_id) {
+          await ReplyModel.updateOne(
+            { _id: subReply.parent_reply_id },
+            { $inc: { sub_reply_count: -1 } },
+          );
+        }
+      }
+
+      // Delete all related likes for all affected replies
+      await LikeModel.deleteMany({
+        entity_type: LikeEntityTypeEnum.REPLY,
+        entity_id: { $in: allReplyIds.map((id) => new Types.ObjectId(id)) },
+      });
+
+      // Delete all related mentions for all affected replies
+      await MentionModel.deleteMany({
+        reply_id: { $in: allReplyIds.map((id) => new Types.ObjectId(id)) },
+      });
+
+      // Soft delete all related attachments for all affected replies
+      await AttachmentModel.updateMany(
+        { reply_id: { $in: allReplyIds.map((id) => new Types.ObjectId(id)) } },
+        {
+          deleted_at: new Date(),
+          deleted_by: new Types.ObjectId(user.id),
+        },
+      );
+
+      // Delete all related reports for all affected replies
+      await ReportModel.deleteMany({
+        entity_type: ReportEntityTypeEnum.REPLY,
+        entity_id: { $in: allReplyIds.map((id) => new Types.ObjectId(id)) },
+      });
+
+      this.logger.log(
+        `Reply and ${subReplies.length} sub-replies deleted: ${replyId}`,
+      );
+
+      return {
+        message: this.errorMessageService.getMessageWithLanguage(
+          'COMMUNITY',
+          'REPLY_DELETED_SUCCESSFULLY',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+        data: {
+          deleted_reply_id: replyId,
+          deleted_sub_replies_count: subReplies.length,
+        },
+      };
+    } catch (error) {
+      this.logger.error(`Error deleting reply: ${replyId}`, error);
+      if (
+        error instanceof NotFoundException ||
+        error instanceof ForbiddenException
+      ) {
+        throw error;
+      }
+      throw new BadRequestException(
+        this.errorMessageService.getMessageWithLanguage(
+          'COMMUNITY',
+          'ERROR_DELETING_REPLY',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
+    }
+  }
+
+  /**
+   * Recursively get all sub-replies for a given reply
+   */
+  private async getSubRepliesRecursively(
+    ReplyModel: any,
+    parentReplyId: string,
+  ): Promise<any[]> {
+    const subReplies = await ReplyModel.find({
+      parent_reply_id: new Types.ObjectId(parentReplyId),
+      deleted_at: null,
+    }).lean();
+
+    const allSubReplies = [...subReplies];
+
+    // Recursively get sub-replies of sub-replies
+    for (const subReply of subReplies) {
+      const nestedSubReplies = await this.getSubRepliesRecursively(
+        ReplyModel,
+        subReply._id.toString(),
+      );
+      allSubReplies.push(...nestedSubReplies);
+    }
+
+    return allSubReplies;
+  }
+
+  /**
+   * Get all available tags for forum discussions
+   */
+  async getAllTags(user: JWTUserPayload) {
+    this.logger.log(`Getting all tags for user: ${user.id}`);
+
+    try {
+      const resolvedSchoolId = this.resolveSchoolId(user);
+
+      // Validate school exists
+      const school = await this.schoolModel.findById(resolvedSchoolId);
+      if (!school) {
+        throw new NotFoundException(
+          this.errorMessageService.getMessageWithLanguage(
+            'SCHOOL',
+            'NOT_FOUND',
+            user?.preferred_language || DEFAULT_LANGUAGE,
+          ),
+        );
+      }
+
+      // Get tenant connection
+      const tenantConnection =
+        await this.tenantConnectionService.getTenantConnection(school.db_name);
+      const DiscussionModel = tenantConnection.model(
+        ForumDiscussion.name,
+        ForumDiscussionSchema,
+      );
+
+      // Get all unique tags from active discussions
+      const discussions = await DiscussionModel.find(
+        {
+          deleted_at: null,
+          status: DiscussionStatusEnum.ACTIVE,
+        },
+        { tags: 1 },
+      ).lean();
+
+      // Extract all tags and flatten the array
+      const allTags = discussions
+        .map((discussion) => discussion.tags || [])
+        .flat()
+        .filter((tag) => tag && tag.trim() !== ''); // Filter out empty tags
+
+      // Get unique tags and sort them alphabetically
+      const uniqueTags = [...new Set(allTags)].sort();
+
+      this.logger.log(`Retrieved ${uniqueTags.length} unique tags`);
+
+      return {
+        message: this.errorMessageService.getMessageWithLanguage(
+          'COMMUNITY',
+          'TAGS_RETRIEVED_SUCCESSFULLY',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+        data: uniqueTags,
+        total: uniqueTags.length,
+      };
+    } catch (error) {
+      this.logger.error('Error getting all tags', error);
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
+      throw new BadRequestException(
+        this.errorMessageService.getMessageWithLanguage(
+          'COMMUNITY',
+          'ERROR_GETTING_TAGS',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
   }
 }

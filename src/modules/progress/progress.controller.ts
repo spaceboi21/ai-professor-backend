@@ -204,6 +204,22 @@ export class ProgressController {
           time_taken_seconds: 25,
           status: 'COMPLETED',
           completed_at: '2024-01-15T10:25:00.000Z',
+          ai_verification: 'completed',
+          ai_verification_report: {},
+          tag_performance: [
+            {
+              tag: 'Trauma',
+              correct_count: 2,
+              total_count: 3,
+              performance_percentage: 66.67
+            },
+            {
+              tag: 'Depression',
+              correct_count: 3,
+              total_count: 4,
+              performance_percentage: 75.0
+            }
+          ],
         },
       },
     },
@@ -459,6 +475,43 @@ export class ProgressController {
               last_accessed_at: '2024-01-15T10:00:00.000Z',
             },
           ],
+          ai_conversation_errors_summary: [
+            {
+              skill_gap: 'communication skills',
+              count: 5,
+              modules: ['Psychology Module 1', 'Psychology Module 2'],
+              latest_occurrence: '2024-01-15T10:00:00.000Z',
+            },
+            {
+              skill_gap: 'clinical reasoning',
+              count: 3,
+              modules: ['Clinical Skills Module'],
+              latest_occurrence: '2024-01-14T15:30:00.000Z',
+            },
+          ],
+          recent_feedback_preview: {
+            ai_feedback: [
+              {
+                _id: '507f1f77bcf86cd799439020',
+                module_title: 'Psychology Module 1',
+                overall_score: 8,
+                strengths: ['empathy', 'active listening'],
+                areas_for_improvement: ['documentation', 'time management'],
+                suggestions: ['Practice more detailed note-taking'],
+                created_at: '2024-01-15T10:00:00.000Z',
+              },
+            ],
+            professor_feedback: [
+              {
+                _id: '507f1f77bcf86cd799439021',
+                module_title: 'Clinical Skills Module',
+                rating: 4,
+                feedback: 'Great communication skills demonstrated. Shows good understanding...',
+                reviewer_role: 'PROFESSOR',
+                created_at: '2024-01-14T16:00:00.000Z',
+              },
+            ],
+          },
         },
       },
     },

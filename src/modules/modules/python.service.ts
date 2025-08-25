@@ -31,13 +31,47 @@ export interface ModuleValidationResponse {
   };
 }
 
+export interface PythonModuleResponse {
+  success: boolean;
+  total_modules: number;
+  modules: Array<{
+    module_id: string;
+    module_title: string;
+    author: string;
+    teaching_unit: string;
+    semester: string;
+    difficulty_level: string;
+    estimated_duration: number;
+    pedagogical_tags: string[];
+    keywords: string[];
+    theoretical_concepts: string[];
+    bibliography: string[];
+    prerequisites: string[];
+    description: string;
+    upload_date: string;
+    namespace: string;
+    total_chunks: number;
+    vector_count: number;
+  }>;
+  index_name: string;
+  total_vectors: number;
+}
+
 @Injectable()
 export class PythonService {
   private readonly logger = new Logger(PythonService.name);
   private readonly baseUrl =
-    process.env.PYTHON_API_URL || 'http://localhost:8000';
+    process.env.PYTHON_API_URL || 'http://localhost:8000/api/v1';
 
   constructor(private readonly httpService: HttpService) {}
+
+  /**
+   * Get modules from Python service
+   * GET /api/v1/modules/
+   */
+  async getModules(): Promise<PythonModuleResponse> {
+    return this._get('/modules/');
+  }
 
   /**
    * Validate module against knowledge base
@@ -58,12 +92,38 @@ export class PythonService {
   }
 
   /**
+   * Generic GET helper with improved error handling
+   */
+  private async _get(path: string) {
+    const url = `${this.baseUrl}${path}`;
+    try {
+      this.logger.log(`Making GET request to Python API: ${url}`);
+      const response = await firstValueFrom(
+        this.httpService.get(url, {
+          timeout: 30000, // 30 second timeout
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        }),
+      );
+
+      this.logger.log(`Python API GET call successful: ${path}`);
+      return response?.data;
+    } catch (error) {
+      // Re-throw with more context
+      const errorMessage =
+        error?.response?.data?.message || error?.message || 'Unknown error';
+      throw new Error(`Python API GET call failed (${path}): ${errorMessage}`);
+    }
+  }
+
+  /**
    * Generic POST helper with improved error handling
    */
   private async _post(path: string, payload: any) {
     const url = `${this.baseUrl}${path}`;
     try {
-      this.logger.log(`Making request to Python API: ${url}`);
+      this.logger.log(`Making POST request to Python API: ${url}`);
       const response = await firstValueFrom(
         this.httpService.post(url, payload, {
           timeout: 30000, // 30 second timeout
@@ -73,13 +133,13 @@ export class PythonService {
         }),
       );
 
-      this.logger.log(`Python API call successful: ${path}`);
+      this.logger.log(`Python API POST call successful: ${path}`);
       return response?.data;
     } catch (error) {
       // Re-throw with more context
       const errorMessage =
         error?.response?.data?.message || error?.message || 'Unknown error';
-      throw new Error(`Python API call failed (${path}): ${errorMessage}`);
+      throw new Error(`Python API POST call failed (${path}): ${errorMessage}`);
     }
   }
 }

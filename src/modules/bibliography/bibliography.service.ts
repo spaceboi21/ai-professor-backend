@@ -389,6 +389,118 @@ export class BibliographyService {
         },
       });
 
+      pipeline.push({
+        $lookup: {
+          from: 'anchor_tags',
+          let: { bibliography_id: '$_id' },
+          pipeline: [
+            {
+              $match: {
+                $expr: {
+                  $and: [
+                    { $eq: ['$bibliography_id', '$$bibliography_id'] },
+                    { $eq: ['$deleted_at', null] },
+                    { $eq: ['$status', 'ACTIVE'] },
+                  ],
+                },
+              },
+            },
+          ],
+          as: 'anchor_points',
+        },
+      });
+
+      // Add student attempt status to anchor points if user is a student
+      if (user.role.name === RoleEnum.STUDENT) {
+        pipeline.push({
+          $lookup: {
+            from: 'student_anchor_tag_attempts',
+            let: { bibliography_id: '$_id' },
+            pipeline: [
+              {
+                $match: {
+                  $expr: {
+                    $and: [
+                      { $eq: ['$bibliography_id', '$$bibliography_id'] },
+                      { $eq: ['$student_id', new Types.ObjectId(user.id)] },
+                      { $eq: ['$deleted_at', null] },
+                    ],
+                  },
+                },
+              },
+              {
+                $group: {
+                  _id: '$anchor_tag_id',
+                  latest_attempt: { $last: '$$ROOT' },
+                },
+              },
+              {
+                $project: {
+                  anchor_tag_id: '$_id',
+                  status: '$latest_attempt.status',
+                },
+              },
+            ],
+            as: 'student_attempts',
+          },
+        });
+
+        // Add student attempt status to each anchor point
+        pipeline.push({
+          $addFields: {
+            anchor_points: {
+              $map: {
+                input: '$anchor_points',
+                as: 'anchor_point',
+                in: {
+                  $mergeObjects: [
+                    '$$anchor_point',
+                    {
+                      student_attempt_status: {
+                        $let: {
+                          vars: {
+                            matching_attempt: {
+                              $arrayElemAt: [
+                                {
+                                  $filter: {
+                                    input: '$student_attempts',
+                                    as: 'attempt',
+                                    cond: {
+                                      $eq: [
+                                        '$$attempt.anchor_tag_id',
+                                        '$$anchor_point._id',
+                                      ],
+                                    },
+                                  },
+                                },
+                                0,
+                              ],
+                            },
+                          },
+                          in: {
+                            $ifNull: [
+                              '$$matching_attempt.status',
+                              'NOT_STARTED',
+                            ],
+                          },
+                        },
+                      },
+                    },
+                  ],
+                },
+              },
+            },
+          },
+        });
+
+        // Remove the temporary student_attempts field
+        pipeline.push({
+          $project: {
+            student_attempts: 0,
+          },
+        });
+      }
+
       // Execute aggregation
       const bibliography = await BibliographyModel.aggregate(pipeline);
 
@@ -398,35 +510,9 @@ export class BibliographyService {
         this.userModel,
       );
 
-      // Get all anchor points for the chapter and module
-      let allAnchorPoints: any[] = [];
-      try {
-        if (filterDto?.chapter_id && filterDto?.module_id) {
-          this.logger.log(`Fetching anchor points for chapter: ${filterDto.chapter_id} and module: ${filterDto.module_id}`);
-          allAnchorPoints = await this.anchorTagService.getAnchorTagsByChapterAndModule(
-            filterDto.chapter_id,
-            filterDto.module_id,
-            user,
-          );
-          this.logger.log(`Found ${allAnchorPoints.length} anchor points`);
-        } else {
-          this.logger.warn('No chapter_id or module_id provided in filter, skipping anchor points fetch');
-        }
-      } catch (error) {
-        this.logger.warn(`Failed to fetch anchor points for chapter ${filterDto?.chapter_id} and module ${filterDto?.module_id}:`, error);
-      }
-
-      // Add anchor points to each bibliography item
-      const bibliographyWithAnchorPoints = bibliographyWithUsers.map((bibliographyItem) => {
-        return {
-          ...bibliographyItem,
-          anchor_points: allAnchorPoints,
-        } as any;
-      });
-
       // Create pagination result
       const result = createPaginationResult(
-        bibliographyWithAnchorPoints,
+        bibliographyWithUsers,
         total,
         paginationOptions,
       );
@@ -503,17 +589,21 @@ export class BibliographyService {
       // Add anchor points to the bibliography item
       let bibliographyWithAnchorPoints = bibliographyWithUser;
       try {
-        const anchorPoints = await this.anchorTagService.getAnchorTagsByChapterAndModule(
-          bibliography.chapter_id,
-          bibliography.module_id,
-          user,
-        );
+        const anchorPoints =
+          await this.anchorTagService.getAnchorTagsByChapterAndModule(
+            bibliography.chapter_id,
+            bibliography.module_id,
+            user,
+          );
         bibliographyWithAnchorPoints = {
           ...bibliographyWithUser,
           anchor_points: anchorPoints,
         } as any;
       } catch (error) {
-        this.logger.warn(`Failed to fetch anchor points for chapter ${bibliography.chapter_id} and module ${bibliography.module_id}:`, error);
+        this.logger.warn(
+          `Failed to fetch anchor points for chapter ${bibliography.chapter_id} and module ${bibliography.module_id}:`,
+          error,
+        );
         bibliographyWithAnchorPoints = {
           ...bibliographyWithUser,
           anchor_points: [],

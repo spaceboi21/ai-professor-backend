@@ -33,6 +33,10 @@ import { LanguageEnum } from 'src/common/constants/language.constant';
 import { JWTUserPayload } from 'src/common/types/jwr-user.type';
 import { DEFAULT_LANGUAGE } from 'src/common/constants/language.constant';
 import { ErrorMessageService } from 'src/common/services/error-message.service';
+import { EmailEncryptionService } from 'src/common/services/email-encryption.service';
+import { ActivityLogService } from '../activity-log/activity-log.service';
+import { ActivityTypeEnum } from 'src/common/constants/activity.constant';
+import { getActivityDescription } from 'src/common/constants/activity-descriptions.constant';
 
 @Injectable()
 export class AuthService {
@@ -47,22 +51,25 @@ export class AuthService {
     private readonly schoolModel: Model<School>,
     @InjectModel(GlobalStudent.name)
     private readonly globalStudentModel: Model<GlobalStudent>,
+    private readonly tenantConnectionService: TenantConnectionService,
     private readonly bcryptUtil: BcryptUtil,
     private readonly jwtUtil: JwtUtil,
     private readonly tokenUtil: TokenUtil,
-    private readonly tenantConnectionService: TenantConnectionService,
     private readonly mailService: MailService,
     private readonly configService: ConfigService,
     private readonly errorMessageService: ErrorMessageService,
+    private readonly emailEncryptionService: EmailEncryptionService,
+    private readonly activityLogService: ActivityLogService,
   ) {}
 
   async superAdminLogin(loginData: LoginSuperAdminDto, req: Request) {
     const { email, password, rememberMe, preferred_language } = loginData;
     this.logger.log(`SuperAdmin login attempt: ${email}`);
 
+    const encryptedEmail = this.emailEncryptionService.encryptEmail(email);
     const isSuperAdminExists = (await this.userModel
       .findOne({
-        email,
+        email: encryptedEmail,
         role: new Types.ObjectId(ROLE_IDS.SUPER_ADMIN),
       })
       .select('+password')
@@ -73,13 +80,20 @@ export class AuthService {
 
     if (!isSuperAdminExists) {
       this.logger.warn(`Super Admin not found: ${email}`);
-      throw new NotFoundException(
-        this.errorMessageService.getMessageWithLanguage(
-          'USER',
-          'NOT_FOUND',
-          DEFAULT_LANGUAGE,
-        ),
-      );
+      throw new NotFoundException({
+        message: {
+          en: this.errorMessageService.getMessageWithLanguage(
+            'USER',
+            'NOT_FOUND',
+            LanguageEnum.ENGLISH,
+          ),
+          fr: this.errorMessageService.getMessageWithLanguage(
+            'USER',
+            'NOT_FOUND',
+            LanguageEnum.FRENCH,
+          ),
+        },
+      });
     }
 
     // Check user status
@@ -129,7 +143,7 @@ export class AuthService {
     }
 
     const tokenPair = this.tokenUtil.generateTokenPair({
-      email: isSuperAdminExists.email,
+      email: email, // Decrypted email
       id: isSuperAdminExists._id.toString(),
       role_id: isSuperAdminExists.role._id.toString(),
       role_name: isSuperAdminExists.role.name as RoleEnum,
@@ -141,6 +155,21 @@ export class AuthService {
     });
 
     this.logger.log(`SuperAdmin login successful: ${email}`);
+
+    // Get school details if super admin has school_id
+    let schoolDetails: { name: string; logo: string } | null = null;
+    if (isSuperAdminExists.school_id) {
+      const school = await this.schoolModel.findById(
+        isSuperAdminExists.school_id,
+      );
+      if (school) {
+        schoolDetails = {
+          name: school.name,
+          logo: school.logo,
+        };
+      }
+    }
+
     return {
       message: this.errorMessageService.getSuccessMessageWithLanguage(
         'AUTH',
@@ -149,13 +178,15 @@ export class AuthService {
       ),
       ...tokenPair,
       user: {
-        email: isSuperAdminExists.email,
+        email: email, // Decrypted email
         first_name: isSuperAdminExists.first_name,
         last_name: isSuperAdminExists.last_name,
         role: isSuperAdminExists.role.toString(),
         _id: isSuperAdminExists._id.toString(),
         preferred_language: updatedPreferredLanguage || DEFAULT_LANGUAGE,
+        profile_pic: isSuperAdminExists.profile_pic,
       },
+      ...(schoolDetails && { school: schoolDetails }),
     };
   }
 
@@ -167,9 +198,10 @@ export class AuthService {
       loginSchoolAdminDto;
     this.logger.log(`SchoolAdmin login attempt: ${email}`);
 
+    const encryptedEmail = this.emailEncryptionService.encryptEmail(email);
     const user = (await this.userModel
       .findOne({
-        email,
+        email: encryptedEmail,
         role: {
           $in: [
             new Types.ObjectId(ROLE_IDS.SCHOOL_ADMIN),
@@ -185,13 +217,20 @@ export class AuthService {
 
     if (!user) {
       this.logger.warn(`School Admin not found: ${email}`);
-      throw new NotFoundException(
-        this.errorMessageService.getMessageWithLanguage(
-          'USER',
-          'NOT_FOUND_WITH_EMAIL',
-          DEFAULT_LANGUAGE,
-        ),
-      );
+      throw new NotFoundException({
+        message: {
+          en: this.errorMessageService.getMessageWithLanguage(
+            'USER',
+            'NOT_FOUND_WITH_EMAIL',
+            LanguageEnum.ENGLISH,
+          ),
+          fr: this.errorMessageService.getMessageWithLanguage(
+            'USER',
+            'NOT_FOUND_WITH_EMAIL',
+            LanguageEnum.FRENCH,
+          ),
+        },
+      });
     }
 
     // Check user status
@@ -261,7 +300,7 @@ export class AuthService {
 
     const tokenPair = this.tokenUtil.generateTokenPair({
       id: user._id.toString(),
-      email: user.email,
+      email: email, // Decrypted email
       role_id: user.role._id.toString(),
       school_id: school._id.toString(),
       role_name: user.role.name as RoleEnum,
@@ -272,6 +311,40 @@ export class AuthService {
     });
 
     this.logger.log(`SchoolAdmin login successful: ${email}`);
+
+    // Log successful login activity
+    try {
+      const description = getActivityDescription(
+        ActivityTypeEnum.USER_LOGIN,
+        true,
+      );
+      await this.activityLogService.createActivityLog({
+        activity_type: ActivityTypeEnum.USER_LOGIN,
+        description: {
+          en: description.en,
+          fr: description.fr,
+        },
+        performed_by: user._id,
+        performed_by_role: user.role.name as RoleEnum,
+        school_id: school._id,
+        school_name: school.name,
+        ip_address: req.ip || 'unknown',
+        user_agent: req.headers['user-agent'] || 'unknown',
+        is_success: true,
+        endpoint: req.url || '/api/auth/school-admin/login',
+        http_method: req.method || 'POST',
+        http_status_code: 200,
+        status: 'SUCCESS',
+        metadata: {
+          login_type: 'school_admin',
+          user_role: user.role.name,
+        },
+      });
+    } catch (error) {
+      this.logger.error('Failed to log school admin login activity:', error);
+      // Don't throw error to not break login flow
+    }
+
     return {
       message: this.errorMessageService.getSuccessMessageWithLanguage(
         'AUTH',
@@ -281,13 +354,18 @@ export class AuthService {
       ...tokenPair,
       user: {
         id: user._id.toString(),
-        email: user.email,
+        email: email, // // Decrypted email
         first_name: user.first_name,
         last_name: user.last_name,
         school_id: school._id.toString(),
         role: user.role._id.toString(),
         role_name: user.role.name as RoleEnum,
         preferred_language: updatedPreferredLanguage || DEFAULT_LANGUAGE,
+        profile_pic: user.profile_pic,
+      },
+      school: {
+        name: school.name,
+        logo: school.logo,
       },
     };
   }
@@ -297,17 +375,27 @@ export class AuthService {
     this.logger.log(`Student login attempt: ${email}`);
 
     // First, find the student in the global students collection
-    const globalStudent = await this.globalStudentModel.findOne({ email });
+    const encryptedEmail = this.emailEncryptionService.encryptEmail(email);
+    const globalStudent = await this.globalStudentModel.findOne({
+      email: encryptedEmail,
+    });
 
     if (!globalStudent) {
       this.logger.warn(`Global student not found: ${email}`);
-      throw new NotFoundException(
-        this.errorMessageService.getMessageWithLanguage(
-          'STUDENT',
-          'NOT_FOUND_WITH_EMAIL',
-          DEFAULT_LANGUAGE,
-        ),
-      );
+      throw new NotFoundException({
+        message: {
+          en: this.errorMessageService.getMessageWithLanguage(
+            'STUDENT',
+            'NOT_FOUND_WITH_EMAIL',
+            LanguageEnum.ENGLISH,
+          ),
+          fr: this.errorMessageService.getMessageWithLanguage(
+            'STUDENT',
+            'NOT_FOUND_WITH_EMAIL',
+            LanguageEnum.FRENCH,
+          ),
+        },
+      });
     }
 
     // Get the school information
@@ -342,19 +430,26 @@ export class AuthService {
 
     // Find the student in the tenant database
     const student = await StudentModel.findOne({
-      email,
+      email: encryptedEmail,
       deleted_at: null,
     }).select('+password');
 
     if (!student) {
       this.logger.warn(`Student not found in school DB: ${email}`);
-      throw new NotFoundException(
-        this.errorMessageService.getMessageWithLanguage(
-          'STUDENT',
-          'NOT_FOUND_IN_SCHOOL',
-          DEFAULT_LANGUAGE,
-        ),
-      );
+      throw new NotFoundException({
+        message: {
+          en: this.errorMessageService.getMessageWithLanguage(
+            'STUDENT',
+            'NOT_FOUND_IN_SCHOOL',
+            LanguageEnum.ENGLISH,
+          ),
+          fr: this.errorMessageService.getMessageWithLanguage(
+            'STUDENT',
+            'NOT_FOUND_IN_SCHOOL',
+            LanguageEnum.FRENCH,
+          ),
+        },
+      });
     }
 
     // Check student status
@@ -404,7 +499,7 @@ export class AuthService {
 
     const tokenPair = this.tokenUtil.generateTokenPair({
       id: student._id.toString(),
-      email: student.email,
+      email: email, // Decrypted email
       role_id: ROLE_IDS.STUDENT,
       school_id: school._id.toString(),
       role_name: RoleEnum.STUDENT,
@@ -418,6 +513,40 @@ export class AuthService {
     const finalPreferredLanguage = updatedPreferredLanguage || DEFAULT_LANGUAGE;
 
     this.logger.log(`Student login successful: ${email}`);
+
+    // Log successful student login activity
+    try {
+      const description = getActivityDescription(
+        ActivityTypeEnum.USER_LOGIN,
+        true,
+      );
+      await this.activityLogService.createActivityLog({
+        activity_type: ActivityTypeEnum.USER_LOGIN,
+        description: {
+          en: description.en,
+          fr: description.fr,
+        },
+        performed_by: student._id,
+        performed_by_role: RoleEnum.STUDENT,
+        school_id: school._id,
+        school_name: school.name,
+        ip_address: req.ip || 'unknown',
+        user_agent: req.headers['user-agent'] || 'unknown',
+        is_success: true,
+        endpoint: req.url || '/api/auth/student/login',
+        http_method: req.method || 'POST',
+        http_status_code: 200,
+        status: 'SUCCESS',
+        metadata: {
+          login_type: 'student',
+          student_code: student.student_code,
+        },
+      });
+    } catch (error) {
+      this.logger.error('Failed to log student login activity:', error);
+      // Don't throw error to not break login flow
+    }
+
     return {
       message: this.errorMessageService.getSuccessMessageWithLanguage(
         'AUTH',
@@ -427,13 +556,18 @@ export class AuthService {
       ...tokenPair,
       user: {
         id: student._id,
-        email: student.email,
+        email: email, // // Decrypted email
         first_name: student.first_name,
         last_name: student.last_name,
         student_code: student.student_code,
         school_id: school._id.toString(),
         role: ROLE_IDS.STUDENT,
         preferred_language: finalPreferredLanguage,
+        profile_pic: student.profile_pic,
+      },
+      school: {
+        name: school.name,
+        logo: school.logo,
       },
     };
   }
@@ -516,10 +650,20 @@ export class AuthService {
         );
       }
 
+      // Decrypt the email before returning
+      const decryptedStudent = this.emailEncryptionService.decryptEmailFields(
+        student,
+        ['email'],
+      );
+
       return {
-        ...student,
+        ...decryptedStudent,
         role: user.role, // role from JWT (already populated)
         preferred_language: student.preferred_language || DEFAULT_LANGUAGE,
+        school: {
+          name: school.name,
+          logo: school.logo,
+        },
       };
     } else {
       // For other roles, get from central userModel
@@ -542,10 +686,30 @@ export class AuthService {
         );
       }
 
+      // Decrypt the email before returning
+      const decryptedUserData = this.emailEncryptionService.decryptEmailFields(
+        userData,
+        ['email'],
+      );
+
+      // Get school information for school admin/professor users
+      let schoolDetails: { name: string; logo: string } | null = null;
+      if (userData.school_id) {
+        const school = await this.schoolModel.findById(userData.school_id);
+        if (school) {
+          schoolDetails = {
+            name: school.name,
+            logo: school.logo,
+          };
+        }
+      }
+
       return {
-        ...userData,
+        ...decryptedUserData,
         role: user.role, // role from JWT (already populated)
         preferred_language: userData.preferred_language || DEFAULT_LANGUAGE,
+        profile_pic: userData.profile_pic,
+        ...(schoolDetails && { school: schoolDetails }),
       };
     }
   }
@@ -555,9 +719,10 @@ export class AuthService {
     this.logger.log(`Forgot password request for email: ${email}`);
 
     // First, check if email exists in school admin/professor users
+    const encryptedEmail = this.emailEncryptionService.encryptEmail(email);
     const schoolUser = await this.userModel
       .findOne({
-        email,
+        email: encryptedEmail,
         role: {
           $in: [
             new Types.ObjectId(ROLE_IDS.SCHOOL_ADMIN),
@@ -571,12 +736,15 @@ export class AuthService {
       });
 
     if (schoolUser) {
+      schoolUser.email = email; // Decrypted email
       // Handle school admin/professor forgot password
       return this.handleSchoolUserForgotPassword(schoolUser);
     }
 
     // If not found in school users, check if it's a student
-    const globalStudent = await this.globalStudentModel.findOne({ email });
+    const globalStudent = await this.globalStudentModel.findOne({
+      email: encryptedEmail,
+    });
     if (!globalStudent) {
       this.logger.warn(`User not found for forgot password: ${email}`);
       throw new NotFoundException(
@@ -620,7 +788,7 @@ export class AuthService {
 
     // Find the student in the tenant database
     const student = await StudentModel.findOne({
-      email,
+      email: encryptedEmail,
       deleted_at: null,
     });
 
@@ -647,6 +815,7 @@ export class AuthService {
       );
     }
 
+    student.email = email; // Decrypted email
     // Handle student forgot password
     return this.handleStudentForgotPassword(student, school);
   }
@@ -758,7 +927,7 @@ export class AuthService {
   }
 
   async setNewPassword(setNewPasswordDto: SetNewPasswordDto) {
-    const { token, new_password } = setNewPasswordDto;
+    const { token, new_password, current_password } = setNewPasswordDto;
     this.logger.log('Setting new password with token');
 
     try {
@@ -767,9 +936,17 @@ export class AuthService {
 
       // Check if it's a student or school user based on role
       if (payload.role_name === RoleEnum.STUDENT) {
-        return this.handleStudentPasswordReset(payload, new_password);
+        return this.handleStudentPasswordReset(
+          payload,
+          new_password,
+          current_password,
+        );
       } else {
-        return this.handleSchoolUserPasswordReset(payload, new_password);
+        return this.handleSchoolUserPasswordReset(
+          payload,
+          new_password,
+          current_password,
+        );
       }
     } catch (error) {
       if (
@@ -792,6 +969,7 @@ export class AuthService {
   private async handleSchoolUserPasswordReset(
     payload: any,
     new_password: string,
+    current_password?: string,
   ) {
     // Find the school user
     const user = await this.userModel.findById(payload.id).select('+password');
@@ -838,6 +1016,26 @@ export class AuthService {
       );
     }
 
+    // If current_password is provided, validate it
+    if (current_password) {
+      const isCurrentPasswordMatch = await this.bcryptUtil.comparePassword(
+        current_password,
+        user.password,
+      );
+      if (!isCurrentPasswordMatch) {
+        this.logger.warn(
+          `Current password mismatch for password reset: ${user.email}`,
+        );
+        throw new BadRequestException(
+          this.errorMessageService.getMessageWithLanguage(
+            'AUTH',
+            'CURRENT_PASSWORD_MISMATCH',
+            user.preferred_language || DEFAULT_LANGUAGE,
+          ),
+        );
+      }
+    }
+
     // Hash the new password
     const hashedPassword = await this.bcryptUtil.hashPassword(new_password);
 
@@ -851,6 +1049,11 @@ export class AuthService {
       `Password updated successfully for school user: ${user.email}`,
     );
 
+    // Decrypt the email before returning
+    const decryptedUser = this.emailEncryptionService.decryptEmailFields(user, [
+      'email',
+    ]);
+
     return {
       message: this.errorMessageService.getSuccessMessageWithLanguage(
         'AUTH',
@@ -859,14 +1062,18 @@ export class AuthService {
       ),
       data: {
         id: user._id,
-        email: user.email,
+        email: decryptedUser.email, // Decrypted email
         first_name: user.first_name,
         last_name: user.last_name,
       },
     };
   }
 
-  private async handleStudentPasswordReset(payload: any, new_password: string) {
+  private async handleStudentPasswordReset(
+    payload: any,
+    new_password: string,
+    current_password?: string,
+  ) {
     // Get the school information
     const school = await this.schoolModel.findById(payload.school_id);
     if (!school) {
@@ -914,6 +1121,26 @@ export class AuthService {
       );
     }
 
+    // If current_password is provided, validate it
+    if (current_password) {
+      const isCurrentPasswordMatch = await this.bcryptUtil.comparePassword(
+        current_password,
+        student.password,
+      );
+      if (!isCurrentPasswordMatch) {
+        this.logger.warn(
+          `Current password mismatch for student password reset: ${student.email}`,
+        );
+        throw new BadRequestException(
+          this.errorMessageService.getMessageWithLanguage(
+            'AUTH',
+            'CURRENT_PASSWORD_MISMATCH',
+            student.preferred_language || DEFAULT_LANGUAGE,
+          ),
+        );
+      }
+    }
+
     // Hash the new password
     const hashedPassword = await this.bcryptUtil.hashPassword(new_password);
 
@@ -927,6 +1154,12 @@ export class AuthService {
       `Password updated successfully for student: ${student.email}`,
     );
 
+    // Decrypt the email before returning
+    const decryptedStudent = this.emailEncryptionService.decryptEmailFields(
+      student,
+      ['email'],
+    );
+
     return {
       message: this.errorMessageService.getSuccessMessageWithLanguage(
         'AUTH',
@@ -935,7 +1168,7 @@ export class AuthService {
       ),
       data: {
         id: student._id,
-        email: student.email,
+        email: decryptedStudent.email, // Decrypted email
         first_name: student.first_name,
         last_name: student.last_name,
         student_code: student.student_code,
@@ -1040,7 +1273,11 @@ export class AuthService {
       );
 
       return {
-        message: 'Preferred language updated successfully',
+        message: this.errorMessageService.getSuccessMessageWithLanguage(
+          'AUTH',
+          'PREFERRED_LANGUAGE_UPDATED_SUCCESSFULLY',
+          updatedUser?.preferred_language || DEFAULT_LANGUAGE,
+        ),
         data: {
           user_id: updatedUser._id,
           preferred_language: updatedUser.preferred_language,

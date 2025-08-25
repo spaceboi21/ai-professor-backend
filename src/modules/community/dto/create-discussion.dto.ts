@@ -9,12 +9,58 @@ import {
   IsNumber,
   IsDateString,
   ValidateIf,
+  ValidateNested,
 } from 'class-validator';
+import { Type } from 'class-transformer';
 import { Types } from 'mongoose';
 import {
   DiscussionTypeEnum,
   VideoPlatformEnum,
 } from 'src/database/schemas/tenant/forum-discussion.schema';
+
+// Simple DTO for discussion attachments
+export class DiscussionAttachmentDto {
+  @IsString({ message: 'Original filename must be a string' })
+  @IsNotEmpty({ message: 'Original filename is required' })
+  @ApiProperty({
+    example: 'document.pdf',
+    description: 'Original filename of the uploaded file',
+  })
+  original_filename: string;
+
+  @IsString({ message: 'Stored filename must be a string' })
+  @IsNotEmpty({ message: 'Stored filename is required' })
+  @ApiProperty({
+    example: '1234567890-uuid-document.pdf',
+    description: 'Generated filename for storage',
+  })
+  stored_filename: string;
+
+  @IsString({ message: 'File URL must be a string' })
+  @IsNotEmpty({ message: 'File URL is required' })
+  @ApiProperty({
+    example:
+      'https://bucket.s3.amazonaws.com/forum-attachments/1234567890-uuid-document.pdf',
+    description: 'URL where the file is stored',
+  })
+  file_url: string;
+
+  @IsString({ message: 'MIME type must be a string' })
+  @IsNotEmpty({ message: 'MIME type is required' })
+  @ApiProperty({
+    example: 'application/pdf',
+    description: 'MIME type of the uploaded file',
+  })
+  mime_type: string;
+
+  @IsNumber({}, { message: 'File size must be a number' })
+  @IsNotEmpty({ message: 'File size is required' })
+  @ApiProperty({
+    example: 1024000,
+    description: 'File size in bytes',
+  })
+  file_size: number;
+}
 
 export class CreateDiscussionDto {
   @IsOptional()
@@ -65,6 +111,38 @@ export class CreateDiscussionDto {
     type: [String],
   })
   tags?: string[];
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => DiscussionAttachmentDto)
+  @ApiProperty({
+    example: [
+      {
+        original_filename: 'document.pdf',
+        stored_filename: '1234567890-uuid-document.pdf',
+        file_url:
+          'https://bucket.s3.amazonaws.com/forum-attachments/1234567890-uuid-document.pdf',
+        mime_type: 'application/pdf',
+        file_size: 1024000,
+      },
+    ],
+    description: 'Array of attachments for the discussion',
+    required: false,
+    type: [DiscussionAttachmentDto],
+  })
+  attachments?: DiscussionAttachmentDto[];
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  @ApiProperty({
+    example: ['@john.doe', '@jane.smith'],
+    description: 'Array of usernames to mention (without @ symbol)',
+    type: [String],
+    required: false,
+  })
+  mentions?: string[];
 
   // Meeting fields (required only when type is MEETING)
   @ValidateIf((o) => o.type === DiscussionTypeEnum.MEETING)

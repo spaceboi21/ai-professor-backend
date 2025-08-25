@@ -69,6 +69,61 @@ export class AnchorTagService {
     private readonly notificationsService: NotificationsService,
   ) {}
 
+  /**
+   * Helper method to check if an anchor tag title already exists in the same bibliography
+   * @param bibliography_id - The bibliography ID
+   * @param title - The anchor tag title to check
+   * @param user - User context for tenant connection
+   * @param excludeAnchorTagId - Optional anchor tag ID to exclude from check (for updates)
+   * @returns Promise<boolean> - true if title exists, false otherwise
+   */
+  private async checkAnchorTagTitleExists(
+    bibliography_id: string | Types.ObjectId,
+    title: string,
+    user: JWTUserPayload,
+    excludeAnchorTagId?: string | Types.ObjectId,
+  ): Promise<boolean> {
+    // Validate school
+    const school = await this.schoolModel.findById(user.school_id);
+    if (!school) {
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'SCHOOL',
+          'NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
+    }
+
+    // Get tenant connection
+    const tenantConnection =
+      await this.tenantConnectionService.getTenantConnection(school.db_name);
+    const AnchorTagModel = tenantConnection.model(
+      AnchorTag.name,
+      AnchorTagSchema,
+    );
+
+    // Normalize input title (trim + lowercase)
+    const normalizedTitle = title.trim().toLowerCase();
+
+    // Build case-insensitive query using aggregation expression
+    const query: any = {
+      bibliography_id: new Types.ObjectId(bibliography_id.toString()),
+      deleted_at: null,
+      $expr: {
+        $eq: [{ $toLower: '$title' }, normalizedTitle],
+      },
+    };
+
+    // Exclude the anchor tag being updated
+    if (excludeAnchorTagId) {
+      query._id = { $ne: new Types.ObjectId(excludeAnchorTagId.toString()) };
+    }
+
+    const exists = await AnchorTagModel.exists(query);
+    return !!exists;
+  }
+
   async createAnchorTag(
     createAnchorTagDto: CreateAnchorTagDto,
     user: JWTUserPayload,
@@ -141,6 +196,23 @@ export class AnchorTagService {
         this.errorMessageService.getMessageWithLanguage(
           'ANCHOR_TAG',
           'BIBLIOGRAPHY_NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
+    }
+
+    // Check for duplicate anchor tag title in the same bibliography
+    const titleExists = await this.checkAnchorTagTitleExists(
+      bibliography_id,
+      createAnchorTagDto.title,
+      user,
+    );
+
+    if (titleExists) {
+      throw new ConflictException(
+        this.errorMessageService.getMessageWithLanguage(
+          'ANCHOR_TAG',
+          'DUPLICATE_TITLE_IN_BIBLIOGRAPHY',
           user?.preferred_language || DEFAULT_LANGUAGE,
         ),
       );
@@ -267,12 +339,35 @@ export class AnchorTagService {
       .populate('chapter_id', 'title')
       .populate('bibliography_id', 'title type')
       .populate('quiz_group_id', 'title subject category difficulty')
-      .populate('created_by', 'first_name last_name email')
       .lean();
+
+    // Fetch user data for each anchor tag from central database
+    const anchorTagsWithUserData = await Promise.all(
+      anchorTags.map(async (anchorTag) => {
+        let createdByUser: any = null;
+        if (anchorTag.created_by) {
+          try {
+            createdByUser = await this.userModel
+              .findById(anchorTag.created_by)
+              .select('first_name last_name email')
+              .lean();
+          } catch (error) {
+            this.logger.warn(
+              `Failed to fetch user data for created_by ${anchorTag.created_by}:`,
+              error,
+            );
+          }
+        }
+        return {
+          ...anchorTag,
+          created_by: createdByUser,
+        };
+      }),
+    );
 
     // Fetch quizzes for each anchor tag's quiz group
     const anchorTagsWithQuizzes = await Promise.all(
-      anchorTags.map(async (anchorTag) => {
+      anchorTagsWithUserData.map(async (anchorTag) => {
         if (
           anchorTag.quiz_group_id &&
           typeof anchorTag.quiz_group_id === 'object' &&
@@ -333,7 +428,6 @@ export class AnchorTagService {
       .populate('chapter_id', 'title')
       .populate('bibliography_id', 'title type')
       .populate('quiz_group_id', 'title subject category difficulty')
-      .populate('created_by', 'first_name last_name email')
       .lean();
 
     if (!anchorTag) {
@@ -344,6 +438,22 @@ export class AnchorTagService {
           user?.preferred_language || DEFAULT_LANGUAGE,
         ),
       );
+    }
+
+    // Fetch user data from central database
+    let createdByUser: any = null;
+    if (anchorTag.created_by) {
+      try {
+        createdByUser = await this.userModel
+          .findById(anchorTag.created_by)
+          .select('first_name last_name email')
+          .lean();
+      } catch (error) {
+        this.logger.warn(
+          `Failed to fetch user data for created_by ${anchorTag.created_by}:`,
+          error,
+        );
+      }
     }
 
     // Fetch quizzes for the anchor tag's quiz group
@@ -362,6 +472,7 @@ export class AnchorTagService {
       const quizGroupData = anchorTag.quiz_group_id as any;
       return {
         ...anchorTag,
+        created_by: createdByUser,
         quiz_group: {
           ...quizGroupData,
           quizzes,
@@ -369,7 +480,10 @@ export class AnchorTagService {
       };
     }
 
-    return anchorTag;
+    return {
+      ...anchorTag,
+      created_by: createdByUser,
+    };
   }
 
   async updateAnchorTag(
@@ -393,6 +507,12 @@ export class AnchorTagService {
       school.db_name,
     );
     const AnchorTagModel = connection.model(AnchorTag.name, AnchorTagSchema);
+    const ModuleModel = connection.model(Module.name, ModuleSchema);
+    const ChapterModel = connection.model(Chapter.name, ChapterSchema);
+    const BibliographyModel = connection.model(
+      Bibliography.name,
+      BibliographySchema,
+    );
     const QuizGroupModel = connection.model(QuizGroup.name, QuizGroupSchema);
     const QuizModel = connection.model(Quiz.name, QuizSchema);
 
@@ -431,6 +551,29 @@ export class AnchorTagService {
           this.errorMessageService.getMessageWithLanguage(
             'ANCHOR_TAG',
             'QUIZ_GROUP_NOT_FOUND',
+            user?.preferred_language || DEFAULT_LANGUAGE,
+          ),
+        );
+      }
+    }
+
+    // Check for duplicate anchor tag title in the same bibliography (excluding current anchor tag)
+    if (
+      updateAnchorTagDto.title &&
+      updateAnchorTagDto.title !== existingAnchorTag.title
+    ) {
+      const titleExists = await this.checkAnchorTagTitleExists(
+        existingAnchorTag.bibliography_id,
+        updateAnchorTagDto.title,
+        user,
+        id,
+      );
+
+      if (titleExists) {
+        throw new ConflictException(
+          this.errorMessageService.getMessageWithLanguage(
+            'ANCHOR_TAG',
+            'DUPLICATE_TITLE_IN_BIBLIOGRAPHY',
             user?.preferred_language || DEFAULT_LANGUAGE,
           ),
         );
@@ -483,17 +626,7 @@ export class AnchorTagService {
       .populate('module_id', 'title')
       .populate('chapter_id', 'title')
       .populate('bibliography_id', 'title type')
-      .populate('quiz_group_id', 'title')
-      .populate({
-        path: 'quiz_group_id',
-        populate: {
-          path: 'quizzes',
-          model: 'Quiz',
-          match: { deleted_at: null },
-          options: { sort: { sequence: 1 } },
-        },
-      })
-      .populate('created_by', 'first_name last_name email')
+      .populate('quiz_group_id', 'title subject category difficulty')
       .lean();
 
     if (!updatedAnchorTag) {
@@ -506,7 +639,50 @@ export class AnchorTagService {
       );
     }
 
-    return updatedAnchorTag;
+    // Fetch user data from central database
+    let createdByUser: any = null;
+    if (updatedAnchorTag.created_by) {
+      try {
+        createdByUser = await this.userModel
+          .findById(updatedAnchorTag.created_by)
+          .select('first_name last_name email')
+          .lean();
+      } catch (error) {
+        this.logger.warn(
+          `Failed to fetch user data for created_by ${updatedAnchorTag.created_by}:`,
+          error,
+        );
+      }
+    }
+
+    // Fetch quizzes for the anchor tag's quiz group
+    if (
+      updatedAnchorTag.quiz_group_id &&
+      typeof updatedAnchorTag.quiz_group_id === 'object' &&
+      '_id' in updatedAnchorTag.quiz_group_id
+    ) {
+      const quizzes = await QuizModel.find({
+        quiz_group_id: updatedAnchorTag.quiz_group_id._id,
+        deleted_at: null,
+      })
+        .sort({ sequence: 1 })
+        .lean();
+
+      const quizGroupData = updatedAnchorTag.quiz_group_id as any;
+      return {
+        ...updatedAnchorTag,
+        created_by: createdByUser,
+        quiz_group: {
+          ...quizGroupData,
+          quizzes,
+        },
+      };
+    }
+
+    return {
+      ...updatedAnchorTag,
+      created_by: createdByUser,
+    };
   }
 
   async removeAnchorTag(id: string | Types.ObjectId, user: JWTUserPayload) {
@@ -553,7 +729,13 @@ export class AnchorTagService {
       { new: true },
     );
 
-    return { message: 'Anchor tag deleted successfully' };
+    return {
+      message: this.errorMessageService.getSuccessMessageWithLanguage(
+        'ANCHOR_TAG',
+        'ANCHOR_TAG_DELETED_SUCCESSFULLY',
+        user?.preferred_language || DEFAULT_LANGUAGE,
+      ),
+    };
   }
 
   async getAnchorTagsByBibliography(
@@ -578,6 +760,10 @@ export class AnchorTagService {
     const AnchorTagModel = connection.model(AnchorTag.name, AnchorTagSchema);
     const QuizGroupModel = connection.model(QuizGroup.name, QuizGroupSchema);
     const QuizModel = connection.model(Quiz.name, QuizSchema);
+    const StudentAnchorTagAttemptModel = connection.model(
+      StudentAnchorTagAttempt.name,
+      StudentAnchorTagAttemptSchema,
+    );
 
     const anchorTags = await AnchorTagModel.find({
       bibliography_id: new Types.ObjectId(bibliography_id),
@@ -588,9 +774,36 @@ export class AnchorTagService {
       .populate('quiz_group_id', 'title subject category difficulty')
       .lean();
 
-    // Fetch quizzes for each anchor tag's quiz group
-    const anchorTagsWithQuizzes = await Promise.all(
+    // Fetch user data for each anchor tag from central database
+    const anchorTagsWithUserData = await Promise.all(
       anchorTags.map(async (anchorTag) => {
+        let createdByUser: any = null;
+        if (anchorTag.created_by) {
+          try {
+            createdByUser = await this.userModel
+              .findById(anchorTag.created_by)
+              .select('first_name last_name email profile_pic')
+              .lean();
+          } catch (error) {
+            this.logger.warn(
+              `Failed to fetch user data for created_by ${anchorTag.created_by}:`,
+              error,
+            );
+          }
+        }
+        return {
+          ...anchorTag,
+          created_by: createdByUser,
+        };
+      }),
+    );
+
+    // Fetch quizzes for each anchor tag's quiz group and student attempt status
+    const anchorTagsWithQuizzes = await Promise.all(
+      anchorTagsWithUserData.map(async (anchorTag) => {
+        let anchorTagWithData: any = { ...anchorTag };
+
+        // Add quiz group and quizzes
         if (
           anchorTag.quiz_group_id &&
           typeof anchorTag.quiz_group_id === 'object' &&
@@ -604,15 +817,46 @@ export class AnchorTagService {
             .lean();
 
           const quizGroupData = anchorTag.quiz_group_id as any;
-          return {
-            ...anchorTag,
+          anchorTagWithData = {
+            ...anchorTagWithData,
             quiz_group: {
               ...quizGroupData,
               quizzes,
             },
           };
         }
-        return anchorTag;
+
+        // Add student attempt status if user is a student
+        if (user.role.name === 'STUDENT') {
+          try {
+            const studentAttempt = await StudentAnchorTagAttemptModel.findOne({
+              student_id: new Types.ObjectId(user.id),
+              anchor_tag_id: anchorTag._id,
+              deleted_at: null,
+            })
+              .sort({ attempt_number: -1 })
+              .select('status')
+              .lean();
+
+            anchorTagWithData = {
+              ...anchorTagWithData,
+              student_attempt_status: studentAttempt
+                ? studentAttempt.status
+                : 'NOT_STARTED',
+            };
+          } catch (error) {
+            this.logger.warn(
+              `Failed to fetch student attempt status for anchor tag ${anchorTag._id}:`,
+              error,
+            );
+            anchorTagWithData = {
+              ...anchorTagWithData,
+              student_attempt_status: 'NOT_STARTED',
+            };
+          }
+        }
+
+        return anchorTagWithData;
       }),
     );
 
@@ -642,6 +886,10 @@ export class AnchorTagService {
     const AnchorTagModel = connection.model(AnchorTag.name, AnchorTagSchema);
     const QuizGroupModel = connection.model(QuizGroup.name, QuizGroupSchema);
     const QuizModel = connection.model(Quiz.name, QuizSchema);
+    const StudentAnchorTagAttemptModel = connection.model(
+      StudentAnchorTagAttempt.name,
+      StudentAnchorTagAttemptSchema,
+    );
 
     this.logger.log(
       `Searching for anchor tags with chapter_id: ${chapter_id} and module_id: ${module_id}`,
@@ -658,9 +906,12 @@ export class AnchorTagService {
 
     this.logger.log(`Found ${anchorTags.length} anchor tags in database`);
 
-    // Fetch quizzes for each anchor tag's quiz group
+    // Fetch quizzes for each anchor tag's quiz group and student attempt status
     const anchorTagsWithQuizzes = await Promise.all(
       anchorTags.map(async (anchorTag) => {
+        let anchorTagWithData: any = { ...anchorTag };
+
+        // Add quiz group and quizzes
         if (
           anchorTag.quiz_group_id &&
           typeof anchorTag.quiz_group_id === 'object' &&
@@ -674,15 +925,46 @@ export class AnchorTagService {
             .lean();
 
           const quizGroupData = anchorTag.quiz_group_id as any;
-          return {
-            ...anchorTag,
+          anchorTagWithData = {
+            ...anchorTagWithData,
             quiz_group: {
               ...quizGroupData,
               quizzes,
             },
           };
         }
-        return anchorTag;
+
+        // Add student attempt status if user is a student
+        if (user.role.name === RoleEnum.STUDENT) {
+          try {
+            const studentAttempt = await StudentAnchorTagAttemptModel.findOne({
+              student_id: new Types.ObjectId(user.id),
+              anchor_tag_id: anchorTag._id,
+              deleted_at: null,
+            })
+              .sort({ attempt_number: -1 })
+              .select('status')
+              .lean();
+
+            anchorTagWithData = {
+              ...anchorTagWithData,
+              student_attempt_status: studentAttempt
+                ? studentAttempt.status
+                : 'NOT_STARTED',
+            };
+          } catch (error) {
+            this.logger.warn(
+              `Failed to fetch student attempt status for anchor tag ${anchorTag._id}:`,
+              error,
+            );
+            anchorTagWithData = {
+              ...anchorTagWithData,
+              student_attempt_status: 'NOT_STARTED',
+            };
+          }
+        }
+
+        return anchorTagWithData;
       }),
     );
 
@@ -772,7 +1054,7 @@ export class AnchorTagService {
 
     if (mandatoryAnchorTags.length === 0) {
       return {
-        message: this.errorMessageService.getMessageWithLanguage(
+        message: this.errorMessageService.getSuccessMessageWithLanguage(
           'ANCHOR_TAG',
           'NO_MANDATORY_ANCHOR_TAGS_FOUND',
           user?.preferred_language || DEFAULT_LANGUAGE,
@@ -849,7 +1131,7 @@ export class AnchorTagService {
     }
 
     return {
-      message: this.errorMessageService.getMessageWithLanguage(
+      message: this.errorMessageService.getSuccessMessageWithLanguage(
         'ANCHOR_TAG',
         'MISSED_ANCHOR_TAG_NOTIFICATIONS_PROCESSED',
         user?.preferred_language || DEFAULT_LANGUAGE,

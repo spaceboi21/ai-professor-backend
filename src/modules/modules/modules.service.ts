@@ -59,7 +59,10 @@ import {
 import { QuizTypeEnum } from 'src/common/constants/quiz.constant';
 import { PythonService, ModuleValidationResponse } from './python.service';
 import { ErrorMessageService } from 'src/common/services/error-message.service';
-import { DEFAULT_LANGUAGE } from 'src/common/constants/language.constant';
+import {
+  DEFAULT_LANGUAGE,
+  LanguageEnum,
+} from 'src/common/constants/language.constant';
 
 @Injectable()
 export class ModulesService {
@@ -339,7 +342,7 @@ export class ModulesService {
         if (assignedModuleIds.length === 0) {
           // Professor has no assigned modules, return empty result
           return {
-            message: this.errorMessageService.getMessageWithLanguage(
+            message: this.errorMessageService.getSuccessMessageWithLanguage(
               'MODULE',
               'NO_ASSIGNED_MODULES',
               user?.preferred_language || DEFAULT_LANGUAGE,
@@ -636,7 +639,7 @@ export class ModulesService {
       const result = createPaginationResult(modules, total, paginationOptions);
 
       return {
-        message: this.errorMessageService.getMessageWithLanguage(
+        message: this.errorMessageService.getSuccessMessageWithLanguage(
           'MODULE',
           'MODULES_RETRIEVED_SUCCESSFULLY',
           user?.preferred_language || DEFAULT_LANGUAGE,
@@ -776,7 +779,7 @@ export class ModulesService {
       );
 
       return {
-        message: this.errorMessageService.getMessageWithLanguage(
+        message: this.errorMessageService.getSuccessMessageWithLanguage(
           'MODULE',
           'MODULE_RETRIEVED_SUCCESSFULLY',
           user?.preferred_language || DEFAULT_LANGUAGE,
@@ -1488,7 +1491,7 @@ export class ModulesService {
       if (result.length === 0) {
         // No modules found, return empty overview
         return {
-          message: this.errorMessageService.getMessageWithLanguage(
+          message: this.errorMessageService.getSuccessMessageWithLanguage(
             'MODULE',
             'MODULE_OVERVIEW_RETRIEVED_SUCCESSFULLY',
             user?.preferred_language || DEFAULT_LANGUAGE,
@@ -1505,7 +1508,7 @@ export class ModulesService {
       }
 
       return {
-        message: this.errorMessageService.getMessageWithLanguage(
+        message: this.errorMessageService.getSuccessMessageWithLanguage(
           'MODULE',
           'MODULE_OVERVIEW_RETRIEVED_SUCCESSFULLY',
           user?.preferred_language || DEFAULT_LANGUAGE,
@@ -1519,6 +1522,30 @@ export class ModulesService {
           'MODULE',
           'RETRIEVE_MODULE_OVERVIEW_FAILED',
           user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
+    }
+  }
+
+  /**
+   * Get modules from Python service
+   */
+  async getModulesFromPythonService() {
+    try {
+      this.logger.log('Fetching modules from Python service');
+      const response = await this.pythonService.getModules();
+      this.logger.log('Successfully fetched modules from Python service');
+      return response;
+    } catch (error) {
+      this.logger.error(
+        'Error fetching modules from Python service',
+        error?.stack || error,
+      );
+      throw new BadRequestException(
+        this.errorMessageService.getMessageWithLanguage(
+          'MODULE',
+          'PYTHON_SERVICE_FETCH_FAILED',
+          LanguageEnum.ENGLISH, // Default to English for now
         ),
       );
     }

@@ -10,6 +10,8 @@ import {
   HttpStatus,
   Res,
   NotFoundException,
+  Delete,
+  Patch,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -26,15 +28,25 @@ import { RoleEnum } from 'src/common/constants/roles.constant';
 import { CommunityService } from './community.service';
 import { CreateDiscussionDto } from './dto/create-discussion.dto';
 import { CreateReplyDto } from './dto/create-reply.dto';
+import { UpdateDiscussionDto } from './dto/update-discussion.dto';
+import { UpdateReplyDto } from './dto/update-reply.dto';
 import { ReportContentDto } from './dto/report-content.dto';
 import { DiscussionFilterDto } from './dto/discussion-filter.dto';
+import { CreateForumAttachmentDto } from './dto/forum-attachment.dto';
+import { DeleteForumAttachmentDto } from './dto/delete-forum-attachment.dto';
 import { PaginationDto } from 'src/common/dto/pagination.dto';
 import { LikeEntityTypeEnum } from 'src/database/schemas/tenant/forum-like.schema';
+import { AttachmentEntityTypeEnum } from 'src/database/schemas/tenant/forum-attachment.schema';
+import { DiscussionTypeEnum } from 'src/database/schemas/tenant/forum-discussion.schema';
 import { JWTUserPayload } from 'src/common/types/jwr-user.type';
 import { PinDiscussionDto } from './dto/pin-discussion.dto';
 import { SchoolMembersFilterDto } from './dto/school-members-filter.dto';
 import { ExportDiscussionsDto } from './dto/export-discussions.dto';
 import { ExportDiscussionsResponseDto } from './dto/export-discussions-response.dto';
+import {
+  DiscussionsListResponseDto,
+  SingleDiscussionResponseDto,
+} from './dto/discussion-response.dto';
 import { Response } from 'express';
 
 @ApiTags('Community')
@@ -51,7 +63,11 @@ export class CommunityController {
     RoleEnum.SCHOOL_ADMIN,
     RoleEnum.SUPER_ADMIN,
   )
-  @ApiOperation({ summary: 'Create a new forum discussion' })
+  @ApiOperation({
+    summary: 'Create a new forum discussion',
+    description:
+      'Create a new discussion with support for various types including meetings. Meeting type discussions require video platform details, scheduled time, and duration. Only professors and admins can create meeting discussions.',
+  })
   @ApiResponse({
     status: HttpStatus.CREATED,
     description: 'Discussion created successfully',
@@ -62,7 +78,8 @@ export class CommunityController {
   })
   @ApiResponse({
     status: HttpStatus.FORBIDDEN,
-    description: 'Access denied - insufficient permissions',
+    description:
+      'Access denied - insufficient permissions or students cannot create meeting discussions',
   })
   async createDiscussion(
     @Body() createDiscussionDto: CreateDiscussionDto,
@@ -83,10 +100,64 @@ export class CommunityController {
   )
   @ApiOperation({
     summary: 'Get all discussions with filtering and pagination',
+    description:
+      'Retrieve discussions with support for meeting details, filtering by type, status, tags, and search. Meeting type discussions include video platform, scheduled time, duration, and computed fields like meeting status and time until meeting.',
   })
   @ApiResponse({
     status: HttpStatus.OK,
     description: 'Discussions retrieved successfully',
+    type: DiscussionsListResponseDto,
+    content: {
+      'application/json': {
+        example: {
+          message: 'Discussions retrieved successfully',
+          data: [
+            {
+              _id: '507f1f77bcf86cd799439011',
+              title: 'Weekly Therapy Session',
+              content: 'Join us for our weekly group therapy session...',
+              type: 'meeting',
+              tags: [
+                'trauma',
+                'resistance',
+                'therapy',
+                'group-session',
+                'weekly',
+              ],
+              meeting_link: 'https://meet.google.com/abc-defg-hij',
+              meeting_platform: 'google_meet',
+              meeting_scheduled_at: '2024-01-15T10:00:00.000Z',
+              meeting_duration_minutes: 60,
+              meeting_status: 'upcoming',
+              meeting_time_until: 3600000,
+              meeting_end_time: '2024-01-15T11:00:00.000Z',
+              is_meeting_ongoing: false,
+              is_pinned: false,
+              has_liked: false,
+              is_unread: true,
+              reply_count: 0,
+              view_count: 5,
+              like_count: 0,
+              created_by_user: {
+                _id: '507f1f77bcf86cd799439012',
+                first_name: 'Dr. John',
+                last_name: 'Smith',
+                email: 'john.smith@school.com',
+                role: 'PROFESSOR',
+              },
+              created_at: '2024-01-15T09:00:00.000Z',
+              updated_at: '2024-01-15T09:00:00.000Z',
+            },
+          ],
+          pagination: {
+            page: 1,
+            limit: 10,
+            total: 1,
+            totalPages: 1,
+          },
+        },
+      },
+    },
   })
   @ApiResponse({
     status: HttpStatus.FORBIDDEN,
@@ -96,6 +167,8 @@ export class CommunityController {
     name: 'type',
     required: false,
     enum: ['discussion', 'question', 'case_study', 'announcement', 'meeting'],
+    description:
+      'Filter by discussion type. Meeting type includes video platform details and computed meeting fields.',
   })
   @ApiQuery({
     name: 'status',
@@ -103,7 +176,13 @@ export class CommunityController {
     enum: ['active', 'archived', 'reported', 'deleted'],
   })
   @ApiQuery({ name: 'search', required: false, type: String })
-  @ApiQuery({ name: 'tags', required: false, type: [String] })
+  @ApiQuery({
+    name: 'tags',
+    required: false,
+    type: String,
+    description:
+      'Filter by tags (comma-separated or pipe-separated, e.g., "trauma,resistance" or "trauma|resistance")',
+  })
   @ApiQuery({ name: 'author_id', required: false, type: String })
   @ApiQuery({ name: 'page', required: false, type: Number })
   @ApiQuery({ name: 'limit', required: false, type: Number })
@@ -126,10 +205,15 @@ export class CommunityController {
     RoleEnum.SCHOOL_ADMIN,
     RoleEnum.SUPER_ADMIN,
   )
-  @ApiOperation({ summary: 'Get a single discussion by ID' })
+  @ApiOperation({
+    summary: 'Get a single discussion by ID',
+    description:
+      'Retrieve detailed discussion information including meeting details (if type is meeting), attachments, mentions, and user interaction status.',
+  })
   @ApiResponse({
     status: HttpStatus.OK,
     description: 'Discussion retrieved successfully',
+    type: SingleDiscussionResponseDto,
   })
   @ApiResponse({
     status: HttpStatus.NOT_FOUND,
@@ -175,6 +259,150 @@ export class CommunityController {
       createReplyDto,
       req.user as JWTUserPayload,
     );
+  }
+
+  @Patch('discussions/:id')
+  @Roles(
+    RoleEnum.STUDENT,
+    RoleEnum.PROFESSOR,
+    RoleEnum.SCHOOL_ADMIN,
+    RoleEnum.SUPER_ADMIN,
+  )
+  @ApiOperation({
+    summary: 'Update a forum discussion',
+    description:
+      'Update discussion details including title, content, tags, and meeting details (for meeting type). Only the creator or admins can edit a discussion.',
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Discussion updated successfully',
+  })
+  @ApiResponse({
+    status: HttpStatus.BAD_REQUEST,
+    description: 'Invalid input data',
+  })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'Discussion not found',
+  })
+  @ApiResponse({
+    status: HttpStatus.FORBIDDEN,
+    description: 'Access denied - only creator or admins can edit',
+  })
+  @ApiParam({ name: 'id', description: 'Discussion ID' })
+  async updateDiscussion(
+    @Param('id') id: string,
+    @Body() updateDiscussionDto: UpdateDiscussionDto,
+    @Request() req: any,
+  ) {
+    return this.communityService.updateDiscussion(
+      id,
+      updateDiscussionDto,
+      req.user as JWTUserPayload,
+    );
+  }
+
+  @Get('replies/:id')
+  @Roles(
+    RoleEnum.STUDENT,
+    RoleEnum.PROFESSOR,
+    RoleEnum.SCHOOL_ADMIN,
+    RoleEnum.SUPER_ADMIN,
+  )
+  @ApiOperation({
+    summary: 'Get a single reply by ID',
+    description:
+      'Retrieve detailed reply information including attachments, mentions, and user interaction status.',
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Reply retrieved successfully',
+  })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'Reply not found',
+  })
+  @ApiResponse({
+    status: HttpStatus.FORBIDDEN,
+    description: 'Access denied - insufficient permissions',
+  })
+  @ApiParam({ name: 'id', description: 'Reply ID' })
+  async findReplyById(@Param('id') id: string, @Request() req: any) {
+    return this.communityService.findReplyById(id, req.user as JWTUserPayload);
+  }
+
+  @Patch('replies/:id')
+  @Roles(
+    RoleEnum.STUDENT,
+    RoleEnum.PROFESSOR,
+    RoleEnum.SCHOOL_ADMIN,
+    RoleEnum.SUPER_ADMIN,
+  )
+  @ApiOperation({
+    summary: 'Update a forum reply',
+    description:
+      'Update reply content and mentions. Only the creator or admins can edit a reply.',
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Reply updated successfully',
+  })
+  @ApiResponse({
+    status: HttpStatus.BAD_REQUEST,
+    description: 'Invalid input data',
+  })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'Reply not found',
+  })
+  @ApiResponse({
+    status: HttpStatus.FORBIDDEN,
+    description: 'Access denied - only creator or admins can edit',
+  })
+  @ApiParam({ name: 'id', description: 'Reply ID' })
+  async updateReply(
+    @Param('id') id: string,
+    @Body() updateReplyDto: UpdateReplyDto,
+    @Request() req: any,
+  ) {
+    return this.communityService.updateReply(
+      id,
+      updateReplyDto,
+      req.user as JWTUserPayload,
+    );
+  }
+
+  @Delete('replies/:id')
+  @Roles(
+    RoleEnum.STUDENT,
+    RoleEnum.PROFESSOR,
+    RoleEnum.SCHOOL_ADMIN,
+    RoleEnum.SUPER_ADMIN,
+  )
+  @ApiOperation({
+    summary: 'Delete a forum reply',
+    description:
+      'Delete a reply (or sub-reply). Only the creator or admins can delete a reply. This will also delete all sub-replies and related data.',
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Reply deleted successfully',
+  })
+  @ApiResponse({
+    status: HttpStatus.BAD_REQUEST,
+    description: 'Invalid input data',
+  })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'Reply not found',
+  })
+  @ApiResponse({
+    status: HttpStatus.FORBIDDEN,
+    description: 'Access denied - only creator or admins can delete',
+  })
+  @ApiParam({ name: 'id', description: 'Reply ID' })
+  async deleteReply(@Param('id') id: string, @Request() req: any) {
+    return this.communityService.deleteReply(id, req.user as JWTUserPayload);
   }
 
   @Get('discussions/:id/replies')
@@ -328,7 +556,7 @@ export class CommunityController {
   }
 
   @Post('discussions/:id/archive')
-  @Roles(RoleEnum.SCHOOL_ADMIN, RoleEnum.SUPER_ADMIN)
+  @Roles(RoleEnum.SCHOOL_ADMIN, RoleEnum.SUPER_ADMIN, RoleEnum.PROFESSOR)
   @ApiOperation({ summary: 'Archive a discussion (admin only)' })
   @ApiResponse({
     status: HttpStatus.OK,
@@ -341,6 +569,29 @@ export class CommunityController {
   @ApiParam({ name: 'id', description: 'Discussion ID' })
   async archiveDiscussion(@Param('id') id: string, @Request() req: any) {
     return this.communityService.archiveDiscussion(
+      id,
+      req.user as JWTUserPayload,
+    );
+  }
+
+  @Delete('discussions/:id')
+  @Roles(RoleEnum.SCHOOL_ADMIN, RoleEnum.SUPER_ADMIN)
+  @ApiOperation({ summary: 'Delete a discussion (admin only)' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Discussion deleted successfully',
+  })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'Discussion not found',
+  })
+  @ApiResponse({
+    status: HttpStatus.FORBIDDEN,
+    description: 'Access denied - admin only',
+  })
+  @ApiParam({ name: 'id', description: 'Discussion ID' })
+  async deleteDiscussion(@Param('id') id: string, @Request() req: any) {
+    return this.communityService.deleteDiscussion(
       id,
       req.user as JWTUserPayload,
     );
@@ -676,5 +927,187 @@ export class CommunityController {
     } catch (error) {
       throw new NotFoundException('File not found or could not be downloaded');
     }
+  }
+
+  @Get('tags')
+  @Roles(
+    RoleEnum.STUDENT,
+    RoleEnum.PROFESSOR,
+    RoleEnum.SCHOOL_ADMIN,
+    RoleEnum.SUPER_ADMIN,
+  )
+  @ApiOperation({
+    summary: 'Get all available tags for forum discussions',
+    description:
+      'Retrieve all unique tags used in forum discussions for dropdown filtering and tag suggestions.',
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Tags retrieved successfully',
+    schema: {
+      type: 'object',
+      properties: {
+        message: {
+          type: 'string',
+          example: 'Tags retrieved successfully',
+        },
+        data: {
+          type: 'array',
+          items: {
+            type: 'string',
+          },
+          example: [
+            'trauma',
+            'resistance',
+            'therapy',
+            'group-session',
+            'weekly',
+          ],
+        },
+        total: {
+          type: 'number',
+          example: 5,
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: HttpStatus.FORBIDDEN,
+    description: 'Access denied - insufficient permissions',
+  })
+  async getAllTags(@Request() req: any) {
+    return this.communityService.getAllTags(req.user as JWTUserPayload);
+  }
+
+  // Forum Attachment Endpoints
+
+  @Post('discussions/:id/attachments')
+  @Roles(
+    RoleEnum.STUDENT,
+    RoleEnum.PROFESSOR,
+    RoleEnum.SCHOOL_ADMIN,
+    RoleEnum.SUPER_ADMIN,
+  )
+  @ApiOperation({ summary: 'Create a forum attachment for a discussion' })
+  @ApiResponse({
+    status: HttpStatus.CREATED,
+    description: 'Attachment created successfully',
+  })
+  @ApiResponse({
+    status: HttpStatus.BAD_REQUEST,
+    description: 'Invalid input data',
+  })
+  @ApiParam({ name: 'id', description: 'Discussion ID' })
+  async createDiscussionAttachment(
+    @Param('id') discussionId: string,
+    @Body() createAttachmentDto: CreateForumAttachmentDto,
+    @Request() req: any,
+  ) {
+    // Set the discussion_id from the URL parameter
+    createAttachmentDto.discussion_id = discussionId;
+    createAttachmentDto.entity_type = AttachmentEntityTypeEnum.DISCUSSION;
+
+    return this.communityService.createForumAttachment(
+      createAttachmentDto,
+      req.user as JWTUserPayload,
+    );
+  }
+
+  @Post('replies/:id/attachments')
+  @Roles(
+    RoleEnum.STUDENT,
+    RoleEnum.PROFESSOR,
+    RoleEnum.SCHOOL_ADMIN,
+    RoleEnum.SUPER_ADMIN,
+  )
+  @ApiOperation({ summary: 'Create a forum attachment for a reply' })
+  @ApiResponse({
+    status: HttpStatus.CREATED,
+    description: 'Attachment created successfully',
+  })
+  @ApiResponse({
+    status: HttpStatus.BAD_REQUEST,
+    description: 'Invalid input data',
+  })
+  @ApiParam({ name: 'id', description: 'Reply ID' })
+  async createReplyAttachment(
+    @Param('id') replyId: string,
+    @Body() createAttachmentDto: CreateForumAttachmentDto,
+    @Request() req: any,
+  ) {
+    // Set the reply_id from the URL parameter
+    createAttachmentDto.reply_id = replyId;
+    createAttachmentDto.entity_type = AttachmentEntityTypeEnum.REPLY;
+
+    return this.communityService.createForumAttachment(
+      createAttachmentDto,
+      req.user as JWTUserPayload,
+    );
+  }
+
+  @Get('discussions/:id/attachments')
+  @Roles(
+    RoleEnum.STUDENT,
+    RoleEnum.PROFESSOR,
+    RoleEnum.SCHOOL_ADMIN,
+    RoleEnum.SUPER_ADMIN,
+  )
+  @ApiOperation({ summary: 'Get attachments for a discussion' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Attachments retrieved successfully',
+  })
+  @ApiParam({ name: 'id', description: 'Discussion ID' })
+  async getDiscussionAttachments(
+    @Param('id') discussionId: string,
+    @Request() req: any,
+  ) {
+    return this.communityService.getDiscussionAttachments(
+      discussionId,
+      req.user as JWTUserPayload,
+    );
+  }
+
+  @Get('replies/:id/attachments')
+  @Roles(
+    RoleEnum.STUDENT,
+    RoleEnum.PROFESSOR,
+    RoleEnum.SCHOOL_ADMIN,
+    RoleEnum.SUPER_ADMIN,
+  )
+  @ApiOperation({ summary: 'Get attachments for a reply' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Attachments retrieved successfully',
+  })
+  @ApiParam({ name: 'id', description: 'Reply ID' })
+  async getReplyAttachments(@Param('id') replyId: string, @Request() req: any) {
+    return this.communityService.getReplyAttachments(
+      replyId,
+      req.user as JWTUserPayload,
+    );
+  }
+
+  @Delete('attachments/:id')
+  @Roles(
+    RoleEnum.STUDENT,
+    RoleEnum.PROFESSOR,
+    RoleEnum.SCHOOL_ADMIN,
+    RoleEnum.SUPER_ADMIN,
+  )
+  @ApiOperation({ summary: 'Delete a forum attachment' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Attachment deleted successfully',
+  })
+  @ApiParam({ name: 'id', description: 'Attachment ID' })
+  async deleteAttachment(
+    @Param('id') attachmentId: string,
+    @Request() req: any,
+  ) {
+    return this.communityService.deleteForumAttachment(
+      { attachment_id: attachmentId },
+      req.user as JWTUserPayload,
+    );
   }
 }

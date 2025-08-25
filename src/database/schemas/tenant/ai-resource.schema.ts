@@ -31,8 +31,8 @@ export class AIResource extends Document {
   @Prop({ type: Types.ObjectId, ref: 'Student', required: true, index: true })
   student_id: Types.ObjectId;
 
-  @Prop({ type: [String], default: [] })
-  resources: string[];
+  @Prop({ type: [Object], default: [] })
+  resources: Object[];
 
   @Prop({ type: String, default: '' })
   recommendations: string;

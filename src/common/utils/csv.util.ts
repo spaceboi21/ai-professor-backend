@@ -13,6 +13,27 @@ export class CSVUtil {
   constructor(private readonly csvStorageService: CSVStorageService) {}
 
   /**
+   * Strip HTML tags from text content
+   */
+  private stripHtmlTags(text: string): string {
+    if (!text || typeof text !== 'string') {
+      return text;
+    }
+
+    // Remove HTML tags and decode HTML entities
+    return text
+      .replace(/<[^>]*>/g, '') // Remove HTML tags
+      .replace(/&nbsp;/g, ' ') // Replace non-breaking spaces
+      .replace(/&amp;/g, '&') // Replace encoded ampersands
+      .replace(/&lt;/g, '<') // Replace encoded less than
+      .replace(/&gt;/g, '>') // Replace encoded greater than
+      .replace(/&quot;/g, '"') // Replace encoded quotes
+      .replace(/&#39;/g, "'") // Replace encoded apostrophes
+      .replace(/\s+/g, ' ') // Replace multiple whitespace with single space
+      .trim(); // Remove leading/trailing whitespace
+  }
+
+  /**
    * Convert data to CSV format
    */
   private convertToCSV(data: Record<string, any>[], headers: string[]): string {
@@ -22,10 +43,17 @@ export class CSVUtil {
         return '';
       }
 
-      const stringValue = String(value);
+      let stringValue = String(value);
+
+      // Strip HTML tags from the value
+      stringValue = this.stripHtmlTags(stringValue);
 
       // If the value contains comma, quote, or newline, wrap it in quotes
-      if (stringValue.includes(',') || stringValue.includes('"') || stringValue.includes('\n')) {
+      if (
+        stringValue.includes(',') ||
+        stringValue.includes('"') ||
+        stringValue.includes('\n')
+      ) {
         return `"${stringValue.replace(/"/g, '""')}"`;
       }
 
@@ -33,11 +61,11 @@ export class CSVUtil {
     };
 
     // Create CSV header row
-    const headerRow = headers.map(header => escapeCSV(header)).join(',');
+    const headerRow = headers.map((header) => escapeCSV(header)).join(',');
 
     // Create CSV data rows
-    const dataRows = data.map(row => {
-      return headers.map(header => escapeCSV(row[header])).join(',');
+    const dataRows = data.map((row) => {
+      return headers.map((header) => escapeCSV(row[header])).join(',');
     });
 
     return [headerRow, ...dataRows].join('\n');
@@ -66,7 +94,9 @@ export class CSVUtil {
   /**
    * Get file content for download
    */
-  async getFileContent(filename: string): Promise<{ content: Buffer; contentType: string }> {
+  async getFileContent(
+    filename: string,
+  ): Promise<{ content: Buffer; contentType: string }> {
     return this.csvStorageService.getFileContent(filename);
   }
 
@@ -96,4 +126,4 @@ export class CSVUtil {
   async cleanupOldFiles(maxAgeHours: number = 24): Promise<void> {
     return this.csvStorageService.cleanupOldFiles(maxAgeHours);
   }
-} 
+}

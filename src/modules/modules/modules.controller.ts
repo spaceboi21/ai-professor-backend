@@ -341,6 +341,78 @@ export class ModulesController {
     return this.modulesService.findAllModules(user, paginationDto, filterDto);
   }
 
+  @Get('pre-defined-modules')
+  @Roles(RoleEnum.SUPER_ADMIN, RoleEnum.SCHOOL_ADMIN, RoleEnum.PROFESSOR)
+  @ApiOperation({
+    summary:
+      'Get modules from Python service (for super admin and school admin and professor)',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Modules retrieved successfully from Python service',
+    schema: {
+      type: 'object',
+      properties: {
+        success: { type: 'boolean', example: true },
+        total_modules: { type: 'number', example: 0 },
+        modules: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              module_id: { type: 'string', example: 'string' },
+              module_title: { type: 'string', example: 'string' },
+              author: { type: 'string', example: 'string' },
+              teaching_unit: { type: 'string', example: 'string' },
+              semester: { type: 'string', example: 'string' },
+              difficulty_level: { type: 'string', example: 'string' },
+              estimated_duration: { type: 'number', example: 0 },
+              pedagogical_tags: {
+                type: 'array',
+                items: { type: 'string' },
+                example: [],
+              },
+              keywords: {
+                type: 'array',
+                items: { type: 'string' },
+                example: [],
+              },
+              theoretical_concepts: {
+                type: 'array',
+                items: { type: 'string' },
+                example: [],
+              },
+              bibliography: {
+                type: 'array',
+                items: { type: 'string' },
+                example: [],
+              },
+              prerequisites: {
+                type: 'array',
+                items: { type: 'string' },
+                example: [],
+              },
+              description: { type: 'string', example: 'string' },
+              upload_date: { type: 'string', example: 'string' },
+              namespace: { type: 'string', example: 'string' },
+              total_chunks: { type: 'number', example: 0 },
+              vector_count: { type: 'number', example: 0 },
+            },
+          },
+        },
+        index_name: { type: 'string', example: 'string' },
+        total_vectors: { type: 'number', example: 0 },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Bad request - Python service error',
+  })
+  async getModulesFromPythonService(@User() user: JWTUserPayload) {
+    return this.modulesService.getModulesFromPythonService();
+  }
+
   // not in use
   // @Get('overview')
   // @Roles(RoleEnum.STUDENT)

@@ -242,7 +242,7 @@ export class StudentController {
   }
 
   @Patch(':id')
-  @Roles(RoleEnum.SUPER_ADMIN, RoleEnum.SCHOOL_ADMIN)
+  @Roles(RoleEnum.SUPER_ADMIN, RoleEnum.SCHOOL_ADMIN, RoleEnum.STUDENT)
   @ApiOperation({ summary: 'Update student details (including status)' })
   @ApiParam({
     name: 'id',

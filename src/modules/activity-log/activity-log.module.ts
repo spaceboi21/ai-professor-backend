@@ -12,6 +12,9 @@ import {
   School,
   SchoolSchema,
 } from 'src/database/schemas/central/school.schema';
+import { UtilsModule } from 'src/common/utils/utils.module';
+import { DatabaseModule } from 'src/database/database.module';
+import { CentralModule } from 'src/modules/central/central.module';
 
 @Module({
   imports: [
@@ -20,6 +23,9 @@ import {
       { name: User.name, schema: UserSchema },
       { name: School.name, schema: SchoolSchema },
     ]),
+    UtilsModule,
+    DatabaseModule,
+    CentralModule,
   ],
   controllers: [ActivityLogController],
   providers: [ActivityLogService, ActivityLogInterceptor],

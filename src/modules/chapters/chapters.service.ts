@@ -1212,7 +1212,11 @@ export class ChaptersService {
         });
 
         return {
-          message: 'Chapter deleted successfully',
+          message: this.errorMessageService.getSuccessMessageWithLanguage(
+            'CHAPTER',
+            'CHAPTER_DELETED_SUCCESSFULLY',
+            user?.preferred_language || DEFAULT_LANGUAGE,
+          ),
           data: { id },
         };
       } finally {
@@ -1422,10 +1426,18 @@ export class ChaptersService {
       chapter_id: chapterId,
       deleted_at: null,
     });
-    const totalDuration = bibliographies.reduce(
-      (sum, b) => sum + (b.duration || 0),
-      0,
-    );
+
+    // Calculate total duration with proper unit conversion
+    const totalDuration = bibliographies.reduce((sum, b) => {
+      if (b.type === BibliographyTypeEnum.VIDEO) {
+        // Convert video duration from seconds to minutes
+        return sum + (b.duration || 0) / 60;
+      } else {
+        // Other content types (PDF, PowerPoint, etc.) are already in minutes
+        return sum + (b.duration || 0);
+      }
+    }, 0);
+
     const chapter = await ChapterModel.findByIdAndUpdate(
       chapterId,
       { duration: totalDuration },

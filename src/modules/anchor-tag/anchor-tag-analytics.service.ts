@@ -488,7 +488,7 @@ export class AnchorTagAnalyticsService {
           time_spent_seconds: 1,
           quiz_attempt: 1,
           text_response: 1,
-          ai_verification_result: 1,
+          ai_verification_report: '$ai_verification_result',
         },
       },
       { $sort: { completed_at: -1 } },

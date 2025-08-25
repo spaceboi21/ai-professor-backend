@@ -5,4 +5,5 @@ export type UploadFolders =
   | 'backups'
   | 'school-logos'
   | 'bibliography'
-  | 'thumbnails';
+  | 'thumbnails'
+  | 'forum-attachments';

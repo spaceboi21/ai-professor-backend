@@ -37,6 +37,18 @@ import { ProgressService } from '../progress/progress.service';
 import { RoleEnum } from 'src/common/constants/roles.constant';
 import { ErrorMessageService } from 'src/common/services/error-message.service';
 import { DEFAULT_LANGUAGE } from 'src/common/constants/language.constant';
+import { NotificationsService } from '../notifications/notifications.service';
+import { NotificationTypeEnum } from 'src/common/constants/notification.constant';
+import { RecipientTypeEnum } from 'src/database/schemas/tenant/notification.schema';
+import {
+  Student,
+  StudentSchema,
+} from 'src/database/schemas/tenant/student.schema';
+import {
+  StudentChapterProgress,
+  StudentChapterProgressSchema,
+} from 'src/database/schemas/tenant/student-chapter-progress.schema';
+import { ProgressStatusEnum } from 'src/common/constants/status.constant';
 
 @Injectable()
 export class QuizService {
@@ -50,6 +62,7 @@ export class QuizService {
     private readonly tenantConnectionService: TenantConnectionService,
     private readonly progressService: ProgressService,
     private readonly errorMessageService: ErrorMessageService,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   // ========== QUIZ GROUP OPERATIONS ==========
@@ -208,6 +221,23 @@ export class QuizService {
     const quizGroup = new QuizGroupModel(quizGroupData);
     await quizGroup.save();
 
+    // If this is a chapter quiz, check if there are students who completed the chapter with auto-completion
+    if (type === QuizTypeEnum.CHAPTER && chapter_id) {
+      try {
+        await this.notifyStudentsAboutNewQuiz(
+          school._id,
+          typeof chapter_id === 'string'
+            ? new Types.ObjectId(chapter_id)
+            : chapter_id,
+          subject,
+          connection,
+        );
+      } catch (error) {
+        this.logger.error('Failed to notify students about new quiz:', error);
+        // Don't throw error to avoid breaking quiz creation
+      }
+    }
+
     this.logger.log(
       `Quiz group created with ID: ${quizGroup._id} by user: ${user.id}`,
     );
@@ -263,10 +293,10 @@ export class QuizService {
       filter.bibliography_id = new Types.ObjectId(filterDto.bibliography_id);
       filter.type = QuizTypeEnum.ANCHOR_TAG;
     }
-
-    const quizGroups = await QuizGroupModel.findOne(filter).lean();
-
-    if (!quizGroups?._id) {
+    console.log(filter);
+    const quizGroups = await QuizGroupModel.find(filter).lean();
+    console.log(quizGroups);
+    if (!quizGroups?.length) {
       throw new NotFoundException(
         this.errorMessageService.getMessageWithLanguage(
           'QUIZ',
@@ -280,7 +310,7 @@ export class QuizService {
     if (user.role.name === RoleEnum.STUDENT) {
       // Validate quiz group exists
       const quizGroup = await QuizGroupModel.findOne({
-        _id: new Types.ObjectId(quizGroups?._id),
+        _id: new Types.ObjectId(quizGroups[0]?._id),
 
         deleted_at: null,
       });
@@ -307,7 +337,7 @@ export class QuizService {
     }
 
     const quiz = await QuizModel.find({
-      quiz_group_id: quizGroups._id,
+      quiz_group_id: { $in: quizGroups.map((qg) => qg._id) },
       deleted_at: null,
     })
       .sort({
@@ -316,7 +346,12 @@ export class QuizService {
       })
       .lean();
 
-    return { ...quizGroups, quiz };
+    return quizGroups.map((quizGroup) => ({
+      ...quizGroup,
+      quiz: quiz.filter(
+        (q) => q.quiz_group_id.toString() === quizGroup._id.toString(),
+      ),
+    }));
   }
 
   async findQuizGroupById(id: string | Types.ObjectId, user: JWTUserPayload) {
@@ -488,7 +523,13 @@ export class QuizService {
       `Quiz group soft deleted with ID: ${id} by user: ${user.id}`,
     );
 
-    return { message: 'Quiz group deleted successfully' };
+    return {
+      message: this.errorMessageService.getSuccessMessageWithLanguage(
+        'QUIZ',
+        'QUIZ_GROUP_DELETED_SUCCESSFULLY',
+        user?.preferred_language || DEFAULT_LANGUAGE,
+      ),
+    };
   }
 
   // ========== QUIZ OPERATIONS ==========
@@ -706,7 +747,11 @@ export class QuizService {
       );
       if (invalidAnswers.length > 0) {
         throw new BadRequestException(
-          `Invalid answers: ${invalidAnswers.join(', ')}. All answers must be from the options array.`,
+          this.errorMessageService.getMessageWithLanguage(
+            'QUIZ',
+            'INVALID_ANSWERS',
+            user?.preferred_language || DEFAULT_LANGUAGE,
+          ),
         );
       }
     }
@@ -756,7 +801,13 @@ export class QuizService {
 
     this.logger.log(`Quiz soft deleted with ID: ${id} by user: ${user.id}`);
 
-    return { message: 'Quiz deleted successfully' };
+    return {
+      message: this.errorMessageService.getSuccessMessageWithLanguage(
+        'QUIZ',
+        'QUIZ_DELETED_SUCCESSFULLY',
+        user?.preferred_language || DEFAULT_LANGUAGE,
+      ),
+    };
   }
 
   // ========== HELPER METHODS ==========
@@ -789,5 +840,102 @@ export class QuizService {
       .exec();
 
     return lastQuiz ? lastQuiz.sequence + 1 : 1;
+  }
+
+  private async notifyStudentsAboutNewQuiz(
+    schoolId: Types.ObjectId,
+    chapterId: Types.ObjectId,
+    subject: string,
+    connection: any,
+  ) {
+    try {
+      const ChapterModel = connection.model(Chapter.name, ChapterSchema);
+      const StudentModel = connection.model(Student.name, StudentSchema);
+      const StudentChapterProgressModel = connection.model(
+        StudentChapterProgress.name,
+        StudentChapterProgressSchema,
+      );
+
+      // Get chapter details
+      const chapter = await ChapterModel.findOne({
+        _id: chapterId,
+        deleted_at: null,
+      });
+
+      if (!chapter) {
+        this.logger.warn(
+          `Chapter with ID ${chapterId} not found for notification logic.`,
+        );
+        return;
+      }
+
+      // Find students who completed this chapter with auto-completion
+      const completedStudents = await StudentChapterProgressModel.find({
+        chapter_id: chapterId,
+        status: ProgressStatusEnum.COMPLETED,
+        quiz_auto_completed: true,
+        chapter_quiz_completed: true,
+      }).lean();
+
+      if (!completedStudents?.length) {
+        this.logger.log(
+          `No students found who completed chapter ${chapter.title} with auto-completion.`,
+        );
+        return;
+      }
+
+      // Get student details for notifications
+      const studentIds = completedStudents.map(
+        (progress) => progress.student_id,
+      );
+      const students = await StudentModel.find({
+        _id: { $in: studentIds },
+        deleted_at: null,
+      }).lean();
+
+      if (!students?.length) {
+        this.logger.warn(`No valid students found for notifications.`);
+        return;
+      }
+
+      // Send notifications to each student
+      for (const student of students) {
+        try {
+          await this.notificationsService.createMultiLanguageNotification(
+            student._id,
+            RecipientTypeEnum.STUDENT,
+            `New Quiz Added: ${subject}`,
+            `Nouveau Quiz Ajouté: ${subject}`,
+            `A new quiz titled "${subject}" has been added to the chapter "${chapter.title}". Since you already completed this chapter, you'll need to complete the quiz to maintain your progress.`,
+            `Un nouveau quiz intitulé "${subject}" a été ajouté au chapitre "${chapter.title}". Comme vous avez déjà terminé ce chapitre, vous devrez compléter le quiz pour maintenir votre progression.`,
+            NotificationTypeEnum.QUIZ_ADDED_TO_COMPLETED_CHAPTER,
+            {
+              quiz_subject: subject,
+              chapter_id: chapterId,
+              chapter_title: chapter.title,
+              module_id: chapter.module_id,
+              action: 'quiz_added_to_completed_chapter',
+            },
+            schoolId,
+          );
+        } catch (error) {
+          this.logger.error(
+            `Failed to send notification to student ${student._id}:`,
+            error,
+          );
+          // Continue with other students even if one fails
+        }
+      }
+
+      this.logger.log(
+        `Sent notifications to ${students.length} students about new quiz in chapter ${chapter.title}.`,
+      );
+    } catch (error) {
+      this.logger.error(
+        `Error in notifyStudentsAboutNewQuiz:`,
+        error?.stack || error,
+      );
+      // Don't throw error to avoid breaking quiz creation
+    }
   }
 }

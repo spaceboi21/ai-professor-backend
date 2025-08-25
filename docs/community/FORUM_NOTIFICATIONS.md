@@ -140,6 +140,27 @@ This document explains the comprehensive notification system for the community f
 }
 ```
 
+#### **Like Notification for Reply**
+
+```json
+{
+  "recipient_type": "STUDENT",
+  "recipient_id": "student_id",
+  "title": "New Like on Your Content",
+  "message": "Mike Davis liked your comment",
+  "type": "FORUM_LIKE",
+  "metadata": {
+    "entity_type": "reply",
+    "entity_id": "reply_id",
+    "entity_title": "your comment",
+    "liker_id": "mike_id",
+    "liker_name": "Mike Davis",
+    "liker_role": "STUDENT",
+    "discussion_id": "discussion_id"
+  }
+}
+```
+
 ### **5. Report Notification**
 
 ```json
@@ -289,7 +310,8 @@ await this.notifyNewReport(
   entity_title: string,
   liker_id: ObjectId,
   liker_name: string,
-  liker_role: string
+  liker_role: string,
+  discussion_id?: ObjectId // Only present when entity_type is 'reply'
 }
 ```
 

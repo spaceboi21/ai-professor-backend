@@ -53,6 +53,8 @@ import {
   SupervisorAnalysisResponseType,
 } from 'src/common/types/ai-chat-module.type';
 import { FeedbackTypeEnum } from 'src/common/constants/ai-chat-feedback.constant';
+import { ErrorMessageService } from 'src/common/services/error-message.service';
+import { DEFAULT_LANGUAGE } from 'src/common/constants/language.constant';
 
 @Injectable()
 export class AIChatService {
@@ -65,6 +67,7 @@ export class AIChatService {
     private readonly schoolModel: Model<School>,
     private readonly tenantConnectionService: TenantConnectionService,
     private readonly pythonService: PythonService,
+    private readonly errorMessageService: ErrorMessageService,
   ) {}
 
   // ========== SESSION OPERATIONS ==========
@@ -76,7 +79,13 @@ export class AIChatService {
     // Validate school exists
     const school = await this.schoolModel.findById(user.school_id);
     if (!school) {
-      throw new NotFoundException('School not found');
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'SCHOOL',
+          'NOT_FOUND',
+          DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     const connection = await this.tenantConnectionService.getTenantConnection(
@@ -102,7 +111,13 @@ export class AIChatService {
       deleted_at: null,
     });
     if (!moduleExists) {
-      throw new NotFoundException('Module not found');
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'MODULE',
+          'NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     // Validate that the student exists
@@ -111,7 +126,13 @@ export class AIChatService {
       deleted_at: null,
     });
     if (!studentExists) {
-      throw new NotFoundException('Student not found');
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'STUDENT',
+          'NOT_FOUND',
+          DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     const sessionData = {
@@ -138,7 +159,11 @@ export class AIChatService {
 
         if (!scenario?.scenario) {
           throw new InternalServerErrorException(
-            'Failed to generate patient scenario',
+            this.errorMessageService.getMessageWithLanguage(
+              'AI_CHAT',
+              'SCENARIO_GENERATION_FAILED',
+              user?.preferred_language || DEFAULT_LANGUAGE,
+            ),
           );
         }
 
@@ -195,7 +220,13 @@ export class AIChatService {
     // Validate school exists
     const school = await this.schoolModel.findById(user.school_id);
     if (!school) {
-      throw new NotFoundException('School not found');
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'SCHOOL',
+          'NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     const connection = await this.tenantConnectionService.getTenantConnection(
@@ -328,7 +359,13 @@ export class AIChatService {
     // Validate school exists
     const school = await this.schoolModel.findById(user.school_id);
     if (!school) {
-      throw new NotFoundException('School not found');
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'SCHOOL',
+          'NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     const connection = await this.tenantConnectionService.getTenantConnection(
@@ -346,17 +383,35 @@ export class AIChatService {
     });
 
     if (!session) {
-      throw new NotFoundException('AI session not found');
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'AI_CHAT',
+          'SESSION_NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     // Check if session is already completed
     if (session.status === AISessionStatusEnum.COMPLETED) {
-      throw new BadRequestException('Session is already completed');
+      throw new BadRequestException(
+        this.errorMessageService.getMessageWithLanguage(
+          'AI_CHAT',
+          'SESSION_ALREADY_COMPLETED',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     // Check if session is cancelled
     if (session.status === AISessionStatusEnum.CANCELLED) {
-      throw new BadRequestException('Cannot complete a cancelled session');
+      throw new BadRequestException(
+        this.errorMessageService.getMessageWithLanguage(
+          'AI_CHAT',
+          'CANNOT_COMPLETE_CANCELLED_SESSION',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     // Update session to completed status with ended_at timestamp
@@ -370,7 +425,13 @@ export class AIChatService {
 
     this.logger.log(`AI session completed with ID: ${id} by user: ${user.id}`);
 
-    return { message: 'AI session completed successfully' };
+    return {
+      message: this.errorMessageService.getSuccessMessageWithLanguage(
+        'AI_CHAT',
+        'AI_SESSION_COMPLETED_SUCCESSFULLY',
+        DEFAULT_LANGUAGE,
+      ),
+    };
   }
 
   // ========== MESSAGE OPERATIONS ==========
@@ -382,7 +443,13 @@ export class AIChatService {
     // Validate school exists
     const school = await this.schoolModel.findById(user.school_id);
     if (!school) {
-      throw new NotFoundException('School not found');
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'SCHOOL',
+          'NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     const connection = await this.tenantConnectionService.getTenantConnection(
@@ -406,11 +473,23 @@ export class AIChatService {
       deleted_at: null,
     });
     if (!session) {
-      throw new NotFoundException('AI session not found');
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'AI_CHAT',
+          'SESSION_NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     if (session.status !== AISessionStatusEnum.ACTIVE) {
-      throw new BadRequestException('Cannot add messages to inactive session');
+      throw new BadRequestException(
+        this.errorMessageService.getMessageWithLanguage(
+          'AI_CHAT',
+          'CANNOT_ADD_MESSAGES_TO_INACTIVE_SESSION',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     const messageData = {
@@ -485,7 +564,13 @@ export class AIChatService {
     // Validate school exists
     const school = await this.schoolModel.findById(user.school_id);
     if (!school) {
-      throw new NotFoundException('School not found');
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'SCHOOL',
+          'NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     const connection = await this.tenantConnectionService.getTenantConnection(
@@ -544,7 +629,13 @@ export class AIChatService {
     // Validate school exists
     const school = await this.schoolModel.findById(user.school_id);
     if (!school) {
-      throw new NotFoundException('School not found');
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'SCHOOL',
+          'NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     const connection = await this.tenantConnectionService.getTenantConnection(
@@ -574,7 +665,13 @@ export class AIChatService {
       deleted_at: null,
     }).lean();
     if (!session) {
-      throw new NotFoundException('AI session not found or not completed');
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'AI_CHAT',
+          'SESSION_NOT_FOUND_OR_NOT_COMPLETED',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     const conversation_history: ConversationHistoryType[] =
@@ -637,7 +734,13 @@ export class AIChatService {
     // Validate school exists
     const school = await this.schoolModel.findById(user.school_id);
     if (!school) {
-      throw new NotFoundException('School not found');
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'SCHOOL',
+          'NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     const connection = await this.tenantConnectionService.getTenantConnection(
@@ -667,7 +770,13 @@ export class AIChatService {
     // Validate school exists
     const school = await this.schoolModel.findById(user.school_id);
     if (!school) {
-      throw new NotFoundException('School not found');
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'SCHOOL',
+          'NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     const connection = await this.tenantConnectionService.getTenantConnection(
@@ -688,7 +797,13 @@ export class AIChatService {
       deleted_at: null,
     });
     if (!session) {
-      throw new NotFoundException('AI session not found');
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'AI_CHAT',
+          'SESSION_NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     const supervisorAnalysisFeedback = await this.findFeedbackBySessionId(
@@ -697,7 +812,13 @@ export class AIChatService {
     );
 
     if (supervisorAnalysisFeedback.length === 0) {
-      throw new NotFoundException(`Supervisor's feedback not found`);
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'AI_CHAT',
+          'SUPERVISOR_FEEDBACK_NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     const professorResources: ProfessorResourcesResponseType =
@@ -711,6 +832,8 @@ export class AIChatService {
         },
         supervisorAnalysisFeedback[0].keywords_for_learning,
       );
+
+    console.log('professorResources', professorResources);
 
     const resourceData = {
       session_id: new Types.ObjectId(session_id),
@@ -742,7 +865,13 @@ export class AIChatService {
     // Validate school exists
     const school = await this.schoolModel.findById(user.school_id);
     if (!school) {
-      throw new NotFoundException('School not found');
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'SCHOOL',
+          'NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     const connection = await this.tenantConnectionService.getTenantConnection(
@@ -765,7 +894,13 @@ export class AIChatService {
   private async validateSchoolAndGetConnection(user: JWTUserPayload) {
     const school = await this.schoolModel.findById(user.school_id);
     if (!school) {
-      throw new NotFoundException('School not found');
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'SCHOOL',
+          'NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
 
     const connection = await this.tenantConnectionService.getTenantConnection(

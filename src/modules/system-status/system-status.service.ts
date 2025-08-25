@@ -5,6 +5,7 @@ import { ActivityLogService } from '../activity-log/activity-log.service';
 import { ActivityTypeEnum } from 'src/common/constants/activity.constant';
 import { RoleEnum } from 'src/common/constants/roles.constant';
 import { JWTUserPayload } from 'src/common/types/jwr-user.type';
+import { LanguageEnum } from 'src/common/constants/language.constant';
 
 export interface SystemStatusCheck {
   component: string;
@@ -72,7 +73,7 @@ export class SystemStatusService {
     };
 
     // Log the system health check as an activity
-    await this.logSystemHealthCheck(systemUser, report);
+    await this.logSystemHealthCheck(report, systemUser);
 
     return report;
   }
@@ -104,7 +105,10 @@ export class SystemStatusService {
       // Test if activity log service is working
       const testLog = await this.activityLogService.createActivityLog({
         activity_type: ActivityTypeEnum.SYSTEM_MAINTENANCE,
-        description: 'System health check - Activity log system test',
+        description: {
+          en: 'System health check - Activity log system test',
+          fr: "Vérification de santé du système - Test du système de journal d'activité",
+        },
         performed_by: 'system' as any,
         performed_by_role: RoleEnum.SUPER_ADMIN,
         is_success: true,
@@ -225,15 +229,19 @@ export class SystemStatusService {
   }
 
   private async logSystemHealthCheck(
-    systemUser: JWTUserPayload,
     report: SystemHealthReport,
+    systemUser: JWTUserPayload,
   ) {
     try {
-      const statusMessage = `System health check completed: ${report.overall_status} (${report.summary.success}/${report.summary.total} components healthy)`;
+      const statusMessageEn = `System health check completed: ${report.overall_status} (${report.summary.success}/${report.summary.total} components healthy)`;
+      const statusMessageFr = `Vérification de santé du système terminée: ${report.overall_status} (${report.summary.success}/${report.summary.total} composants en bonne santé)`;
 
       await this.activityLogService.createActivityLog({
         activity_type: ActivityTypeEnum.SYSTEM_MAINTENANCE,
-        description: statusMessage,
+        description: {
+          en: statusMessageEn,
+          fr: statusMessageFr,
+        },
         performed_by: systemUser.id as any,
         performed_by_role: systemUser.role.name as RoleEnum,
         is_success: report.overall_status === 'HEALTHY',
@@ -250,7 +258,7 @@ export class SystemStatusService {
         execution_time_ms: Date.now() - report.timestamp.getTime(),
       });
 
-      this.logger.log(`System health check logged: ${statusMessage}`);
+      this.logger.log(`System health check logged: ${statusMessageEn}`);
     } catch (error) {
       this.logger.error('Failed to log system health check:', error);
     }

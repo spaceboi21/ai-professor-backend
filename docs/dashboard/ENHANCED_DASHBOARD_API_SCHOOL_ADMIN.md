@@ -70,6 +70,13 @@ GET /api/school-admin/dashboard
           "common_issues": ["Complex terminology", "Long video content"]
         }
       ]
+    },
+    "quiz_statistics": {
+      "total_quiz_attempts": 150,
+      "passed_quiz_attempts": 120,
+      "quiz_pass_rate": 80,
+      "average_quiz_score": 75,
+      "total_ai_chat_sessions": 85
     }
   }
 }
@@ -109,6 +116,56 @@ GET /api/school-admin/dashboard
 - **Cohort Filter**: Analyze specific student groups
 - **Real-time Updates**: Data updates within 24 hours
 
+### 6. Quiz Statistics (TC-006)
+- **Total Quiz Attempts**: Count of all quiz attempts in the school
+- **Quiz Pass Rate**: Percentage of quiz attempts that passed
+- **Average Quiz Score**: Mean score across all quiz attempts
+- **AI Chat Sessions**: Total number of AI practice sessions created
+- **Performance Tracking**: Real-time monitoring of student assessment performance
+
+## Quiz Statistics Calculation
+
+### Overview
+The quiz statistics provide comprehensive insights into student assessment performance and AI practice session engagement within the school.
+
+### Metrics Breakdown
+
+#### 1. Total Quiz Attempts
+- **Description**: Count of all quiz attempts made by students
+- **Calculation**: `COUNT(*)` from `student_quiz_attempts` collection
+- **Filtering**: Respects date range, module, and professor assignment filters
+- **Real-time**: Updates with each new quiz attempt
+
+#### 2. Quiz Pass Rate
+- **Description**: Percentage of quiz attempts that achieved passing scores
+- **Calculation**: `(passed_attempts / total_attempts) * 100`
+- **Passing Criteria**: Based on `is_passed` field in quiz attempts
+- **Accuracy**: Rounded to nearest whole percentage
+
+#### 3. Average Quiz Score
+- **Description**: Mean score percentage across all quiz attempts
+- **Calculation**: `AVG(score_percentage)` from all attempts
+- **Score Range**: 0-100 percentage scale
+- **Precision**: Rounded to nearest whole number
+
+#### 4. AI Chat Sessions
+- **Description**: Total number of AI practice sessions created by students
+- **Calculation**: `COUNT(*)` from `ai_chat_sessions` collection
+- **Session Types**: Includes all AI practice scenarios (patient simulation, supervisor analysis)
+- **Filtering**: Respects module and date range filters
+
+### Performance Considerations
+- **Database Optimization**: Uses indexed fields for efficient querying
+- **Aggregation**: Leverages MongoDB aggregation pipeline for accurate calculations
+- **Error Handling**: Graceful fallback to default values if calculations fail
+- **Caching**: Results are cached to improve response times for large datasets
+
+### Data Accuracy
+- **Real-time Updates**: Statistics reflect current database state
+- **Filter Consistency**: All metrics respect the same filtering criteria
+- **Role-based Access**: Professors only see data for their assigned modules
+- **Data Integrity**: Excludes soft-deleted records and invalid data
+
 ## Test Cases
 
 ### Test Case 1: Display of Active Student Count (TC-001)
@@ -128,16 +185,34 @@ GET /api/school-admin/dashboard
 
 **Description**: Show average completion percentage across modules
 
-**Precondition**: Students have completed or partially completed modules
+**Precondition**: At least one student has progress data in modules
 
 **Test Steps**:
-1. Log in as admin or professor
-2. Open dashboard
-3. Check completion % for each module
+1. Log in as school admin or professor
+2. View the dashboard
+3. Locate "Average Completion Percentage" section
 
-**Expected Result**: Each module shows a correct and updated average progress bar or percentage
+**Expected Result**: Correct average completion percentage is displayed
 
-### Test Case 3: View Most Common AI-Reported Errors (TC-003)
+### Test Case 3: Display Quiz Statistics (TC-006)
+
+**Description**: Display comprehensive quiz performance statistics
+
+**Precondition**: At least one quiz attempt exists in the system
+
+**Test Steps**:
+1. Log in as school admin or professor
+2. View the dashboard
+3. Locate "Quiz Statistics" section
+
+**Expected Result**: 
+- Total quiz attempts count is displayed
+- Quiz pass rate percentage is shown
+- Average quiz score is calculated and displayed
+- Total AI chat sessions count is shown
+- All statistics respect date and module filters
+
+### Test Case 4: View Most Common AI-Reported Errors (TC-003)
 
 **Description**: Show top AI feedback error categories
 
@@ -273,4 +348,6 @@ curl -X GET "https://api.example.com/api/school-admin/dashboard?cohort=Class%20o
 2. **Scalability**: Designed to handle large datasets efficiently
 3. **Extensibility**: Easy to add new metrics and filters
 4. **Monitoring**: Comprehensive logging for debugging and monitoring
-5. **Caching**: Strategic caching to improve response times 
+5. **Caching**: Strategic caching to improve response times
+6. **Quiz Analytics**: Real-time calculation of quiz performance metrics
+7. **AI Session Tracking**: Comprehensive monitoring of AI practice sessions

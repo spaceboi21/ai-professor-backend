@@ -1,5 +1,5 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document, Types } from 'mongoose';
+import { Document, Types, Schema as MongooseSchema } from 'mongoose';
 import { User } from './user.schema';
 import { School } from './school.schema';
 import {
@@ -8,6 +8,20 @@ import {
   ActivityLevelEnum,
 } from 'src/common/constants/activity.constant';
 import { RoleEnum } from 'src/common/constants/roles.constant';
+
+export interface MultiLanguageDescription {
+  en: string;
+  fr: string;
+}
+
+// Define a schema for the description without _id
+const MultiLanguageDescriptionSchema = new MongooseSchema(
+  {
+    en: { type: String, required: true },
+    fr: { type: String, required: true },
+  },
+  { _id: false },
+);
 
 @Schema({
   collection: 'activity_logs',
@@ -33,8 +47,11 @@ export class ActivityLog extends Document {
   @Prop({ type: String, required: true, enum: ActivityLevelEnum, index: true })
   level: ActivityLevelEnum;
 
-  @Prop({ type: String, required: true })
-  description: string;
+  @Prop({
+    type: MultiLanguageDescriptionSchema,
+    required: true,
+  })
+  description: MultiLanguageDescription;
 
   @Prop({ type: String })
   description_en: string;
@@ -74,6 +91,9 @@ export class ActivityLog extends Document {
 
   @Prop({ type: String })
   chapter_name: string;
+
+  @Prop({ type: Types.ObjectId, index: true })
+  quiz_group_id: Types.ObjectId;
 
   @Prop({ type: Object, default: {} })
   metadata: Record<string, any>;
@@ -131,6 +151,7 @@ ActivityLogSchema.index({ is_success: 1, created_at: -1 });
 ActivityLogSchema.index({ target_user_id: 1, created_at: -1 });
 ActivityLogSchema.index({ module_id: 1, created_at: -1 });
 ActivityLogSchema.index({ chapter_id: 1, created_at: -1 });
+ActivityLogSchema.index({ quiz_group_id: 1, created_at: -1 });
 ActivityLogSchema.index({ status: 1, created_at: -1 });
 
 // Compound indexes for common query patterns

@@ -24,6 +24,10 @@ import {
   LearningLogReview,
   LearningLogReviewSchema,
 } from 'src/database/schemas/tenant/learning-log-review.schema';
+import {
+  Module,
+  ModuleSchema,
+} from 'src/database/schemas/tenant/module.schema';
 import { RecipientTypeEnum } from 'src/database/schemas/tenant/notification.schema';
 import { TenantConnectionService } from 'src/database/tenant-connection.service';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -32,8 +36,11 @@ import { LearningLogReviewResponseDto } from './dto/learning-log-review-response
 import { LearningLogsExportResponseDto } from './dto/learning-logs-export-response.dto';
 import { LearningLogsFilterDto } from './dto/learning-logs-filter.dto';
 import { LearningLogsResponseDto } from './dto/learning-logs-response.dto';
+import { ModuleFeedbackFilterDto } from './dto/module-feedback-filter.dto';
+import { ModuleFeedbackResponseDto } from './dto/module-feedback-response.dto';
 import { ErrorMessageService } from 'src/common/services/error-message.service';
 import { DEFAULT_LANGUAGE } from 'src/common/constants/language.constant';
+import { EmailEncryptionService } from 'src/common/services/email-encryption.service';
 
 @Injectable()
 export class LearningLogsService {
@@ -48,6 +55,7 @@ export class LearningLogsService {
     private readonly notificationsService: NotificationsService,
     private readonly csvUtil: CSVUtil,
     private readonly errorMessageService: ErrorMessageService,
+    private readonly emailEncryptionService: EmailEncryptionService,
   ) {}
 
   async getLearningLogs(
@@ -88,7 +96,16 @@ export class LearningLogsService {
       return createPaginationResult([], totalCount, options);
     }
 
-    return createPaginationResult(data, totalCount, options);
+    // Decrypt student emails in the results
+    const decryptedData = data.map(item => {
+      if (item.student && item.student.email) {
+        // Decrypt the student email
+        item.student.email = this.emailEncryptionService.decryptEmail(item.student.email);
+      }
+      return item;
+    });
+
+    return createPaginationResult(decryptedData, totalCount, options);
   }
 
   async getLearningLogById(
@@ -111,7 +128,13 @@ export class LearningLogsService {
       );
     }
 
-    return results[0];
+    // Decrypt student email in the result
+    const result = results[0];
+    if (result.student && result.student.email) {
+      result.student.email = this.emailEncryptionService.decryptEmail(result.student.email);
+    }
+
+    return result;
   }
 
   async getSkillGapStats(user: JWTUserPayload) {
@@ -197,6 +220,7 @@ export class LearningLogsService {
     // Create the review
     const reviewData = {
       ai_feedback_id: new Types.ObjectId(aiFeedbackId),
+      student_id: learningLog.student_id, // Add student_id from the learning log
       reviewer_id: new Types.ObjectId(user.id),
       reviewer_role: user.role.name,
       rating: createReviewDto.rating,
@@ -232,10 +256,16 @@ export class LearningLogsService {
         ),
       );
     }
+    // Decrypt the reviewer email before returning
+    const decryptedReviewer = this.emailEncryptionService.decryptEmailFields(
+      reviewer,
+      ['email'],
+    );
+
     const reviewerInfo = {
       first_name: reviewer.first_name,
       last_name: reviewer.last_name,
-      email: reviewer.email,
+      email: decryptedReviewer.email,
       profile_pic: reviewer.profile_pic,
     };
 
@@ -315,10 +345,16 @@ export class LearningLogsService {
         ),
       );
     }
+    // Decrypt the reviewer email before returning
+    const decryptedReviewer = this.emailEncryptionService.decryptEmailFields(
+      reviewer,
+      ['email'],
+    );
+
     const reviewerInfo = {
       first_name: reviewer.first_name,
       last_name: reviewer.last_name,
-      email: reviewer.email,
+      email: decryptedReviewer.email,
       profile_pic: reviewer.profile_pic,
     };
 
@@ -340,6 +376,171 @@ export class LearningLogsService {
     );
 
     return response;
+  }
+
+  async getFeedbackByModule(
+    moduleId: string,
+    user: JWTUserPayload,
+  ): Promise<ModuleFeedbackResponseDto> {
+    this.logger.log(`Getting feedback for module ${moduleId} and user ${user.id}`);
+
+    // Check if user is a student - only students can call this API
+    if (user.role.name !== RoleEnum.STUDENT) {
+      throw new BadRequestException(
+        this.errorMessageService.getMessageWithLanguage(
+          'LEARNING_LOGS',
+          'ONLY_STUDENTS_CAN_ACCESS_MODULE_FEEDBACK',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
+    }
+
+    const { connection, AIChatFeedbackModel, LearningLogReviewModel, ModuleModel } =
+      await this.getConnectionAndModelsWithModule(user);
+
+    // First get the module information
+    const module = await ModuleModel.findById(moduleId);
+    if (!module) {
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'LEARNING_LOGS',
+          'MODULE_NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
+    }
+
+    // Build aggregation pipeline to get all reviews for this student and module
+    // This is now much more efficient since we can query reviews directly by student_id
+    const pipeline: any[] = [
+      {
+        $match: {
+          student_id: new Types.ObjectId(user.id),
+          deleted_at: null,
+        },
+      },
+      {
+        $lookup: {
+          from: 'ai_chat_feedback',
+          localField: 'ai_feedback_id',
+          foreignField: '_id',
+          pipeline: [
+            {
+              $match: {
+                module_id: new Types.ObjectId(moduleId),
+                deleted_at: null,
+              },
+            },
+            {
+              $project: {
+                _id: 1,
+                module_id: 1,
+              },
+            },
+          ],
+          as: 'learning_log',
+        },
+      },
+      {
+        $unwind: {
+          path: '$learning_log',
+          preserveNullAndEmptyArrays: false, // Only include reviews for the specified module
+        },
+      },
+      {
+        $sort: { created_at: -1 },
+      },
+      {
+        $project: {
+          _id: 1,
+          ai_feedback_id: 1,
+          rating: 1,
+          feedback: 1,
+          metadata: 1,
+          reviewer_id: 1,
+          reviewer_role: 1,
+          created_at: 1,
+          updated_at: 1,
+        },
+      },
+    ];
+
+    const feedbackResults = await LearningLogReviewModel.aggregate(pipeline);
+
+    if (feedbackResults.length === 0) {
+      // Return empty response if no feedback found
+      return {
+        module_id: moduleId,
+        module_title: module.title,
+        total_feedback_count: 0,
+        average_rating: 0,
+        feedback_list: [],
+      };
+    }
+
+    // Get reviewer information for all unique reviewer IDs
+    const reviewerIds = [...new Set(feedbackResults.map(item => item.reviewer_id))];
+    const reviewers = await this.userModel.find({
+      _id: { $in: reviewerIds },
+    }).lean();
+
+    // Create a map of reviewer information
+    const reviewerMap = new Map();
+    reviewers.forEach(reviewer => {
+      const decryptedReviewer = this.emailEncryptionService.decryptEmailFields(
+        reviewer,
+        ['email'],
+      );
+      reviewerMap.set(reviewer._id.toString(), {
+        first_name: reviewer.first_name,
+        last_name: reviewer.last_name,
+        email: decryptedReviewer.email,
+        profile_pic: reviewer.profile_pic,
+      });
+    });
+
+    // Format the feedback list
+    const feedbackList = feedbackResults.map(review => {
+      const reviewerInfo = reviewerMap.get(review.reviewer_id.toString());
+
+      return {
+        _id: review._id.toString(),
+        ai_feedback_id: review.ai_feedback_id.toString(),
+        rating: review.rating,
+        feedback: review.feedback,
+        metadata: review.metadata,
+        reviewer_info: reviewerInfo ? {
+          ...reviewerInfo,
+          role: review.reviewer_role, // Use the role from the review document
+        } : {
+          first_name: 'Unknown',
+          last_name: 'Reviewer',
+          email: 'unknown@example.com',
+          role: review.reviewer_role || 'UNKNOWN',
+          profile_pic: null,
+        },
+        created_at: review.created_at,
+        updated_at: review.updated_at,
+      };
+    });
+
+    // Calculate average rating
+    const averageRating = feedbackList.length > 0 
+      ? feedbackList.reduce((sum, item) => sum + item.rating, 0) / feedbackList.length 
+      : 0;
+
+    // Sort feedback by creation date (newest first)
+    feedbackList.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+    this.logger.log(`Retrieved ${feedbackList.length} feedback items for module ${moduleId}`);
+
+    return {
+      module_id: moduleId,
+      module_title: module.title,
+      total_feedback_count: feedbackList.length,
+      average_rating: Math.round(averageRating * 100) / 100, // Round to 2 decimal places
+      feedback_list: feedbackList,
+    };
   }
 
   async exportLearningLogs(
@@ -398,60 +599,72 @@ export class LearningLogsService {
     }
 
     // Transform data for CSV export - removing IDs and technical fields
-    const csvData = data.map((log: any) => ({
-      'Student Name': log.student
-        ? `${log.student.first_name} ${log.student.last_name}`.trim()
-        : 'N/A',
-      'Student Email': log.student?.email || 'N/A',
-      'Module Title': log.module?.title || 'N/A',
-      'Module Subject': log.module?.subject || 'N/A',
-      'Module Difficulty': log.module?.difficulty || 'N/A',
-      'Session Status': log.session?.status || 'N/A',
-      'Session Start Date': log.session?.started_at
-        ? new Date(log.session.started_at).toISOString()
-        : 'N/A',
-      'Session End Date': log.session?.ended_at
-        ? new Date(log.session.ended_at).toISOString()
-        : 'N/A',
-      'Primary Skill Gap':
-        Array.isArray(log.skill_gaps) && log.skill_gaps.length > 0
-          ? log.skill_gaps[0]
+    const csvData = data.map((log: any) => {
+      // Decrypt student email if it exists
+      let decryptedStudentEmail = 'N/A';
+      if (log.student?.email) {
+        const decryptedStudent = this.emailEncryptionService.decryptEmailFields(
+          log.student,
+          ['email'],
+        );
+        decryptedStudentEmail = decryptedStudent.email;
+      }
+
+      return {
+        'Student Name': log.student
+          ? `${log.student.first_name} ${log.student.last_name}`.trim()
           : 'N/A',
-      'Skill Gaps': Array.isArray(log.skill_gaps)
-        ? log.skill_gaps.join('; ')
-        : 'N/A',
-      Strengths: Array.isArray(log.strengths)
-        ? log.strengths.join('; ')
-        : 'N/A',
-      'Areas for Improvement': Array.isArray(log.areas_for_improvement)
-        ? log.areas_for_improvement.join('; ')
-        : 'N/A',
-      'Missed Opportunities': Array.isArray(log.missed_opportunities)
-        ? log.missed_opportunities.join('; ')
-        : 'N/A',
-      Suggestions: Array.isArray(log.suggestions)
-        ? log.suggestions.join('; ')
-        : 'N/A',
-      'Keywords for Learning': Array.isArray(log.keywords_for_learning)
-        ? log.keywords_for_learning.join('; ')
-        : 'N/A',
-      'Overall Rating': log.rating?.overall_score || 'N/A',
-      'Communication Rating': log.rating?.communication_score || 'N/A',
-      'Professionalism Rating': log.rating?.professionalism_score || 'N/A',
-      Status: log.status || 'N/A',
-      'Feedback Created At': log.created_at
-        ? new Date(log.created_at).toISOString()
-        : 'N/A',
-      'Feedback Updated At': log.updated_at
-        ? new Date(log.updated_at).toISOString()
-        : 'N/A',
-      'Review Rating': log.user_review?.[0]?.rating || 'N/A',
-      'Review Feedback': log.user_review?.[0]?.feedback || 'N/A',
-      'Reviewer Role': log.user_review?.[0]?.reviewer_role || 'N/A',
-      'Review Created At': log.user_review?.[0]?.created_at
-        ? new Date(log.user_review[0].created_at).toISOString()
-        : 'N/A',
-    }));
+        'Student Email': decryptedStudentEmail,
+        'Module Title': log.module?.title || 'N/A',
+        'Module Subject': log.module?.subject || 'N/A',
+        'Module Difficulty': log.module?.difficulty || 'N/A',
+        'Session Status': log.session?.status || 'N/A',
+        'Session Start Date': log.session?.started_at
+          ? new Date(log.session.started_at).toISOString()
+          : 'N/A',
+        'Session End Date': log.session?.ended_at
+          ? new Date(log.session.ended_at).toISOString()
+          : 'N/A',
+        'Primary Skill Gap':
+          Array.isArray(log.skill_gaps) && log.skill_gaps.length > 0
+            ? log.skill_gaps[0]
+            : 'N/A',
+        'Skill Gaps': Array.isArray(log.skill_gaps)
+          ? log.skill_gaps.join('; ')
+          : 'N/A',
+        Strengths: Array.isArray(log.strengths)
+          ? log.strengths.join('; ')
+          : 'N/A',
+        'Areas for Improvement': Array.isArray(log.areas_for_improvement)
+          ? log.areas_for_improvement.join('; ')
+          : 'N/A',
+        'Missed Opportunities': Array.isArray(log.missed_opportunities)
+          ? log.missed_opportunities.join('; ')
+          : 'N/A',
+        Suggestions: Array.isArray(log.suggestions)
+          ? log.suggestions.join('; ')
+          : 'N/A',
+        'Keywords for Learning': Array.isArray(log.keywords_for_learning)
+          ? log.keywords_for_learning.join('; ')
+          : 'N/A',
+        'Overall Rating': log.rating?.overall_score || 'N/A',
+        'Communication Rating': log.rating?.communication_score || 'N/A',
+        'Professionalism Rating': log.rating?.professionalism_score || 'N/A',
+        Status: log.status || 'N/A',
+        'Feedback Created At': log.created_at
+          ? new Date(log.created_at).toISOString()
+          : 'N/A',
+        'Feedback Updated At': log.updated_at
+          ? new Date(log.updated_at).toISOString()
+          : 'N/A',
+        'Review Rating': log.user_review?.[0]?.rating || 'N/A',
+        'Review Feedback': log.user_review?.[0]?.feedback || 'N/A',
+        'Reviewer Role': log.user_review?.[0]?.reviewer_role || 'N/A',
+        'Review Created At': log.user_review?.[0]?.created_at
+          ? new Date(log.user_review[0].created_at).toISOString()
+          : 'N/A',
+      };
+    });
 
     // Define CSV headers - removing IDs and technical fields
     const headers = [
@@ -496,7 +709,7 @@ export class LearningLogsService {
     const downloadUrl = await this.csvUtil.generateDownloadUrl(filename);
 
     this.logger.log(
-      `CSV export completed: ${filePath}, Size: ${fileSize} bytes, Records: ${csvData.length}`,
+      `CSV export completed: ${filePath}, Size: ${fileSize} bytes, Records: ${csvData.length}, ${process.env.NODE_ENV}`,
     );
 
     return {
@@ -506,7 +719,7 @@ export class LearningLogsService {
       record_count: csvData.length,
       exported_at: new Date(),
       storage_type: process.env.NODE_ENV === 'production' ? 's3' : 'local',
-      download_url: downloadUrl,
+      download_url: process.env.NODE_ENV === 'production' ? downloadUrl : `${process.env.BACKEND_URL}/uploads/csv/${filename}`,
       applied_filters: filterDto
         ? {
             text: filterDto.text,
@@ -587,6 +800,40 @@ export class LearningLogsService {
     );
 
     return { connection, AIChatFeedbackModel, LearningLogReviewModel };
+  }
+
+  private async getConnectionAndModelsWithModule(user: JWTUserPayload) {
+    const school = await this.schoolModel.findById(user.school_id);
+    if (!school) {
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'LEARNING_LOGS',
+          'SCHOOL_NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
+    }
+
+    const connection = await this.tenantConnectionService.getTenantConnection(
+      school.db_name,
+    );
+
+    const AIChatFeedbackModel = connection.model(
+      AIChatFeedback.name,
+      AIChatFeedbackSchema,
+    );
+
+    const LearningLogReviewModel = connection.model(
+      LearningLogReview.name,
+      LearningLogReviewSchema,
+    );
+
+    const ModuleModel = connection.model(
+      Module.name,
+      ModuleSchema,
+    );
+
+    return { connection, AIChatFeedbackModel, LearningLogReviewModel, ModuleModel };
   }
 
   private buildAggregationPipeline(
