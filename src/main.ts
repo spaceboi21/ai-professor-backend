@@ -32,33 +32,33 @@ async function bootstrap() {
     const activityLogInterceptor = app.get(ActivityLogInterceptor);
     app.useGlobalInterceptors(activityLogInterceptor);
 
-    // Parse multiple frontend origins from environment variable
-    const frontendOriginString =
-      configService.get<string>('ALLOWED_CORS_URLS') || 'http://localhost:3000';
-    const frontendOrigins = frontendOriginString
-      .split(',')
-      .map((origin) => origin.trim());
+    // Get portal URLs from environment variables
+    const adminPortalUrl = configService.get<string>('ADMIN_PORTAL_URL');
+    const schoolPortalUrl = configService.get<string>('SCHOOL_PORTAL_URL');
+    const studentPortalUrl = configService.get<string>('STUDENT_PORTAL_URL');
+    
+    // Collect allowed origins (filter out undefined values)
+    const allowedOrigins = [adminPortalUrl, schoolPortalUrl, studentPortalUrl].filter(Boolean);
 
-    // CORS configuration with multiple domains support
+    // CORS configuration with environment-based access control
     app.enableCors({
-      // origin: (origin, callback) => {
-      //   // Allow requests with no origin (like mobile apps or curl requests)
-      //   if (!origin) return callback(null, true);
+      origin: (origin, callback) => {
+        // For development, allow all origins
+        if (process.env.NODE_ENV === 'development') {
+          return callback(null, true);
+        }
 
-      //   // Check if the origin is in the allowed list
-      //   if (frontendOrigins.includes(origin)) {
-      //     return callback(null, true);
-      //   }
+        // Allow requests with no origin (like mobile apps or curl requests)
+        if (!origin) return callback(null, true);
 
-      //   // For development, allow localhost with any port
-      //   if (process.env.NODE_ENV === 'development' && origin.startsWith('http://localhost')) {
-      //     return callback(null, true);
-      //   }
+        // Check if the origin is in the allowed portal URLs
+        if (allowedOrigins.includes(origin)) {
+          return callback(null, true);
+        }
 
-      //   // Reject the request
-      //   return callback(new Error('Not allowed by CORS'), false);
-      // },
-      origin: '*',
+        // Reject the request for production
+        return callback(new Error('Not allowed by CORS'), false);
+      },
       credentials: true,
       methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
       allowedHeaders: ['Content-Type', 'Authorization'],
@@ -98,7 +98,10 @@ async function bootstrap() {
       logger.log(`📱 API available at: http://localhost:${port}/api`);
       logger.log(`🏥 Health check at: http://localhost:${port}/api/health`);
       logger.log(`📚 API docs at: http://localhost:${port}/api/docs`);
-      logger.log(`🌐 CORS enabled for: ${frontendOrigins.join(', ')}`);
+      const corsMessage = process.env.NODE_ENV === 'development' 
+        ? '🌐 CORS enabled for: All origins (Development mode)'
+        : `🌐 CORS enabled for: ${allowedOrigins.length > 0 ? allowedOrigins.join(', ') : 'No origins configured'}`;
+      logger.log(corsMessage);
     });
   } catch (error) {
     logger.error('❌ Failed to start application:', error);
