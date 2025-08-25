@@ -141,7 +141,6 @@ export class ActivityLogInterceptor implements NestInterceptor {
         request,
         activityType,
         isSuccess,
-        user.preferred_language,
       );
       const metadata = this.extractMetadata(request, response, activityType);
 
@@ -174,9 +173,7 @@ export class ActivityLogInterceptor implements NestInterceptor {
 
       const createActivityLogDto: CreateActivityLogDto = {
         activity_type: activityType,
-        description: descriptions.primary,
-        description_en: descriptions.english,
-        description_fr: descriptions.french,
+        description: description,
         performed_by: this.safeObjectIdConversion(user.id?.toString()) as any,
         performed_by_role: user.role.name as RoleEnum,
         school_id: this.safeObjectIdConversion(user.school_id?.toString()),
