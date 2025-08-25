@@ -18,12 +18,16 @@ async function bootstrap() {
     // Validate LibreOffice availability for PPT to PDF conversion
     logger.log('🔍 Validating LibreOffice installation...');
     try {
-      const { LibreOfficeDetectorService } = await import('./modules/conversion/services/libreoffice-detector.service');
+      const { LibreOfficeDetectorService } = await import(
+        './modules/conversion/services/libreoffice-detector.service'
+      );
       const libreOfficeDetector = new LibreOfficeDetectorService(configService);
       await libreOfficeDetector.validateLibreOfficeOrThrow();
     } catch (error) {
       logger.error('❌ LibreOffice validation failed:', error.message);
-      logger.error('💡 Please install LibreOffice to enable PPT to PDF conversion functionality.');
+      logger.error(
+        '💡 Please install LibreOffice to enable PPT to PDF conversion functionality.',
+      );
       logger.error('📥 Download from: https://www.libreoffice.org/download/');
       throw error;
     }
@@ -36,9 +40,15 @@ async function bootstrap() {
     const adminPortalUrl = configService.get<string>('ADMIN_PORTAL_URL');
     const schoolPortalUrl = configService.get<string>('SCHOOL_PORTAL_URL');
     const studentPortalUrl = configService.get<string>('STUDENT_PORTAL_URL');
-    
+    const backendUrl = configService.get<string>('BACKEND_API_URL');
+
     // Collect allowed origins (filter out undefined values)
-    const allowedOrigins = [adminPortalUrl, schoolPortalUrl, studentPortalUrl].filter(Boolean);
+    const allowedOrigins = [
+      adminPortalUrl,
+      schoolPortalUrl,
+      studentPortalUrl,
+      backendUrl,
+    ].filter(Boolean);
 
     // CORS configuration with environment-based access control
     app.enableCors({
@@ -98,9 +108,10 @@ async function bootstrap() {
       logger.log(`📱 API available at: http://localhost:${port}/api`);
       logger.log(`🏥 Health check at: http://localhost:${port}/api/health`);
       logger.log(`📚 API docs at: http://localhost:${port}/api/docs`);
-      const corsMessage = process.env.NODE_ENV === 'development' 
-        ? '🌐 CORS enabled for: All origins (Development mode)'
-        : `🌐 CORS enabled for: ${allowedOrigins.length > 0 ? allowedOrigins.join(', ') : 'No origins configured'}`;
+      const corsMessage =
+        process.env.NODE_ENV === 'development'
+          ? '🌐 CORS enabled for: All origins (Development mode)'
+          : `🌐 CORS enabled for: ${allowedOrigins.length > 0 ? allowedOrigins.join(', ') : 'No origins configured'}`;
       logger.log(corsMessage);
     });
   } catch (error) {
