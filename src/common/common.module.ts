@@ -1,12 +1,12 @@
 import { Global, Module } from '@nestjs/common';
-import { ErrorMessageService } from './services/error-message.service';
 import { EmailEncryptionService } from './services/email-encryption.service';
 import { UtilsModule } from './utils/utils.module';
+import { ServicesModule } from './services/services.module';
 
 @Global()
 @Module({
-  imports: [UtilsModule],
-  providers: [ErrorMessageService, EmailEncryptionService],
-  exports: [ErrorMessageService, EmailEncryptionService],
+  imports: [UtilsModule, ServicesModule],
+  providers: [EmailEncryptionService],
+  exports: [EmailEncryptionService, ServicesModule],
 })
 export class CommonModule {}
