@@ -38,6 +38,7 @@ import { CommunityModule } from './modules/community/community.module';
 import { CommonModule } from './common/common.module';
 import { AnchorTagModule } from './modules/anchor-tag/anchor-tag.module';
 import { EncryptionModule } from './modules/encryption/encryption.module';
+import { ConversionModule } from './modules/conversion/conversion.module';
 
 @Module({
   imports: [
@@ -131,6 +132,7 @@ import { EncryptionModule } from './modules/encryption/encryption.module';
     CommunityModule,
     AnchorTagModule,
     EncryptionModule,
+    ConversionModule,
     HttpModule,
   ],
   controllers: [AppController],

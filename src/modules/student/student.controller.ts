@@ -125,7 +125,9 @@ export class StudentController {
         }
       },
       limits: {
-        fileSize: parseInt(process.env.MAXIMUM_FILE_SIZE || '5') * 1024 * 1024, // 5MB default
+        fileSize: process.env.NODE_ENV === 'production' 
+          ? Number.MAX_SAFE_INTEGER  // No limit in production
+          : parseInt(process.env.MAXIMUM_FILE_SIZE || '5') * 1024 * 1024, // 5MB default in development
       },
     }),
   )

@@ -76,6 +76,26 @@ function fileFilterForBibliography(req, file, cb) {
   }
 }
 
+/**
+ * Helper function to get max file size based on environment and file type
+ */
+function getMaxFileSize(configService: ConfigService, fileType: 'general' | 'bibliography' | 'forum'): number {
+  // In production, allow unlimited file size
+  if (process.env.NODE_ENV === 'production') {
+    return Number.MAX_SAFE_INTEGER;
+  }
+  
+  // In development, use configured limits
+  switch (fileType) {
+    case 'bibliography':
+      return (configService.get<number>('MAXIMUM_BIBLIOGRAPHY_FILE_SIZE') ?? 100) * 1024 * 1024;
+    case 'forum':
+      return (configService.get<number>('MAXIMUM_FILE_SIZE') ?? 10) * 1024 * 1024;
+    default:
+      return (configService.get<number>('MAXIMUM_FILE_SIZE') ?? 5) * 1024 * 1024;
+  }
+}
+
 @Controller('upload')
 @ApiTags('Upload')
 @ApiBearerAuth()
@@ -127,10 +147,7 @@ export class UploadController {
       return {
         uploadUrl: `${this.configService.get('BACKEND_API_URL')}/upload/profile`,
         method: 'PUT',
-        maxSize:
-          (this.configService.get<number>('MAXIMUM_FILE_SIZE') ?? 5) *
-          1024 *
-          1024, // 5MB
+        maxSize: getMaxFileSize(this.configService, 'general'),
         expiresIn: 300, // 5 minutes
       };
     }
@@ -177,11 +194,7 @@ export class UploadController {
       return {
         uploadUrl: `${this.configService.get('BACKEND_API_URL')}/upload/bibliography`,
         method: 'PUT',
-        maxSize:
-          (this.configService.get<number>('MAXIMUM_BIBLIOGRAPHY_FILE_SIZE') ??
-            100) *
-          1024 *
-          1024, // 100MB
+        maxSize: getMaxFileSize(this.configService, 'bibliography'),
         expiresIn: 600, // 10 minutes
       };
     }
@@ -227,10 +240,7 @@ export class UploadController {
       return {
         uploadUrl: `${this.configService.get('BACKEND_API_URL')}/upload/thumbnail`,
         method: 'PUT',
-        maxSize:
-          (this.configService.get<number>('MAXIMUM_FILE_SIZE') ?? 5) *
-          1024 *
-          1024, // 5MB
+        maxSize: getMaxFileSize(this.configService, 'general'),
         expiresIn: 300, // 5 minutes
       };
     }
@@ -317,10 +327,7 @@ export class UploadController {
       return {
         uploadUrl: `${this.configService.get('BACKEND_API_URL')}/upload/forum-attachment`,
         method: 'PUT',
-        maxSize:
-          (this.configService.get<number>('MAXIMUM_FILE_SIZE') ?? 10) *
-          1024 *
-          1024, // 10MB
+        maxSize: getMaxFileSize(this.configService, 'forum'),
         expiresIn: 300, // 5 minutes
       };
     }
@@ -400,10 +407,7 @@ export class UploadController {
 
     try {
       // Get max file size for forum attachments
-      const maxSize =
-        (this.configService.get<number>('MAXIMUM_FILE_SIZE') ?? 10) *
-        1024 *
-        1024;
+      const maxSize = getMaxFileSize(this.configService, 'forum');
 
       // Use the improved file processing method
       const { buffer, size } = await this.uploadService.processFileBuffer(
@@ -518,10 +522,7 @@ export class UploadController {
       const { buffer, size } = await this.uploadService.processFileBuffer(
         req as any,
         filePath,
-        (this.configService.get<number>('MAXIMUM_BIBLIOGRAPHY_FILE_SIZE') ??
-          100) *
-          1024 *
-          1024, // Use env variable for bibliography files
+        getMaxFileSize(this.configService, 'bibliography'),
       );
 
       // Write the file
@@ -598,9 +599,7 @@ export class UploadController {
       const { buffer, size } = await this.uploadService.processFileBuffer(
         req as any,
         filePath,
-        (this.configService.get<number>('MAXIMUM_FILE_SIZE') ?? 5) *
-          1024 *
-          1024, // Use env variable for profile pictures
+        getMaxFileSize(this.configService, 'general'),
       );
 
       // Write the file
@@ -677,9 +676,7 @@ export class UploadController {
       const { buffer, size } = await this.uploadService.processFileBuffer(
         req as any,
         filePath,
-        (this.configService.get<number>('MAXIMUM_FILE_SIZE') ?? 5) *
-          1024 *
-          1024, // Use env variable for thumbnails
+        getMaxFileSize(this.configService, 'general'),
       );
 
       // Write the file
