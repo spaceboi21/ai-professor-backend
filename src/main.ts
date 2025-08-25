@@ -40,7 +40,7 @@ async function bootstrap() {
     const adminPortalUrl = configService.get<string>('ADMIN_PORTAL_URL');
     const schoolPortalUrl = configService.get<string>('SCHOOL_PORTAL_URL');
     const studentPortalUrl = configService.get<string>('STUDENT_PORTAL_URL');
-    const backendUrl = configService.get<string>('BACKEND_API_URL');
+    const backendUrl = configService.get<string>('BACKEND_URL');
 
     // Collect allowed origins (filter out undefined values)
     const allowedOrigins = [
