@@ -7,9 +7,10 @@ import { CSVUtil } from './csv.util';
 import { EmailEncryptionUtil } from './email-encryption.util';
 import { JwtService } from '@nestjs/jwt';
 import { UploadModule } from '../../modules/upload/upload.module';
+import { ServicesModule } from '../services/services.module';
 
 @Module({
-  imports: [ConfigModule, UploadModule],
+  imports: [ConfigModule, UploadModule, ServicesModule],
   providers: [BcryptUtil, JwtUtil, TokenUtil, CSVUtil, EmailEncryptionUtil, JwtService],
   exports: [BcryptUtil, JwtUtil, TokenUtil, CSVUtil, EmailEncryptionUtil],
 })
