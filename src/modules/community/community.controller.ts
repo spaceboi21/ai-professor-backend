@@ -575,7 +575,7 @@ export class CommunityController {
   }
 
   @Delete('discussions/:id')
-  @Roles(RoleEnum.SCHOOL_ADMIN, RoleEnum.SUPER_ADMIN)
+  @Roles(RoleEnum.SCHOOL_ADMIN, RoleEnum.SUPER_ADMIN, RoleEnum.PROFESSOR)
   @ApiOperation({ summary: 'Delete a discussion (admin only)' })
   @ApiResponse({
     status: HttpStatus.OK,
