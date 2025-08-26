@@ -37,7 +37,7 @@ export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
   @Get()
-  @Roles(RoleEnum.SUPER_ADMIN)
+  @Roles(RoleEnum.SUPER_ADMIN, RoleEnum.PROFESSOR, RoleEnum.SCHOOL_ADMIN)
   @ApiOperation({ summary: 'Get all users (Super Admin only)' })
   @ApiQuery({ name: 'page', required: false, type: Number })
   @ApiQuery({ name: 'limit', required: false, type: Number })
