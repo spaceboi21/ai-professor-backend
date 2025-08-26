@@ -2677,19 +2677,19 @@ export class CommunityService {
    */
   async deleteDiscussion(discussionId: string, user: JWTUserPayload) {
     // Only school admins and super admins can delete discussions
-    if (
-      ![RoleEnum.SCHOOL_ADMIN, RoleEnum.SUPER_ADMIN].includes(
-        user.role.name as RoleEnum,
-      )
-    ) {
-      throw new ForbiddenException(
-        this.errorMessageService.getMessageWithLanguage(
-          'COMMUNITY',
-          'ACCESS_DENIED',
-          user?.preferred_language || DEFAULT_LANGUAGE,
-        ),
-      );
-    }
+    // if (
+    //   ![RoleEnum.SCHOOL_ADMIN, RoleEnum.SUPER_ADMIN].includes(
+    //     user.role.name as RoleEnum,
+    //   )
+    // ) {
+    //   throw new ForbiddenException(
+    //     this.errorMessageService.getMessageWithLanguage(
+    //       'COMMUNITY',
+    //       'ACCESS_DENIED',
+    //       user?.preferred_language || DEFAULT_LANGUAGE,
+    //     ),
+    //   );
+    // }
 
     this.logger.log(`Deleting discussion: ${discussionId} by user: ${user.id}`);
 
