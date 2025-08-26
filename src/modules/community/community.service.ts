@@ -1933,8 +1933,24 @@ export class CommunityService {
 
       this.logger.debug(`Found ${subReplies.length} sub-replies`);
 
-      // Decrypt emails in the aggregation results
+      // Populate missing user details and decrypt emails in the aggregation results
       for (const subReply of subReplies) {
+        // If created_by_user is null (professor/admin), populate it using getUserDetails
+        if (
+          !subReply.created_by_user &&
+          subReply.created_by &&
+          subReply.created_by_role
+        ) {
+          this.logger.debug(
+            `Populating user details for sub-reply ${subReply._id} created by ${subReply.created_by}`,
+          );
+          subReply.created_by_user = await this.getUserDetails(
+            subReply.created_by.toString(),
+            subReply.created_by_role,
+            tenantConnection,
+          );
+        }
+
         // Decrypt email in created_by_user
         if (subReply.created_by_user && subReply.created_by_user.email) {
           subReply.created_by_user.email =
