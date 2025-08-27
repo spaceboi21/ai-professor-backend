@@ -14,7 +14,7 @@ export class LoginSuperAdminDto {
   @IsEmail({}, { message: 'Invalid email format' })
   @IsNotEmpty({ message: 'Email is required' })
   @Transform(({ value }) => value.toLowerCase())
-  @ApiProperty({ example: 'superadmin.aiprofessor@yopmail.com' })
+  @ApiProperty({ example: 'niesen.stefan@gmail.com' })
   email: string;
 
   @IsString({ message: 'Password must be a string' })
