@@ -12,7 +12,7 @@ import { User } from 'src/database/schemas/central/user.schema';
 import { School } from 'src/database/schemas/central/school.schema';
 import { TenantConnectionService } from 'src/database/tenant-connection.service';
 import { JWTUserPayload } from 'src/common/types/jwr-user.type';
-import { RoleEnum } from 'src/common/constants/roles.constant';
+import { ROLE_IDS, RoleEnum } from 'src/common/constants/roles.constant';
 import {
   ForumDiscussion,
   ForumDiscussionSchema,
@@ -322,7 +322,7 @@ export class CommunityService {
         savedDiscussion,
         userDetails,
         resolvedMentions,
-        resolvedSchoolId,
+        school,
       );
 
       // Attach user details to the response
@@ -1306,7 +1306,7 @@ export class CommunityService {
         replyCreator,
         discussion,
         resolvedMentions,
-        resolvedSchoolId,
+        school,
       );
 
       // Attach user details to the response
@@ -3076,7 +3076,7 @@ export class CommunityService {
       const professors = await this.userModel
         .find({
           school_id: new Types.ObjectId(schoolId),
-          role: RoleEnum.PROFESSOR,
+          role: new Types.ObjectId(ROLE_IDS.PROFESSOR),
           deleted_at: null,
         })
         .lean();
@@ -3310,7 +3310,12 @@ export class CommunityService {
       const admins = await this.userModel
         .find({
           school_id: new Types.ObjectId(schoolId),
-          role: { $in: [RoleEnum.SCHOOL_ADMIN, RoleEnum.SUPER_ADMIN] },
+          role: {
+            $in: [
+              new Types.ObjectId(ROLE_IDS.SCHOOL_ADMIN),
+              new Types.ObjectId(ROLE_IDS.SUPER_ADMIN),
+            ],
+          },
           deleted_at: null,
         })
         .lean();
@@ -3359,11 +3364,11 @@ export class CommunityService {
     replyCreator: any,
     discussion: any,
     mentionedUsers: MentionInfo[],
-    schoolId: string,
+    school: any,
   ) {
     try {
       const tenantConnection =
-        await this.tenantConnectionService.getTenantConnection(schoolId);
+        await this.tenantConnectionService.getTenantConnection(school.db_name);
       const MentionModel = tenantConnection.model(
         ForumMention.name,
         ForumMentionSchema,
@@ -3406,7 +3411,7 @@ export class CommunityService {
               messageFr,
               NotificationTypeEnum.FORUM_MENTION,
               metadata,
-              schoolId,
+              school._id.toString(),
             );
           }
         }
@@ -3425,11 +3430,11 @@ export class CommunityService {
     discussion: any,
     discussionCreator: any,
     mentionedUsers: MentionInfo[],
-    schoolId: string,
+    school: any,
   ) {
     try {
       const tenantConnection =
-        await this.tenantConnectionService.getTenantConnection(schoolId);
+        await this.tenantConnectionService.getTenantConnection(school.db_name);
       const MentionModel = tenantConnection.model(
         ForumMention.name,
         ForumMentionSchema,
@@ -3471,7 +3476,7 @@ export class CommunityService {
               messageFr,
               NotificationTypeEnum.FORUM_MENTION,
               metadata,
-              schoolId,
+              school._id.toString(),
             );
           }
         }
@@ -4352,7 +4357,12 @@ export class CommunityService {
       // Build professor filter
       const professorFilter: any = {
         school_id: new Types.ObjectId(resolvedSchoolId),
-        role: { $in: [RoleEnum.PROFESSOR, RoleEnum.SCHOOL_ADMIN] },
+        role: {
+          $in: [
+            new Types.ObjectId(ROLE_IDS.PROFESSOR),
+            new Types.ObjectId(ROLE_IDS.SCHOOL_ADMIN),
+          ],
+        },
         deleted_at: null,
       };
 
