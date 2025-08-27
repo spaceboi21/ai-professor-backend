@@ -186,9 +186,9 @@ export class QuizController {
   @Get('groups/:id')
   @Roles(RoleEnum.PROFESSOR, RoleEnum.SCHOOL_ADMIN, RoleEnum.STUDENT)
   @ApiOperation({
-    summary: 'Get a quiz group by ID',
+    summary: 'Get a quiz group by ID with quizzes',
     description:
-      'Retrieve a specific quiz group with its details. All authenticated users can view individual quiz groups.',
+      'Retrieve a specific quiz group with its details and all non-deleted quizzes in the group. All authenticated users can view individual quiz groups.',
   })
   @ApiParam({
     name: 'id',
@@ -199,7 +199,7 @@ export class QuizController {
   })
   @ApiResponse({
     status: 200,
-    description: 'Quiz group retrieved successfully',
+    description: 'Quiz group retrieved successfully with all non-deleted quizzes',
     schema: {
       example: {
         _id: '507f1f77bcf86cd799439011',
@@ -211,6 +211,21 @@ export class QuizController {
         chapter_id: '507f1f77bcf86cd799439012',
         created_at: '2024-01-15T10:30:00Z',
         updated_at: '2024-01-15T10:30:00Z',
+        quiz: [
+          {
+            _id: '507f1f77bcf86cd799439013',
+            quiz_group_id: '507f1f77bcf86cd799439011',
+            question: 'What is 2 + 2?',
+            type: 'MULTIPLE_CHOICE',
+            options: ['2', '3', '4', '5'],
+            answer: ['4'],
+            explanation: 'Basic addition: 2 + 2 equals 4',
+            sequence: 1,
+            tags: ['basic', 'addition'],
+            created_at: '2024-01-15T10:35:00Z',
+            updated_at: '2024-01-15T10:35:00Z',
+          },
+        ],
       },
     },
   })

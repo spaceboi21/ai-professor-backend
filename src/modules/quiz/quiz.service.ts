@@ -370,6 +370,7 @@ export class QuizService {
       school.db_name,
     );
     const QuizGroupModel = connection.model(QuizGroup.name, QuizGroupSchema);
+    const QuizModel = connection.model(Quiz.name, QuizSchema);
     // Register Module and Chapter models for populate to work
     connection.model(Module.name, ModuleSchema);
     connection.model(Chapter.name, ChapterSchema);
@@ -392,7 +393,19 @@ export class QuizService {
       );
     }
 
-    return quizGroup;
+    // Fetch all non-deleted quizzes for this quiz group
+    const quizzes = await QuizModel.find({
+      quiz_group_id: id,
+      deleted_at: null,
+    })
+      .sort({ sequence: 1, created_at: -1 })
+      .exec();
+
+    // Return quiz group with quizzes included
+    return {
+      ...quizGroup.toObject(),
+      quiz: quizzes,
+    };
   }
 
   async updateQuizGroup(

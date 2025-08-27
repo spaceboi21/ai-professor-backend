@@ -116,7 +116,7 @@ http://localhost:5000/api/quiz
 
 **Endpoint:** `GET /quiz/groups/:id`  
 **Access:** All authenticated users  
-**Description:** Retrieve a specific quiz group with its details.
+**Description:** Retrieve a specific quiz group with its details and all non-deleted quizzes in the group.
 
 **Response:**
 
@@ -130,7 +130,22 @@ http://localhost:5000/api/quiz
   "module_id": "507f1f77bcf86cd799439011",
   "chapter_id": "507f1f77bcf86cd799439012",
   "created_at": "2024-01-15T10:30:00Z",
-  "updated_at": "2024-01-15T10:30:00Z"
+  "updated_at": "2024-01-15T10:30:00Z",
+  "quizzes": [
+    {
+      "_id": "507f1f77bcf86cd799439013",
+      "quiz_group_id": "507f1f77bcf86cd799439011",
+      "question": "What is 2 + 2?",
+      "type": "MULTIPLE_CHOICE",
+      "options": ["2", "3", "4", "5"],
+      "answer": ["4"],
+      "explanation": "Basic addition: 2 + 2 equals 4",
+      "sequence": 1,
+      "tags": ["basic", "addition"],
+      "created_at": "2024-01-15T10:35:00Z",
+      "updated_at": "2024-01-15T10:35:00Z"
+    }
+  ]
 }
 ```
 
