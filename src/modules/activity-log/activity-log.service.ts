@@ -353,6 +353,11 @@ export class ActivityLogService {
         ];
       }
 
+      // Enforce: Professors can only see student activity logs in the list view
+      if (currentUser?.role?.name === RoleEnum.PROFESSOR) {
+        query.performed_by_role = RoleEnum.STUDENT;
+      }
+
       // Get logs with user and school population
       const logs = await this.activityLogModel
         .find(query)
