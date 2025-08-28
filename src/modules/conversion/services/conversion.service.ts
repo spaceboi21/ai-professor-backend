@@ -76,7 +76,7 @@ export class ConversionService {
       const fileUrl = this.generateFileUrl(savedFiles.pdfFileName);
       const originalFileUrl = this.generateFileUrl(savedFiles.pptFileName);
 
-      const urlToStoreinDB = process.env.NODE_ENV === 'production' ? savedFiles.pdfFileName : 'uploads/bibliography/' + savedFiles.pdfFileName;
+      const urlToStoreinDB = process.env.NODE_ENV === 'production' ? fileUrl : 'uploads/bibliography/' + savedFiles.pdfFileName;
 
       this.logger.log(`✅ Direct conversion completed in ${totalTime}ms`);
       this.logger.log(`📄 ${file.originalname} → ${savedFiles.pdfFileName} (${result.pageCount} slides)`);
