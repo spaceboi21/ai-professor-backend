@@ -25,11 +25,15 @@ import { RoleGuard } from 'src/common/guards/roles.guard';
 import { JWTUserPayload } from 'src/common/types/jwr-user.type';
 import { CreateSchoolAdminDto } from './dto/create-school-admin.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
-import { DashboardFilterDto, EnhancedDashboardResponseDto } from './dto/dashboard-filter.dto';
+import {
+  DashboardFilterDto,
+  EnhancedDashboardResponseDto,
+} from './dto/dashboard-filter.dto';
 import { UpdateSchoolAdminDto } from './dto/update-school-admin.dto';
 import { SchoolAdminService } from './school-admin.service';
 import { ParseObjectIdPipe } from '@nestjs/mongoose';
 import { Types } from 'mongoose';
+import { CreateAdditionalSchoolAdminDto } from './dto/create-additional-school-admin.dto';
 
 @ApiTags('School Admin')
 @ApiBearerAuth()
@@ -53,6 +57,23 @@ export class SchoolAdminController {
     @User() user: JWTUserPayload,
   ) {
     return this.schoolAdminService.createSchoolAdmin(body, user);
+  }
+
+  // Create an additional school admin for the same school (School Admin only)
+  @Post('create-additional')
+  @Roles(RoleEnum.SCHOOL_ADMIN)
+  @ApiOperation({ summary: 'Create another school admin for your school' })
+  @ApiBody({ type: CreateAdditionalSchoolAdminDto })
+  @ApiResponse({
+    status: 201,
+    description: 'School admin created successfully',
+  })
+  @ApiResponse({ status: 409, description: 'Email already exists' })
+  async createAdditionalSchoolAdmin(
+    @Body() body: CreateAdditionalSchoolAdminDto,
+    @User() user: JWTUserPayload,
+  ) {
+    return this.schoolAdminService.createAdditionalSchoolAdmin(body, user);
   }
 
   // Get enhanced dashboard statistics for school admin and professor

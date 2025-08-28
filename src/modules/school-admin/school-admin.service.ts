@@ -40,6 +40,7 @@ import { ErrorMessageService } from 'src/common/services/error-message.service';
 import { EmailEncryptionService } from 'src/common/services/email-encryption.service';
 import { DEFAULT_LANGUAGE } from 'src/common/constants/language.constant';
 import { UpdateSchoolAdminDto } from './dto/update-school-admin.dto';
+import { CreateAdditionalSchoolAdminDto } from './dto/create-additional-school-admin.dto';
 
 @Injectable()
 export class SchoolAdminService {
@@ -215,6 +216,125 @@ export class SchoolAdminService {
       );
     } finally {
       session.endSession();
+    }
+  }
+
+  async createAdditionalSchoolAdmin(
+    dto: CreateAdditionalSchoolAdminDto,
+    adminUser: JWTUserPayload,
+  ) {
+    const { first_name, last_name, email, status, preferred_language } = dto;
+
+    this.logger.log(
+      `Creating additional school admin with email: ${email} by admin: ${adminUser.id}`,
+    );
+
+    // Only school admin can create within their own school
+    if (adminUser.role.name !== RoleEnum.SCHOOL_ADMIN) {
+      throw new BadRequestException(
+        this.errorMessageService.getMessageWithLanguage(
+          'SCHOOL_ADMIN',
+          'UNAUTHORIZED_ACCESS',
+          adminUser?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
+    }
+
+    // Validate admin has a school_id
+    if (!adminUser.school_id) {
+      throw new BadRequestException(
+        this.errorMessageService.getMessageWithLanguage(
+          'SCHOOL',
+          'ADMIN_MUST_HAVE_SCHOOL_ID',
+          adminUser?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
+    }
+
+    // Validate school exists
+    const school = await this.schoolModel.findById(
+      new Types.ObjectId(adminUser.school_id as string),
+    );
+    if (!school) {
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'SCHOOL',
+          'NOT_FOUND',
+          adminUser?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
+    }
+
+    // Check email uniqueness (users and global students)
+    const encryptedEmail = this.emailEncryptionService.encryptEmail(email);
+    const [existingUser, existingGlobalStudent] = await Promise.all([
+      this.userModel.findOne({ email: encryptedEmail }),
+      this.globalStudentModel.findOne({ email: encryptedEmail }),
+    ]);
+
+    if (existingGlobalStudent) {
+      throw new ConflictException(
+        this.errorMessageService.getMessageWithLanguage(
+          'STUDENT',
+          'STUDENT_ALREADY_EXISTS',
+          adminUser?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
+    }
+    if (existingUser) {
+      throw new ConflictException(
+        this.errorMessageService.getMessageWithLanguage(
+          'USER',
+          'USER_ALREADY_EXISTS',
+          adminUser?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
+    }
+
+    try {
+      // Create user with SCHOOL_ADMIN role in same school
+      const password = this.bcryptUtil.generateStrongPassword();
+      const created = await this.userModel.create({
+        email: encryptedEmail,
+        first_name,
+        last_name,
+        school_id: new Types.ObjectId(adminUser.school_id as string),
+        password: await this.bcryptUtil.hashPassword(password),
+        role: new Types.ObjectId(ROLE_IDS.SCHOOL_ADMIN),
+        created_by: new Types.ObjectId(adminUser.id),
+        status,
+        preferred_language: preferred_language || DEFAULT_LANGUAGE,
+      });
+
+      // Send credentials email
+      await this.mailService.sendCredentialsEmail(
+        email,
+        `${first_name}${last_name ? ` ${last_name}` : ''}`,
+        password,
+        RoleEnum.SCHOOL_ADMIN,
+        preferred_language || adminUser?.preferred_language,
+      );
+
+      return {
+        message: this.errorMessageService.getSuccessMessageWithLanguage(
+          'SCHOOL_ADMIN',
+          'SCHOOL_ADMIN_CREATED_SUCCESSFULLY',
+          adminUser?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+        data: created,
+      };
+    } catch (error) {
+      this.logger.error(
+        'Failed to create additional school admin',
+        error?.stack || error,
+      );
+      throw new BadRequestException(
+        this.errorMessageService.getMessageWithLanguage(
+          'SCHOOL_ADMIN',
+          'FAILED_TO_CREATE_SCHOOL_ADMIN',
+          adminUser?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
     }
   }
 
@@ -544,10 +664,7 @@ export class SchoolAdminService {
           user,
         );
       } catch (error) {
-        this.logger.warn(
-          'Error calculating quiz statistics:',
-          error?.message,
-        );
+        this.logger.warn('Error calculating quiz statistics:', error?.message);
       }
 
       // Add debug logging
