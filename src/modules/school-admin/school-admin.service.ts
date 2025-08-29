@@ -1260,14 +1260,30 @@ export class SchoolAdminService {
 
     const paginationOptions = getPaginationOptions(paginationDto || {});
 
-    // Get total count for pagination
-    const total = await this.userModel.countDocuments({
+    // Build filter query
+    const filter: any = {
       role: new Types.ObjectId(ROLE_IDS.SCHOOL_ADMIN),
       deleted_at: null,
-      school_id: user?.school_id ? new Types.ObjectId(user.school_id) : null,
-    });
+    };
 
-    console.log(total);
+    // If user is school admin, only show school admins from their school and exclude themselves
+    if (user.role.name === RoleEnum.SCHOOL_ADMIN) {
+      if (!user.school_id) {
+        throw new BadRequestException(
+          this.errorMessageService.getMessageWithLanguage(
+            'SCHOOL_ADMIN',
+            'SCHOOL_ID_REQUIRED',
+            user?.preferred_language || DEFAULT_LANGUAGE,
+          ),
+        );
+      }
+      filter.school_id = new Types.ObjectId(user.school_id.toString());
+      filter._id = { $ne: new Types.ObjectId(user.id.toString()) }; // Exclude current user
+    }
+
+    // Get total count for pagination
+    const total = await this.userModel.countDocuments(filter);
+
     if (total === 0) {
       return {
         message: this.errorMessageService.getMessageWithLanguage(
@@ -1288,11 +1304,7 @@ export class SchoolAdminService {
     }
 
     const schoolAdmins = await this.userModel
-      .find({
-        role: new Types.ObjectId(ROLE_IDS.SCHOOL_ADMIN),
-        deleted_at: null,
-        school_id: user?.school_id ? new Types.ObjectId(user.school_id) : null,
-      })
+      .find(filter)
       .populate('role', 'name')
       .populate('school_id', 'name')
       .sort({ created_at: -1 })
