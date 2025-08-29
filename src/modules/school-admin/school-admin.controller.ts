@@ -196,7 +196,7 @@ export class SchoolAdminController {
   @ApiOperation({
     summary: 'Get all school admins',
     description:
-      'Super admin can see all school admins, school admin can only see other admins from their school. Supports search by email, first name, or last name.',
+      'Super admin can see all school admins, school admin can only see other admins from their school. Supports search by email, first name, or last name, and filtering by status.',
   })
   @ApiQuery({
     name: 'page',
