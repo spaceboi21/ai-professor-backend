@@ -1262,10 +1262,12 @@ export class SchoolAdminService {
 
     // Get total count for pagination
     const total = await this.userModel.countDocuments({
-      role: ROLE_IDS.SCHOOL_ADMIN,
+      role: new Types.ObjectId(ROLE_IDS.SCHOOL_ADMIN),
       deleted_at: null,
+      school_id: user?.school_id ? new Types.ObjectId(user.school_id) : null,
     });
 
+    console.log(total);
     if (total === 0) {
       return {
         message: this.errorMessageService.getMessageWithLanguage(
@@ -1286,7 +1288,11 @@ export class SchoolAdminService {
     }
 
     const schoolAdmins = await this.userModel
-      .find({ role: ROLE_IDS.SCHOOL_ADMIN, deleted_at: null })
+      .find({
+        role: new Types.ObjectId(ROLE_IDS.SCHOOL_ADMIN),
+        deleted_at: null,
+        school_id: user?.school_id ? new Types.ObjectId(user.school_id) : null,
+      })
       .populate('role', 'name')
       .populate('school_id', 'name')
       .sort({ created_at: -1 })
