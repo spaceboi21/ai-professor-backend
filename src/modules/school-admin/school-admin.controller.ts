@@ -219,6 +219,14 @@ export class SchoolAdminController {
     description: 'Search in email, first name, or last name',
     example: 'john',
   })
+  @ApiQuery({
+    name: 'status',
+    required: false,
+    type: String,
+    enum: ['ACTIVE', 'INACTIVE'],
+    description: 'Filter by status',
+    example: 'ACTIVE',
+  })
   @ApiResponse({
     status: 200,
     description: 'All school admins retrieved successfully',
@@ -264,11 +272,13 @@ export class SchoolAdminController {
     @Query() paginationDto: PaginationDto,
     @User() user: JWTUserPayload,
     @Query('search') search?: string,
+    @Query('status') status?: string,
   ) {
     return this.schoolAdminService.getAllSchoolAdmins(
       user,
       paginationDto,
       search,
+      status,
     );
   }
 

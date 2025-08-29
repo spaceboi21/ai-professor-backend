@@ -1256,6 +1256,7 @@ export class SchoolAdminService {
     user: JWTUserPayload,
     paginationDto?: PaginationDto,
     search?: string,
+    status?: string,
   ) {
     this.logger.log(`Getting all school admins for user: ${user.id}`);
 
@@ -1290,6 +1291,11 @@ export class SchoolAdminService {
         { first_name: searchRegex },
         { last_name: searchRegex },
       ];
+    }
+
+    // Add status filter if status is provided
+    if (status && status.trim()) {
+      filter.status = status.trim().toUpperCase();
     }
 
     // Get total count for pagination
