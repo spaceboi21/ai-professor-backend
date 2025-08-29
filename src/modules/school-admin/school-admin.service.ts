@@ -1255,6 +1255,7 @@ export class SchoolAdminService {
   async getAllSchoolAdmins(
     user: JWTUserPayload,
     paginationDto?: PaginationDto,
+    search?: string,
   ) {
     this.logger.log(`Getting all school admins for user: ${user.id}`);
 
@@ -1279,6 +1280,16 @@ export class SchoolAdminService {
       }
       filter.school_id = new Types.ObjectId(user.school_id.toString());
       filter._id = { $ne: new Types.ObjectId(user.id.toString()) }; // Exclude current user
+    }
+
+    // Add search filter if search term is provided
+    if (search && search.trim()) {
+      const searchRegex = { $regex: search.trim(), $options: 'i' };
+      filter.$or = [
+        { email: searchRegex },
+        { first_name: searchRegex },
+        { last_name: searchRegex },
+      ];
     }
 
     // Get total count for pagination

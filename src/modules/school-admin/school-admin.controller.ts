@@ -211,6 +211,13 @@ export class SchoolAdminController {
     description: 'Number of items per page',
     example: 10,
   })
+  @ApiQuery({
+    name: 'search',
+    required: false,
+    type: String,
+    description: 'Search in email, first name, or last name',
+    example: 'john',
+  })
   @ApiResponse({
     status: 200,
     description: 'All school admins retrieved successfully',
@@ -255,8 +262,13 @@ export class SchoolAdminController {
   async getAllSchoolAdmins(
     @Query() paginationDto: PaginationDto,
     @User() user: JWTUserPayload,
+    @Query('search') search?: string,
   ) {
-    return this.schoolAdminService.getAllSchoolAdmins(user, paginationDto);
+    return this.schoolAdminService.getAllSchoolAdmins(
+      user,
+      paginationDto,
+      search,
+    );
   }
 
   // Get school admin details by ID
