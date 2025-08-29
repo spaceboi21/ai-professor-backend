@@ -592,33 +592,69 @@ export class AIChatService {
       AIChatSessionSchema,
     );
 
-    const messages = await AIMessageModel.find({
-      session_id,
-      deleted_at: null,
-    })
-      .sort({ created_at: 1 })
-      .exec();
+    // Fetch all data in parallel
+    const [messages, supervisor_feedback, professor_resources, sessionDetails] = await Promise.all([
+      AIMessageModel.find({
+        session_id,
+        deleted_at: null,
+      }).sort({ created_at: 1 }).exec(),
+      
+      AIChatFeedbackModel.find({
+        session_id,
+        deleted_at: null,
+      }).sort({ created_at: 1 }).exec(),
+      
+      AIResourceModel.find({
+        session_id,
+        deleted_at: null,
+      }).sort({ created_at: 1 }).exec(),
+      
+      AISessionModel.findOne({
+        _id: session_id,
+        deleted_at: null,
+      }).lean()
+    ]);
 
-    const supervisor_feedback = await AIChatFeedbackModel.find({
-      session_id,
-      deleted_at: null,
+    // Create unified array with type indicators (excluding session details)
+    const activities: any[] = [];
+
+    // Add messages
+    messages.forEach(message => {
+      activities.push({
+        type: 'message',
+        created_at: message.created_at,
+        data: message,
+      });
     });
 
-    const professor_resources = await AIResourceModel.find({
-      session_id,
-      deleted_at: null,
+    // Add feedback
+    supervisor_feedback.forEach(feedback => {
+      activities.push({
+        type: 'feedback',
+        created_at: feedback.created_at,
+        data: feedback,
+      });
     });
 
-    const sessionDetails = await AISessionModel.findOne({
-      _id: session_id,
-      deleted_at: null,
+    // Add resources
+    professor_resources.forEach(resource => {
+      activities.push({
+        type: 'resource',
+        created_at: resource.created_at,
+        data: resource,
+      });
     });
+
+    // Sort all activities by created_at in ascending order
+    activities.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
 
     return {
-      messages,
-      supervisor_feedback,
-      professor_resources,
+      activities,
       sessionDetails,
+      total_count: activities.length,
+      messages_count: messages.length,
+      feedback_count: supervisor_feedback.length,
+      resources_count: professor_resources.length,
     };
   }
 

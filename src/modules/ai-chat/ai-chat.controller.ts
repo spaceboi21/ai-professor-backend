@@ -30,6 +30,7 @@ import { AISessionResponseDto } from './dto/ai-session-response.dto';
 import { AIMessageResponseDto } from './dto/ai-message-response.dto';
 import { AIFeedbackResponseDto } from './dto/ai-feedback-response.dto';
 import { AIResourceResponseDto } from './dto/ai-resource-response.dto';
+import { SessionActivityResponseDto } from './dto/session-activity-response.dto';
 import { getPaginationOptions } from 'src/common/utils/pagination.util';
 import { JwtAuthGuard } from 'src/common/guards/jwt.guard';
 import { User } from 'src/common/decorators/user.decorator';
@@ -210,8 +211,8 @@ export class AIChatController {
   @Get('sessions/:sessionId/messages')
   @Roles(RoleEnum.STUDENT, RoleEnum.PROFESSOR, RoleEnum.SCHOOL_ADMIN)
   @ApiOperation({
-    summary: 'Get messages by session ID',
-    description: 'Retrieve all messages for a specific AI chat session',
+    summary: 'Get session activities by session ID',
+    description: 'Retrieve all activities (messages, feedback, resources) for a specific AI chat session, combined and sorted by creation date. Session details are returned separately.',
   })
   @ApiParam({
     name: 'sessionId',
@@ -222,8 +223,64 @@ export class AIChatController {
   })
   @ApiResponse({
     status: 200,
-    description: 'Messages retrieved successfully',
-    type: [AIMessageResponseDto],
+    description: 'Session activities retrieved successfully. Returns a unified array of activities (messages, feedback, resources) sorted by created_at in ascending order, with session details as a separate object.',
+    type: SessionActivityResponseDto,
+    schema: {
+      type: 'object',
+      properties: {
+        activities: {
+          type: 'array',
+          description: 'Combined and sorted list of session activities (messages, feedback, resources only)',
+          items: {
+            type: 'object',
+            properties: {
+              type: {
+                type: 'string',
+                enum: ['message', 'feedback', 'resource'],
+                description: 'Type of activity item',
+              },
+              created_at: {
+                type: 'string',
+                format: 'date-time',
+                description: 'Creation date of the activity item',
+              },
+              data: {
+                oneOf: [
+                  { $ref: '#/components/schemas/AIMessageResponseDto' },
+                  { $ref: '#/components/schemas/AIFeedbackResponseDto' },
+                  { $ref: '#/components/schemas/AIResourceResponseDto' },
+                ],
+                description: 'Activity item data - structure depends on type',
+              },
+            },
+          },
+        },
+        sessionDetails: {
+          type: 'object',
+          description: 'Session details object (separate from activities)',
+        },
+        total_count: {
+          type: 'number',
+          description: 'Total count of activities (excludes session details)',
+          example: 15,
+        },
+        messages_count: {
+          type: 'number',
+          description: 'Count of messages',
+          example: 8,
+        },
+        feedback_count: {
+          type: 'number',
+          description: 'Count of feedback items',
+          example: 2,
+        },
+        resources_count: {
+          type: 'number',
+          description: 'Count of resources',
+          example: 5,
+        },
+      },
+    },
   })
   @ApiResponse({
     status: 404,
