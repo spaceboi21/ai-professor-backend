@@ -34,6 +34,7 @@ import { SchoolAdminService } from './school-admin.service';
 import { ParseObjectIdPipe } from '@nestjs/mongoose';
 import { Types } from 'mongoose';
 import { CreateAdditionalSchoolAdminDto } from './dto/create-additional-school-admin.dto';
+import { PaginationDto } from 'src/common/dto/pagination.dto';
 
 @ApiTags('School Admin')
 @ApiBearerAuth()
@@ -196,6 +197,20 @@ export class SchoolAdminController {
     summary: 'Get all school admins',
     description: 'Super admin only - retrieves all school admin accounts',
   })
+  @ApiQuery({
+    name: 'page',
+    required: false,
+    type: Number,
+    description: 'Page number (starts from 1)',
+    example: 1,
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    type: Number,
+    description: 'Number of items per page',
+    example: 10,
+  })
   @ApiResponse({
     status: 200,
     description: 'All school admins retrieved successfully',
@@ -225,12 +240,23 @@ export class SchoolAdminController {
             updated_at: '2024-01-01T00:00:00.000Z',
           },
         ],
+        pagination_data: {
+          page: 1,
+          limit: 10,
+          total: 25,
+          totalPages: 3,
+          hasNext: true,
+          hasPrev: false,
+        },
       },
     },
   })
   @ApiResponse({ status: 400, description: 'Unauthorized access' })
-  async getAllSchoolAdmins(@User() user: JWTUserPayload) {
-    return this.schoolAdminService.getAllSchoolAdmins(user);
+  async getAllSchoolAdmins(
+    @Query() paginationDto: PaginationDto,
+    @User() user: JWTUserPayload,
+  ) {
+    return this.schoolAdminService.getAllSchoolAdmins(user, paginationDto);
   }
 
   // Get school admin details by ID

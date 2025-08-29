@@ -41,6 +41,11 @@ import { EmailEncryptionService } from 'src/common/services/email-encryption.ser
 import { DEFAULT_LANGUAGE } from 'src/common/constants/language.constant';
 import { UpdateSchoolAdminDto } from './dto/update-school-admin.dto';
 import { CreateAdditionalSchoolAdminDto } from './dto/create-additional-school-admin.dto';
+import { PaginationDto } from 'src/common/dto/pagination.dto';
+import {
+  getPaginationOptions,
+  createPaginationResult,
+} from 'src/common/utils/pagination.util';
 
 @Injectable()
 export class SchoolAdminService {
@@ -1247,16 +1252,21 @@ export class SchoolAdminService {
     };
   }
 
-  async getAllSchoolAdmins(user: JWTUserPayload) {
+  async getAllSchoolAdmins(
+    user: JWTUserPayload,
+    paginationDto?: PaginationDto,
+  ) {
     this.logger.log(`Getting all school admins for user: ${user.id}`);
 
-    const schoolAdmins = await this.userModel
-      .find({ role: ROLE_IDS.SCHOOL_ADMIN, deleted_at: null })
-      .populate('role', 'name')
-      .populate('school_id', 'name')
-      .lean();
+    const paginationOptions = getPaginationOptions(paginationDto || {});
 
-    if (schoolAdmins.length === 0) {
+    // Get total count for pagination
+    const total = await this.userModel.countDocuments({
+      role: ROLE_IDS.SCHOOL_ADMIN,
+      deleted_at: null,
+    });
+
+    if (total === 0) {
       return {
         message: this.errorMessageService.getMessageWithLanguage(
           'SCHOOL_ADMIN',
@@ -1264,16 +1274,29 @@ export class SchoolAdminService {
           user?.preferred_language || DEFAULT_LANGUAGE,
         ),
         data: [],
+        pagination_data: {
+          page: paginationOptions.page,
+          limit: paginationOptions.limit,
+          total: 0,
+          totalPages: 0,
+          hasNext: false,
+          hasPrev: false,
+        },
       };
     }
 
-    return {
-      message: this.errorMessageService.getMessageWithLanguage(
-        'SCHOOL_ADMIN',
-        'SCHOOL_ADMINS_RETRIEVED_SUCCESSFULLY',
-        user?.preferred_language || DEFAULT_LANGUAGE,
-      ),
-      data: schoolAdmins.map((admin) => ({
+    const schoolAdmins = await this.userModel
+      .find({ role: ROLE_IDS.SCHOOL_ADMIN, deleted_at: null })
+      .populate('role', 'name')
+      .populate('school_id', 'name')
+      .sort({ created_at: -1 })
+      .skip(paginationOptions.skip)
+      .limit(paginationOptions.limit)
+      .lean();
+
+    // Create pagination result
+    const result = createPaginationResult(
+      schoolAdmins.map((admin) => ({
         id: admin._id,
         email: this.emailEncryptionService.decryptEmail(admin.email),
         first_name: admin.first_name,
@@ -1283,6 +1306,18 @@ export class SchoolAdminService {
         school_id: admin.school_id,
         created_at: admin.created_at,
       })),
+      total,
+      paginationOptions,
+    );
+
+    return {
+      message: this.errorMessageService.getMessageWithLanguage(
+        'SCHOOL_ADMIN',
+        'SCHOOL_ADMINS_RETRIEVED_SUCCESSFULLY',
+        user?.preferred_language || DEFAULT_LANGUAGE,
+      ),
+      data: result.data,
+      pagination_data: result.pagination_data,
     };
   }
 }
