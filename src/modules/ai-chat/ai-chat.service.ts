@@ -483,13 +483,15 @@ export class AIChatService {
     }
 
     if (session.status !== AISessionStatusEnum.ACTIVE) {
-      throw new BadRequestException(
-        this.errorMessageService.getMessageWithLanguage(
-          'AI_CHAT',
-          'CANNOT_ADD_MESSAGES_TO_INACTIVE_SESSION',
-          user?.preferred_language || DEFAULT_LANGUAGE,
-        ),
-      );
+      // throw new BadRequestException(
+      //   this.errorMessageService.getMessageWithLanguage(
+      //     'AI_CHAT',
+      //     'CANNOT_ADD_MESSAGES_TO_INACTIVE_SESSION',
+      //     user?.preferred_language || DEFAULT_LANGUAGE,
+      //   ),
+      // );
+      session.status = AISessionStatusEnum.ACTIVE;
+      await session.save();
     }
 
     const messageData = {
