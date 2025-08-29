@@ -602,12 +602,12 @@ export class AIChatService {
       AIChatFeedbackModel.find({
         session_id,
         deleted_at: null,
-      }).sort({ created_at: 1 }).exec(),
+      }).sort({ created_at: -1 }).exec(), // Get latest feedback first
       
       AIResourceModel.find({
         session_id,
         deleted_at: null,
-      }).sort({ created_at: 1 }).exec(),
+      }).sort({ created_at: -1 }).exec(), // Get latest resources first
       
       AISessionModel.findOne({
         _id: session_id,
@@ -866,16 +866,18 @@ export class AIChatService {
       );
     }
 
+    // Use the latest feedback (first element after sorting by created_at desc) to generate resources
+    const latestFeedback = supervisorAnalysisFeedback[0];
+
     const professorResources: ProfessorResourcesResponseType =
       await this.pythonService.professorResources(
         session.session_title,
         {
-          areas_for_improvement:
-            supervisorAnalysisFeedback[0].areas_for_improvement,
-          overall_score: supervisorAnalysisFeedback[0].rating.overall_score,
-          strengths: supervisorAnalysisFeedback[0].strengths,
+          areas_for_improvement: latestFeedback.areas_for_improvement,
+          overall_score: latestFeedback.rating.overall_score,
+          strengths: latestFeedback.strengths,
         },
-        supervisorAnalysisFeedback[0].keywords_for_learning,
+        latestFeedback.keywords_for_learning,
       );
 
     console.log('professorResources', professorResources);
@@ -888,9 +890,7 @@ export class AIChatService {
       recommendations: professorResources.recommendations,
       total_found: professorResources.total_found,
       knowledge_available: professorResources.knowledge_available,
-      supervisor_feedback_id: new Types.ObjectId(
-        supervisorAnalysisFeedback[0]._id,
-      ),
+      supervisor_feedback_id: new Types.ObjectId(latestFeedback._id),
     };
 
     const resource = new AIResourceModel(resourceData);
