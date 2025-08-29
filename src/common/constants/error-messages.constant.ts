@@ -128,6 +128,10 @@ export const ERROR_MESSAGES: {
       [LanguageEnum.ENGLISH]: 'School validation failed: {error}',
       [LanguageEnum.FRENCH]: "Échec de la validation de l'école: {error}",
     },
+    SCHOOL_ALREADY_EXISTS: {
+      [LanguageEnum.ENGLISH]: 'School with this email already exists',
+      [LanguageEnum.FRENCH]: 'Une école avec cet email existe déjà',
+    },
   },
 
   // User Related
@@ -174,6 +178,10 @@ export const ERROR_MESSAGES: {
       [LanguageEnum.ENGLISH]: 'Super admin cannot change their own status',
       [LanguageEnum.FRENCH]:
         'Le super administrateur ne peut pas changer son propre statut',
+    },
+    USER_ALREADY_EXISTS: {
+      [LanguageEnum.ENGLISH]: 'User with this email already exists',
+      [LanguageEnum.FRENCH]: 'Un utilisateur avec cet email existe déjà',
     },
   },
 
@@ -327,6 +335,10 @@ export const ERROR_MESSAGES: {
       [LanguageEnum.ENGLISH]: 'Unauthorized role for bulk student creation',
       [LanguageEnum.FRENCH]:
         "Rôle non autorisé pour la création en masse d'étudiants",
+    },
+    STUDENT_ALREADY_EXISTS: {
+      [LanguageEnum.ENGLISH]: 'Student with this email already exists',
+      [LanguageEnum.FRENCH]: 'Un étudiant avec cet email existe déjà',
     },
   },
 
@@ -1684,6 +1696,11 @@ export const ERROR_MESSAGES: {
       [LanguageEnum.ENGLISH]: 'Dashboard statistics retrieved successfully',
       [LanguageEnum.FRENCH]:
         'Statistiques du tableau de bord récupérées avec succès',
+    },
+    SCHOOL_ID_REQUIRED: {
+      [LanguageEnum.ENGLISH]: 'School ID is required for school admin',
+      [LanguageEnum.FRENCH]:
+        "L'identifiant de l'école est requis pour l'administrateur d'école",
     },
   },
 };

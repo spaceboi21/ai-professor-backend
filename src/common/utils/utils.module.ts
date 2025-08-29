@@ -11,7 +11,14 @@ import { ServicesModule } from '../services/services.module';
 
 @Module({
   imports: [ConfigModule, UploadModule, ServicesModule],
-  providers: [BcryptUtil, JwtUtil, TokenUtil, CSVUtil, EmailEncryptionUtil, JwtService],
+  providers: [
+    BcryptUtil,
+    JwtUtil,
+    TokenUtil,
+    CSVUtil,
+    EmailEncryptionUtil,
+    JwtService,
+  ],
   exports: [BcryptUtil, JwtUtil, TokenUtil, CSVUtil, EmailEncryptionUtil],
 })
 export class UtilsModule {}
