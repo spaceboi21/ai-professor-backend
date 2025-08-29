@@ -1323,6 +1323,7 @@ export class SchoolAdminService {
         role: admin.role,
         school_id: admin.school_id,
         created_at: admin.created_at,
+        last_logged_in: admin.last_logged_in,
       })),
       total,
       paginationOptions,
