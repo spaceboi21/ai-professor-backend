@@ -1250,17 +1250,6 @@ export class SchoolAdminService {
   async getAllSchoolAdmins(user: JWTUserPayload) {
     this.logger.log(`Getting all school admins for user: ${user.id}`);
 
-    // Only super admin can get all school admins
-    if (user.role.name !== RoleEnum.SUPER_ADMIN) {
-      throw new BadRequestException(
-        this.errorMessageService.getMessageWithLanguage(
-          'SCHOOL_ADMIN',
-          'UNAUTHORIZED_ACCESS',
-          user?.preferred_language || DEFAULT_LANGUAGE,
-        ),
-      );
-    }
-
     const schoolAdmins = await this.userModel
       .find({ role: ROLE_IDS.SCHOOL_ADMIN, deleted_at: null })
       .populate('role', 'name')
