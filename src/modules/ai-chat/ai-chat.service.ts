@@ -676,9 +676,11 @@ export class AIChatService {
       );
     }
 
-    if(session?.status !== AISessionStatusEnum.COMPLETED){
-      session.status = AISessionStatusEnum.COMPLETED;
-      await session.save();
+    // Update session status to COMPLETED if it's not already
+    if (session?.status !== AISessionStatusEnum.COMPLETED) {
+      await AISessionModel.findByIdAndUpdate(new Types.ObjectId(session_id), {
+        status: AISessionStatusEnum.COMPLETED,
+      });
     }
 
     const conversation_history: ConversationHistoryType[] =
