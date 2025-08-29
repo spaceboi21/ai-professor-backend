@@ -662,7 +662,7 @@ export class AIChatService {
     // Validate that the session exists
     const session = await AISessionModel.findOne({
       _id: session_id,
-      status: AISessionStatusEnum.COMPLETED,
+      // status: AISessionStatusEnum.COMPLETED,
       student_id: new Types.ObjectId(student_id),
       deleted_at: null,
     }).lean();
@@ -674,6 +674,11 @@ export class AIChatService {
           user?.preferred_language || DEFAULT_LANGUAGE,
         ),
       );
+    }
+
+    if(session?.status !== AISessionStatusEnum.COMPLETED){
+      session.status = AISessionStatusEnum.COMPLETED;
+      await session.save();
     }
 
     const conversation_history: ConversationHistoryType[] =
