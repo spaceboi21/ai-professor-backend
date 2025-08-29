@@ -195,7 +195,8 @@ export class SchoolAdminController {
   @Roles(RoleEnum.SUPER_ADMIN, RoleEnum.SCHOOL_ADMIN)
   @ApiOperation({
     summary: 'Get all school admins',
-    description: 'Super admin only - retrieves all school admin accounts',
+    description:
+      'Super admin can see all school admins, school admin can only see other admins from their school. Supports search by email, first name, or last name.',
   })
   @ApiQuery({
     name: 'page',
