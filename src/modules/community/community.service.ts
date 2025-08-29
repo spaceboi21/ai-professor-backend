@@ -789,7 +789,6 @@ export class CommunityService {
       ]);
 
       this.logger.debug(`Found ${discussions.length} discussions`);
-      console.log(discussions);
 
       // Process discussions and populate user details
       for (const discussion of discussions) {

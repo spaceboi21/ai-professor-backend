@@ -191,7 +191,7 @@ export class SchoolAdminController {
 
   // Get all school admins (Super Admin only)
   @Get('all')
-  @Roles(RoleEnum.SUPER_ADMIN)
+  @Roles(RoleEnum.SUPER_ADMIN, RoleEnum.SCHOOL_ADMIN)
   @ApiOperation({
     summary: 'Get all school admins',
     description: 'Super admin only - retrieves all school admin accounts',

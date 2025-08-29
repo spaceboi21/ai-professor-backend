@@ -293,9 +293,7 @@ export class QuizService {
       filter.bibliography_id = new Types.ObjectId(filterDto.bibliography_id);
       filter.type = QuizTypeEnum.ANCHOR_TAG;
     }
-    console.log(filter);
     const quizGroups = await QuizGroupModel.find(filter).lean();
-    console.log(quizGroups);
     if (!quizGroups?.length) {
       throw new NotFoundException(
         this.errorMessageService.getMessageWithLanguage(

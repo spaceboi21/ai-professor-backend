@@ -381,7 +381,6 @@ export class ProfessorService {
       role: new Types.ObjectId(ROLE_IDS.PROFESSOR),
       school_id: user?.school_id ? new Types.ObjectId(user.school_id) : null,
     };
-    console.log(filter);
     if (search) {
       filter.$or = [
         { email: { $regex: search, $options: 'i' } },
