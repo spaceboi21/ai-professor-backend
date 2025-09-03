@@ -15,21 +15,26 @@ async function bootstrap() {
     const app = await NestFactory.create<NestExpressApplication>(AppModule);
     const configService = app.get(ConfigService);
 
-    // Validate LibreOffice availability for PPT to PDF conversion
-    logger.log('🔍 Validating LibreOffice installation...');
-    try {
-      const { LibreOfficeDetectorService } = await import(
-        './modules/conversion/services/libreoffice-detector.service'
-      );
-      const libreOfficeDetector = new LibreOfficeDetectorService(configService);
-      await libreOfficeDetector.validateLibreOfficeOrThrow();
-    } catch (error) {
-      logger.error('❌ LibreOffice validation failed:', error.message);
-      logger.error(
-        '💡 Please install LibreOffice to enable PPT to PDF conversion functionality.',
-      );
-      logger.error('📥 Download from: https://www.libreoffice.org/download/');
-      throw error;
+    // Validate LibreOffice availability for PPT to PDF conversion (optional)
+    const requireLibreOffice = configService.get<boolean>('conversion.requireLibreOffice', false);
+
+    if (requireLibreOffice) {
+      logger.log('🔍 Validating LibreOffice installation...');
+      try {
+        const { LibreOfficeDetectorService } = await import(
+          './modules/conversion/services/libreoffice-detector.service'
+        );
+        const libreOfficeDetector = new LibreOfficeDetectorService(configService);
+        await libreOfficeDetector.validateLibreOfficeOrThrow();
+        logger.log('✅ LibreOffice validation successful - PPT to PDF conversion enabled');
+      } catch (error) {
+        logger.warn('⚠️  LibreOffice validation failed:', error.message);
+        logger.warn('💡 PPT to PDF conversion will be disabled. LibreOffice is not available.');
+        logger.warn('📥 To enable conversion features, install LibreOffice from: https://www.libreoffice.org/download/');
+      }
+    } else {
+      logger.log('ℹ️  LibreOffice validation skipped - PPT to PDF conversion features are optional');
+      logger.log('💡 To enable conversion features, install LibreOffice and set REQUIRE_LIBREOFFICE=true');
     }
 
     // Apply global interceptor for activity logging
