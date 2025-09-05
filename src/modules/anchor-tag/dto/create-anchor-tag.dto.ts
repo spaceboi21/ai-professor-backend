@@ -15,6 +15,7 @@ import { Types } from 'mongoose';
 import {
   AnchorTagTypeEnum,
   AnchorTagStatusEnum,
+  AnchorTypeEnum,
 } from 'src/common/constants/anchor-tag.constant';
 
 export class CreateAnchorTagDto {
@@ -130,13 +131,40 @@ export class CreateAnchorTagDto {
   })
   is_mandatory?: boolean;
 
+  @IsOptional()
+  @ValidateIf((o) => o.anchor_type === AnchorTypeEnum.QUIZ)
+  @IsNotEmpty({ message: 'Quiz group ID is required when anchor type is QUIZ' })
   @IsMongoId({ message: 'Quiz group ID must be a valid MongoDB ObjectId' })
   @ApiProperty({
     example: '507f1f77bcf86cd799439014',
     description:
-      'ID of the quiz group containing questions for this anchor tag',
+      'ID of the quiz group containing questions for this anchor tag (required when anchor_type is QUIZ)',
+    required: false,
   })
-  quiz_group_id: string | Types.ObjectId;
+  quiz_group_id?: string | Types.ObjectId;
+
+  @ValidateIf((o) => o.anchor_type === AnchorTypeEnum.AI_CHAT)
+  @IsString({ message: 'AI chat question must be a string' })
+  @IsOptional()
+  @ApiProperty({
+    example: 'What are the key principles of active listening demonstrated in this content?',
+    description:
+      'Question or prompt for AI chat interaction (optional when anchor_type is AI_CHAT)',
+    required: false,
+  })
+  ai_chat_question?: string;
+
+  @IsEnum(AnchorTypeEnum, {
+    message: 'Anchor type must be a valid anchor type',
+  })
+  @IsOptional()
+  @ApiProperty({
+    example: AnchorTypeEnum.QUIZ,
+    description: 'Type of anchor interaction (QUIZ or AI_CHAT)',
+    enum: AnchorTypeEnum,
+    required: false,
+  })
+  anchor_type?: AnchorTypeEnum;
 
   @IsArray({ message: 'Tags must be an array' })
   @IsString({ each: true, message: 'Each tag must be a string' })

@@ -14,9 +14,10 @@ export default registerAs('conversion', () => ({
   tempFileMaxAge: parseInt(process.env.TEMP_FILE_MAX_AGE || '3600000') || 60 * 60 * 1000, // 1 hour
   cleanupInterval: parseInt(process.env.TEMP_CLEANUP_INTERVAL || '1800000') || 30 * 60 * 1000, // 30 min
 
-  // LibreOffice
+    // LibreOffice
   libreOfficePath: process.env.LIBREOFFICE_PATH || null,
-  
+  requireLibreOffice: process.env.REQUIRE_LIBREOFFICE !== 'false', // Default to true, can be disabled with REQUIRE_LIBREOFFICE=false
+
   // Performance
   batchSize: parseInt(process.env.BATCH_SIZE || '5') || 5,
   maxConcurrentConversions: parseInt(process.env.MAX_CONCURRENT || '3') || 3,

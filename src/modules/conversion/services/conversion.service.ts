@@ -39,6 +39,15 @@ export class ConversionService {
   ): Promise<ConversionResponse> {
     this.validateFile(file);
 
+    // Check if LibreOffice is required
+    const requireLibreOffice = this.configService.get<boolean>('conversion.requireLibreOffice', true);
+    if (!requireLibreOffice) {
+      throw new InternalServerErrorException(
+        'PPT to PDF conversion is disabled. LibreOffice validation is turned off. ' +
+        'To enable this feature, install LibreOffice and set REQUIRE_LIBREOFFICE=true in your environment variables.',
+      );
+    }
+
     // Check LibreOffice availability
     const libreOfficePath = await this.libreOfficeDetector.findLibreOffice();
     if (!libreOfficePath) {
@@ -49,7 +58,7 @@ export class ConversionService {
 
     const startTime = Date.now();
     let tempFile;
-    
+
     try {
       this.logger.log(`🚀 Starting direct conversion for: ${file.originalname} by user: ${userId}`);
 
@@ -65,13 +74,13 @@ export class ConversionService {
 
       // Save both original PPT and converted PDF to bibliography folder
       const savedFiles = await this.fileManager.saveBothFiles(
-        file.buffer, 
-        result.pdfBytes, 
+        file.buffer,
+        result.pdfBytes,
         file.originalname
       );
 
       const totalTime = Date.now() - startTime;
-      
+
       // Generate URLs for both files (PDF is primary for database)
       const fileUrl = this.generateFileUrl(savedFiles.pdfFileName);
       const originalFileUrl = this.generateFileUrl(savedFiles.pptFileName);
@@ -145,7 +154,7 @@ export class ConversionService {
    */
   private generateFileUrl(fileName: string): string {
     const nodeEnv = process.env.NODE_ENV;
-    
+
     if (nodeEnv === 'production') {
       // In production, return S3 URL (fileName already includes bibliography/ prefix)
       const bucketName = this.configService.get('AWS_S3_BUCKET_NAME');
@@ -162,6 +171,7 @@ export class ConversionService {
    * Get system information
    */
   async getSystemInfo(): Promise<any> {
+    const requireLibreOffice = this.configService.get<boolean>('conversion.requireLibreOffice', true);
     const libreOfficePath = await this.libreOfficeDetector.findLibreOffice();
     const isValid = await this.libreOfficeDetector.validateLibreOffice();
 
@@ -170,15 +180,18 @@ export class ConversionService {
       nodeVersion: process.version,
       nodeEnv: process.env.NODE_ENV,
       libreOffice: {
+        required: requireLibreOffice,
         found: !!libreOfficePath,
         path: libreOfficePath,
         valid: isValid,
+        conversionEnabled: requireLibreOffice && !!libreOfficePath && isValid,
       },
       config: {
         maxFileSize: this.configService.get('conversion.maxFileSize'),
         conversionTimeout: this.configService.get('conversion.conversionTimeout'),
         batchSize: this.configService.get('conversion.batchSize'),
         maxConcurrent: this.configService.get('conversion.maxConcurrentConversions'),
+        requireLibreOffice: requireLibreOffice,
       },
     };
   }

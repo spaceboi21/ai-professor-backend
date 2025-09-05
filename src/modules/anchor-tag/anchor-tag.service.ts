@@ -50,6 +50,7 @@ import { DEFAULT_LANGUAGE } from 'src/common/constants/language.constant';
 import {
   AnchorTagStatusEnum,
   AnchorTagTypeEnum,
+  AnchorTypeEnum,
 } from 'src/common/constants/anchor-tag.constant';
 import { NotificationsService } from '../notifications/notifications.service';
 import { RecipientTypeEnum } from 'src/database/schemas/tenant/notification.schema';
@@ -218,16 +219,22 @@ export class AnchorTagService {
       );
     }
 
-    // Validate quiz group exists
-    const quizGroup = await QuizGroupModel.findById(quiz_group_id);
-    if (!quizGroup) {
-      throw new NotFoundException(
-        this.errorMessageService.getMessageWithLanguage(
-          'ANCHOR_TAG',
-          'QUIZ_GROUP_NOT_FOUND',
-          user?.preferred_language || DEFAULT_LANGUAGE,
-        ),
-      );
+    // Validate quiz group exists (only if anchor_type is QUIZ)
+    if (createAnchorTagDto.anchor_type === AnchorTypeEnum.QUIZ) {
+      if (!quiz_group_id) {
+        throw new BadRequestException('Quiz group ID is required when anchor type is QUIZ');
+      }
+
+      const quizGroup = await QuizGroupModel.findById(quiz_group_id);
+      if (!quizGroup) {
+        throw new NotFoundException(
+          this.errorMessageService.getMessageWithLanguage(
+            'ANCHOR_TAG',
+            'QUIZ_GROUP_NOT_FOUND',
+            user?.preferred_language || DEFAULT_LANGUAGE,
+          ),
+        );
+      }
     }
 
     // Validate content-specific fields
@@ -254,7 +261,11 @@ export class AnchorTagService {
       slide_number: createAnchorTagDto.slide_number ?? null,
       status: createAnchorTagDto.status ?? AnchorTagStatusEnum.ACTIVE,
       is_mandatory: createAnchorTagDto.is_mandatory ?? false,
-      quiz_group_id: new Types.ObjectId(createAnchorTagDto.quiz_group_id),
+                  quiz_group_id: createAnchorTagDto.quiz_group_id
+        ? new Types.ObjectId(createAnchorTagDto.quiz_group_id)
+        : null,
+      ai_chat_question: createAnchorTagDto.ai_chat_question ?? null,
+      anchor_type: createAnchorTagDto.anchor_type ?? AnchorTypeEnum.QUIZ,
       tags: createAnchorTagDto.tags ?? [],
       created_by: new Types.ObjectId(user.id),
       created_by_role: user.role.name,
@@ -616,6 +627,8 @@ export class AnchorTagService {
     updateData.quiz_group_id = quiz_group_id
       ? new Types.ObjectId(quiz_group_id)
       : null;
+    updateData.ai_chat_question = updateAnchorTagDto.ai_chat_question ?? null;
+    updateData.anchor_type = updateAnchorTagDto.anchor_type ?? null;
 
     // Update anchor tag
     const updatedAnchorTag = await AnchorTagModel.findByIdAndUpdate(

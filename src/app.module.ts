@@ -37,6 +37,7 @@ import { ActivityLogModule } from './modules/activity-log/activity-log.module';
 import { CommunityModule } from './modules/community/community.module';
 import { CommonModule } from './common/common.module';
 import { AnchorTagModule } from './modules/anchor-tag/anchor-tag.module';
+import { AnchorChatModule } from './modules/anchor-chat/anchor-chat.module';
 import { EncryptionModule } from './modules/encryption/encryption.module';
 import { ConversionModule } from './modules/conversion/conversion.module';
 
@@ -131,6 +132,7 @@ import { ConversionModule } from './modules/conversion/conversion.module';
     ActivityLogModule,
     CommunityModule,
     AnchorTagModule,
+    AnchorChatModule,
     EncryptionModule,
     ConversionModule,
     HttpModule,

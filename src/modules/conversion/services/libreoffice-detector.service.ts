@@ -36,7 +36,7 @@ export class LibreOfficeDetectorService {
           'C:\\ProgramData\\chocolatey\\lib\\libreoffice-fresh\\tools\\LibreOffice\\program\\soffice.exe',
         ];
         break;
-      
+
       case 'darwin':
         possiblePaths = [
           '/Applications/LibreOffice.app/Contents/MacOS/soffice',
@@ -44,7 +44,7 @@ export class LibreOfficeDetectorService {
           '/opt/homebrew/bin/soffice',
         ];
         break;
-      
+
       case 'linux':
         possiblePaths = [
           '/usr/bin/soffice',
@@ -71,7 +71,7 @@ export class LibreOfficeDetectorService {
       const command = platform === 'win32' ? 'where soffice' : 'which soffice';
       const stdout = execSync(command, { encoding: 'utf8' });
       const pathFromPATH = stdout.trim().split('\n')[0];
-      
+
       if (pathFromPATH && fs.existsSync(pathFromPATH)) {
         this.logger.log(`Found LibreOffice in PATH: ${pathFromPATH}`);
         this.cachedPath = pathFromPATH;
@@ -90,7 +90,7 @@ export class LibreOfficeDetectorService {
     if (!path) return false;
 
     try {
-      execSync(`"${path}" --version`, { timeout: 10000 });
+      execSync(`"${path}" --version`, { timeout: 5000, stdio: 'pipe' });
       return true;
     } catch (error) {
       this.logger.error('LibreOffice validation failed:', error.message);
@@ -114,7 +114,8 @@ export class LibreOfficeDetectorService {
     const isValid = await this.validateLibreOffice();
     if (!isValid) {
       throw new Error(
-        'LibreOffice is installed but not working properly. Please check the installation.'
+        'LibreOffice is installed but not working properly. This might be due to a timeout or permission issue. ' +
+        'You can skip this validation by setting REQUIRE_LIBREOFFICE=false in your environment variables.'
       );
     }
 

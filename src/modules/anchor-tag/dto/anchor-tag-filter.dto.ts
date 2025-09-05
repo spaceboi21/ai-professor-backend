@@ -11,6 +11,7 @@ import { Types } from 'mongoose';
 import {
   AnchorTagTypeEnum,
   AnchorTagStatusEnum,
+  AnchorTypeEnum,
 } from 'src/common/constants/anchor-tag.constant';
 
 export class AnchorTagFilterDto {
@@ -73,6 +74,18 @@ export class AnchorTagFilterDto {
     required: false,
   })
   status?: AnchorTagStatusEnum;
+
+  @IsEnum(AnchorTypeEnum, {
+    message: 'Anchor type must be a valid anchor type',
+  })
+  @IsOptional()
+  @ApiProperty({
+    example: AnchorTypeEnum.QUIZ,
+    description: 'Filter by anchor type (QUIZ or AI_CHAT)',
+    enum: AnchorTypeEnum,
+    required: false,
+  })
+  anchor_type?: AnchorTypeEnum;
 
   @IsBoolean({ message: 'Is mandatory must be a boolean' })
   @IsOptional()

@@ -8,6 +8,7 @@ import { QuizGroup } from './quiz-group.schema';
 import {
   AnchorTagTypeEnum,
   AnchorTagStatusEnum,
+  AnchorTypeEnum,
 } from 'src/common/constants/anchor-tag.constant';
 import { RoleEnum } from 'src/common/constants/roles.constant';
 
@@ -71,8 +72,18 @@ export class AnchorTag extends Document {
   @Prop({ type: Boolean, required: true, default: false })
   is_mandatory: boolean;
 
-  @Prop({ type: Types.ObjectId, ref: QuizGroup.name, required: true })
+  @Prop({ type: Types.ObjectId, ref: QuizGroup.name, required: false })
   quiz_group_id: Types.ObjectId;
+
+  @Prop({ type: String, required: false })
+  ai_chat_question: string;
+
+  @Prop({
+    required: true,
+    enum: AnchorTypeEnum,
+    default: AnchorTypeEnum.QUIZ,
+  })
+  anchor_type: AnchorTypeEnum;
 
   @Prop({ type: [String], default: [] })
   tags: string[];
@@ -98,6 +109,7 @@ AnchorTagSchema.index({ bibliography_id: 1, content_type: 1, status: 1 });
 AnchorTagSchema.index({ quiz_group_id: 1 });
 AnchorTagSchema.index({ created_by: 1, status: 1 });
 AnchorTagSchema.index({ content_type: 1, content_reference: 1 });
+AnchorTagSchema.index({ anchor_type: 1, status: 1 });
 
 // Create compound index for bibliography_id, title, and deleted_at to ensure unique titles per bibliography
 // Only active anchor tags (deleted_at is null) will be considered for uniqueness

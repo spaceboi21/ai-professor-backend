@@ -26,3 +26,8 @@ export enum AnchorTagAttemptStatusEnum {
   SKIPPED = 'SKIPPED',
   FAILED = 'FAILED',
 }
+
+export enum AnchorTypeEnum {
+  QUIZ = 'QUIZ',
+  AI_CHAT = 'AI_CHAT',
+}
