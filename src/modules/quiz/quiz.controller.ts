@@ -10,6 +10,8 @@ import {
   UseGuards,
   Res,
 } from '@nestjs/common';
+import { HttpService } from '@nestjs/axios';
+import { firstValueFrom } from 'rxjs';
 import { ParseObjectIdPipe } from '@nestjs/mongoose';
 import {
   ApiBearerAuth,
@@ -19,7 +21,6 @@ import {
   ApiTags,
   ApiQuery,
   ApiBody,
-  ApiSecurity,
 } from '@nestjs/swagger';
 import { Types } from 'mongoose';
 import { Response } from 'express';
@@ -39,6 +40,10 @@ import { QuizAnalyticsService } from './quiz-analytics.service';
 import { QuizAnalyticsFilterDto } from './dto/quiz-analytics-filter.dto';
 import { StudentQuizAnalyticsFilterDto } from './dto/student-quiz-analytics-filter.dto';
 import { ExportFormatEnum } from 'src/common/constants/export.constant';
+import {
+  AIGenerateQuizRequest,
+  AIGenerateQuizResponse
+} from './dto/ai-generate-quiz.dto';
 
 @ApiTags('Quiz Management & Analytics')
 @ApiBearerAuth()
@@ -48,6 +53,7 @@ export class QuizController {
   constructor(
     private readonly quizService: QuizService,
     private readonly quizAnalyticsService: QuizAnalyticsService,
+    private readonly httpService: HttpService,
   ) {}
 
   // ========== QUIZ GROUP ENDPOINTS ==========
@@ -648,7 +654,7 @@ export class QuizController {
     - Most missed questions with accuracy rates
     - Time analysis and score distributions
     - Module and chapter breakdowns
-    
+
     **Access Control:** Only Professors and School Admins can access this endpoint.
     **Data Scope:** Analytics are filtered by the user's school and can be further filtered by module, chapter, quiz group, and date range.
     `,
@@ -767,18 +773,18 @@ export class QuizController {
     summary: 'Export quiz analytics data',
     description: `
     Export comprehensive quiz analytics in CSV or JSON format.
-    
+
     **Supported Formats:**
     - CSV: Comma-separated values with headers
     - JSON: Structured data with full analytics
-    
+
     **Export Content:**
     - Quiz group information
     - Module and chapter details
     - Total attempts and scores
     - Pass rates and time analysis
     - Most missed questions
-    
+
     **Access Control:** Only Professors and School Admins can export analytics.
     **Filtering:** All analytics filters are supported for export.
     `,
@@ -874,11 +880,11 @@ export class QuizController {
     summary: 'Get detailed student quiz analytics',
     description: `
     Retrieve detailed personal quiz analytics including attempt history, per-question breakdown, and performance summary.
-    
+
     **Access Control:**
     - **Students:** Can view their own detailed analytics
     - **Admins (School Admin/Professor):** Can view any student's detailed analytics by providing student_id
-    
+
     **Features:**
     - Personal attempt history with timestamps
     - Per-question accuracy breakdown
@@ -886,7 +892,7 @@ export class QuizController {
     - Time spent per question
     - Performance summary (best/worst scores)
     - Question explanations for incorrect answers
-    
+
     **Use Case:** Students can analyze their performance in detail.
     **Admin Use Case:** Admins can monitor individual student performance and identify areas for improvement.
     `,
@@ -1028,11 +1034,11 @@ export class QuizController {
     summary: 'Get quiz groups that student has attempted',
     description: `
     Retrieve a list of quiz groups that the student has attempted, with summary statistics for each group.
-    
+
     **Access Control:**
     - **Students:** Can view their own attempted quiz groups
     - **Admins (School Admin/Professor):** Can view any student's attempted quiz groups by providing student_id
-    
+
     **Features:**
     - List of quiz groups with attempt statistics
     - Average scores and pass rates per group
@@ -1040,7 +1046,7 @@ export class QuizController {
     - Attempt dates and frequency
     - Module and chapter information
     - Pagination support for large datasets
-    
+
     **Use Case:** Students can use this to select a specific quiz group to view detailed analytics.
     **Admin Use Case:** Admins can monitor student progress and performance across different quiz groups.
     `,
@@ -1163,21 +1169,21 @@ export class QuizController {
     summary: 'Export student quiz analytics data',
     description: `
     Export student quiz analytics in CSV or JSON format.
-    
+
     **Access Control:**
     - **Students:** Can export their own analytics
     - **Admins (School Admin/Professor):** Can export any student's analytics by providing student_id
-    
+
     **Supported Formats:**
     - CSV: Comma-separated values with attempt details
     - JSON: Structured data with full personal analytics
-    
+
     **Export Content:**
     - Personal attempt history
     - Quiz group and module information
     - Score and time analysis
     - Question breakdown with explanations
-    
+
     **Use Case:** Students can export their performance data for offline analysis.
     **Admin Use Case:** Admins can export student data for reporting and analysis.
     `,
@@ -1434,5 +1440,110 @@ export class QuizController {
   ) {
     const updatedFilter = { chapter_id: chapterId };
     return this.quizService.findAllQuizGroups(user, updatedFilter);
+  }
+
+  // ========== AI QUIZ GENERATION ENDPOINT ==========
+
+  @Post('generate-ai')
+  @Roles(RoleEnum.PROFESSOR, RoleEnum.SCHOOL_ADMIN)
+  @ApiOperation({
+    summary: 'Generate quiz questions using AI',
+    description:
+      'Generates quiz questions using AI based on the provided parameters. Only Professors and School Admins can generate AI quizzes.',
+  })
+  @ApiBody({
+    type: AIGenerateQuizRequest,
+    description: 'AI quiz generation parameters',
+    examples: {
+      example1: {
+        summary: 'Module Quiz Generation',
+        value: {
+          module_id: '507f1f77bcf86cd799439011',
+          type: 'MODULE',
+          subject: 'Psychology',
+          description: 'Basic concepts of cognitive psychology and memory',
+          category: 'Cognitive Psychology',
+          difficulty: 'INTERMEDIATE',
+          time_left: 30,
+          question_count: 10,
+          question_types: ['SINGLE_SELECT', 'MULTI_SELECT'],
+          content_context: 'Focus on memory formation, retrieval processes, and cognitive biases',
+        },
+      },
+      example2: {
+        summary: 'Chapter Quiz Generation',
+        value: {
+          module_id: '507f1f77bcf86cd799439011',
+          chapter_id: '507f1f77bcf86cd799439012',
+          type: 'CHAPTER',
+          subject: 'Mathematics',
+          description: 'Algebra fundamentals',
+          category: 'Algebra',
+          difficulty: 'BEGINNER',
+          time_left: 20,
+          question_count: 5,
+          question_types: ['SINGLE_SELECT'],
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Quiz questions generated successfully',
+    type: AIGenerateQuizResponse,
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Invalid input data or validation error',
+  })
+  @ApiResponse({
+    status: 500,
+    description: 'AI service error or internal server error',
+  })
+  async generateQuizWithAI(
+    @Body() request: AIGenerateQuizRequest,
+    @User() user: JWTUserPayload,
+  ): Promise<AIGenerateQuizResponse> {
+    const pythonServiceUrl = process.env.PYTHON_AI_SERVICE_URL || 'http://localhost:8000';
+    const fullUrl = `${pythonServiceUrl}/api/v1/chat/quiz/generate`;
+
+    // Debug logging (remove in production)
+    console.log(`Calling AI service at: ${fullUrl}`);
+
+    try {
+      const response = await firstValueFrom(
+        this.httpService.post(`${pythonServiceUrl}/api/v1/chat/quiz/generate`, {
+          subject: request.subject,
+          description: request.description,
+          category: request.category,
+          difficulty: request.difficulty,
+          question_count: request.question_count,
+          question_types: request.question_types,
+          content_context: request.content_context,
+          quiz_type: request.type,
+          module_id: request.module_id,
+          chapter_id: request.chapter_id,
+          bibliography_id: request.bibliography_id,
+          time_left: request.time_left,
+        })
+      );
+
+      return { questions: response.data.questions };
+    } catch (error) {
+      console.error('AI service call failed:', error);
+
+      // Handle different types of errors
+      if (error.response?.status === 404) {
+        throw new Error(`AI service endpoint not found at ${fullUrl}. Please check if the AI service is running and the /api/v1/chat/quiz/generate endpoint is available.`);
+      } else if (error.response?.status >= 500) {
+        throw new Error('AI service is temporarily unavailable. Please try again later.');
+      } else if (error.code === 'ECONNREFUSED') {
+        throw new Error(`Unable to connect to AI service at ${pythonServiceUrl}. Please check if the service is running.`);
+      } else if (error.code === 'ENOTFOUND') {
+        throw new Error(`AI service host not found: ${pythonServiceUrl}. Please check the PYTHON_AI_SERVICE_URL environment variable.`);
+      } else {
+        throw new Error(`AI quiz generation failed: ${error.message || 'Unknown error'}`);
+      }
+    }
   }
 }
