@@ -285,7 +285,7 @@ export class QuizService {
       filter.module_id = new Types.ObjectId(filterDto.module_id);
       filter.type = QuizTypeEnum.MODULE;
     }
-    if (filterDto?.chapter_id) {
+    if (filterDto?.chapter_id && filterDto.chapter_id !== '') {
       filter.chapter_id = new Types.ObjectId(filterDto.chapter_id);
       filter.type = QuizTypeEnum.CHAPTER;
     }
@@ -662,7 +662,7 @@ export class QuizService {
     if (filterDto?.module_id) {
       filter.module_id = new Types.ObjectId(filterDto.module_id);
     }
-    if (filterDto?.chapter_id) {
+    if (filterDto?.chapter_id && filterDto.chapter_id !== '') {
       filter.chapter_id = new Types.ObjectId(filterDto.chapter_id);
     }
     if (filterDto?.tags) {

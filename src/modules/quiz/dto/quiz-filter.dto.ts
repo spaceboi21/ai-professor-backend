@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsEnum, IsOptional, IsMongoId, IsString } from 'class-validator';
+import { IsEnum, IsOptional, IsMongoId, IsString, ValidateIf } from 'class-validator';
 import { Types } from 'mongoose';
 import { DifficultyEnum } from 'src/common/constants/difficulty.constant';
 import {
@@ -51,11 +51,12 @@ export class QuizGroupFilterDto extends PaginationDto {
   })
   module_id?: string | Types.ObjectId;
 
+  @ValidateIf((o: QuizGroupFilterDto) => Boolean(o.chapter_id && o.chapter_id !== ''))
   @IsMongoId({ message: 'Chapter ID must be a valid MongoDB ObjectId' })
   @IsOptional()
   @ApiProperty({
     example: '507f1f77bcf86cd799439012',
-    description: 'Filter by chapter ID',
+    description: 'Filter by chapter ID (optional, can be empty string)',
     required: false,
   })
   chapter_id?: string | Types.ObjectId;
@@ -101,11 +102,12 @@ export class QuizFilterDto extends PaginationDto {
   })
   module_id?: string | Types.ObjectId;
 
+  @ValidateIf((o: QuizFilterDto) => Boolean(o.chapter_id && o.chapter_id !== ''))
   @IsMongoId({ message: 'Chapter ID must be a valid MongoDB ObjectId' })
   @IsOptional()
   @ApiProperty({
     example: '507f1f77bcf86cd799439012',
-    description: 'Filter by chapter ID',
+    description: 'Filter by chapter ID (optional, can be empty string)',
     required: false,
   })
   chapter_id?: string | Types.ObjectId;
