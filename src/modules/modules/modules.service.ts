@@ -276,6 +276,7 @@ export class ModulesService {
       (sum, chapter) => sum + (chapter.duration || 0),
       0,
     );
+    this.logger.log(`Total duration for module: ${moduleId} is ${totalDuration}`);
     await ModuleModel.findByIdAndUpdate(moduleId, { duration: totalDuration });
     return totalDuration;
   }

@@ -1166,23 +1166,24 @@ export class ChaptersService {
     const ChapterModel = tenantConnection.model(Chapter.name, ChapterSchema);
 
     try {
+      // Get the chapter first to retrieve module_id
+      const chapterToDelete = await ChapterModel.findOne({
+        _id: id,
+        deleted_at: null,
+      });
+
+      if (!chapterToDelete) {
+        throw new NotFoundException('Chapter not found');
+      }
+
+      const deletedSequence = chapterToDelete.sequence;
+      const module_id = chapterToDelete.module_id;
+
       // Use a transaction to ensure atomic updates
       const session = await tenantConnection.startSession();
 
       try {
         await session.withTransaction(async () => {
-          const chapterToDelete = await ChapterModel.findOne({
-            _id: id,
-            deleted_at: null,
-          }).session(session);
-
-          if (!chapterToDelete) {
-            throw new NotFoundException('Chapter not found');
-          }
-
-          const deletedSequence = chapterToDelete.sequence;
-          const module_id = chapterToDelete.module_id;
-
           // ✅ Step 1: Soft delete and move sequence to -1 (avoid conflict)
           const deletedChapter = await ChapterModel.findOneAndUpdate(
             { _id: id, deleted_at: null },
@@ -1210,6 +1211,12 @@ export class ChaptersService {
             },
           ).session(session);
         });
+
+        // ✅ Step 3: Recalculate module duration after chapter deletion
+        await this.modulesService.recalculateModuleDuration(
+          module_id,
+          tenantConnection,
+        );
 
         return {
           message: this.errorMessageService.getSuccessMessageWithLanguage(

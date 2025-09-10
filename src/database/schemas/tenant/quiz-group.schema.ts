@@ -21,16 +21,16 @@ export class QuizGroup extends Document {
   @Prop({ required: true })
   subject: string;
 
-  @Prop({ required: true })
+  @Prop()
   description: string;
 
-  @Prop({ required: true, enum: DifficultyEnum })
+  @Prop({ enum: DifficultyEnum })
   difficulty: DifficultyEnum;
 
-  @Prop({ required: true, type: Number, min: 1 })
+  @Prop({ type: Number, min: 1 })
   time_left: number; // in minutes
 
-  @Prop({ required: true })
+  @Prop()
   category: string;
 
   @Prop({ type: Types.ObjectId, ref: Module.name })
@@ -42,7 +42,7 @@ export class QuizGroup extends Document {
   @Prop({ type: Types.ObjectId, ref: Bibliography.name, default: null })
   bibliography_id: Types.ObjectId;
 
-  @Prop({ required: true, enum: QuizTypeEnum })
+  @Prop({ enum: QuizTypeEnum })
   type: QuizTypeEnum;
 
   @Prop({ type: Types.ObjectId, ref: User.name, required: true })

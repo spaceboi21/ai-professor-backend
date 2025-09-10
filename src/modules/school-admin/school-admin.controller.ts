@@ -288,7 +288,7 @@ export class SchoolAdminController {
   @ApiOperation({
     summary: 'Get school admin details by ID',
     description:
-      'Super admin can view any school admin, school admin can only view their own profile',
+      'Super admin can view any school admin, school admin can view other school admins within the same school',
   })
   @ApiParam({
     name: 'id',
@@ -344,7 +344,7 @@ export class SchoolAdminController {
   @ApiOperation({
     summary: 'Update school admin details',
     description:
-      'Super admin can update any school admin including status and school_id, school admin can only update their own profile',
+      'Super admin can update any school admin including status and school_id, school admin can update other school admins within the same school including status but not school_id',
   })
   @ApiParam({
     name: 'id',

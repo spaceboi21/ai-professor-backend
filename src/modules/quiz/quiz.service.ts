@@ -574,6 +574,17 @@ export class QuizService {
       tags = [],
     } = createQuizDto;
 
+    // Validate required fields
+    if (!quiz_group_id) {
+      throw new BadRequestException(
+        this.errorMessageService.getMessageWithLanguage(
+          'QUIZ',
+          'QUIZ_GROUP_ID_REQUIRED',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
+    }
+
     // Validate that the quiz group exists
     const quizGroup = await QuizGroupModel.findOne({
       _id: quiz_group_id,

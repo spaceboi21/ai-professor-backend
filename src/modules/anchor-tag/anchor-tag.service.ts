@@ -255,7 +255,7 @@ export class AnchorTagService {
       title: createAnchorTagDto.title,
       description: createAnchorTagDto.description ?? null,
       content_type: createAnchorTagDto.content_type,
-      content_reference: createAnchorTagDto.content_reference,
+      content_reference: createAnchorTagDto.content_reference ?? null,
       timestamp_seconds: createAnchorTagDto.timestamp_seconds ?? null,
       page_number: createAnchorTagDto.page_number ?? null,
       slide_number: createAnchorTagDto.slide_number ?? null,
@@ -986,7 +986,7 @@ export class AnchorTagService {
 
   private validateContentSpecificFields(
     content_type: AnchorTagTypeEnum,
-    content_reference: string,
+    content_reference?: string,
     timestamp_seconds?: number,
     page_number?: number,
     slide_number?: number,

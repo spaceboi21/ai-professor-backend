@@ -50,7 +50,7 @@ export class AnchorTag extends Document {
   @Prop({ required: true, enum: AnchorTagTypeEnum })
   content_type: AnchorTagTypeEnum;
 
-  @Prop({ required: true })
+  @Prop()
   content_reference: string; // e.g., "slide-3", "00:02:30", "page-5"
 
   @Prop({ type: Number })

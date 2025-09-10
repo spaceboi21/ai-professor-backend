@@ -19,7 +19,6 @@ export class Quiz extends Document {
   @Prop({
     type: Types.ObjectId,
     ref: QuizGroup.name,
-    required: true,
     index: true,
   })
   quiz_group_id: Types.ObjectId;
@@ -33,7 +32,7 @@ export class Quiz extends Document {
   @Prop({ required: true })
   question: string;
 
-  @Prop({ required: true, enum: QuizQuestionTypeEnum })
+  @Prop({ enum: QuizQuestionTypeEnum })
   type: QuizQuestionTypeEnum;
 
   @Prop({ required: false, type: [String], default: [] })

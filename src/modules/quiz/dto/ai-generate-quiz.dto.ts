@@ -10,6 +10,7 @@ import {
   IsNumber,
   Min,
   Max,
+  ValidateIf,
 } from 'class-validator';
 import { Types } from 'mongoose';
 import { QuizTypeEnum, QuizQuestionTypeEnum } from 'src/common/constants/quiz.constant';
@@ -23,11 +24,12 @@ export class AIGenerateQuizRequest {
   })
   module_id: string | Types.ObjectId;
 
+  @ValidateIf((o) => o.chapter_id && o.chapter_id !== '')
   @IsMongoId({ message: 'Chapter ID must be a valid MongoDB ObjectId' })
   @IsOptional()
   @ApiProperty({
     example: '507f1f77bcf86cd799439012',
-    description: 'ID of the chapter for quiz generation (optional)',
+    description: 'ID of the chapter for quiz generation (optional, can be empty string)',
     required: false,
   })
   chapter_id?: string | Types.ObjectId;
@@ -61,20 +63,22 @@ export class AIGenerateQuizRequest {
   subject: string;
 
   @IsString({ message: 'Description must be a string' })
-  @IsNotEmpty({ message: 'Description is required' })
+  @IsOptional()
   @ApiProperty({
     example: 'Basic concepts of cognitive psychology and memory',
     description: 'Description of the quiz content',
+    required: false,
   })
-  description: string;
+  description?: string;
 
   @IsString({ message: 'Category must be a string' })
-  @IsNotEmpty({ message: 'Category is required' })
+  @IsOptional()
   @ApiProperty({
     example: 'Cognitive Psychology',
     description: 'Category of the quiz',
+    required: false,
   })
-  category: string;
+  category?: string;
 
   @IsEnum(['BEGINNER', 'INTERMEDIATE', 'ADVANCED'], {
     message: 'Difficulty must be BEGINNER, INTERMEDIATE, or ADVANCED',

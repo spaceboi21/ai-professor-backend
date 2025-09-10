@@ -69,13 +69,14 @@ export class CreateAnchorTagDto {
   content_type: AnchorTagTypeEnum;
 
   @IsString({ message: 'Content reference must be a string' })
-  @IsNotEmpty({ message: 'Content reference is required' })
+  @IsOptional()
   @ApiProperty({
     example: 'slide-3',
     description:
       'Reference to the specific content location (e.g., "slide-3", "00:02:30", "page-5")',
+    required: false,
   })
-  content_reference: string;
+  content_reference?: string;
 
   @ValidateIf((o) => o.content_type === AnchorTagTypeEnum.VIDEO)
   @IsNumber({}, { message: 'Timestamp seconds must be a number' })

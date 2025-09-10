@@ -1451,6 +1451,10 @@ export const ERROR_MESSAGES: {
       [LanguageEnum.FRENCH]:
         'Réponses invalides fournies. Toutes les réponses doivent provenir du tableau des options.',
     },
+    QUIZ_GROUP_ID_REQUIRED: {
+      [LanguageEnum.ENGLISH]: 'Quiz group ID is required',
+      [LanguageEnum.FRENCH]: "L'ID du groupe de quiz est requis",
+    },
   },
 
   // Anchor Tag Related
@@ -1665,6 +1669,10 @@ export const ERROR_MESSAGES: {
       [LanguageEnum.ENGLISH]: 'Cannot update status or school assignment',
       [LanguageEnum.FRENCH]:
         "Impossible de mettre à jour le statut ou l'affectation d'école",
+    },
+    CANNOT_UPDATE_SCHOOL: {
+      [LanguageEnum.ENGLISH]: 'Cannot update school assignment',
+      [LanguageEnum.FRENCH]: "Impossible de mettre à jour l'affectation d'école",
     },
     NOT_FOUND_AFTER_UPDATE: {
       [LanguageEnum.ENGLISH]: 'School admin not found after update',

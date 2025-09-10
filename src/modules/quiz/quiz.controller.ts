@@ -1461,8 +1461,6 @@ export class QuizController {
           module_id: '507f1f77bcf86cd799439011',
           type: 'MODULE',
           subject: 'Psychology',
-          description: 'Basic concepts of cognitive psychology and memory',
-          category: 'Cognitive Psychology',
           difficulty: 'INTERMEDIATE',
           time_left: 30,
           question_count: 10,
@@ -1477,8 +1475,6 @@ export class QuizController {
           chapter_id: '507f1f77bcf86cd799439012',
           type: 'CHAPTER',
           subject: 'Mathematics',
-          description: 'Algebra fundamentals',
-          category: 'Algebra',
           difficulty: 'BEGINNER',
           time_left: 20,
           question_count: 5,
@@ -1511,21 +1507,24 @@ export class QuizController {
     console.log(`Calling AI service at: ${fullUrl}`);
 
     try {
+      // Prepare the request payload, handling empty string chapter_id
+      const payload = {
+        subject: request.subject,
+        description: request.description,
+        category: request.category,
+        difficulty: request.difficulty,
+        question_count: request.question_count,
+        question_types: request.question_types,
+        content_context: request.content_context,
+        quiz_type: request.type,
+        module_id: request.module_id,
+        chapter_id: request.chapter_id && request.chapter_id !== '' ? request.chapter_id : null,
+        bibliography_id: request.bibliography_id,
+        time_left: request.time_left,
+      };
+
       const response = await firstValueFrom(
-        this.httpService.post(`${pythonServiceUrl}/api/v1/chat/quiz/generate`, {
-          subject: request.subject,
-          description: request.description,
-          category: request.category,
-          difficulty: request.difficulty,
-          question_count: request.question_count,
-          question_types: request.question_types,
-          content_context: request.content_context,
-          quiz_type: request.type,
-          module_id: request.module_id,
-          chapter_id: request.chapter_id,
-          bibliography_id: request.bibliography_id,
-          time_left: request.time_left,
-        })
+        this.httpService.post(`${pythonServiceUrl}/api/v1/chat/quiz/generate`, payload)
       );
 
       return { questions: response.data.questions };

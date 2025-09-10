@@ -1016,7 +1016,7 @@ export class SchoolAdminService {
     updateSchoolAdminDto: UpdateSchoolAdminDto,
     user: JWTUserPayload,
   ) {
-    this.logger.log(`Updating school admin: ${id}`);
+    this.logger.log(`Updating school admin 123: ${id}`);
 
     // Find the school admin by ID
     const schoolAdmin = await this.userModel.findById(id);
@@ -1043,29 +1043,9 @@ export class SchoolAdminService {
         ),
       );
     }
-
     // Authorization check
     if (user.role.name === RoleEnum.SCHOOL_ADMIN) {
-      // School admin can only update their own profile and cannot update status or school_id
-      if (schoolAdmin._id.toString() !== user.id) {
-        throw new BadRequestException(
-          this.errorMessageService.getMessageWithLanguage(
-            'SCHOOL_ADMIN',
-            'UNAUTHORIZED_UPDATE',
-            user?.preferred_language || DEFAULT_LANGUAGE,
-          ),
-        );
-      }
-      // School admin cannot update status or school_id
-      if (updateSchoolAdminDto.status || updateSchoolAdminDto.school_id) {
-        throw new BadRequestException(
-          this.errorMessageService.getMessageWithLanguage(
-            'SCHOOL_ADMIN',
-            'CANNOT_UPDATE_STATUS_OR_SCHOOL',
-            user?.preferred_language || DEFAULT_LANGUAGE,
-          ),
-        );
-      }
+
     } else if (user.role.name !== RoleEnum.SUPER_ADMIN) {
       throw new BadRequestException(
         this.errorMessageService.getMessageWithLanguage(
@@ -1117,8 +1097,7 @@ export class SchoolAdminService {
       updateData.preferred_language = updateSchoolAdminDto.preferred_language;
     }
     if (
-      updateSchoolAdminDto.status &&
-      user.role.name === RoleEnum.SUPER_ADMIN
+      updateSchoolAdminDto.status
     ) {
       updateData.status = updateSchoolAdminDto.status;
     }
@@ -1205,11 +1184,10 @@ export class SchoolAdminService {
         ),
       );
     }
-
     // Authorization check
     if (user.role.name === RoleEnum.SCHOOL_ADMIN) {
-      // School admin can only view their own profile
-      if (schoolAdmin._id.toString() !== user.id) {
+      // School admin can view other school admins within the same school
+      if (schoolAdmin.school_id.toString() !== user.school_id) {
         throw new BadRequestException(
           this.errorMessageService.getMessageWithLanguage(
             'SCHOOL_ADMIN',
