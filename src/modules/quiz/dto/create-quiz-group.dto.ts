@@ -7,6 +7,7 @@ import {
   IsMongoId,
   IsNumber,
   Min,
+  ValidateIf,
 } from 'class-validator';
 import { Types } from 'mongoose';
 import { DifficultyEnum } from 'src/common/constants/difficulty.constant';
@@ -84,11 +85,12 @@ export class CreateQuizGroupDto {
   })
   module_id?: string | Types.ObjectId;
 
+  @ValidateIf((o: CreateQuizGroupDto) => o.chapter_id && o.chapter_id !== '')
   @IsMongoId({ message: 'Chapter ID must be a valid MongoDB ObjectId' })
   @IsOptional()
   @ApiProperty({
     example: '507f1f77bcf86cd799439012',
-    description: 'ID of the parent chapter',
+    description: 'ID of the parent chapter (optional, can be empty string)',
     required: false,
   })
   chapter_id?: string | Types.ObjectId;

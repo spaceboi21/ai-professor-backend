@@ -115,7 +115,7 @@ export class QuizService {
         ),
       );
     }
-    if (type === QuizTypeEnum.CHAPTER && !chapter_id) {
+    if (type === QuizTypeEnum.CHAPTER && (!chapter_id || chapter_id === '')) {
       throw new BadRequestException(
         this.errorMessageService.getMessageWithLanguage(
           'QUIZ',
@@ -161,7 +161,7 @@ export class QuizService {
       }
     }
 
-    if (type === QuizTypeEnum.CHAPTER) {
+    if (type === QuizTypeEnum.CHAPTER && chapter_id && chapter_id !== '') {
       const chapterExists = await ChapterModel.findOne({
         _id: chapter_id,
         deleted_at: null,
@@ -207,7 +207,7 @@ export class QuizService {
           ? new Types.ObjectId(module_id)
           : null,
       chapter_id:
-        type === QuizTypeEnum.CHAPTER || type === QuizTypeEnum.ANCHOR_TAG
+        (type === QuizTypeEnum.CHAPTER || type === QuizTypeEnum.ANCHOR_TAG) && chapter_id && chapter_id !== ''
           ? new Types.ObjectId(chapter_id)
           : null,
       bibliography_id:
