@@ -1524,7 +1524,7 @@ export class QuizController {
       };
 
       const response = await firstValueFrom(
-        this.httpService.post(`${pythonServiceUrl}/api/v1/chat/quiz/generate`, payload)
+        this.httpService.post(`${pythonServiceUrl}/chat/quiz/generate`, payload)
       );
 
       return { questions: response.data.questions };
@@ -1537,9 +1537,9 @@ export class QuizController {
       } else if (error.response?.status >= 500) {
         throw new Error('AI service is temporarily unavailable. Please try again later.');
       } else if (error.code === 'ECONNREFUSED') {
-        throw new Error(`Unable to connect to AI service at ${pythonServiceUrl}. Please check if the service is running.`);
+        throw new Error(`Unable to connect to AI service at ${fullUrl}. Please check if the service is running.`);
       } else if (error.code === 'ENOTFOUND') {
-        throw new Error(`AI service host not found: ${pythonServiceUrl}. Please check the PYTHON_AI_SERVICE_URL environment variable.`);
+        throw new Error(`AI service host not found: ${fullUrl}. Please check the PYTHON_AI_SERVICE_URL environment variable.`);
       } else {
         throw new Error(`AI quiz generation failed: ${error.message || 'Unknown error'}`);
       }
