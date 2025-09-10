@@ -1501,7 +1501,7 @@ export class QuizController {
     @User() user: JWTUserPayload,
   ): Promise<AIGenerateQuizResponse> {
     const pythonServiceUrl = process.env.PYTHON_API_URL || 'http://localhost:8000';
-    const fullUrl = `${pythonServiceUrl}/quiz/generate`;
+    const fullUrl = `${pythonServiceUrl}/chat/quiz/generate`;
 
     // Debug logging (remove in production)
     console.log(`Calling AI service at: ${fullUrl}`);
