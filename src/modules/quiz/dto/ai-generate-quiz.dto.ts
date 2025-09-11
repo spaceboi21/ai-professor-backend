@@ -34,6 +34,14 @@ export class AIGenerateQuizRequest {
   })
   chapter_id?: string | Types.ObjectId;
 
+  @IsMongoId({ message: 'Quiz Group ID must be a valid MongoDB ObjectId' })
+  @IsNotEmpty({ message: 'Quiz Group ID is required' })
+  @ApiProperty({
+    example: '507f1f77bcf86cd799439011',
+    description: 'ID of the quiz group to generate quiz',
+  })
+  quiz_group_id: string | Types.ObjectId;
+
   @IsMongoId({ message: 'Bibliography ID must be a valid MongoDB ObjectId' })
   @IsOptional()
   @ApiProperty({

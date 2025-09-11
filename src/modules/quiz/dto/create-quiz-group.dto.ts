@@ -86,7 +86,7 @@ export class CreateQuizGroupDto {
   module_id?: string | Types.ObjectId;
 
   @ValidateIf((o: CreateQuizGroupDto) => Boolean(o.chapter_id && o.chapter_id !== ''))
-  @IsMongoId({ message: 'Chapter ID must be a valid MongoDB ObjectId' })
+  // @IsMongoId({ message: 'Chapter ID must be a valid MongoDB ObjectId' })
   @IsOptional()
   @ApiProperty({
     example: '507f1f77bcf86cd799439012',

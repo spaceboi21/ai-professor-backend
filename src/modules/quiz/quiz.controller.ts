@@ -41,9 +41,12 @@ import { QuizAnalyticsFilterDto } from './dto/quiz-analytics-filter.dto';
 import { StudentQuizAnalyticsFilterDto } from './dto/student-quiz-analytics-filter.dto';
 import { ExportFormatEnum } from 'src/common/constants/export.constant';
 import {
+  AIGeneratedQuestion,
   AIGenerateQuizRequest,
-  AIGenerateQuizResponse
+  AIGenerateQuizResponse,
 } from './dto/ai-generate-quiz.dto';
+import { QuizQuestionTypeEnum } from 'src/common/constants/quiz.constant';
+import { QuizQuestion } from 'src/common/types/quiz.type';
 
 @ApiTags('Quiz Management & Analytics')
 @ApiBearerAuth()
@@ -205,7 +208,8 @@ export class QuizController {
   })
   @ApiResponse({
     status: 200,
-    description: 'Quiz group retrieved successfully with all non-deleted quizzes',
+    description:
+      'Quiz group retrieved successfully with all non-deleted quizzes',
     schema: {
       example: {
         _id: '507f1f77bcf86cd799439011',
@@ -1465,7 +1469,8 @@ export class QuizController {
           time_left: 30,
           question_count: 10,
           question_types: ['SINGLE_SELECT', 'MULTI_SELECT'],
-          content_context: 'Focus on memory formation, retrieval processes, and cognitive biases',
+          content_context:
+            'Focus on memory formation, retrieval processes, and cognitive biases',
         },
       },
       example2: {
@@ -1500,7 +1505,8 @@ export class QuizController {
     @Body() request: AIGenerateQuizRequest,
     @User() user: JWTUserPayload,
   ): Promise<AIGenerateQuizResponse> {
-    const pythonServiceUrl = process.env.PYTHON_API_URL || 'http://localhost:8000';
+    const pythonServiceUrl =
+      process.env.PYTHON_API_URL || 'http://localhost:8000';
     const fullUrl = `${pythonServiceUrl}/chat/quiz/generate`;
 
     // Debug logging (remove in production)
@@ -1518,30 +1524,76 @@ export class QuizController {
         content_context: request.content_context,
         quiz_type: request.type,
         module_id: request.module_id,
-        chapter_id: request.chapter_id && request.chapter_id !== '' ? request.chapter_id : null,
+        chapter_id:
+          request.chapter_id && request.chapter_id !== ''
+            ? request.chapter_id
+            : null,
         bibliography_id: request.bibliography_id,
         time_left: request.time_left,
+        quiz_group_id: request.quiz_group_id,
       };
 
-      const response = await firstValueFrom(
-        this.httpService.post(`${pythonServiceUrl}/chat/quiz/generate`, payload)
-      );
+      const response: { data: { questions: AIGeneratedQuestion[] } } =
+        await firstValueFrom(
+          this.httpService.post(
+            `${pythonServiceUrl}/chat/quiz/generate`,
+            payload,
+          ),
+        );
 
-      return { questions: response.data.questions };
+      const questions: any[] = [];
+      const existingQuizQuestions = await this.quizService.findAllQuizzes(
+        user,
+        { quiz_group_id: request.quiz_group_id },
+      );
+      existingQuizQuestions.forEach((question) => {
+        questions.push(question);
+      });
+      await Promise.all(
+        response.data.questions?.map(async (question, index) => {
+          const createdQuestion = await this.quizService.createQuiz(
+            {
+              quiz_group_id: new Types.ObjectId(request.quiz_group_id),
+              question: question.question,
+              type: question.type as QuizQuestionTypeEnum,
+              options: question.options ?? [],
+              sequence: questions.length + index + 1,
+              tags: question.tags ?? [],
+            } as CreateQuizDto,
+            user,
+          );
+          questions.push(createdQuestion);
+        }),
+      ).catch((error) => {
+        console.error('Error creating quiz question:', error);
+        throw new Error('Error creating quiz question');
+      });
+
+      return { questions: questions.sort((a, b) => a.sequence - b.sequence) };
     } catch (error) {
       console.error('AI service call failed:', error);
 
       // Handle different types of errors
       if (error.response?.status === 404) {
-        throw new Error(`AI service endpoint not found at ${fullUrl}. Please check if the AI service is running and the /api/v1/chat/quiz/generate endpoint is available.`);
+        throw new Error(
+          `AI service endpoint not found at ${fullUrl}. Please check if the AI service is running and the /api/v1/chat/quiz/generate endpoint is available.`,
+        );
       } else if (error.response?.status >= 500) {
-        throw new Error('AI service is temporarily unavailable. Please try again later.');
+        throw new Error(
+          'AI service is temporarily unavailable. Please try again later.',
+        );
       } else if (error.code === 'ECONNREFUSED') {
-        throw new Error(`Unable to connect to AI service at ${fullUrl}. Please check if the service is running.`);
+        throw new Error(
+          `Unable to connect to AI service at ${fullUrl}. Please check if the service is running.`,
+        );
       } else if (error.code === 'ENOTFOUND') {
-        throw new Error(`AI service host not found: ${fullUrl}. Please check the PYTHON_AI_SERVICE_URL environment variable.`);
+        throw new Error(
+          `AI service host not found: ${fullUrl}. Please check the PYTHON_AI_SERVICE_URL environment variable.`,
+        );
       } else {
-        throw new Error(`AI quiz generation failed: ${error.message || 'Unknown error'}`);
+        throw new Error(
+          `AI quiz generation failed: ${error.message || 'Unknown error'}`,
+        );
       }
     }
   }
