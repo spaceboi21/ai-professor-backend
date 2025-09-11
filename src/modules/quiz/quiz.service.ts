@@ -428,6 +428,7 @@ export class QuizService {
     const QuizGroupModel = connection.model(QuizGroup.name, QuizGroupSchema);
     const ModuleModel = connection.model(Module.name, ModuleSchema);
     const ChapterModel = connection.model(Chapter.name, ChapterSchema);
+    const QuizModel = connection.model(Quiz.name, QuizSchema);
 
     const quizGroup = await QuizGroupModel.findOne({
       _id: id,
@@ -486,9 +487,16 @@ export class QuizService {
     Object.assign(quizGroup, updateQuizGroupDto);
     await quizGroup.save();
 
+    const questions = await QuizModel.find({
+      quiz_group_id: id,
+      deleted_at: null,
+    }).sort({ sequence: 1 });
     this.logger.log(`Quiz group updated with ID: ${id} by user: ${user.id}`);
 
-    return quizGroup;
+    return {
+      ...quizGroup,
+      quiz: questions,
+    };
   }
 
   async removeQuizGroup(id: string | Types.ObjectId, user: JWTUserPayload) {
