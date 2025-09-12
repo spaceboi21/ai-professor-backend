@@ -125,6 +125,7 @@ export class ModulesService {
       difficulty,
       tags,
       thumbnail,
+      year,
     } = createModuleDto;
 
     this.logger.log(`Creating module: ${title} by user: ${user.id}`);
@@ -141,6 +142,17 @@ export class ModulesService {
           'NOT_FOUND',
           user?.preferred_language || DEFAULT_LANGUAGE,
         ),
+      );
+    }
+
+    // Validate year is between 1 and 5
+    if (year < 1 || year > 5) {
+      throw new BadRequestException(
+        this.errorMessageService.getMessageWithLanguage(
+          'MODULE',
+          'INVALID_YEAR',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ) || 'Year must be between 1 and 5',
       );
     }
 
@@ -205,6 +217,7 @@ export class ModulesService {
         difficulty,
         tags: tags || [],
         thumbnail: thumbnail || '/uploads/default-module-thumbnail.jpg',
+        year,
         created_by: new Types.ObjectId(user.id),
         created_by_role: user.role.name as RoleEnum,
         // Add validation fields
@@ -238,6 +251,7 @@ export class ModulesService {
           duration: savedModule.duration,
           difficulty: savedModule.difficulty,
           tags: savedModule.tags,
+          year: savedModule.year,
           created_by: savedModule.created_by,
           created_by_role: savedModule.created_by_role,
           is_validated: savedModule.is_validated,
@@ -276,7 +290,9 @@ export class ModulesService {
       (sum, chapter) => sum + (chapter.duration || 0),
       0,
     );
-    this.logger.log(`Total duration for module: ${moduleId} is ${totalDuration}`);
+    this.logger.log(
+      `Total duration for module: ${moduleId} is ${totalDuration}`,
+    );
     await ModuleModel.findByIdAndUpdate(moduleId, { duration: totalDuration });
     return totalDuration;
   }
@@ -824,6 +840,25 @@ export class ModulesService {
           user?.preferred_language || DEFAULT_LANGUAGE,
         ),
       );
+    }
+
+    // Only school admins can update year
+    if (user.role.name !== RoleEnum.SCHOOL_ADMIN) {
+      moduleUpdateData.year = undefined;
+    }
+    
+    // Validate year if provided
+    if (moduleUpdateData.year !== undefined) {
+      // Validate year is between 1 and 5
+      if (moduleUpdateData.year < 1 || moduleUpdateData.year > 5) {
+        throw new BadRequestException(
+          this.errorMessageService.getMessageWithLanguage(
+            'MODULE',
+            'INVALID_YEAR',
+            user?.preferred_language || DEFAULT_LANGUAGE,
+          ) || 'Year must be between 1 and 5',
+        );
+      }
     }
 
     // Get tenant connection for the school

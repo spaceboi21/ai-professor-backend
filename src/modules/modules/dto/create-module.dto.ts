@@ -85,4 +85,14 @@ export class CreateModuleDto {
     required: false,
   })
   thumbnail?: string;
+
+  @IsNumber({}, { message: 'Year must be a number' })
+  @IsNotEmpty({ message: 'Year is required' })
+  @ApiProperty({
+    example: 1,
+    description: 'Academic year for the module (1-5)',
+    minimum: 1,
+    maximum: 5,
+  })
+  year: number;
 }

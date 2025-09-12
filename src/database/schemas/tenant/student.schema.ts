@@ -74,6 +74,9 @@ export class Student extends Document {
   })
   preferred_language: LanguageEnum;
 
+  @Prop({ required: true, type: Number, min: 1, max: 5 })
+  year: number;
+
   readonly created_at?: Date;
   readonly updated_at?: Date;
 }

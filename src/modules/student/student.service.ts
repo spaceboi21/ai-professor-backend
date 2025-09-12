@@ -66,6 +66,7 @@ export class StudentService {
       school_id,
       status,
       preferred_language,
+      year,
     } = createStudentDto;
 
     this.logger.log(
@@ -134,6 +135,17 @@ export class StudentService {
           ),
         );
       }
+    }
+
+    // Validate year is between 1 and 5
+    if (year < 1 || year > 5) {
+      throw new BadRequestException(
+        this.errorMessageService.getMessageWithLanguage(
+          'STUDENT',
+          'INVALID_YEAR',
+          adminUser?.preferred_language || DEFAULT_LANGUAGE,
+        ) || 'Year must be between 1 and 5',
+      );
     }
 
     // Check if email already exists in central users
@@ -230,6 +242,7 @@ export class StudentService {
         created_by_role: adminUser.role.name as RoleEnum,
         is_csv_upload: false, // Mark as non-CSV upload
         preferred_language: preferred_language || DEFAULT_LANGUAGE, // Use provided language or default
+        year,
       });
 
       const savedStudent = await newStudent.save();
@@ -617,6 +630,31 @@ export class StudentService {
       );
     }
 
+    // Validate year if provided and restrict to school admins only
+    if (updateStudentDto.year !== undefined) {
+      // Only school admins can update year
+      if (user.role.name !== RoleEnum.SCHOOL_ADMIN) {
+        throw new BadRequestException(
+          this.errorMessageService.getMessageWithLanguage(
+            'STUDENT',
+            'ONLY_SCHOOL_ADMIN_CAN_UPDATE_YEAR',
+            user?.preferred_language || DEFAULT_LANGUAGE,
+          ) || 'Only school administrators can update the year field',
+        );
+      }
+
+      // Validate year is between 1 and 5
+      if (updateStudentDto.year < 1 || updateStudentDto.year > 5) {
+        throw new BadRequestException(
+          this.errorMessageService.getMessageWithLanguage(
+            'STUDENT',
+            'INVALID_YEAR',
+            user?.preferred_language || DEFAULT_LANGUAGE,
+          ) || 'Year must be between 1 and 5',
+        );
+      }
+    }
+
     // Get tenant connection
     const tenantConnection =
       await this.tenantConnectionService.getTenantConnection(school.db_name);
@@ -791,6 +829,13 @@ export class StudentService {
       user.role.name !== RoleEnum.STUDENT
     ) {
       student.status = updateStudentDto.status;
+    }
+    // Only school admins can update year
+    if (
+      updateStudentDto.year !== undefined &&
+      user.role.name === RoleEnum.SCHOOL_ADMIN
+    ) {
+      student.year = updateStudentDto.year;
     }
 
     // Save the updated student
@@ -1145,12 +1190,13 @@ export class StudentService {
         .pipe(csv())
         .on('data', (row) => {
           // Validate required fields
-          if (!row.first_name || !row.email) {
+          if (!row.first_name || !row.email || !row.year) {
             result.failed.push({
               row: {
                 first_name: row.first_name || '',
                 last_name: row.last_name || '',
                 email: row.email || '',
+                year: row.year || 0,
               },
               error: this.errorMessageService.getMessageWithLanguage(
                 'STUDENT',
@@ -1171,6 +1217,7 @@ export class StudentService {
                 first_name: row.first_name,
                 last_name: row.last_name || '',
                 email: row.email,
+                year: row.year || 0,
               },
               error: this.errorMessageService.getMessageWithLanguage(
                 'STUDENT',
@@ -1181,10 +1228,30 @@ export class StudentService {
             return;
           }
 
+          // Validate year is between 1 and 5
+          const year = parseInt(row.year);
+          if (isNaN(year) || year < 1 || year > 5) {
+            result.failed.push({
+              row: {
+                first_name: row.first_name,
+                last_name: row.last_name || '',
+                email: row.email,
+                year: row.year || 0,
+              },
+              error: this.errorMessageService.getMessageWithLanguage(
+                'STUDENT',
+                'INVALID_YEAR',
+                adminUser?.preferred_language || DEFAULT_LANGUAGE,
+              ) || 'Year must be between 1 and 5',
+            });
+            return;
+          }
+
           students.push({
             first_name: row.first_name.trim(),
             last_name: (row.last_name || '').trim(),
             email: emailValidation.normalizedEmail!,
+            year: year,
           });
         })
         .on('end', resolve)
@@ -1450,6 +1517,7 @@ export class StudentService {
           created_by: new Types.ObjectId(adminUser?.id),
           created_by_role: adminUser.role.name as RoleEnum,
           is_csv_upload: true, // Mark as CSV upload
+          year: student.year,
         });
 
         const savedStudent = await newStudent.save();

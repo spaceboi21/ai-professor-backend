@@ -67,6 +67,9 @@ export class Module extends Document {
   @Prop({ type: Number, default: 0 })
   validation_max_similarity_score: number;
 
+  @Prop({ required: true, type: Number, min: 1, max: 5 })
+  year: number;
+
   readonly created_at?: Date;
   readonly updated_at?: Date;
 }

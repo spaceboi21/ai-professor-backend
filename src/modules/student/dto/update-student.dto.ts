@@ -1,6 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
-import { IsString, IsEmail, IsOptional, IsEnum, IsUrl } from 'class-validator';
+import { IsString, IsEmail, IsOptional, IsEnum, IsUrl, IsNumber } from 'class-validator';
 import { StatusEnum } from 'src/common/constants/status.constant';
 
 export class UpdateStudentDto {
@@ -38,4 +38,15 @@ export class UpdateStudentDto {
     description: 'Student status (ACTIVE, INACTIVE)',
   })
   status?: StatusEnum;
+
+  @IsNumber({}, { message: 'Year must be a number' })
+  @IsOptional()
+  @ApiProperty({
+    example: 1,
+    description: 'Academic year for the student (1-5)',
+    minimum: 1,
+    maximum: 5,
+    required: false,
+  })
+  year?: number;
 }

@@ -16,6 +16,7 @@ export interface StudentCsvRow {
   first_name: string;
   last_name: string;
   email: string;
+  year: number;
 }
 
 export interface BulkCreateResult {

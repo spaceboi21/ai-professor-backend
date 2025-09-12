@@ -33,6 +33,7 @@ The CSV file should have the following columns:
 | first_name | Yes         | Student's first name         | "John"                     | Required for all users                                 |
 | last_name  | No          | Student's last name          | "Doe"                      | Optional                                               |
 | email      | Yes         | Student's email address      | "john.doe@student.com"     | Required for all users                                 |
+| year       | Yes         | Academic year (1-5)          | "1"                        | Required for all users                                 |
 | school_id  | Conditional | School ID (MongoDB ObjectId) | "60d21b4667d0d8992e610c85" | Required for SUPER_ADMIN, not allowed for SCHOOL_ADMIN |
 
 ### Role-Specific Requirements
@@ -44,9 +45,9 @@ The CSV file should have the following columns:
 - **Example CSV**:
 
 ```csv
-first_name,last_name,email
-John,Doe,john.doe@student.com
-Jane,Smith,jane.smith@student.com
+first_name,last_name,email,year
+John,Doe,john.doe@student.com,1
+Jane,Smith,jane.smith@student.com,2
 ```
 
 #### For SUPER_ADMIN:
@@ -56,9 +57,9 @@ Jane,Smith,jane.smith@student.com
 - **Example CSV**:
 
 ```csv
-first_name,last_name,email,school_id
-John,Doe,john.doe@student.com,60d21b4667d0d8992e610c85
-Jane,Smith,jane.smith@student.com,60d21b4667d0d8992e610c86
+first_name,last_name,email,year,school_id
+John,Doe,john.doe@student.com,1,60d21b4667d0d8992e610c85
+Jane,Smith,jane.smith@student.com,2,60d21b4667d0d8992e610c86
 ```
 
 ### Sample CSV Content
@@ -66,21 +67,21 @@ Jane,Smith,jane.smith@student.com,60d21b4667d0d8992e610c86
 #### For School Admin:
 
 ```csv
-first_name,last_name,email
-John,Doe,john.doe@student.com
-Jane,Smith,jane.smith@student.com
-Mike,Johnson,mike.johnson@student.com
-Sarah,,sarah@student.com
+first_name,last_name,email,year
+John,Doe,john.doe@student.com,1
+Jane,Smith,jane.smith@student.com,2
+Mike,Johnson,mike.johnson@student.com,1
+Sarah,,sarah@student.com,3
 ```
 
 #### For Super Admin:
 
 ```csv
-first_name,last_name,email,school_id
-John,Doe,john.doe@student.com,60d21b4667d0d8992e610c85
-Jane,Smith,jane.smith@student.com,60d21b4667d0d8992e610c85
-Mike,Johnson,mike.johnson@student.com,60d21b4667d0d8992e610c86
-Sarah,Williams,sarah.williams@student.com,60d21b4667d0d8992e610c85
+first_name,last_name,email,year,school_id
+John,Doe,john.doe@student.com,1,60d21b4667d0d8992e610c85
+Jane,Smith,jane.smith@student.com,2,60d21b4667d0d8992e610c85
+Mike,Johnson,mike.johnson@student.com,1,60d21b4667d0d8992e610c86
+Sarah,Williams,sarah.williams@student.com,3,60d21b4667d0d8992e610c85
 ```
 
 ## Response Format
@@ -117,7 +118,7 @@ Sarah,Williams,sarah.williams@student.com,60d21b4667d0d8992e610c85
 
 ## Validation Rules
 
-1. **Required Fields**: `first_name` and `email` are required for all users
+1. **Required Fields**: `first_name`, `email`, and `year` are required for all users
 2. **Email Format**: Must be a valid email address
 3. **Email Uniqueness**: Email must not exist in the system (central users, global students, or tenant students)
 4. **CSV Format**: Only CSV files are allowed (5MB max)

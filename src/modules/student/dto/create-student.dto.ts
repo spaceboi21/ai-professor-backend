@@ -7,6 +7,7 @@ import {
   IsMongoId,
   IsOptional,
   IsEnum,
+  IsNumber,
 } from 'class-validator';
 import { StatusEnum } from 'src/common/constants/status.constant';
 import { LanguageEnum } from 'src/common/constants/language.constant';
@@ -67,4 +68,14 @@ export class CreateStudentDto {
     required: false,
   })
   preferred_language?: LanguageEnum;
+
+  @IsNumber({}, { message: 'Year must be a number' })
+  @IsNotEmpty({ message: 'Year is required' })
+  @ApiProperty({
+    example: 1,
+    description: 'Academic year for the student (1-5)',
+    minimum: 1,
+    maximum: 5,
+  })
+  year: number;
 }
