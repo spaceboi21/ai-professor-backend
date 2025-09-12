@@ -336,8 +336,29 @@ export class ModulesService {
       // Stage 2: Add role-based filtering
       // Students can only see published modules
       if (user.role.name === RoleEnum.STUDENT) {
+        // Get student's year from tenant database
+        const StudentModel = tenantConnection.model(Student.name, StudentSchema);
+        const student = await StudentModel.findOne({
+          _id: new Types.ObjectId(user.id),
+          deleted_at: null,
+        }).select('year');
+
+        if (!student) {
+          throw new NotFoundException(
+            this.errorMessageService.getMessageWithLanguage(
+              'STUDENT',
+              'NOT_FOUND',
+              user?.preferred_language || DEFAULT_LANGUAGE,
+            ),
+          );
+        }
+
+        // Filter modules by student's year and published status
         pipeline.push({
-          $match: { published: true },
+          $match: { 
+            published: true,
+            year: student.year
+          },
         });
       }
 
