@@ -10,6 +10,7 @@ export enum ModuleSortBy {
   CREATED_AT = 'created_at',
   DURATION = 'duration',
   PROGRESS_STATUS = 'progress_status',
+  SEQUENCE = 'sequence',
 }
 
 export enum SortOrder {

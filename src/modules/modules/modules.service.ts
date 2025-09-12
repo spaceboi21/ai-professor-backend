@@ -27,7 +27,7 @@ import {
 import { TenantConnectionService } from 'src/database/tenant-connection.service';
 import { CreateModuleDto } from './dto/create-module.dto';
 import { UpdateModuleDto } from './dto/update-module.dto';
-import { ModuleFilterDto } from './dto/module-filter.dto';
+import { ModuleFilterDto, ModuleSortBy } from './dto/module-filter.dto';
 import { ToggleModuleVisibilityDto } from './dto/toggle-module-visibility.dto';
 import { JWTUserPayload } from 'src/common/types/jwr-user.type';
 import { RoleEnum } from 'src/common/constants/roles.constant';
@@ -537,6 +537,14 @@ export class ModulesService {
             default: 0,
           },
         },
+        // Add sequence ordering - modules with sequence come first, then by sequence number
+        sequence_order: {
+          $cond: {
+            if: { $ne: ['$sequence', null] },
+            then: '$sequence',
+            else: 999999, // Modules without sequence go to the end
+          },
+        },
       };
 
       // Add progress status ordering for students
@@ -585,34 +593,38 @@ export class ModulesService {
       pipeline.push({ $addFields: addFieldsStage });
 
       // Stage 6: Sort
-      let sortStage: any = { created_at: -1 }; // default sort
+      let sortStage: any = { sequence_order: 1, created_at: -1 }; // default sort by sequence first, then by creation date
 
       if (filterDto?.sortBy) {
         const sortOrder = filterDto.sortOrder === 'desc' ? -1 : 1;
 
         switch (filterDto.sortBy) {
-          case 'title':
-            sortStage = { title_lower: sortOrder };
+          case ModuleSortBy.TITLE:
+            sortStage = { sequence_order: 1, title_lower: sortOrder, created_at: -1 };
             break;
-          case 'difficulty':
-            sortStage = { difficulty_order: sortOrder };
+          case ModuleSortBy.DIFFICULTY:
+            sortStage = { sequence_order: 1, difficulty_order: sortOrder, created_at: -1 };
             break;
-          case 'duration':
-            sortStage = { duration: sortOrder };
+          case ModuleSortBy.DURATION:
+            sortStage = { sequence_order: 1, duration: sortOrder, created_at: -1 };
             break;
-          case 'created_at':
-            sortStage = { created_at: sortOrder };
+          case ModuleSortBy.CREATED_AT:
+            sortStage = { sequence_order: 1, created_at: sortOrder };
             break;
-          case 'progress_status':
+          case ModuleSortBy.PROGRESS_STATUS:
             // Only allow progress status sorting for students
             if (user.role.name === RoleEnum.STUDENT) {
-              sortStage = { progress_status_order: sortOrder };
+              sortStage = { sequence_order: 1, progress_status_order: sortOrder, created_at: -1 };
             } else {
-              sortStage = { created_at: -1 }; // fallback for non-students
+              sortStage = { sequence_order: 1, created_at: -1 }; // fallback for non-students
             }
             break;
+          case ModuleSortBy.SEQUENCE:
+            // Allow explicit sequence sorting
+            sortStage = { sequence_order: sortOrder, created_at: -1 };
+            break;
           default:
-            sortStage = { created_at: -1 };
+            sortStage = { sequence_order: 1, created_at: -1 };
         }
       }
 
@@ -643,6 +655,7 @@ export class ModulesService {
         published: 1,
         published_at: 1,
         year: 1,
+        sequence: 1,
         created_by: 1,
         created_by_role: 1,
         created_at: 1,
@@ -673,6 +686,36 @@ export class ModulesService {
 
       // Execute aggregation
       const modules = await ModuleModel.aggregate(pipeline);
+
+      // Add isLock logic for students
+      if (user.role.name === RoleEnum.STUDENT) {
+        // Find the highest completed sequence
+        let highestCompletedSequence = 0;
+        const modulesWithSequence = modules.filter(module => module.sequence !== null);
+        
+        if (modulesWithSequence.length > 0) {
+          const completedModules = modulesWithSequence.filter(module => 
+            module.progress && module.progress.status === ProgressStatusEnum.COMPLETED
+          );
+          
+          if (completedModules.length > 0) {
+            highestCompletedSequence = Math.max(
+              ...completedModules.map(module => module.sequence)
+            );
+          }
+        }
+
+        // Add isLock field to each module
+        modules.forEach(module => {
+          if (module.sequence !== null) {
+            // Module is locked if its sequence is greater than highest completed + 1
+            module.isLock = module.sequence > highestCompletedSequence + 1;
+          } else {
+            // Modules without sequence are not locked
+            module.isLock = false;
+          }
+        });
+      }
 
       // Create pagination result
       const result = createPaginationResult(modules, total, paginationOptions);
@@ -790,6 +833,52 @@ export class ModulesService {
       }
 
       const module = modules[0];
+
+      // Add isLock logic for students
+      if (user.role.name === RoleEnum.STUDENT) {
+        // Get all modules in the same year to calculate highest completed sequence
+        const allModules = await ModuleModel
+          .find({
+            year: module.year,
+            deleted_at: null,
+            sequence: { $exists: true, $ne: null },
+          })
+          .lean();
+
+        // Get student's completed modules
+        const StudentModuleProgressModel = tenantConnection.model(
+          StudentModuleProgress.name,
+          StudentModuleProgressSchema,
+        );
+        
+        const completedProgress = await StudentModuleProgressModel.find({
+          student_id: new Types.ObjectId(user.id),
+          status: ProgressStatusEnum.COMPLETED,
+        });
+
+        const completedModuleIds = completedProgress.map(p => p.module_id.toString());
+        
+        // Find the highest completed sequence
+        let highestCompletedSequence = 0;
+        const completedModules = allModules.filter(m => 
+          completedModuleIds.includes(m._id.toString())
+        );
+
+        if (completedModules.length > 0) {
+          highestCompletedSequence = Math.max(
+            ...completedModules.map(m => m.sequence)
+          );
+        }
+
+        // Add isLock field to the module
+        if (module.sequence !== null) {
+          // Module is locked if its sequence is greater than highest completed + 1
+          module.isLock = module.sequence > highestCompletedSequence + 1;
+        } else {
+          // Modules without sequence are not locked
+          module.isLock = false;
+        }
+      }
 
       // Check professor access if user is a professor
       if (user.role.name === RoleEnum.PROFESSOR) {
@@ -1054,6 +1143,11 @@ export class ModulesService {
             user?.preferred_language || DEFAULT_LANGUAGE,
           ),
         );
+      }
+
+      // Handle sequence reordering if module has a sequence
+      if (deletedModule.sequence) {
+        await this.handleModuleSoftDelete(id.toString(), user, school_id);
       }
 
       return {
@@ -1607,5 +1701,257 @@ export class ModulesService {
         ),
       );
     }
+  }
+
+  /**
+   * Update module sequence with automatic reordering
+   */
+  async updateModuleSequence(
+    moduleId: string,
+    newSequence: number,
+    user: JWTUserPayload,
+    schoolId?: string,
+  ) {
+    const resolvedSchoolId = this.resolveSchoolId(user, schoolId);
+    const school = await this.schoolModel.findById(resolvedSchoolId);
+    if (!school) {
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'SCHOOL',
+          'SCHOOL_NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
+    }
+    const tenantConnection = await this.tenantConnectionService.getTenantConnection(school.db_name);
+    const moduleModel = tenantConnection.model('Module', ModuleSchema);
+
+    // Validate module exists and is not soft deleted
+    const module = await moduleModel.findOne({
+      _id: new Types.ObjectId(moduleId),
+      deleted_at: null,
+    });
+
+    if (!module) {
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'MODULE',
+          'MODULE_NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
+    }
+
+    const currentSequence = module.sequence;
+    
+    // If sequence is the same, no need to update
+    if (currentSequence === newSequence) {
+      return {
+        module_id: moduleId,
+        sequence: newSequence,
+        success: true,
+        message: 'Module sequence unchanged',
+      };
+    }
+
+    // Get all modules in the same year and school, excluding soft deleted ones
+    const allModules = await moduleModel
+      .find({
+        year: module.year,
+        deleted_at: null,
+        _id: { $ne: new Types.ObjectId(moduleId) },
+      })
+      .sort({ sequence: 1, created_at: 1 });
+
+    // Handle sequence reordering
+    const reorderedModules = this.reorderModuleSequences(
+      allModules,
+      newSequence,
+      currentSequence,
+    );
+
+    // Update all affected modules
+    const updatePromises = reorderedModules.map((mod) =>
+      moduleModel.updateOne(
+        { _id: mod._id },
+        { sequence: mod.sequence },
+      ),
+    );
+
+    // Update the target module
+    updatePromises.push(
+      moduleModel.updateOne(
+        { _id: new Types.ObjectId(moduleId) },
+        { sequence: newSequence },
+      ),
+    );
+
+    await Promise.all(updatePromises);
+
+    this.logger.log(
+      `Module ${moduleId} sequence updated from ${currentSequence} to ${newSequence}`,
+    );
+
+    return {
+      module_id: moduleId,
+      sequence: newSequence,
+      success: true,
+      message: 'Module sequence updated successfully',
+    };
+  }
+
+  /**
+   * Bulk update module sequences
+   */
+  async bulkUpdateModuleSequences(
+    updates: Array<{ module_id: string; sequence: number }>,
+    user: JWTUserPayload,
+    schoolId?: string,
+  ) {
+    const resolvedSchoolId = this.resolveSchoolId(user, schoolId);
+    const school = await this.schoolModel.findById(resolvedSchoolId);
+    if (!school) {
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'SCHOOL',
+          'SCHOOL_NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
+    }
+    const tenantConnection = await this.tenantConnectionService.getTenantConnection(school.db_name);
+    const moduleModel = tenantConnection.model('Module', ModuleSchema);
+
+    const results: Array<{ module_id: string; sequence: number; success: boolean; error?: string }> = [];
+    let successfulUpdates = 0;
+    let failedUpdates = 0;
+
+    for (const update of updates) {
+      try {
+        const result = await this.updateModuleSequence(
+          update.module_id,
+          update.sequence,
+          user,
+          schoolId,
+        );
+        results.push({
+          module_id: update.module_id,
+          sequence: update.sequence,
+          success: true,
+        });
+        successfulUpdates++;
+      } catch (error) {
+        results.push({
+          module_id: update.module_id,
+          sequence: update.sequence,
+          success: false,
+          error: error.message,
+        });
+        failedUpdates++;
+      }
+    }
+
+    return {
+      results,
+      total_processed: updates.length,
+      successful_updates: successfulUpdates,
+      failed_updates: failedUpdates,
+    };
+  }
+
+
+  /**
+   * Handle sequence reordering when a module is soft deleted
+   */
+  async handleModuleSoftDelete(moduleId: string, user: JWTUserPayload, schoolId?: string) {
+    const resolvedSchoolId = this.resolveSchoolId(user, schoolId);
+    const school = await this.schoolModel.findById(resolvedSchoolId);
+    if (!school) {
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'SCHOOL',
+          'SCHOOL_NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
+    }
+    const tenantConnection = await this.tenantConnectionService.getTenantConnection(school.db_name);
+    const moduleModel = tenantConnection.model('Module', ModuleSchema);
+
+    // Get the deleted module to find its sequence
+    const deletedModule = await moduleModel.findOne({
+      _id: new Types.ObjectId(moduleId),
+      deleted_at: { $ne: null }, // Only get soft deleted modules
+    });
+
+    if (!deletedModule || !deletedModule.sequence) {
+      // Module doesn't have a sequence, no reordering needed
+      return;
+    }
+
+    const deletedSequence = deletedModule.sequence;
+
+    // Get all modules with sequence higher than the deleted one
+    const modulesToReorder = await moduleModel.find({
+      year: deletedModule.year,
+      deleted_at: null,
+      sequence: { $gt: deletedSequence },
+    }).sort({ sequence: 1 });
+
+    // Decrease sequence by 1 for all modules after the deleted one
+    const updatePromises = modulesToReorder.map((module) =>
+      moduleModel.updateOne(
+        { _id: module._id },
+        { sequence: module.sequence - 1 },
+      ),
+    );
+
+    await Promise.all(updatePromises);
+
+    this.logger.log(
+      `Reordered sequences after soft deleting module ${moduleId} with sequence ${deletedSequence}`,
+    );
+  }
+
+  /**
+   * Helper method to reorder module sequences
+   */
+  private reorderModuleSequences(
+    modules: any[],
+    newSequence: number,
+    currentSequence: number,
+  ) {
+    const reorderedModules = [...modules];
+
+    if (currentSequence === null) {
+      // Module doesn't have a sequence yet, insert it
+      reorderedModules.forEach((module, index) => {
+        if (module.sequence >= newSequence) {
+          module.sequence = module.sequence + 1;
+        }
+      });
+    } else if (newSequence > currentSequence) {
+      // Moving down in sequence
+      reorderedModules.forEach((module) => {
+        if (
+          module.sequence > currentSequence &&
+          module.sequence <= newSequence
+        ) {
+          module.sequence = module.sequence - 1;
+        }
+      });
+    } else if (newSequence < currentSequence) {
+      // Moving up in sequence
+      reorderedModules.forEach((module) => {
+        if (
+          module.sequence >= newSequence &&
+          module.sequence < currentSequence
+        ) {
+          module.sequence = module.sequence + 1;
+        }
+      });
+    }
+
+    return reorderedModules;
   }
 }

@@ -73,7 +73,10 @@ import {
   QuizVerificationResponse,
 } from 'src/common/types/quiz.type';
 import { ErrorMessageService } from 'src/common/services/error-message.service';
-import { DEFAULT_LANGUAGE } from 'src/common/constants/language.constant';
+import { 
+  DEFAULT_LANGUAGE,
+  LanguageEnum,
+} from 'src/common/constants/language.constant';
 
 @Injectable()
 export class ProgressService {
@@ -155,6 +158,18 @@ export class ProgressService {
             user?.preferred_language || DEFAULT_LANGUAGE,
           ),
         );
+      }
+
+      // Check module sequence access if module has a sequence
+      if (module.sequence) {
+        const sequenceCheck = await this.checkModuleSequenceAccess(
+          module,
+          user.id.toString(),
+          tenantConnection,
+        );
+        if (!sequenceCheck.can_access) {
+          throw new ForbiddenException(sequenceCheck.error_message);
+        }
       }
 
       // Get total chapters count for this module
@@ -2311,5 +2326,74 @@ export class ProgressService {
         ),
       );
     }
+  }
+
+  /**
+   * Check if a student can access a module based on sequence
+   */
+  private async checkModuleSequenceAccess(
+    module: any,
+    studentId: string,
+    tenantConnection: any,
+  ) {
+    const ModuleModel = tenantConnection.model(Module.name, ModuleSchema);
+    const StudentModuleProgressModel = tenantConnection.model(
+      StudentModuleProgress.name,
+      StudentModuleProgressSchema,
+    );
+
+    // Get all modules in the same year, ordered by sequence
+    const allModules = await ModuleModel
+      .find({
+        year: module.year,
+        deleted_at: null,
+        sequence: { $exists: true, $ne: null },
+      })
+      .sort({ sequence: 1 });
+
+    // Get student's completed modules
+    const completedProgress = await StudentModuleProgressModel.find({
+      student_id: new Types.ObjectId(studentId),
+      status: ProgressStatusEnum.COMPLETED,
+    });
+
+    const completedModuleIds = completedProgress.map(p => p.module_id.toString());
+    
+    // Find the highest completed sequence
+    let highestCompletedSequence = 0;
+    const completedModules = allModules.filter(m => 
+      completedModuleIds.includes(m._id.toString())
+    );
+
+    if (completedModules.length > 0) {
+      highestCompletedSequence = Math.max(
+        ...completedModules.map(m => m.sequence)
+      );
+    }
+
+    // Check if student can access this module
+    const canAccess = module.sequence <= highestCompletedSequence + 1;
+
+    if (!canAccess) {
+      // Find required modules that need to be completed
+      const requiredModules = allModules.filter(m => 
+        m.sequence <= module.sequence - 1 && 
+        !completedModuleIds.includes(m._id.toString())
+      );
+
+      return {
+        can_access: false,
+        error_message: this.errorMessageService.getMessageWithLanguage(
+          'PROGRESS',
+          'SEQUENCE_ACCESS_DENIED',
+          LanguageEnum.ENGLISH,
+        ),
+        required_modules: requiredModules.map(m => m._id.toString()),
+      };
+    }
+
+    return {
+      can_access: true,
+    };
   }
 }

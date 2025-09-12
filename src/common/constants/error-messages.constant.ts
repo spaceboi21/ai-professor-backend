@@ -1304,6 +1304,10 @@ export const ERROR_MESSAGES: {
       [LanguageEnum.ENGLISH]: 'Quiz attempt already in progress',
       [LanguageEnum.FRENCH]: 'Une tentative de quiz est déjà en cours',
     },
+    SEQUENCE_ACCESS_DENIED: {
+      [LanguageEnum.ENGLISH]: 'Please complete the previous module first to start this module',
+      [LanguageEnum.FRENCH]: 'Veuillez d\'abord terminer le module précédent pour commencer ce module',
+    },
   },
 
   // Quiz Related
@@ -1613,6 +1617,10 @@ export const ERROR_MESSAGES: {
       [LanguageEnum.ENGLISH]: 'Duplicate sequence numbers are not allowed',
       [LanguageEnum.FRENCH]:
         'Les numéros de séquence en double ne sont pas autorisés',
+    },
+    SEQUENCE_ACCESS_DENIED: {
+      [LanguageEnum.ENGLISH]: 'Please complete the previous module first to start this module',
+      [LanguageEnum.FRENCH]: 'Veuillez d\'abord terminer le module précédent pour commencer ce module',
     },
   },
 

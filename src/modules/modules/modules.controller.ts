@@ -35,6 +35,10 @@ import {
   UnassignProfessorDto,
   ManageModuleAssignmentsDto,
 } from './dto/assign-professor.dto';
+import {
+  UpdateModuleSequenceDto,
+  BulkUpdateModuleSequenceDto,
+} from './dto/update-module-sequence.dto';
 import { ModulesService } from './modules.service';
 import {
   ModuleAssignmentService,
@@ -320,10 +324,10 @@ export class ModulesController {
   @ApiQuery({
     name: 'sortBy',
     required: false,
-    enum: ['title', 'difficulty', 'duration', 'created_at', 'progress_status'],
+    enum: ['title', 'difficulty', 'duration', 'created_at', 'progress_status', 'sequence'],
     description:
-      'Sort by field. progress_status is only available for students (ASC: IN_PROGRESS → NOT_STARTED → COMPLETED, DESC: COMPLETED → NOT_STARTED → IN_PROGRESS)',
-    example: 'progress_status',
+      'Sort by field. progress_status is only available for students (ASC: IN_PROGRESS → NOT_STARTED → COMPLETED, DESC: COMPLETED → NOT_STARTED → IN_PROGRESS). sequence sorts by module sequence number.',
+    example: 'sequence',
   })
   @ApiQuery({
     name: 'sortOrder',
@@ -534,4 +538,41 @@ export class ModulesController {
   ) {
     return this.modulesService.removeModule(id, user, school_id);
   }
+
+  @Patch('sequence')
+  @Roles(RoleEnum.SUPER_ADMIN, RoleEnum.SCHOOL_ADMIN, RoleEnum.PROFESSOR)
+  @ApiOperation({ summary: 'Update module sequence' })
+  @ApiBody({ type: UpdateModuleSequenceDto })
+  @ApiResponse({ status: 200, description: 'Module sequence updated successfully' })
+  @ApiResponse({ status: 404, description: 'Module not found' })
+  @ApiResponse({ status: 400, description: 'Bad request' })
+  async updateModuleSequence(
+    @Body() updateSequenceDto: UpdateModuleSequenceDto,
+    @User() user: JWTUserPayload,
+  ) {
+    return this.modulesService.updateModuleSequence(
+      updateSequenceDto.module_id,
+      updateSequenceDto.sequence,
+      user,
+      updateSequenceDto.school_id,
+    );
+  }
+
+  @Patch('sequence/bulk')
+  @Roles(RoleEnum.SUPER_ADMIN, RoleEnum.SCHOOL_ADMIN, RoleEnum.PROFESSOR)
+  @ApiOperation({ summary: 'Bulk update module sequences' })
+  @ApiBody({ type: BulkUpdateModuleSequenceDto })
+  @ApiResponse({ status: 200, description: 'Module sequences updated successfully' })
+  @ApiResponse({ status: 400, description: 'Bad request' })
+  async bulkUpdateModuleSequences(
+    @Body() bulkUpdateDto: BulkUpdateModuleSequenceDto,
+    @User() user: JWTUserPayload,
+  ) {
+    return this.modulesService.bulkUpdateModuleSequences(
+      bulkUpdateDto.updates,
+      user,
+      bulkUpdateDto.school_id,
+    );
+  }
+
 }

@@ -70,6 +70,9 @@ export class Module extends Document {
   @Prop({ required: true, type: Number, min: 1, max: 5 })
   year: number;
 
+  @Prop({ type: Number, default: null, min: 1 })
+  sequence: number;
+
   readonly created_at?: Date;
   readonly updated_at?: Date;
 }
