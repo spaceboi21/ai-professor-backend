@@ -642,6 +642,7 @@ export class ModulesService {
         thumbnail: 1,
         published: 1,
         published_at: 1,
+        year: 1,
         created_by: 1,
         created_by_role: 1,
         created_at: 1,
