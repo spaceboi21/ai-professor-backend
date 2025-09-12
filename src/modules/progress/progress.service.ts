@@ -2330,7 +2330,7 @@ export class ProgressService {
   }
 
   /**
-   * Check if a student can access a module based on sequence
+   * Check if a student can access a module based on sequence and year
    */
   private async checkModuleSequenceAccess(
     module: any,
@@ -2343,7 +2343,45 @@ export class ProgressService {
       StudentModuleProgress.name,
       StudentModuleProgressSchema,
     );
+    const StudentModel = tenantConnection.model(Student.name, StudentSchema);
 
+    // Get student's current year
+    const student = await StudentModel.findOne({
+      _id: new Types.ObjectId(studentId),
+      deleted_at: null,
+    }).select('year');
+
+    if (!student) {
+      return {
+        can_access: false,
+        error_message: this.errorMessageService.getMessageWithLanguage(
+          'PROGRESS',
+          'STUDENT_NOT_FOUND',
+          preferredLanguage,
+        ),
+      };
+    }
+
+    // Year-based access check first
+    if (module.year > student.year) {
+      return {
+        can_access: false,
+        error_message: this.errorMessageService.getMessageWithLanguage(
+          'PROGRESS',
+          'SEQUENCE_ACCESS_DENIED',
+          preferredLanguage,
+        ),
+      };
+    }
+
+    // For previous years, allow access
+    if (module.year < student.year) {
+      return {
+        can_access: true,
+      };
+    }
+
+    // For current year, check sequence logic
     // Get all modules in the same year, ordered by sequence
     const allModules = await ModuleModel
       .find({
@@ -2361,7 +2399,7 @@ export class ProgressService {
 
     const completedModuleIds = completedProgress.map(p => p.module_id.toString());
     
-    // Find the highest completed sequence
+    // Find the highest completed sequence in this year
     let highestCompletedSequence = 0;
     const completedModules = allModules.filter(m => 
       completedModuleIds.includes(m._id.toString())
@@ -2371,6 +2409,17 @@ export class ProgressService {
       highestCompletedSequence = Math.max(
         ...completedModules.map(m => m.sequence)
       );
+    }
+
+    // Safety fallback: Always allow access to the lowest sequence in current year
+    const lowestSequenceInYear = allModules.length > 0 
+      ? Math.min(...allModules.map(m => m.sequence))
+      : 1;
+    
+    if (module.sequence === lowestSequenceInYear) {
+      return {
+        can_access: true,
+      };
     }
 
     // Check if student can access this module
