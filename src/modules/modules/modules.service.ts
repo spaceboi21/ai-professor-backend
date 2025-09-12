@@ -697,6 +697,23 @@ export class ModulesService {
         }).select('year');
 
         if (student) {
+          // Check if this is the first page to apply safety fallback
+          const isFirstPage = paginationOptions.page === 1;
+          
+          // Get all modules in student's current year to determine lowest sequence
+          const allCurrentYearModules = await ModuleModel
+            .find({
+              year: student.year,
+              deleted_at: null,
+              sequence: { $exists: true, $ne: null },
+            })
+            .sort({ sequence: 1 })
+            .lean();
+
+          const lowestSequenceInCurrentYear = allCurrentYearModules.length > 0 
+            ? Math.min(...allCurrentYearModules.map(m => m.sequence))
+            : 1;
+
           // Group modules by year
           const modulesByYear = {};
           modules.forEach(module => {
@@ -733,16 +750,11 @@ export class ModulesService {
           modules.forEach(module => {
             if (module.sequence !== null) {
               const highestCompletedInYear = highestCompletedByYear[module.year] || 0;
-              const currentYearModules = modulesByYear[module.year] || [];
-              const currentYearWithSequence = currentYearModules.filter(m => m.sequence !== null);
-              const lowestSequenceInYear = currentYearWithSequence.length > 0 
-                ? Math.min(...currentYearWithSequence.map(m => m.sequence))
-                : 1;
               
               // For current year: sequence logic with safety fallback
               if (module.year === student.year) {
-                // Always allow access to the lowest sequence in current year (safety fallback)
-                if (module.sequence === lowestSequenceInYear) {
+                // Safety fallback: Only on first page, allow access to the lowest sequence
+                if (isFirstPage && module.sequence === lowestSequenceInCurrentYear && highestCompletedInYear === 0) {
                   module.isLock = false;
                 } else {
                   module.isLock = module.sequence > highestCompletedInYear + 1;
@@ -943,8 +955,8 @@ export class ModulesService {
             
             // For current year: sequence logic with safety fallback
             if (module.year === student.year) {
-              // Always allow access to the lowest sequence in current year (safety fallback)
-              if (module.sequence === lowestSequenceInYear) {
+              // Safety fallback: Allow access to the lowest sequence if no progress exists
+              if (module.sequence === lowestSequenceInYear && highestCompletedSequence === 0) {
                 module.isLock = false;
               } else {
                 module.isLock = module.sequence > highestCompletedSequence + 1;

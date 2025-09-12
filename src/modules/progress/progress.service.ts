@@ -2411,12 +2411,12 @@ export class ProgressService {
       );
     }
 
-    // Safety fallback: Always allow access to the lowest sequence in current year
+    // Safety fallback: Allow access to the lowest sequence in current year if no progress exists
     const lowestSequenceInYear = allModules.length > 0 
       ? Math.min(...allModules.map(m => m.sequence))
       : 1;
     
-    if (module.sequence === lowestSequenceInYear) {
+    if (module.sequence === lowestSequenceInYear && highestCompletedSequence === 0) {
       return {
         can_access: true,
       };
