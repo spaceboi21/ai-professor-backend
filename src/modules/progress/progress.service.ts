@@ -166,6 +166,7 @@ export class ProgressService {
           module,
           user.id.toString(),
           tenantConnection,
+          user.preferred_language || DEFAULT_LANGUAGE,
         );
         if (!sequenceCheck.can_access) {
           throw new ForbiddenException(sequenceCheck.error_message);
@@ -2335,6 +2336,7 @@ export class ProgressService {
     module: any,
     studentId: string,
     tenantConnection: any,
+    preferredLanguage: LanguageEnum,
   ) {
     const ModuleModel = tenantConnection.model(Module.name, ModuleSchema);
     const StudentModuleProgressModel = tenantConnection.model(
@@ -2386,7 +2388,7 @@ export class ProgressService {
         error_message: this.errorMessageService.getMessageWithLanguage(
           'PROGRESS',
           'SEQUENCE_ACCESS_DENIED',
-          LanguageEnum.ENGLISH,
+          preferredLanguage,
         ),
         required_modules: requiredModules.map(m => m._id.toString()),
       };
