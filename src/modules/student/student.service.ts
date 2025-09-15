@@ -855,19 +855,19 @@ export class StudentService {
       }
 
       // Send email notification if email was updated
-      if (shouldSendEmail && updateStudentDto.email) {
-        await this.mailService.queueCredentialsEmail(
-          updateStudentDto.email,
-          `${updatedStudent.first_name}${updatedStudent.last_name ? ` ${updatedStudent.last_name}` : ''}`,
-          newPassword,
-          RoleEnum.STUDENT,
-          user?.preferred_language,
-        );
+      // if (shouldSendEmail && updateStudentDto.email) {
+      //   await this.mailService.queueCredentialsEmail(
+      //     updateStudentDto.email,
+      //     `${updatedStudent.first_name}${updatedStudent.last_name ? ` ${updatedStudent.last_name}` : ''}`,
+      //     newPassword,
+      //     RoleEnum.STUDENT,
+      //     user?.preferred_language,
+      //   );
 
-        this.logger.log(
-          `Credentials email queued for updated email: ${updateStudentDto.email}`,
-        );
-      }
+      //   this.logger.log(
+      //     `Credentials email queued for updated email: ${updateStudentDto.email}`,
+      //   );
+      // }
 
       this.logger.log(`Student updated successfully: ${id}`);
 
@@ -1238,11 +1238,12 @@ export class StudentService {
                 email: row.email,
                 year: row.year || 0,
               },
-              error: this.errorMessageService.getMessageWithLanguage(
-                'STUDENT',
-                'INVALID_YEAR',
-                adminUser?.preferred_language || DEFAULT_LANGUAGE,
-              ) || 'Year must be between 1 and 5',
+              error:
+                this.errorMessageService.getMessageWithLanguage(
+                  'STUDENT',
+                  'INVALID_YEAR',
+                  adminUser?.preferred_language || DEFAULT_LANGUAGE,
+                ) || 'Year must be between 1 and 5',
             });
             return;
           }
