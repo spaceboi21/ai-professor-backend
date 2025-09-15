@@ -1553,10 +1553,16 @@ export class QuizController {
   ): Promise<AIGenerateQuizResponse> {
     const pythonServiceUrl =
       process.env.PYTHON_API_URL || 'http://localhost:8000';
-    const fullUrl = `${pythonServiceUrl}/chat/quiz/generate`;
+    
+    // Ensure we don't have double /api/v1 in the URL
+    const baseUrl = pythonServiceUrl.replace(/\/api\/v1$/, '');
+    const fullUrl = `${baseUrl}/chat/quiz/generate`;
 
     // Debug logging (remove in production)
-    console.log(`Calling AI service at: ${fullUrl}`);
+    console.log(`PYTHON_API_URL env var: ${process.env.PYTHON_API_URL || 'not set'}`);
+    console.log(`Python service URL: ${pythonServiceUrl}`);
+    console.log(`Base URL (after cleanup): ${baseUrl}`);
+    console.log(`Full URL: ${fullUrl}`);
 
     try {
       // Prepare the request payload, handling empty string chapter_id
@@ -1579,18 +1585,12 @@ export class QuizController {
         quiz_group_id: request.quiz_group_id,
       };
 
-      console.log('Request payload:', JSON.stringify(payload, null, 2));
-
-      const response: { data: { questions: AIGeneratedQuestion[] } } =
-        await firstValueFrom(
-          this.httpService.post(
-            `${pythonServiceUrl}/chat/quiz/generate`,
-            payload,
-          ),
-        );
+      const response = await firstValueFrom(
+        this.httpService.post(fullUrl, payload),
+      );
 
       // Debug logging for AI service response
-      console.log('AI Service Response:', JSON.stringify(response, null, 2));
+      console.log('AI Service Response:', response);
       console.log('AI Service Questions:', response.data?.questions);
       console.log('AI Service Questions Length:', response.data?.questions?.length);
 
@@ -1658,12 +1658,14 @@ export class QuizController {
         }
       };
     } catch (error) {
-      console.error('AI service call failed:', error);
+      console.error('AI service call failed:', error.message);
+      console.error('Error code:', error.code);
+      console.error('Error status:', error.response?.status);
 
       // Handle different types of errors
       if (error.response?.status === 404) {
         throw new Error(
-          `AI service endpoint not found at ${fullUrl}. Please check if the AI service is running and the /api/v1/chat/quiz/generate endpoint is available.`,
+          `AI service endpoint not found at ${fullUrl}. Please check if the AI service is running and the /chat/quiz/generate endpoint is available.`,
         );
       } else if (error.response?.status >= 500) {
         throw new Error(
@@ -1675,7 +1677,11 @@ export class QuizController {
         );
       } else if (error.code === 'ENOTFOUND') {
         throw new Error(
-          `AI service host not found: ${fullUrl}. Please check the PYTHON_AI_SERVICE_URL environment variable.`,
+          `AI service host not found: ${fullUrl}. Please check the PYTHON_API_URL environment variable.`,
+        );
+      } else if (error.message?.includes('circular structure')) {
+        throw new Error(
+          `AI service connection error. Please check if the Python service is running at ${fullUrl}`,
         );
       } else {
         throw new Error(
