@@ -1579,6 +1579,8 @@ export class QuizController {
         quiz_group_id: request.quiz_group_id,
       };
 
+      console.log('Request payload:', JSON.stringify(payload, null, 2));
+
       const response: { data: { questions: AIGeneratedQuestion[] } } =
         await firstValueFrom(
           this.httpService.post(
@@ -1586,6 +1588,11 @@ export class QuizController {
             payload,
           ),
         );
+
+      // Debug logging for AI service response
+      console.log('AI Service Response:', JSON.stringify(response, null, 2));
+      console.log('AI Service Questions:', response.data?.questions);
+      console.log('AI Service Questions Length:', response.data?.questions?.length);
 
       const questions: any[] = [];
       const existingQuizQuestions = await this.quizService.findAllQuizzes(
@@ -1599,37 +1606,54 @@ export class QuizController {
       });
 
       const existingCount = existingQuizQuestions.length;
-      const newQuestionsCount = response.data.questions?.length || 0;
+      const newQuestionsCount = response.data?.questions?.length || 0;
 
       // Log information about existing and new questions
-      console.log(`Quiz group already has ${existingCount} questions. Generating ${newQuestionsCount} new questions.`);
+      console.log(`Quiz group already has ${existingCount} questions. AI service returned ${newQuestionsCount} new questions.`);
+
+      // Check if AI service returned questions
+      if (!response.data?.questions || response.data.questions.length === 0) {
+        console.warn('AI service returned no questions. This might indicate:');
+        console.warn('1. AI service is not running');
+        console.warn('2. AI service endpoint is not available');
+        console.warn('3. AI service returned an error or empty response');
+        console.warn('4. Request payload might be invalid');
+        console.warn('Request payload sent to AI service:', JSON.stringify(payload, null, 2));
+      }
 
       // Create new questions with proper sequencing
-      const createdQuestions = await Promise.all(
-        response.data.questions?.map(async (question, index) => {
-          const createdQuestion = await this.quizService.createQuiz(
-            {
-              quiz_group_id: new Types.ObjectId(request.quiz_group_id),
-              question: question.question,
-              type: question.type as QuizQuestionTypeEnum,
-              options: question.options ?? [],
-              sequence: existingCount + index + 1, // Start from existing count + 1
-              tags: question.tags ?? [],
-            } as CreateQuizDto,
-            user,
-          );
-          return createdQuestion;
-        }) || [],
-      );
+      let createdQuestions: any[] = [];
 
-      // Add newly created questions to the array
-      questions.push(...createdQuestions);
+      if (response.data?.questions && response.data.questions.length > 0) {
+        createdQuestions = await Promise.all(
+          response.data.questions.map(async (question, index) => {
+            const createdQuestion = await this.quizService.createQuiz(
+              {
+                quiz_group_id: new Types.ObjectId(request.quiz_group_id),
+                question: question.question,
+                type: question.type as QuizQuestionTypeEnum,
+                options: question.options ?? [],
+                sequence: existingCount + index + 1, // Start from existing count + 1
+                tags: question.tags ?? [],
+              } as CreateQuizDto,
+              user,
+            );
+            return createdQuestion;
+          }),
+        );
+
+        // Add newly created questions to the array
+        questions.push(...createdQuestions);
+        console.log(`Successfully created ${createdQuestions.length} new questions`);
+      } else {
+        console.log('No new questions to create - AI service returned empty or no questions');
+      }
 
       return {
         questions: questions.sort((a, b) => a.sequence - b.sequence),
         summary: {
           existing_questions: existingCount,
-          new_questions: newQuestionsCount,
+          new_questions: createdQuestions.length,
           total_questions: questions.length
         }
       };
