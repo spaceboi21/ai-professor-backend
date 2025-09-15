@@ -1553,7 +1553,8 @@ export class QuizController {
   ): Promise<AIGenerateQuizResponse> {
     const pythonServiceUrl =
       process.env.PYTHON_API_URL || 'http://localhost:8000';
-    const fullUrl = `${pythonServiceUrl}/api/v1/chat/quiz/generate`;
+
+    const fullUrl = `${pythonServiceUrl}/chat/quiz/generate`;
 
     // Debug logging (remove in production)
     console.log(`PYTHON_API_URL env var: ${process.env.PYTHON_API_URL || 'not set'}`);
@@ -1586,7 +1587,7 @@ export class QuizController {
       );
 
       // Debug logging for AI service response
-      console.log('AI Service Response Status:', response.status);
+      console.log('AI Service Response:', response);
       console.log('AI Service Questions:', response.data?.questions);
       console.log('AI Service Questions Length:', response.data?.questions?.length);
 
