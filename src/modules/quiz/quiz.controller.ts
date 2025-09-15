@@ -1452,8 +1452,20 @@ export class QuizController {
   @Roles(RoleEnum.PROFESSOR, RoleEnum.SCHOOL_ADMIN)
   @ApiOperation({
     summary: 'Generate quiz questions using AI',
-    description:
-      'Generates quiz questions using AI based on the provided parameters. Only Professors and School Admins can generate AI quizzes.',
+    description: `
+    Generates quiz questions using AI based on the provided parameters. Only Professors and School Admins can generate AI quizzes.
+
+    **Existing Questions Handling:**
+    - If the quiz group already contains questions, new AI-generated questions will be added to the existing ones
+    - Sequence numbers are automatically calculated to maintain proper order
+    - The response includes both existing and newly generated questions
+    - A summary is provided showing the count of existing vs new questions
+
+    **Use Cases:**
+    - Generate initial quiz questions for a new quiz group
+    - Add more questions to an existing quiz group
+    - Expand quiz content based on specific topics or difficulty levels
+    `,
   })
   @ApiBody({
     type: AIGenerateQuizRequest,
@@ -1491,7 +1503,41 @@ export class QuizController {
   @ApiResponse({
     status: 200,
     description: 'Quiz questions generated successfully',
-    type: AIGenerateQuizResponse,
+    schema: {
+      example: {
+        questions: [
+          {
+            _id: '507f1f77bcf86cd799439011',
+            quiz_group_id: '507f1f77bcf86cd799439010',
+            question: 'What is the capital of France?',
+            type: 'MULTIPLE_CHOICE',
+            options: ['London', 'Berlin', 'Paris', 'Madrid'],
+            answer: ['Paris'],
+            explanation: 'Paris is the capital and largest city of France.',
+            sequence: 1,
+            tags: ['Geography', 'Europe'],
+            created_at: '2024-01-15T10:30:00Z',
+          },
+          {
+            _id: '507f1f77bcf86cd799439012',
+            quiz_group_id: '507f1f77bcf86cd799439010',
+            question: 'Which programming language is known for its use in web development?',
+            type: 'MULTIPLE_CHOICE',
+            options: ['Python', 'JavaScript', 'C++', 'Java'],
+            answer: ['JavaScript'],
+            explanation: 'JavaScript is widely used for web development, both frontend and backend.',
+            sequence: 2,
+            tags: ['Programming', 'Web Development'],
+            created_at: '2024-01-15T10:31:00Z',
+          }
+        ],
+        summary: {
+          existing_questions: 0,
+          new_questions: 2,
+          total_questions: 2
+        }
+      }
+    }
   })
   @ApiResponse({
     status: 400,
@@ -1546,10 +1592,20 @@ export class QuizController {
         user,
         { quiz_group_id: request.quiz_group_id },
       );
+
+      // Add existing questions to the array
       existingQuizQuestions.forEach((question) => {
         questions.push(question);
       });
-      await Promise.all(
+
+      const existingCount = existingQuizQuestions.length;
+      const newQuestionsCount = response.data.questions?.length || 0;
+
+      // Log information about existing and new questions
+      console.log(`Quiz group already has ${existingCount} questions. Generating ${newQuestionsCount} new questions.`);
+
+      // Create new questions with proper sequencing
+      const createdQuestions = await Promise.all(
         response.data.questions?.map(async (question, index) => {
           const createdQuestion = await this.quizService.createQuiz(
             {
@@ -1557,19 +1613,26 @@ export class QuizController {
               question: question.question,
               type: question.type as QuizQuestionTypeEnum,
               options: question.options ?? [],
-              sequence: questions.length + index + 1,
+              sequence: existingCount + index + 1, // Start from existing count + 1
               tags: question.tags ?? [],
             } as CreateQuizDto,
             user,
           );
-          questions.push(createdQuestion);
-        }),
-      ).catch((error) => {
-        console.error('Error creating quiz question:', error);
-        throw new Error('Error creating quiz question');
-      });
+          return createdQuestion;
+        }) || [],
+      );
 
-      return { questions: questions.sort((a, b) => a.sequence - b.sequence) };
+      // Add newly created questions to the array
+      questions.push(...createdQuestions);
+
+      return {
+        questions: questions.sort((a, b) => a.sequence - b.sequence),
+        summary: {
+          existing_questions: existingCount,
+          new_questions: newQuestionsCount,
+          total_questions: questions.length
+        }
+      };
     } catch (error) {
       console.error('AI service call failed:', error);
 
