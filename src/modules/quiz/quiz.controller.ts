@@ -1558,7 +1558,6 @@ export class QuizController {
     // Debug logging (remove in production)
     console.log(`PYTHON_API_URL env var: ${process.env.PYTHON_API_URL || 'not set'}`);
     console.log(`Python service URL: ${pythonServiceUrl}`);
-    console.log(`Base URL (after cleanup): ${baseUrl}`);
     console.log(`Full URL: ${fullUrl}`);
 
     try {
