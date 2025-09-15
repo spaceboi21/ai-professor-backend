@@ -202,4 +202,18 @@ export class AIGenerateQuizResponse {
     description: 'Array of generated questions',
   })
   questions: AIGeneratedQuestion[];
+
+  @ApiProperty({
+    description: 'Summary of quiz generation including counts of existing and new questions',
+    example: {
+      existing_questions: 2,
+      new_questions: 3,
+      total_questions: 5
+    }
+  })
+  summary: {
+    existing_questions: number;
+    new_questions: number;
+    total_questions: number;
+  };
 }
