@@ -538,6 +538,29 @@ export class QuizService {
       QuizModel.updateMany({ quiz_group_id: id }, { deleted_at: new Date() }),
     ]);
 
+    // Recalculate module progress for all students who have progress in this module
+    // This is important because deleting a quiz might affect chapter completion status
+    if (quizGroup.module_id) {
+      const StudentChapterProgressModel = connection.model(
+        StudentChapterProgress.name,
+        StudentChapterProgressSchema,
+      );
+
+      // Get all students who have progress in this module
+      const studentsWithProgress = await StudentChapterProgressModel.distinct('student_id', {
+        module_id: quizGroup.module_id,
+      });
+
+      // Recalculate progress for each student
+      for (const studentId of studentsWithProgress) {
+        await this.progressService.recalculateModuleProgress(
+          studentId,
+          quizGroup.module_id,
+          connection,
+        );
+      }
+    }
+
     this.logger.log(
       `Quiz group soft deleted with ID: ${id} by user: ${user.id}`,
     );

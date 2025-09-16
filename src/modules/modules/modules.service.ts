@@ -355,7 +355,7 @@ export class ModulesService {
 
         // Filter modules by student's year and published status
         pipeline.push({
-          $match: { 
+          $match: {
             published: true,
             year: student.year
           },
@@ -699,18 +699,19 @@ export class ModulesService {
         if (student) {
           // Check if this is the first page to apply safety fallback
           const isFirstPage = paginationOptions.page === 1;
-          
-          // Get all modules in student's current year to determine lowest sequence
+
+          // Get all published modules in student's current year to determine lowest sequence
           const allCurrentYearModules = await ModuleModel
             .find({
               year: student.year,
               deleted_at: null,
+              published: true,
               sequence: { $exists: true, $ne: null },
             })
             .sort({ sequence: 1 })
             .lean();
 
-          const lowestSequenceInCurrentYear = allCurrentYearModules.length > 0 
+          const lowestSequenceInCurrentYear = allCurrentYearModules.length > 0
             ? Math.min(...allCurrentYearModules.map(m => m.sequence))
             : 1;
 
@@ -725,15 +726,18 @@ export class ModulesService {
 
           // Calculate highest completed sequence for each year
           const highestCompletedByYear = {};
-          
+
           for (const year of Object.keys(modulesByYear)) {
-            const yearModules = modulesByYear[year].filter(module => module.sequence !== null);
-            
+            // Only consider published modules with sequence for completion calculation
+            const yearModules = modulesByYear[year].filter(module =>
+              module.sequence !== null && module.published === true
+            );
+
             if (yearModules.length > 0) {
-              const completedModules = yearModules.filter(module => 
+              const completedModules = yearModules.filter(module =>
                 module.progress && module.progress.status === ProgressStatusEnum.COMPLETED
               );
-              
+
               if (completedModules.length > 0) {
                 highestCompletedByYear[year] = Math.max(
                   ...completedModules.map(module => module.sequence)
@@ -750,14 +754,19 @@ export class ModulesService {
           modules.forEach(module => {
             if (module.sequence !== null) {
               const highestCompletedInYear = highestCompletedByYear[module.year] || 0;
-              
+
               // For current year: sequence logic with safety fallback
               if (module.year === student.year) {
                 // Safety fallback: Only on first page, allow access to the lowest sequence
                 if (isFirstPage && module.sequence === lowestSequenceInCurrentYear && highestCompletedInYear === 0) {
                   module.isLock = false;
                 } else {
-                  module.isLock = module.sequence > highestCompletedInYear + 1;
+                  // Find the next available sequence after the highest completed
+                  const nextAvailableSequence = this.findNextAvailableSequence(
+                    allCurrentYearModules,
+                    highestCompletedInYear
+                  );
+                  module.isLock = module.sequence > nextAvailableSequence;
                 }
               }
               // For previous years: all modules should be unlocked (already accessible)
@@ -912,11 +921,12 @@ export class ModulesService {
         }).select('year');
 
         if (student) {
-          // Get all modules in the same year to calculate highest completed sequence
+          // Get all published modules in the same year to calculate highest completed sequence
           const allModules = await ModuleModel
             .find({
               year: module.year,
               deleted_at: null,
+              published: true,
               sequence: { $exists: true, $ne: null },
             })
             .lean();
@@ -926,18 +936,18 @@ export class ModulesService {
             StudentModuleProgress.name,
             StudentModuleProgressSchema,
           );
-          
+
           const completedProgress = await StudentModuleProgressModel.find({
             student_id: new Types.ObjectId(user.id),
             status: ProgressStatusEnum.COMPLETED,
           });
 
           const completedModuleIds = completedProgress.map(p => p.module_id.toString());
-          
-          // Find the highest completed sequence in this year
+
+          // Find the highest completed sequence in this year (only from published modules)
           let highestCompletedSequence = 0;
-          const completedModules = allModules.filter(m => 
-            completedModuleIds.includes(m._id.toString())
+          const completedModules = allModules.filter(m =>
+            completedModuleIds.includes(m._id.toString()) && m.published === true
           );
 
           if (completedModules.length > 0) {
@@ -949,17 +959,22 @@ export class ModulesService {
           // Add isLock field to the module based on year-wise sequence
           if (module.sequence !== null) {
             // Get the lowest sequence in this year for safety fallback
-            const lowestSequenceInYear = allModules.length > 0 
+            const lowestSequenceInYear = allModules.length > 0
               ? Math.min(...allModules.map(m => m.sequence))
               : 1;
-            
+
             // For current year: sequence logic with safety fallback
             if (module.year === student.year) {
               // Safety fallback: Allow access to the lowest sequence if no progress exists
               if (module.sequence === lowestSequenceInYear && highestCompletedSequence === 0) {
                 module.isLock = false;
               } else {
-                module.isLock = module.sequence > highestCompletedSequence + 1;
+                // Find the next available sequence after the highest completed
+                const nextAvailableSequence = this.findNextAvailableSequence(
+                  allModules,
+                  highestCompletedSequence
+                );
+                module.isLock = module.sequence > nextAvailableSequence;
               }
             }
             // For previous years: all modules should be unlocked (already accessible)
@@ -1061,7 +1076,7 @@ export class ModulesService {
     if (user.role.name !== RoleEnum.SCHOOL_ADMIN) {
       moduleUpdateData.year = undefined;
     }
-    
+
     // Validate year if provided
     if (moduleUpdateData.year !== undefined) {
       // Validate year is between 1 and 5
@@ -1847,7 +1862,7 @@ export class ModulesService {
     }
 
     const currentSequence = module.sequence;
-    
+
     // If sequence is the same, no need to update
     if (currentSequence === newSequence) {
       return {
@@ -2023,6 +2038,34 @@ export class ModulesService {
     this.logger.log(
       `Reordered sequences after soft deleting module ${moduleId} with sequence ${deletedSequence}`,
     );
+  }
+
+  /**
+   * Helper method to find the next available sequence after the highest completed
+   * This handles gaps in sequence caused by unpublished modules
+   */
+  private findNextAvailableSequence(
+    allModules: any[],
+    highestCompletedSequence: number,
+  ): number {
+    if (highestCompletedSequence === 0) {
+      // No modules completed yet, return the lowest sequence
+      return allModules.length > 0 ? Math.min(...allModules.map(m => m.sequence)) : 1;
+    }
+
+    // Find all sequences that are greater than the highest completed
+    const availableSequences = allModules
+      .map(m => m.sequence)
+      .filter(seq => seq > highestCompletedSequence)
+      .sort((a, b) => a - b);
+
+    if (availableSequences.length === 0) {
+      // No more modules available, return a high number to lock everything
+      return 999999;
+    }
+
+    // Return the next available sequence
+    return availableSequences[0];
   }
 
   /**

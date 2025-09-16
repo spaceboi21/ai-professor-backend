@@ -1587,7 +1587,9 @@ export class QuizController {
       );
 
       // Debug logging for AI service response
-      console.log('AI Service Response:', response);
+      console.log('AI Service Response Status:', response.status);
+      console.log('AI Service Response Headers:', response.headers);
+      console.log('AI Service Response Data:', JSON.stringify(response.data, null, 2));
       console.log('AI Service Questions:', response.data?.questions);
       console.log('AI Service Questions Length:', response.data?.questions?.length);
 

@@ -468,8 +468,22 @@ export class ChaptersService {
         addFieldsStage.chapter_quiz_completed = {
           $cond: {
             if: { $gt: [{ $size: '$progress' }, 0] },
-            then: { $arrayElemAt: ['$progress.chapter_quiz_completed', 0] },
-            else: false,
+            then: {
+              // If progress record exists, check if chapter still has quiz
+              $cond: {
+                if: { $gt: [{ $size: '$quiz_groups' }, 0] },
+                then: { $arrayElemAt: ['$progress.chapter_quiz_completed', 0] }, // Has quiz, use progress value
+                else: true, // No quiz, so considered completed regardless of progress
+              },
+            },
+            else: {
+              // If no progress record exists, check if chapter has quiz
+              $cond: {
+                if: { $gt: [{ $size: '$quiz_groups' }, 0] },
+                then: false, // Has quiz but not completed
+                else: true,  // No quiz, so considered completed
+              },
+            },
           },
         };
 
@@ -563,8 +577,12 @@ export class ChaptersService {
             const isPrevCompleted =
               prev.status === ProgressStatusEnum.COMPLETED;
             const isPrevQuizCompleted = prev.chapter_quiz_completed === true;
+            const prevHasQuiz = prev.hasQuiz === true;
 
-            chapter.is_locked = !(isPrevCompleted && isPrevQuizCompleted);
+            // Chapter is locked if:
+            // 1. Previous chapter is not completed, OR
+            // 2. Previous chapter has quiz but quiz is not completed
+            chapter.is_locked = !isPrevCompleted || (prevHasQuiz && !isPrevQuizCompleted);
 
             // Add locked reason
             if (!isPrevCompleted) {
@@ -574,7 +592,7 @@ export class ChaptersService {
                   'LOCKED_REASON_PREVIOUS_CHAPTER',
                   user?.preferred_language || DEFAULT_LANGUAGE,
                 );
-            } else if (!isPrevQuizCompleted) {
+            } else if (prevHasQuiz && !isPrevQuizCompleted) {
               chapter.locked_reason =
                 this.errorMessageService.getMessageWithLanguage(
                   'CHAPTER',
@@ -665,7 +683,6 @@ export class ChaptersService {
           },
         },
       ];
-
       // Stage 2: Add content information for all users
       // Lookup bibliography items
       pipeline.push({
@@ -687,7 +704,6 @@ export class ChaptersService {
           as: 'bibliography',
         },
       });
-
       // Lookup quiz groups
       pipeline.push({
         $lookup: {
@@ -708,7 +724,6 @@ export class ChaptersService {
           as: 'quiz_groups',
         },
       });
-
       // Stage 3: Add computed fields for all users
       const addFieldsStage: any = {
         // Check for video content
@@ -764,7 +779,6 @@ export class ChaptersService {
         // Get quiz count
         quiz_count: { $size: '$quiz_groups' },
       };
-
       // Add student progress lookup and status field only for students
       if (user.role.name === RoleEnum.STUDENT) {
         // Lookup student progress
@@ -841,8 +855,22 @@ export class ChaptersService {
         addFieldsStage.chapter_quiz_completed = {
           $cond: {
             if: { $gt: [{ $size: '$progress' }, 0] },
-            then: { $arrayElemAt: ['$progress.chapter_quiz_completed', 0] },
-            else: false,
+            then: {
+              // If progress record exists, check if chapter still has quiz
+              $cond: {
+                if: { $gt: [{ $size: '$quiz_groups' }, 0] },
+                then: { $arrayElemAt: ['$progress.chapter_quiz_completed', 0] }, // Has quiz, use progress value
+                else: true, // No quiz, so considered completed regardless of progress
+              },
+            },
+            else: {
+              // If no progress record exists, check if chapter has quiz
+              $cond: {
+                if: { $gt: [{ $size: '$quiz_groups' }, 0] },
+                then: false, // Has quiz but not completed
+                else: true,  // No quiz, so considered completed
+              },
+            },
           },
         };
 
@@ -866,7 +894,6 @@ export class ChaptersService {
       }
 
       pipeline.push({ $addFields: addFieldsStage });
-
       // Stage 4: Project final fields
       const projectFields: any = {
         _id: 1,
@@ -885,14 +912,12 @@ export class ChaptersService {
         bibliography_count: 1,
         quiz_count: 1,
       };
-
       // Add status field only for students
       if (user.role.name === RoleEnum.STUDENT) {
         projectFields.status = 1;
         projectFields.chapter_quiz_completed = 1;
         projectFields.quiz_attempt_count = 1;
       }
-
       pipeline.push({ $project: projectFields });
 
       // Execute aggregation
@@ -922,8 +947,12 @@ export class ChaptersService {
             const isPrevCompleted =
               prev.status === ProgressStatusEnum.COMPLETED;
             const isPrevQuizCompleted = prev.chapter_quiz_completed === true;
+            const prevHasQuiz = prev.hasQuiz === true;
 
-            chapter.is_locked = !(isPrevCompleted && isPrevQuizCompleted);
+            // Chapter is locked if:
+            // 1. Previous chapter is not completed, OR
+            // 2. Previous chapter has quiz but quiz is not completed
+            chapter.is_locked = !isPrevCompleted || (prevHasQuiz && !isPrevQuizCompleted);
 
             // Add locked reason
             if (!isPrevCompleted) {
@@ -933,7 +962,7 @@ export class ChaptersService {
                   'LOCKED_REASON_PREVIOUS_CHAPTER',
                   user?.preferred_language || DEFAULT_LANGUAGE,
                 );
-            } else if (!isPrevQuizCompleted) {
+            } else if (prevHasQuiz && !isPrevQuizCompleted) {
               chapter.locked_reason =
                 this.errorMessageService.getMessageWithLanguage(
                   'CHAPTER',

@@ -73,7 +73,7 @@ import {
   QuizVerificationResponse,
 } from 'src/common/types/quiz.type';
 import { ErrorMessageService } from 'src/common/services/error-message.service';
-import { 
+import {
   DEFAULT_LANGUAGE,
   LanguageEnum,
 } from 'src/common/constants/language.constant';
@@ -1082,22 +1082,32 @@ export class ProgressService {
       );
     }
 
-    // Check if previous chapter quiz is completed
-    const previousChapterProgress = await StudentChapterProgressModel.findOne({
-      student_id: new Types.ObjectId(studentId),
+    // Check if previous chapter has quiz and if it's completed
+    const QuizGroupModel = tenantConnection.model(QuizGroup.name, QuizGroupSchema);
+    const previousChapterHasQuiz = await QuizGroupModel.exists({
       chapter_id: previousChapter._id,
-      chapter_quiz_completed: true,
+      deleted_at: null,
     });
 
-    if (!previousChapterProgress) {
-      throw new ForbiddenException(
-        this.errorMessageService.getMessageWithLanguage(
-          'PROGRESS',
-          'CHAPTER_IS_LOCKED',
-          user?.preferred_language || DEFAULT_LANGUAGE,
-        ),
-      );
+    // If previous chapter has quiz, check if it's completed
+    if (previousChapterHasQuiz) {
+      const previousChapterProgress = await StudentChapterProgressModel.findOne({
+        student_id: new Types.ObjectId(studentId),
+        chapter_id: previousChapter._id,
+        chapter_quiz_completed: true,
+      });
+
+      if (!previousChapterProgress) {
+        throw new ForbiddenException(
+          this.errorMessageService.getMessageWithLanguage(
+            'PROGRESS',
+            'CHAPTER_IS_LOCKED',
+            user?.preferred_language || DEFAULT_LANGUAGE,
+          ),
+        );
+      }
     }
+    // If previous chapter has no quiz, allow access (no quiz to complete)
 
     return true;
   }
@@ -1122,14 +1132,43 @@ export class ProgressService {
         deleted_at: null,
       });
 
-      // Get completed chapters count (both manually completed and quiz completed)
-      const completedChapters =
-        await StudentChapterProgressModel.countDocuments({
-          student_id: new Types.ObjectId(studentId),
-          module_id: quizGroup.module_id,
-          status: ProgressStatusEnum.COMPLETED,
-          chapter_quiz_completed: true,
+      // Get completed chapters count - need to check both chapter completion and quiz completion
+      const QuizGroupModel = tenantConnection.model(QuizGroup.name, QuizGroupSchema);
+
+      // Get all chapters in this module
+      const allChapters = await ChapterModel.find({
+        module_id: quizGroup.module_id,
+        deleted_at: null,
+      }).lean();
+
+      let completedChapters = 0;
+
+      for (const chapter of allChapters) {
+        // Check if chapter has a quiz
+        const hasQuiz = await QuizGroupModel.exists({
+          chapter_id: chapter._id,
+          deleted_at: null,
         });
+
+        // Get student's progress for this chapter
+        const chapterProgress = await StudentChapterProgressModel.findOne({
+          student_id: new Types.ObjectId(studentId),
+          chapter_id: chapter._id,
+        });
+
+        if (chapterProgress && chapterProgress.status === ProgressStatusEnum.COMPLETED) {
+          // Chapter is completed, now check quiz requirement
+          if (hasQuiz) {
+            // Chapter has quiz, check if quiz is completed
+            if (chapterProgress.chapter_quiz_completed === true) {
+              completedChapters++;
+            }
+          } else {
+            // Chapter has no quiz, so it's considered completed
+            completedChapters++;
+          }
+        }
+      }
 
       if (completedChapters < totalChapters) {
         throw new ForbiddenException(
@@ -1264,7 +1303,7 @@ export class ProgressService {
     );
   }
 
-  private async recalculateModuleProgress(
+  async recalculateModuleProgress(
     studentId: Types.ObjectId,
     moduleId: Types.ObjectId,
     tenantConnection: any,
@@ -1285,12 +1324,43 @@ export class ProgressService {
       deleted_at: null,
     });
 
-    // Get completed chapters count
-    const completedChapters = await StudentChapterProgressModel.countDocuments({
-      student_id: studentId,
+    // Get completed chapters count - need to check both chapter completion and quiz completion
+    const QuizGroupModel = tenantConnection.model(QuizGroup.name, QuizGroupSchema);
+
+    // Get all chapters in this module
+    const allChapters = await ChapterModel.find({
       module_id: moduleId,
-      chapter_quiz_completed: true,
-    });
+      deleted_at: null,
+    }).lean();
+
+    let completedChapters = 0;
+
+    for (const chapter of allChapters) {
+      // Check if chapter has a quiz
+      const hasQuiz = await QuizGroupModel.exists({
+        chapter_id: chapter._id,
+        deleted_at: null,
+      });
+
+      // Get student's progress for this chapter
+      const chapterProgress = await StudentChapterProgressModel.findOne({
+        student_id: studentId,
+        chapter_id: chapter._id,
+      });
+
+      if (chapterProgress && chapterProgress.status === ProgressStatusEnum.COMPLETED) {
+        // Chapter is completed, now check quiz requirement
+        if (hasQuiz) {
+          // Chapter has quiz, check if quiz is completed
+          if (chapterProgress.chapter_quiz_completed === true) {
+            completedChapters++;
+          }
+        } else {
+          // Chapter has no quiz, so it's considered completed
+          completedChapters++;
+        }
+      }
+    }
 
     // Get module progress
     const moduleProgress = await StudentModuleProgressModel.findOne({
@@ -2398,10 +2468,10 @@ export class ProgressService {
     });
 
     const completedModuleIds = completedProgress.map(p => p.module_id.toString());
-    
+
     // Find the highest completed sequence in this year
     let highestCompletedSequence = 0;
-    const completedModules = allModules.filter(m => 
+    const completedModules = allModules.filter(m =>
       completedModuleIds.includes(m._id.toString())
     );
 
@@ -2412,10 +2482,10 @@ export class ProgressService {
     }
 
     // Safety fallback: Allow access to the lowest sequence in current year if no progress exists
-    const lowestSequenceInYear = allModules.length > 0 
+    const lowestSequenceInYear = allModules.length > 0
       ? Math.min(...allModules.map(m => m.sequence))
       : 1;
-    
+
     if (module.sequence === lowestSequenceInYear && highestCompletedSequence === 0) {
       return {
         can_access: true,
@@ -2427,8 +2497,8 @@ export class ProgressService {
 
     if (!canAccess) {
       // Find required modules that need to be completed
-      const requiredModules = allModules.filter(m => 
-        m.sequence <= module.sequence - 1 && 
+      const requiredModules = allModules.filter(m =>
+        m.sequence <= module.sequence - 1 &&
         !completedModuleIds.includes(m._id.toString())
       );
 
