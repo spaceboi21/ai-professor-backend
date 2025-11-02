@@ -15,7 +15,7 @@ import { ConversionEngineService } from './services/conversion-engine.service';
     MulterModule.register({
       storage: require('multer').memoryStorage(),
       limits: {
-        fileSize: 50 * 1024 * 1024, // 50MB
+        fileSize: 500 * 1024 * 1024, // 500 MB
       },
     }),
   ],

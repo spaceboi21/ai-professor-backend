@@ -30,7 +30,7 @@ export class ConversionController {
   @Post('convert')
   @UseInterceptors(FileInterceptor('pptFile', {
     limits: {
-      fileSize: 50 * 1024 * 1024, // 50MB
+      fileSize: 500 * 1024 * 1024, // 500MB
     },
   }))
   @ApiOperation({ 
@@ -100,7 +100,7 @@ export class ConversionController {
           valid: true
         },
         config: {
-          maxFileSize: 52428800,
+          maxFileSize: 524288000,
           conversionTimeout: 300000,
           batchSize: 5,
           maxConcurrent: 3

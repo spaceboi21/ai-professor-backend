@@ -59,7 +59,7 @@ Add these to your `.env` file:
 
 ```env
 # Conversion Settings
-MAX_FILE_SIZE=52428800                # 50MB in bytes
+MAX_FILE_SIZE=524288000                # 500MB in bytes
 CONVERSION_TIMEOUT=300000             # 5 minutes
 TEMP_FILE_MAX_AGE=3600000            # 1 hour
 TEMP_CLEANUP_INTERVAL=1800000        # 30 minutes

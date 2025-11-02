@@ -2,7 +2,7 @@ import { registerAs } from '@nestjs/config';
 
 export default registerAs('conversion', () => ({
   // File handling
-  maxFileSize: parseInt(process.env.MAX_FILE_SIZE || '52428800') || 50 * 1024 * 1024, // 50MB
+  maxFileSize: parseInt(process.env.MAX_FILE_SIZE || '524288000') || 500 * 1024 * 1024, // 500MB
   allowedMimeTypes: [
     'application/vnd.openxmlformats-officedocument.presentationml.presentation',
     'application/vnd.ms-powerpoint',

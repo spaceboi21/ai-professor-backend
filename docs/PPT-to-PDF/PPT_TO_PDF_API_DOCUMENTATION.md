@@ -66,7 +66,7 @@ FormData {
 // 400 Bad Request - File too large
 {
   "statusCode": 400,
-  "message": "File too large. Maximum size is 50MB",
+  "message": "File too large. Maximum size is 500MB",
   "error": "Bad Request"
 }
 
@@ -108,7 +108,7 @@ FormData {
     "valid": true
   },
   "config": {
-    "maxFileSize": 52428800,
+    "maxFileSize": 524288000,
     "conversionTimeout": 300000,
     "batchSize": 5,
     "maxConcurrent": 3
@@ -361,7 +361,7 @@ export default {
 
 ```bash
 # Conversion Settings
-MAX_FILE_SIZE=52428800          # 50MB in bytes
+MAX_FILE_SIZE=524288000          # 500MB in bytes
 CONVERSION_TIMEOUT=300000       # 5 minutes in ms
 TEMP_FILE_MAX_AGE=3600000      # 1 hour in ms
 TEMP_CLEANUP_INTERVAL=1800000  # 30 minutes in ms
@@ -408,7 +408,7 @@ AWS_SECRET_ACCESS_KEY=your-secret-key
 
 ### Performance Metrics
 - **Conversion Time:** 3-5 seconds for typical presentations
-- **File Size Limit:** 50MB maximum
+- **File Size Limit:** 500MB maximum
 - **Supported Formats:** PPT, PPTX
 - **Rate Limiting:** 10 requests per 15 minutes per user
 
@@ -424,7 +424,7 @@ AWS_SECRET_ACCESS_KEY=your-secret-key
 | Error | Cause | Solution |
 |-------|--------|----------|
 | `LibreOffice not found` | LibreOffice not installed | Install LibreOffice on server |
-| `File too large` | File exceeds 50MB | Reduce file size or increase limit |
+| `File too large` | File exceeds 500MB | Reduce file size or increase limit |
 | `Only PowerPoint files allowed` | Wrong file type | Use only .ppt or .pptx files |
 | `Conversion timeout` | Large file or server load | Try again or contact support |
 
@@ -436,7 +436,7 @@ try {
   // Handle success
 } catch (error) {
   if (error.message.includes('File too large')) {
-    alert('File is too large. Maximum size is 50MB.');
+    alert('File is too large. Maximum size is 500MB.');
   } else if (error.message.includes('Only PowerPoint files')) {
     alert('Please select a PowerPoint file (.ppt or .pptx).');
   } else if (error.message.includes('LibreOffice not found')) {

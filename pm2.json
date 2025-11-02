@@ -1,0 +1,15 @@
+{
+  "apps": [
+    {
+      "name": "ai-professor-backend-5000",
+      "cwd": "/opt/ai/ai-professor-backend",
+      "script": "yarn",
+      "args": "run start:prod",
+      "exec_interpreter": "none",
+      "env": {
+        "PORT": 3000,
+        "NODE_ENV": "production"
+      }
+    }
+  ]
+}

@@ -105,7 +105,7 @@ import { registerAs } from '@nestjs/config';
 
 export default registerAs('conversion', () => ({
   // File handling
-  maxFileSize: parseInt(process.env.MAX_FILE_SIZE) || 50 * 1024 * 1024, // 50MB
+  maxFileSize: parseInt(process.env.MAX_FILE_SIZE) || 500 * 1024 * 1024, // 500MB
   allowedMimeTypes: [
     'application/vnd.openxmlformats-officedocument.presentationml.presentation',
     'application/vnd.ms-powerpoint',
@@ -760,7 +760,7 @@ import { ConversionEngineService } from './services/conversion-engine.service';
     MulterModule.register({
       storage: 'memory', // Store files in memory for processing
       limits: {
-        fileSize: 50 * 1024 * 1024, // 50MB
+        fileSize: 500 * 1024 * 1024, // 500MB
       },
     }),
   ],
@@ -811,7 +811,7 @@ Create `.env` file:
 PORT=3000
 
 # File handling
-MAX_FILE_SIZE=52428800                # 50MB in bytes
+MAX_FILE_SIZE=524288000                # 500MB in bytes
 UPLOAD_DIR=./uploads
 TEMP_DIR=./temp
 
@@ -891,7 +891,7 @@ services:
     environment:
       - NODE_ENV=production
       - PORT=3000
-      - MAX_FILE_SIZE=52428800
+      - MAX_FILE_SIZE=524288000
       - UPLOAD_DIR=/app/uploads
       - TEMP_DIR=/app/temp
     volumes:
@@ -1020,7 +1020,7 @@ describe('ConversionService', () => {
           useValue: {
             get: jest.fn((key: string) => {
               const config = {
-                'conversion.maxFileSize': 50 * 1024 * 1024,
+                'conversion.maxFileSize': 500 * 1024 * 1024,
                 'conversion.allowedMimeTypes': [
                   'application/vnd.openxmlformats-officedocument.presentationml.presentation',
                 ],
@@ -1127,7 +1127,7 @@ describe('ConversionController', () => {
    ```bash
    NODE_ENV=production
    LOG_LEVEL=warn
-   MAX_FILE_SIZE=52428800
+   MAX_FILE_SIZE=524288000
    CONVERSION_TIMEOUT=300000
    ```
 

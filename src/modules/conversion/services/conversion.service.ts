@@ -206,7 +206,7 @@ export class ConversionService {
       'application/vnd.ms-powerpoint',
     ];
     const allowedExtensions = this.configService.get<string[]>('conversion.allowedExtensions') || ['.ppt', '.pptx'];
-    const maxFileSize = this.configService.get<number>('conversion.maxFileSize') || 50 * 1024 * 1024;
+    const maxFileSize = this.configService.get<number>('conversion.maxFileSize') || 500 * 1024 * 1024;
 
     // Check file size
     if (file.size > maxFileSize) {
