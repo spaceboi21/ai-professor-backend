@@ -731,155 +731,126 @@ export class ProgressService {
     }
   }
 
-
   async submitQuizAnswers(
-  submitQuizAnswersDto: SubmitQuizAnswersDto,
-  user: JWTUserPayload,
-) {
-  const { quiz_group_id, answers, total_time_taken_seconds } =
-    submitQuizAnswersDto;
+    submitQuizAnswersDto: SubmitQuizAnswersDto,
+    user: JWTUserPayload,
+  ) {
+    const { quiz_group_id, answers, total_time_taken_seconds } =
+      submitQuizAnswersDto;
 
-  this.logger.log(
-    `Student ${user.id} submitting quiz answers for quiz group ${quiz_group_id}`,
-  );
-
-  // Validate user is a student
-  if (user.role.name !== RoleEnum.STUDENT) {
-    throw new ForbiddenException(
-      this.errorMessageService.getMessageWithLanguage(
-        'PROGRESS',
-        'ONLY_STUDENTS_CAN_SUBMIT_QUIZ_ANSWERS',
-        user?.preferred_language || DEFAULT_LANGUAGE,
-      ),
+    this.logger.log(
+      `Student ${user.id} submitting quiz answers for quiz group ${quiz_group_id}`,
     );
-  }
 
-  // Get school and tenant connection
-  const school = await this.schoolModel.findById(user.school_id);
-  if (!school) {
-    throw new NotFoundException(
-      this.errorMessageService.getMessageWithLanguage(
-        'PROGRESS',
-        'SCHOOL_NOT_FOUND',
-        user?.preferred_language || DEFAULT_LANGUAGE,
-      ),
+    // Validate user is a student
+    if (user.role.name !== RoleEnum.STUDENT) {
+      throw new ForbiddenException(
+        this.errorMessageService.getMessageWithLanguage(
+          'PROGRESS',
+          'ONLY_STUDENTS_CAN_SUBMIT_QUIZ_ANSWERS',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
+    }
+
+    // Get school and tenant connection
+    const school = await this.schoolModel.findById(user.school_id);
+    if (!school) {
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'PROGRESS',
+          'SCHOOL_NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
+    }
+
+    const tenantConnection =
+      await this.tenantConnectionService.getTenantConnection(school.db_name);
+    const QuizModel = tenantConnection.model(Quiz.name, QuizSchema);
+    const QuizGroupModel = tenantConnection.model(
+      QuizGroup.name,
+      QuizGroupSchema,
     );
-  }
-
-  const tenantConnection =
-    await this.tenantConnectionService.getTenantConnection(school.db_name);
-  const QuizModel = tenantConnection.model(Quiz.name, QuizSchema);
-  const QuizGroupModel = tenantConnection.model(QuizGroup.name, QuizGroupSchema);
-  const StudentQuizAttemptModel = tenantConnection.model(
-    StudentQuizAttempt.name,
-    StudentQuizAttemptSchema,
-  );
-  const ModuleModel = tenantConnection.model(Module.name, ModuleSchema);
-
-  // Find the in-progress attempt
-  const attempt = await StudentQuizAttemptModel.findOne({
-    student_id: new Types.ObjectId(user.id),
-    quiz_group_id: new Types.ObjectId(quiz_group_id),
-    status: AttemptStatusEnum.IN_PROGRESS,
-  });
-
-  if (!attempt) {
-    throw new NotFoundException(
-      this.errorMessageService.getMessageWithLanguage(
-        'PROGRESS',
-        'NO_IN_PROGRESS_QUIZ_ATTEMPT_FOUND',
-        user?.preferred_language || DEFAULT_LANGUAGE,
-      ),
+    const StudentQuizAttemptModel = tenantConnection.model(
+      StudentQuizAttempt.name,
+      StudentQuizAttemptSchema,
     );
-  }
+    const ModuleModel = tenantConnection.model(Module.name, ModuleSchema);
 
-  // Get quiz group and module
-  const quizGroup = await QuizGroupModel.findById(quiz_group_id);
-  if (!quizGroup) {
-    throw new NotFoundException(
-      this.errorMessageService.getMessageWithLanguage(
-        'PROGRESS',
-        'QUIZ_GROUP_NOT_FOUND',
-        user?.preferred_language || DEFAULT_LANGUAGE,
-      ),
+    // Find the in-progress attempt
+    const attempt = await StudentQuizAttemptModel.findOne({
+      student_id: new Types.ObjectId(user.id),
+      quiz_group_id: new Types.ObjectId(quiz_group_id),
+      status: AttemptStatusEnum.IN_PROGRESS,
+    });
+
+    if (!attempt) {
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'PROGRESS',
+          'NO_IN_PROGRESS_QUIZ_ATTEMPT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
+    }
+
+    // Get quiz group details
+    const quizGroup = await QuizGroupModel.findById(
+      new Types.ObjectId(quiz_group_id),
     );
-  }
+    if (!quizGroup) {
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'PROGRESS',
+          'QUIZ_GROUP_NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
+    }
 
-  const module = await ModuleModel.findById(quizGroup.module_id);
-  if (!module) {
-    throw new NotFoundException(
-      this.errorMessageService.getMessageWithLanguage(
-        'PROGRESS',
-        'MODULE_NOT_FOUND',
-        user?.preferred_language || DEFAULT_LANGUAGE,
-      ),
-    );
-  }
+    // Get module details for AI verification
+    const module = await ModuleModel.findById(quizGroup.module_id);
+    if (!module) {
+      throw new NotFoundException(
+        this.errorMessageService.getMessageWithLanguage(
+          'PROGRESS',
+          'MODULE_NOT_FOUND',
+          user?.preferred_language || DEFAULT_LANGUAGE,
+        ),
+      );
+    }
 
-  // Get all quizzes for this group with correct answers
-  const quizzes = await QuizModel.find({
-    quiz_group_id: new Types.ObjectId(quiz_group_id),
-    deleted_at: null,
-  })
-    .sort({ sequence: 1 })
-    .lean();
+    // Get all quizzes for this group with correct answers (sorted by sequence)
+    const quizzes = await QuizModel.find({
+      quiz_group_id: new Types.ObjectId(quiz_group_id),
+      deleted_at: null,
+    })
+      .sort({ sequence: 1 }) // Ensure consistent ordering
+      .lean();
 
-  // ✅ Separate into manual & AI
-  const questionsForAI: QuizQuestion[] = [];
-  const directlyValidatedResults: any[] = [];
-
-  answers.forEach((answer) => {
-    const quiz = quizzes.find(
-      (q) => q._id.toString() === answer.quiz_id.toString(),
-    );
-    if (!quiz) return;
-
-    const hasStoredCorrectAnswer =
-      quiz.answer && quiz.answer.length > 0 && quiz.answer[0] !== '';
-
-    if (hasStoredCorrectAnswer) {
-
-      // Direct check
-      const correctAnswers = quiz.answer.map((a) => a.trim().toLowerCase());
-      const userAnswers = (answer.selected_answers || []).map((a) =>
-        a.trim().toLowerCase(),
+    // Prepare questions for AI verification
+    const questionsForAI: QuizQuestion[] = [];
+    answers.map((answer) => {
+      const quiz = quizzes.find(
+        (q) => q._id.toString() === answer.quiz_id.toString(),
       );
 
-      const isCorrect =
-        quiz.type === 'SINGLE_SELECT'
-          ? userAnswers[0] === correctAnswers[0]
-          : correctAnswers.every((ca) => userAnswers.includes(ca)) &&
-            userAnswers.length === correctAnswers.length;
+      if (quiz) {
+        questionsForAI.push({
+          question: quiz?.question || '',
+          question_type: quiz?.type,
+          options: quiz?.options || [],
+          user_answer:
+            answer.selected_answers && answer.selected_answers.length > 0
+              ? answer.selected_answers.join(', ')
+              : '',
+        });
+      }
+    });
 
-      directlyValidatedResults.push({
-        question: quiz.question,
-        question_type: quiz.type,
-        options: quiz.options,
-        user_answer: answer.selected_answers,
-        correct_answer: quiz.answer,
-        is_correct: isCorrect,
-        feedback: isCorrect
-          ? 'Correct! Well done.'
-          : `Incorrect. Correct answer(s): ${quiz.answer.join(', ')}`,
-        score: isCorrect ? 1 : 0,
-      });
-    } else {
-
-      questionsForAI.push({
-        question: quiz.question,
-        question_type: quiz.type,
-        options: quiz.options || [],
-        user_answer:
-          answer.selected_answers && answer.selected_answers.length > 0
-            ? answer.selected_answers.join(', ')
-            : '',
-      });
-    }
-  });
-
-  // ✅ Call AI only if needed
-  let aiVerificationResult: QuizVerificationResponse | null = null;
-  if (questionsForAI.length > 0) {
+    // Verify quiz questions using Python AI service
+    let aiVerificationResult: QuizVerificationResponse | null = null;
     try {
       aiVerificationResult = await this.pythonService.quizVerificationByAI(
         module.title,
@@ -889,78 +860,75 @@ export class ProgressService {
       this.logger.log('AI verification completed successfully');
     } catch (error) {
       this.logger.error('AI verification failed:', error.message);
+      // Continue with manual verification if AI fails
       aiVerificationResult = null;
     }
+
+    // TODO: Remove this after testing
+    const isPassed =
+      (aiVerificationResult?.score_percentage || 0) >=
+      attempt.passing_threshold;
+    // const isPassed = true;
+
+    // Update attempt
+    attempt.status = AttemptStatusEnum.COMPLETED;
+    attempt.completed_at = new Date();
+    attempt.score_percentage = aiVerificationResult?.score_percentage || 0;
+    attempt.correct_answers = aiVerificationResult?.correct_answers || 0;
+    attempt.total_questions = quizzes.length;
+    attempt.time_taken_seconds = total_time_taken_seconds || 0;
+    attempt.is_passed = isPassed;
+    attempt.answers = answers?.map((answer) => ({
+      quiz_id: new Types.ObjectId(answer.quiz_id),
+      selected_answers: answer.selected_answers,
+      time_spent_seconds: answer?.time_spent_seconds || 0,
+    }));
+
+    // Store AI verification result if available
+    if (aiVerificationResult) {
+      attempt.ai_verification_result = aiVerificationResult;
+    }
+
+    // Calculate tag performance for this quiz group
+    const tagPerformance = this.calculateTagPerformance(
+      quizzes,
+      answers,
+      aiVerificationResult,
+    );
+    attempt.tag_performance = tagPerformance;
+
+    await attempt.save();
+
+    // Update chapter/module progress if quiz is passed
+    if (isPassed) {
+      await this.updateProgressOnQuizCompletion(attempt, tenantConnection);
+    }
+
+    this.logger.log(
+      `Quiz attempt completed for student ${user.id}, score: ${aiVerificationResult?.score_percentage || 0}%`,
+    );
+
+    return {
+      message: this.errorMessageService.getSuccessMessageWithLanguage(
+        'PROGRESS',
+        'QUIZ_ANSWERS_SUBMITTED_SUCCESSFULLY',
+        user?.preferred_language || DEFAULT_LANGUAGE,
+      ),
+      data: {
+        attempt_id: attempt._id,
+        score_percentage: attempt.score_percentage,
+        correct_answers: attempt.correct_answers,
+        total_questions: attempt.total_questions,
+        is_passed: attempt.is_passed,
+        time_taken_seconds: attempt.time_taken_seconds,
+        status: attempt.status,
+        completed_at: attempt.completed_at,
+        ai_verification: aiVerificationResult ? 'completed' : 'failed',
+        ai_verification_report: aiVerificationResult,
+        tag_performance: attempt.tag_performance,
+      },
+    };
   }
-
-  // ✅ Merge both result sets
-  const allResults = [
-    ...(aiVerificationResult?.questions_results || []),
-    ...directlyValidatedResults,
-  ];
-
-  const correctCount = allResults.filter((r) => r.is_correct).length;
-  const scorePercentage = (correctCount / quizzes.length) * 100;
-
-  // ✅ Finalize attempt
-  attempt.status = AttemptStatusEnum.COMPLETED;
-  attempt.completed_at = new Date();
-  attempt.score_percentage = scorePercentage;
-  attempt.correct_answers = correctCount;
-  attempt.total_questions = quizzes.length;
-  attempt.time_taken_seconds = total_time_taken_seconds || 0;
-  attempt.is_passed = scorePercentage >= attempt.passing_threshold;
-  attempt.ai_verification_result = {
-    ...(aiVerificationResult || {}),
-    questions_results: allResults,
-    score_percentage: scorePercentage,
-    correct_answers: correctCount,
-  };
-
-  attempt.answers = answers.map((answer) => ({
-    quiz_id: new Types.ObjectId(answer.quiz_id),
-    selected_answers: answer.selected_answers,
-    time_spent_seconds: answer?.time_spent_seconds || 0,
-  }));
-
-  const tagPerformance = this.calculateTagPerformance(
-    quizzes,
-    answers,
-    attempt.ai_verification_result,
-  );
-  attempt.tag_performance = tagPerformance;
-
-  await attempt.save();
-
-  if (attempt.is_passed) {
-    await this.updateProgressOnQuizCompletion(attempt, tenantConnection);
-  }
-
-  this.logger.log(
-    `Quiz attempt completed for student ${user.id}, score: ${scorePercentage}%`,
-  );
-
-  return {
-    message: this.errorMessageService.getSuccessMessageWithLanguage(
-      'PROGRESS',
-      'QUIZ_ANSWERS_SUBMITTED_SUCCESSFULLY',
-      user?.preferred_language || DEFAULT_LANGUAGE,
-    ),
-    data: {
-      attempt_id: attempt._id,
-      score_percentage: attempt.score_percentage,
-      correct_answers: attempt.correct_answers,
-      total_questions: attempt.total_questions,
-      is_passed: attempt.is_passed,
-      time_taken_seconds: attempt.time_taken_seconds,
-      status: attempt.status,
-      completed_at: attempt.completed_at,
-      ai_verification: aiVerificationResult ? 'completed' : 'skipped',
-      ai_verification_report: attempt.ai_verification_result,
-      tag_performance: attempt.tag_performance,
-    },
-  };
-}
 
   // ========== TAG PERFORMANCE CALCULATION ==========
 
