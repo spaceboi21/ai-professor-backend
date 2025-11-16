@@ -828,16 +828,26 @@ export class ProgressService {
   const questionsForAI: QuizQuestion[] = [];
   const directlyValidatedResults: any[] = [];
 
-  answers.forEach((answer) => {
+  this.logger.log(`[Quiz Validation] Starting validation for ${answers.length} answers across ${quizzes.length} quizzes`);
+  this.logger.log(`[Quiz Validation] Quiz Group ID: ${quiz_group_id}, Student ID: ${user.id}`);
+
+  answers.forEach((answer, index) => {
     const quiz = quizzes.find(
       (q) => q._id.toString() === answer.quiz_id.toString(),
     );
-    if (!quiz) return;
+    if (!quiz) {
+      this.logger.warn(`[Quiz Validation] Quiz not found for answer index ${index}, quiz_id: ${answer.quiz_id}`);
+      return;
+    }
 
     const hasStoredCorrectAnswer =
       quiz.answer && quiz.answer.length > 0 && quiz.answer[0] !== '';
 
+    this.logger.log(`[Quiz Validation] Question ${index + 1}/${answers.length} - Quiz ID: ${quiz._id}, Type: ${quiz.type}`);
+    this.logger.log(`[Quiz Validation] Question ${index + 1} - Has stored correct answer: ${hasStoredCorrectAnswer}`);
+
     if (hasStoredCorrectAnswer) {
+      this.logger.log(`[Quiz Validation] Question ${index + 1} - Processing with MANUAL validation`);
 
       // Direct check
       const correctAnswers = quiz.answer.map((a) => a.trim().toLowerCase());
@@ -845,11 +855,16 @@ export class ProgressService {
         a.trim().toLowerCase(),
       );
 
+      this.logger.log(`[Quiz Validation] Question ${index + 1} - Correct answers: [${correctAnswers.join(', ')}]`);
+      this.logger.log(`[Quiz Validation] Question ${index + 1} - User answers: [${userAnswers.join(', ')}]`);
+
       const isCorrect =
         quiz.type === 'SINGLE_SELECT'
           ? userAnswers[0] === correctAnswers[0]
           : correctAnswers.every((ca) => userAnswers.includes(ca)) &&
             userAnswers.length === correctAnswers.length;
+
+      this.logger.log(`[Quiz Validation] Question ${index + 1} - Manual validation result: ${isCorrect ? 'CORRECT' : 'INCORRECT'}`);
 
       directlyValidatedResults.push({
         question: quiz.question,
@@ -864,6 +879,8 @@ export class ProgressService {
         score: isCorrect ? 1 : 0,
       });
     } else {
+      this.logger.log(`[Quiz Validation] Question ${index + 1} - NO stored answer found, queuing for AI validation`);
+      this.logger.log(`[Quiz Validation] Question ${index + 1} - User answer for AI: ${answer.selected_answers && answer.selected_answers.length > 0 ? answer.selected_answers.join(', ') : '(empty)'}`);
 
       questionsForAI.push({
         question: quiz.question,
@@ -877,30 +894,54 @@ export class ProgressService {
     }
   });
 
+  this.logger.log(`[Quiz Validation] ========== VALIDATION SUMMARY ==========`);
+  this.logger.log(`[Quiz Validation] Total questions: ${quizzes.length}`);
+  this.logger.log(`[Quiz Validation] Manually validated: ${directlyValidatedResults.length}`);
+  this.logger.log(`[Quiz Validation] Queued for AI validation: ${questionsForAI.length}`);
+  this.logger.log(`[Quiz Validation] ======================================`);
+
   // ✅ Call AI only if needed
   let aiVerificationResult: QuizVerificationResponse | null = null;
   if (questionsForAI.length > 0) {
+    this.logger.log(`[Quiz Validation] Starting AI verification for ${questionsForAI.length} questions...`);
+    this.logger.log(`[Quiz Validation] Module context - Title: ${module.title}, Description: ${module.description?.substring(0, 100)}...`);
+    
     try {
       aiVerificationResult = await this.pythonService.quizVerificationByAI(
         module.title,
         module.description,
         questionsForAI,
       );
-      this.logger.log('AI verification completed successfully');
+      this.logger.log(`[Quiz Validation] AI verification completed successfully`);
+      this.logger.log(`[Quiz Validation] AI returned ${aiVerificationResult?.questions_results?.length || 0} results`);
     } catch (error) {
-      this.logger.error('AI verification failed:', error.message);
+      this.logger.error(`[Quiz Validation] AI verification FAILED: ${error.message}`);
+      this.logger.error(`[Quiz Validation] AI error stack:`, error.stack);
       aiVerificationResult = null;
     }
+  } else {
+    this.logger.log(`[Quiz Validation] Skipping AI verification - all questions have stored answers`);
   }
 
   // ✅ Merge both result sets
+  this.logger.log(`[Quiz Validation] Merging results...`);
+  this.logger.log(`[Quiz Validation] AI results to merge: ${aiVerificationResult?.questions_results?.length || 0}`);
+  this.logger.log(`[Quiz Validation] Manual results to merge: ${directlyValidatedResults.length}`);
+  
   const allResults = [
     ...(aiVerificationResult?.questions_results || []),
     ...directlyValidatedResults,
   ];
 
+  this.logger.log(`[Quiz Validation] Total merged results: ${allResults.length}`);
+
   const correctCount = allResults.filter((r) => r.is_correct).length;
   const scorePercentage = (correctCount / quizzes.length) * 100;
+
+  this.logger.log(`[Quiz Validation] ========== FINAL RESULTS ==========`);
+  this.logger.log(`[Quiz Validation] Correct answers: ${correctCount}/${quizzes.length}`);
+  this.logger.log(`[Quiz Validation] Score percentage: ${scorePercentage.toFixed(2)}%`);
+  this.logger.log(`[Quiz Validation] ====================================`);
 
   // ✅ Finalize attempt
   attempt.status = AttemptStatusEnum.COMPLETED;
