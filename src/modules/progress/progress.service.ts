@@ -2487,6 +2487,12 @@ export class ProgressService {
       StudentModuleProgressSchema,
     );
     const StudentModel = tenantConnection.model(Student.name, StudentSchema);
+    const StudentChapterProgressModel = tenantConnection.model(
+      StudentChapterProgress.name,
+      StudentChapterProgressSchema,
+    );
+    const ChapterModel = tenantConnection.model(Chapter.name, ChapterSchema);
+    const QuizGroupModel = tenantConnection.model(QuizGroup.name, QuizGroupSchema);
 
     // Get student's current year
     const student = await StudentModel.findOne({
@@ -2534,13 +2540,24 @@ export class ProgressService {
       })
       .sort({ sequence: 1 });
 
-    // Get student's completed modules
-    const completedProgress = await StudentModuleProgressModel.find({
-      student_id: new Types.ObjectId(studentId),
-      status: ProgressStatusEnum.COMPLETED,
-    });
-
-    const completedModuleIds = completedProgress.map(p => p.module_id.toString());
+    // Check which modules are truly completed (all chapters done)
+    // A module is considered "completed for progression" when all chapters and their quizzes are done
+    // The module quiz itself is NOT required for unlocking the next module
+    const completedModuleIds: string[] = [];
+    
+    for (const mod of allModules) {
+      const isModuleChaptersCompleted = await this.areAllChaptersCompleted(
+        mod._id,
+        new Types.ObjectId(studentId),
+        ChapterModel,
+        QuizGroupModel,
+        StudentChapterProgressModel,
+      );
+      
+      if (isModuleChaptersCompleted) {
+        completedModuleIds.push(mod._id.toString());
+      }
+    }
 
     // Find the highest completed sequence in this year
     let highestCompletedSequence = 0;
@@ -2589,5 +2606,58 @@ export class ProgressService {
     return {
       can_access: true,
     };
+  }
+
+  /**
+   * Helper method to check if all chapters in a module are completed
+   * A chapter is completed when it's marked as complete AND (has no quiz OR quiz is passed)
+   */
+  private async areAllChaptersCompleted(
+    moduleId: Types.ObjectId,
+    studentId: Types.ObjectId,
+    ChapterModel: any,
+    QuizGroupModel: any,
+    StudentChapterProgressModel: any,
+  ): Promise<boolean> {
+    // Get all chapters in this module
+    const allChapters = await ChapterModel.find({
+      module_id: moduleId,
+      deleted_at: null,
+    }).lean();
+
+    if (allChapters.length === 0) {
+      return false;
+    }
+
+    let completedChapters = 0;
+
+    for (const chapter of allChapters) {
+      // Check if chapter has a quiz
+      const hasQuiz = await QuizGroupModel.exists({
+        chapter_id: chapter._id,
+        deleted_at: null,
+      });
+
+      // Get student's progress for this chapter
+      const chapterProgress = await StudentChapterProgressModel.findOne({
+        student_id: studentId,
+        chapter_id: chapter._id,
+      });
+
+      if (chapterProgress && chapterProgress.status === ProgressStatusEnum.COMPLETED) {
+        // Chapter is completed, now check quiz requirement
+        if (hasQuiz) {
+          // Chapter has quiz, check if quiz is completed
+          if (chapterProgress.chapter_quiz_completed === true) {
+            completedChapters++;
+          }
+        } else {
+          // Chapter has no quiz, so it's considered completed
+          completedChapters++;
+        }
+      }
+    }
+
+    return completedChapters === allChapters.length;
   }
 }

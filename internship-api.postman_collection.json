@@ -1,0 +1,909 @@
+{
+  "info": {
+    "name": "Internship API",
+    "description": "Complete API collection for testing Internship feature",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_postman_id": "internship-api-v1"
+  },
+  "item": [
+    {
+      "name": "School Admin - Internship Management",
+      "item": [
+        {
+          "name": "1. Create new internship",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Clinical Psychology Internship - Year 3\",\n  \"description\": \"This internship provides hands-on experience in clinical psychology with real patient cases. Students will practice assessment, diagnosis, and therapy techniques under AI supervision.\",\n  \"guidelines\": \"<h2>Guidelines for Students</h2><ul><li>Complete all cases in sequence</li><li>Spend minimum 30 minutes per patient interview</li><li>Document all observations in your logbook</li><li>Real-time supervision available</li><li>Professor validation required for feedback</li></ul>\",\n  \"year\": 3,\n  \"thumbnail\": \"https://your-s3-bucket.s3.amazonaws.com/internship-thumbnails/clinical-psych.jpg\",\n  \"duration\": 40\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/internship",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "internship"]
+            },
+            "description": "Creates a new internship. Requires SCHOOL_ADMIN or PROFESSOR role."
+          },
+          "response": []
+        },
+        {
+          "name": "2. Get all internships",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/internship?page=1&limit=10&year=3&published=true&search=clinical",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "internship"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1",
+                  "description": "Page number (default: 1)"
+                },
+                {
+                  "key": "limit",
+                  "value": "10",
+                  "description": "Items per page (default: 10)"
+                },
+                {
+                  "key": "year",
+                  "value": "3",
+                  "description": "Filter by year (1-5)"
+                },
+                {
+                  "key": "published",
+                  "value": "true",
+                  "description": "Filter by published status",
+                  "disabled": true
+                },
+                {
+                  "key": "search",
+                  "value": "clinical",
+                  "description": "Search in title/description",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Get paginated list of internships with optional filters"
+          },
+          "response": []
+        },
+        {
+          "name": "3. Get internship by ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/internship/:id",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "internship", ":id"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "PASTE_INTERNSHIP_ID_HERE",
+                  "description": "Internship MongoDB ObjectId"
+                }
+              ]
+            },
+            "description": "Get detailed information about a specific internship"
+          },
+          "response": []
+        },
+        {
+          "name": "4. Update internship",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Advanced Clinical Psychology Internship - Updated\",\n  \"description\": \"Updated description with more details\",\n  \"duration\": 50,\n  \"guidelines\": \"<h2>Updated Guidelines</h2><p>New requirements...</p>\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/internship/:id",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "internship", ":id"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "PASTE_INTERNSHIP_ID_HERE"
+                }
+              ]
+            },
+            "description": "Update existing internship (partial update)"
+          },
+          "response": []
+        },
+        {
+          "name": "5. Delete internship (soft delete)",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/internship/:id",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "internship", ":id"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "PASTE_INTERNSHIP_ID_HERE"
+                }
+              ]
+            },
+            "description": "Soft delete internship and all related data"
+          },
+          "response": []
+        },
+        {
+          "name": "6. Publish internship",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"internship_id\": \"{{lastInternshipId}}\",\n  \"action\": \"PUBLISH\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/internship/toggle-visibility",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "internship", "toggle-visibility"]
+            },
+            "description": "Publish internship to students. Sends notifications."
+          },
+          "response": []
+        },
+        {
+          "name": "7. Unpublish internship",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"internship_id\": \"{{lastInternshipId}}\",\n  \"action\": \"UNPUBLISH\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/internship/toggle-visibility",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "internship", "toggle-visibility"]
+            },
+            "description": "Unpublish internship from students"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "School Admin - Case Management",
+      "item": [
+        {
+          "name": "1. Create case for internship",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Major Depressive Disorder - Initial Assessment\",\n  \"description\": \"Patient John, 35-year-old male, presents with 6-week history of depressed mood, anhedonia, and psychomotor retardation.\",\n  \"sequence\": 1,\n  \"case_content\": \"<h2>Patient Presentation</h2><p><strong>Chief Complaint:</strong> \\\"I just don't feel like myself anymore.\\\"</p><h3>History of Present Illness</h3><p>Patient is a 35-year-old male presenting with a 6-week history of persistent depressed mood. Symptoms began shortly after he lost his job as a marketing manager. He reports:</p><ul><li>Pervasive sadness throughout the day</li><li>Loss of interest in previously enjoyed activities (anhedonia)</li><li>Early morning awakening (3 AM) with inability to return to sleep</li><li>Decreased appetite with 15-pound weight loss</li><li>Psychomotor retardation</li><li>Difficulty concentrating at work interviews</li><li>Feelings of worthlessness</li><li>Passive death wish but denies active suicidal ideation</li></ul><h3>Past Psychiatric History</h3><p>One previous depressive episode 5 years ago, successfully treated with sertraline 100mg for 8 months. No hospitalizations. No suicide attempts.</p><h3>Social History</h3><p>Married for 8 years, supportive wife. Two children ages 6 and 4. Recently unemployed (2 months). Denies alcohol or substance use. Non-smoker.</p><h3>Mental Status Exam</h3><ul><li><strong>Appearance:</strong> Casually dressed, poor grooming</li><li><strong>Behavior:</strong> Psychomotor retardation, minimal eye contact</li><li><strong>Speech:</strong> Soft, slow, increased latency</li><li><strong>Mood:</strong> \\\"Hopeless\\\"</li><li><strong>Affect:</strong> Constricted, depressed</li><li><strong>Thought Process:</strong> Linear, goal-directed</li><li><strong>Thought Content:</strong> Preoccupied with job loss, feelings of failure. Denies SI/HI/AVH</li><li><strong>Cognition:</strong> Alert, oriented x3. Concentration impaired.</li><li><strong>Insight:</strong> Good - recognizes need for help</li><li><strong>Judgment:</strong> Fair</li></ul>\",\n  \"case_documents\": [\n    {\n      \"url\": \"https://your-s3-bucket.s3.amazonaws.com/case-documents/john-doe-medical-records.pdf\",\n      \"type\": \"application/pdf\",\n      \"name\": \"Medical Records - Lab Results\"\n    },\n    {\n      \"url\": \"https://your-s3-bucket.s3.amazonaws.com/case-documents/john-doe-previous-treatment.pdf\",\n      \"type\": \"application/pdf\",\n      \"name\": \"Previous Treatment Summary\"\n    }\n  ],\n  \"patient_simulation_config\": {\n    \"patient_profile\": {\n      \"name\": \"John Smith\",\n      \"age\": 35,\n      \"gender\": \"male\",\n      \"condition\": \"Major Depressive Disorder\",\n      \"chief_complaint\": \"I just don't feel like myself anymore\",\n      \"presentation_style\": \"withdrawn, soft-spoken, psychomotor retardation\"\n    },\n    \"scenario_type\": \"clinical_interview\",\n    \"difficulty_level\": \"intermediate\"\n  },\n  \"supervisor_prompts\": [\n    \"Monitor student's empathy and rapport-building skills\",\n    \"Check if student assesses suicide risk appropriately\",\n    \"Evaluate proper mental status exam technique\",\n    \"Ensure student explores precipitating factors\",\n    \"Check if student considers differential diagnosis\"\n  ],\n  \"therapist_prompts\": [\n    \"Guide student on building therapeutic alliance with depressed patients\",\n    \"Explain importance of suicide risk assessment\",\n    \"Teach CBT techniques for depression\",\n    \"Discuss medication options and their rationale\",\n    \"Explain importance of involving family support\"\n  ],\n  \"evaluation_criteria\": [\n    {\n      \"criterion\": \"Clinical Reasoning\",\n      \"weight\": 30\n    },\n    {\n      \"criterion\": \"Communication Skills & Empathy\",\n      \"weight\": 25\n    },\n    {\n      \"criterion\": \"Mental Status Exam Technique\",\n      \"weight\": 20\n    },\n    {\n      \"criterion\": \"Risk Assessment\",\n      \"weight\": 15\n    },\n    {\n      \"criterion\": \"Treatment Planning\",\n      \"weight\": 10\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/internship/:internshipId/cases",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "internship", ":internshipId", "cases"],
+              "variable": [
+                {
+                  "key": "internshipId",
+                  "value": "PASTE_INTERNSHIP_ID_HERE",
+                  "description": "Internship ID from previous request"
+                }
+              ]
+            },
+            "description": "Create case with detailed clinical content. Will be automatically ingested into Python/Pinecone."
+          },
+          "response": []
+        },
+        {
+          "name": "2. Get all cases for internship",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/internship/:internshipId/cases",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "internship", ":internshipId", "cases"],
+              "variable": [
+                {
+                  "key": "internshipId",
+                  "value": "PASTE_INTERNSHIP_ID_HERE"
+                }
+              ]
+            },
+            "description": "Get all cases for specific internship, ordered by sequence"
+          },
+          "response": []
+        },
+        {
+          "name": "3. Get case by ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/internship/cases/:caseId",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "internship", "cases", ":caseId"],
+              "variable": [
+                {
+                  "key": "caseId",
+                  "value": "PASTE_CASE_ID_HERE",
+                  "description": "Case MongoDB ObjectId"
+                }
+              ]
+            },
+            "description": "Get detailed case information including all content"
+          },
+          "response": []
+        },
+        {
+          "name": "4. Update case",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Major Depressive Disorder - Initial Assessment (Updated)\",\n  \"description\": \"Updated description with more context\",\n  \"case_content\": \"<h2>Updated Patient Presentation</h2><p>Additional information...</p>\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/internship/cases/:caseId",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "internship", "cases", ":caseId"],
+              "variable": [
+                {
+                  "key": "caseId",
+                  "value": "PASTE_CASE_ID_HERE"
+                }
+              ]
+            },
+            "description": "Update case. Will automatically re-ingest into Python/Pinecone."
+          },
+          "response": []
+        },
+        {
+          "name": "5. Delete case",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/internship/cases/:caseId",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "internship", "cases", ":caseId"],
+              "variable": [
+                {
+                  "key": "caseId",
+                  "value": "PASTE_CASE_ID_HERE"
+                }
+              ]
+            },
+            "description": "Soft delete case. Also removes from Python/Pinecone."
+          },
+          "response": []
+        },
+        {
+          "name": "6. Update case sequence",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"item_id\": \"PASTE_CASE_ID_HERE\",\n  \"sequence\": 2\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/internship/cases/:caseId/sequence",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "internship", "cases", ":caseId", "sequence"],
+              "variable": [
+                {
+                  "key": "caseId",
+                  "value": "PASTE_CASE_ID_HERE"
+                }
+              ]
+            },
+            "description": "Reorder case within internship"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Student - Session Management",
+      "item": [
+        {
+          "name": "1. Create session (Start patient interview)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{studentToken}}",
+                "description": "Use student JWT token"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"internship_id\": \"{{lastInternshipId}}\",\n  \"case_id\": \"{{lastCaseId}}\",\n  \"session_type\": \"patient_interview\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/internship/sessions",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "internship", "sessions"]
+            },
+            "description": "Start patient interview session. Session types: patient_interview, therapist_consultation, supervisor_feedback"
+          },
+          "response": []
+        },
+        {
+          "name": "2. Send message to AI patient",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{studentToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"message\": \"Hello John, thank you for coming in today. Can you tell me what brings you here?\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/internship/sessions/:sessionId/message",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "internship", "sessions", ":sessionId", "message"],
+              "variable": [
+                {
+                  "key": "sessionId",
+                  "value": "PASTE_SESSION_ID_HERE",
+                  "description": "Session ID from create session response"
+                }
+              ]
+            },
+            "description": "Send message to AI (patient/therapist/supervisor). May receive real-time tips."
+          },
+          "response": []
+        },
+        {
+          "name": "3. Get session details",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{studentToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/internship/sessions/:sessionId",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "internship", "sessions", ":sessionId"],
+              "variable": [
+                {
+                  "key": "sessionId",
+                  "value": "PASTE_SESSION_ID_HERE"
+                }
+              ]
+            },
+            "description": "Get session details including all messages and real-time tips"
+          },
+          "response": []
+        },
+        {
+          "name": "4. Complete session",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{studentToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/internship/sessions/:sessionId/complete",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "internship", "sessions", ":sessionId", "complete"],
+              "variable": [
+                {
+                  "key": "sessionId",
+                  "value": "PASTE_SESSION_ID_HERE"
+                }
+              ]
+            },
+            "description": "Mark session as completed. Required before generating feedback."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Feedback Management",
+      "item": [
+        {
+          "name": "1. Generate AI feedback (Student)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{studentToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/internship/sessions/:sessionId/feedback",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "internship", "sessions", ":sessionId", "feedback"],
+              "variable": [
+                {
+                  "key": "sessionId",
+                  "value": "PASTE_SESSION_ID_HERE"
+                }
+              ]
+            },
+            "description": "Generate AI feedback for completed session. Status: PENDING_VALIDATION"
+          },
+          "response": []
+        },
+        {
+          "name": "2. Get pending feedback (Professor)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "description": "Professor/Admin token"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/internship/feedback/pending?page=1&limit=10",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "internship", "feedback", "pending"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                }
+              ]
+            },
+            "description": "Get all feedback awaiting professor validation"
+          },
+          "response": []
+        },
+        {
+          "name": "3. Validate feedback (Professor)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"is_approved\": true,\n  \"professor_comments\": \"Excellent work on establishing rapport with the patient. Your empathy and active listening skills were evident throughout the interview. Good use of open-ended questions to explore the patient's concerns. Consider asking more about the timeline of symptoms in future interviews.\",\n  \"edited_score\": 88\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/internship/feedback/:feedbackId/validate",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "internship", "feedback", ":feedbackId", "validate"],
+              "variable": [
+                {
+                  "key": "feedbackId",
+                  "value": "PASTE_FEEDBACK_ID_HERE",
+                  "description": "Feedback ID from pending list"
+                }
+              ]
+            },
+            "description": "Approve or revise AI feedback with professor comments"
+          },
+          "response": []
+        },
+        {
+          "name": "4. Update feedback (Professor)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"professor_comments\": \"Updated feedback: Your clinical reasoning has improved significantly. Continue working on differential diagnosis.\",\n  \"edited_score\": 90\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/internship/feedback/:feedbackId",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "internship", "feedback", ":feedbackId"],
+              "variable": [
+                {
+                  "key": "feedbackId",
+                  "value": "PASTE_FEEDBACK_ID_HERE"
+                }
+              ]
+            },
+            "description": "Update already validated feedback"
+          },
+          "response": []
+        },
+        {
+          "name": "5. Get feedback for case",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/internship/cases/:caseId/feedback",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "internship", "cases", ":caseId", "feedback"],
+              "variable": [
+                {
+                  "key": "caseId",
+                  "value": "PASTE_CASE_ID_HERE"
+                }
+              ]
+            },
+            "description": "Get all feedback for specific case. Students only see VALIDATED feedback."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Student - Logbook",
+      "item": [
+        {
+          "name": "1. Get student logbook",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{studentToken}}",
+                "description": "Student JWT token"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/internship/:internshipId/logbook",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "internship", ":internshipId", "logbook"],
+              "variable": [
+                {
+                  "key": "internshipId",
+                  "value": "PASTE_INTERNSHIP_ID_HERE"
+                }
+              ]
+            },
+            "description": "Get student's logbook with all entries for this internship"
+          },
+          "response": []
+        },
+        {
+          "name": "2. Add logbook entry",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{studentToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"case_id\": \"{{lastCaseId}}\",\n  \"case_title\": \"Major Depressive Disorder - Initial Assessment\",\n  \"completed_date\": \"2025-11-16T10:30:00Z\",\n  \"session_summary\": \"Conducted comprehensive clinical interview with 35-year-old male patient presenting with 6-week history of depressed mood. Successfully established rapport and gathered detailed history of present illness. Patient was cooperative and demonstrated good insight into his condition.\",\n  \"skills_practiced\": [\n    \"Active listening\",\n    \"Empathy building\",\n    \"Clinical interviewing\",\n    \"Mental status examination\",\n    \"Suicide risk assessment\",\n    \"Differential diagnosis formulation\"\n  ],\n  \"feedback_summary\": \"Professor feedback: Excellent rapport building. Strong empathy demonstrated. Good use of open-ended questions. Areas for improvement: explore timeline of symptoms more thoroughly, consider broader differential diagnosis.\",\n  \"self_reflection\": \"I felt confident in establishing rapport with the patient and creating a safe space for disclosure. However, I realized I could have probed deeper into the chronology of symptom onset. I also need to improve my systematic approach to differential diagnosis. Overall, this was a valuable learning experience that highlighted both my strengths in interpersonal skills and areas for growth in clinical reasoning.\",\n  \"attachments\": [\n    {\n      \"url\": \"https://your-s3-bucket.s3.amazonaws.com/logbook-attachments/session-notes-123.pdf\",\n      \"type\": \"application/pdf\"\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/internship/:internshipId/logbook",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "internship", ":internshipId", "logbook"],
+              "variable": [
+                {
+                  "key": "internshipId",
+                  "value": "PASTE_INTERNSHIP_ID_HERE"
+                }
+              ]
+            },
+            "description": "Add entry to logbook after completing a case"
+          },
+          "response": []
+        },
+        {
+          "name": "3. Generate logbook summary",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{studentToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/internship/:internshipId/logbook/summary",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "internship", ":internshipId", "logbook", "summary"],
+              "variable": [
+                {
+                  "key": "internshipId",
+                  "value": "PASTE_INTERNSHIP_ID_HERE"
+                }
+              ]
+            },
+            "description": "Generate/update overall progress summary based on all entries"
+          },
+          "response": []
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:5000",
+      "type": "string"
+    },
+    {
+      "key": "token",
+      "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY5MDE0YTU4YjhiYzNmMjA4YTE2ZjUwOCIsImVtYWlsIjoibWFfYWJiYXMyMDAxQGhvdG1haWwuY29tIiwicm9sZV9pZCI6IjY4NjNjZWE0MTFiZTkwMTZiN2NjYjdmZCIsInNjaG9vbF9pZCI6IjY5MDE0YTU4YjhiYzNmMjA4YTE2ZjUwNiIsInJvbGVfbmFtZSI6IlNDSE9PTF9BRE1JTiIsInRva2VuX3R5cGUiOiJhY2Nlc3MiLCJpYXQiOjE3NjMzMDMwNTMsImV4cCI6MTc2NTg5NTA1M30.G0NrXZdPdr022_D8aOvz5vTOalBosALDyj8oxny5VtY",
+      "type": "string",
+      "description": "School Admin JWT token"
+    },
+    {
+      "key": "studentToken",
+      "value": "PASTE_STUDENT_JWT_TOKEN_HERE",
+      "type": "string",
+      "description": "Student JWT token (login as student to get this)"
+    },
+    {
+      "key": "lastInternshipId",
+      "value": "",
+      "type": "string",
+      "description": "Auto-populated from Create Internship response"
+    },
+    {
+      "key": "lastCaseId",
+      "value": "",
+      "type": "string",
+      "description": "Auto-populated from Create Case response"
+    },
+    {
+      "key": "lastSessionId",
+      "value": "",
+      "type": "string",
+      "description": "Auto-populated from Create Session response"
+    },
+    {
+      "key": "lastFeedbackId",
+      "value": "",
+      "type": "string",
+      "description": "Auto-populated from Generate Feedback response"
+    }
+  ]
+}

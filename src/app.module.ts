@@ -40,6 +40,7 @@ import { AnchorTagModule } from './modules/anchor-tag/anchor-tag.module';
 import { AnchorChatModule } from './modules/anchor-chat/anchor-chat.module';
 import { EncryptionModule } from './modules/encryption/encryption.module';
 import { ConversionModule } from './modules/conversion/conversion.module';
+import { InternshipModule } from './modules/internship/internship.module';
 
 @Module({
   imports: [
@@ -135,6 +136,7 @@ import { ConversionModule } from './modules/conversion/conversion.module';
     AnchorChatModule,
     EncryptionModule,
     ConversionModule,
+    InternshipModule,
     HttpModule,
   ],
   controllers: [AppController],

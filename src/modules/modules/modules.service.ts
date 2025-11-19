@@ -725,6 +725,8 @@ export class ModulesService {
           });
 
           // Calculate highest completed sequence for each year
+          // A module is considered completed for progression when chapters are done (90%+)
+          // Module quiz is NOT required for unlocking next modules
           const highestCompletedByYear = {};
 
           for (const year of Object.keys(modulesByYear)) {
@@ -735,7 +737,7 @@ export class ModulesService {
 
             if (yearModules.length > 0) {
               const completedModules = yearModules.filter(module =>
-                module.progress && module.progress.status === ProgressStatusEnum.COMPLETED
+                module.progress && module.progress.progress_percentage >= 90
               );
 
               if (completedModules.length > 0) {
