@@ -1400,6 +1400,13 @@ export class ProgressService {
     // Get completed chapters count - need to check both chapter completion and quiz completion
     const QuizGroupModel = tenantConnection.model(QuizGroup.name, QuizGroupSchema);
 
+    // Check if module has a module-level quiz
+    const hasModuleQuiz = await QuizGroupModel.exists({
+      module_id: moduleId,
+      type: QuizTypeEnum.MODULE,
+      deleted_at: null,
+    });
+
     // Get all chapters in this module
     const allChapters = await ChapterModel.find({
       module_id: moduleId,
@@ -1443,12 +1450,18 @@ export class ProgressService {
 
     if (!moduleProgress) return;
 
-    // Calculate progress percentage
+    // Calculate progress percentage based on whether module quiz exists
     let progressPercentage = 0;
     if (totalChapters > 0) {
-      progressPercentage = Math.round((completedChapters / totalChapters) * 90); // 90% for chapters
-      if (moduleProgress.module_quiz_completed) {
-        progressPercentage += 10; // 10% for module quiz
+      if (hasModuleQuiz) {
+        // Module has quiz: 90% for chapters + 10% for module quiz
+        progressPercentage = Math.round((completedChapters / totalChapters) * 90);
+        if (moduleProgress.module_quiz_completed) {
+          progressPercentage += 10;
+        }
+      } else {
+        // Module has no quiz: 100% for chapters only
+        progressPercentage = Math.round((completedChapters / totalChapters) * 100);
       }
     }
 
