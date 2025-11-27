@@ -19,6 +19,7 @@
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json",
     "seed": "ts-node -r tsconfig-paths/register src/seeders/seeder.ts",
+    "seed:internship": "ts-node -r tsconfig-paths/register src/database/seeds/internship-seed.ts",
     "migrate": "ts-node -r tsconfig-paths/register src/database/migration-cli.ts",
     "migrate:tags-all": "ts-node -r tsconfig-paths/register src/database/run-tags-migration-all-tenants.ts",
     "export-swagger": "ts-node -r tsconfig-paths/register scripts/export-swagger.ts",

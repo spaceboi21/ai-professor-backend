@@ -883,27 +883,27 @@
     },
     {
       "key": "lastInternshipId",
-      "value": "",
+      "value": "692757d8d57d3a3ab0e6cd1d",
       "type": "string",
-      "description": "Auto-populated from Create Internship response"
+      "description": "Seeded internship ID - can be replaced after creating new internship"
     },
     {
       "key": "lastCaseId",
-      "value": "",
+      "value": "692757d8d57d3a3ab0e6cd25",
       "type": "string",
-      "description": "Auto-populated from Create Case response"
+      "description": "Seeded case ID - can be replaced after creating new case"
     },
     {
       "key": "lastSessionId",
-      "value": "",
+      "value": "692757d8d57d3a3ab0e6cd38",
       "type": "string",
-      "description": "Auto-populated from Create Session response"
+      "description": "Seeded session ID - can be replaced after creating new session"
     },
     {
       "key": "lastFeedbackId",
-      "value": "",
+      "value": "692757d8d57d3a3ab0e6cd51",
       "type": "string",
-      "description": "Auto-populated from Generate Feedback response"
+      "description": "Seeded feedback ID - can be replaced after generating new feedback"
     }
   ]
 }
