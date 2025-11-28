@@ -100,10 +100,20 @@ export class InternshipSessionService {
       let pythonSessionId: string | null = null;
 
       if (session_type === SessionTypeEnum.PATIENT_INTERVIEW) {
+        // Validate patient_simulation_config exists and has required fields
+        if (!caseData.patient_simulation_config || !caseData.patient_simulation_config.patient_profile) {
+          throw new BadRequestException(
+            'Case is missing patient_simulation_config. Please update the case with patient profile and scenario configuration before starting a session.'
+          );
+        }
+
+        // Log what we're sending to Python API for debugging
+        this.logger.debug(`Sending to Python API: case_id=${case_id}, patient_profile=${JSON.stringify(caseData.patient_simulation_config.patient_profile)}`);
+
         const pythonResponse = await this.pythonService.initializePatientSession(
           case_id,
-          caseData.patient_simulation_config?.patient_profile || {},
-          caseData.patient_simulation_config || {},
+          caseData.patient_simulation_config.patient_profile,
+          caseData.patient_simulation_config,
         );
         pythonSessionId = pythonResponse.session_id;
       } else if (session_type === SessionTypeEnum.THERAPIST_CONSULTATION) {

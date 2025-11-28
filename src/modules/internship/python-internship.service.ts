@@ -301,6 +301,8 @@ export class PythonInternshipService {
     const url = `${this.baseUrl}${path}`;
     try {
       this.logger.log(`Making POST request to Python API: ${url}`);
+      this.logger.debug(`Request payload: ${JSON.stringify(payload, null, 2)}`);
+      
       const response = await firstValueFrom(
         this.httpService.post(url, payload, {
           timeout: 60000, // 60 second timeout for AI operations
@@ -313,9 +315,29 @@ export class PythonInternshipService {
       this.logger.log(`Python API POST call successful: ${path}`);
       return response?.data;
     } catch (error) {
-      // Re-throw with more context
-      const errorMessage =
-        error?.response?.data?.message || error?.message || 'Unknown error';
+      // Enhanced error handling with detailed validation errors
+      const statusCode = error?.response?.status;
+      const errorData = error?.response?.data;
+      const errorMessage = errorData?.detail || errorData?.message || error?.message || 'Unknown error';
+      
+      // For 422 validation errors, provide detailed field information
+      if (statusCode === 422) {
+        const validationDetails = errorData?.detail || [];
+        const fieldErrors = Array.isArray(validationDetails) 
+          ? validationDetails.map(err => `${err.loc?.join('.')} - ${err.msg}`).join(', ')
+          : JSON.stringify(validationDetails);
+        
+        this.logger.error(
+          `Python API validation error (422) on ${path}:\n` +
+          `  Fields: ${fieldErrors}\n` +
+          `  Payload sent: ${JSON.stringify(payload, null, 2)}`
+        );
+        throw new Error(
+          `Python API validation failed: ${fieldErrors || errorMessage}\n` +
+          `Please check that your case has a properly configured patient_simulation_config with all required fields.`
+        );
+      }
+      
       this.logger.error(
         `Python API POST call failed (${path}): ${errorMessage}`,
       );

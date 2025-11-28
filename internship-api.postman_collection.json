@@ -441,6 +441,117 @@
       ]
     },
     {
+      "name": "🔍 Quick ID Retrieval - GET Endpoints",
+      "item": [
+        {
+          "name": "Get All Sessions (by student)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{studentToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/internship/sessions/:sessionId",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "internship", "sessions", ":sessionId"],
+              "variable": [
+                {
+                  "key": "sessionId",
+                  "value": "{{lastSessionId}}",
+                  "description": "Use this to get session details and all messages"
+                }
+              ]
+            },
+            "description": "Get session details including all messages. Replace sessionId with actual ID from create session response."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Feedback by ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/internship/feedback/pending?page=1&limit=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "internship", "feedback", "pending"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "20"
+                }
+              ]
+            },
+            "description": "Get all pending feedback - use this to find feedback IDs"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Feedback for Specific Case",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{studentToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/internship/cases/:caseId/feedback",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "internship", "cases", ":caseId", "feedback"],
+              "variable": [
+                {
+                  "key": "caseId",
+                  "value": "{{lastCaseId}}",
+                  "description": "Case ID to get feedback for"
+                }
+              ]
+            },
+            "description": "Get all validated feedback for a specific case"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Student Logbook",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{studentToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/internship/:internshipId/logbook",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "internship", ":internshipId", "logbook"],
+              "variable": [
+                {
+                  "key": "internshipId",
+                  "value": "{{lastInternshipId}}"
+                }
+              ]
+            },
+            "description": "Get student's logbook with all entries"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
       "name": "Student - Session Management",
       "item": [
         {
