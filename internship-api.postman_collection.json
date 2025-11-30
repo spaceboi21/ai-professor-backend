@@ -106,7 +106,7 @@
               "variable": [
                 {
                   "key": "id",
-                  "value": "PASTE_INTERNSHIP_ID_HERE",
+                  "value": "{{lastInternshipId}}",
                   "description": "Internship MongoDB ObjectId"
                 }
               ]
@@ -145,7 +145,7 @@
               "variable": [
                 {
                   "key": "id",
-                  "value": "PASTE_INTERNSHIP_ID_HERE"
+                  "value": "{{lastInternshipId}}"
                 }
               ]
             },
@@ -170,7 +170,7 @@
               "variable": [
                 {
                   "key": "id",
-                  "value": "PASTE_INTERNSHIP_ID_HERE"
+                  "value": "{{lastInternshipId}}"
                 }
               ]
             },
@@ -263,7 +263,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"title\": \"Major Depressive Disorder - Initial Assessment\",\n  \"description\": \"Patient John, 35-year-old male, presents with 6-week history of depressed mood, anhedonia, and psychomotor retardation.\",\n  \"sequence\": 1,\n  \"case_content\": \"<h2>Patient Presentation</h2><p><strong>Chief Complaint:</strong> \\\"I just don't feel like myself anymore.\\\"</p><h3>History of Present Illness</h3><p>Patient is a 35-year-old male presenting with a 6-week history of persistent depressed mood. Symptoms began shortly after he lost his job as a marketing manager. He reports:</p><ul><li>Pervasive sadness throughout the day</li><li>Loss of interest in previously enjoyed activities (anhedonia)</li><li>Early morning awakening (3 AM) with inability to return to sleep</li><li>Decreased appetite with 15-pound weight loss</li><li>Psychomotor retardation</li><li>Difficulty concentrating at work interviews</li><li>Feelings of worthlessness</li><li>Passive death wish but denies active suicidal ideation</li></ul><h3>Past Psychiatric History</h3><p>One previous depressive episode 5 years ago, successfully treated with sertraline 100mg for 8 months. No hospitalizations. No suicide attempts.</p><h3>Social History</h3><p>Married for 8 years, supportive wife. Two children ages 6 and 4. Recently unemployed (2 months). Denies alcohol or substance use. Non-smoker.</p><h3>Mental Status Exam</h3><ul><li><strong>Appearance:</strong> Casually dressed, poor grooming</li><li><strong>Behavior:</strong> Psychomotor retardation, minimal eye contact</li><li><strong>Speech:</strong> Soft, slow, increased latency</li><li><strong>Mood:</strong> \\\"Hopeless\\\"</li><li><strong>Affect:</strong> Constricted, depressed</li><li><strong>Thought Process:</strong> Linear, goal-directed</li><li><strong>Thought Content:</strong> Preoccupied with job loss, feelings of failure. Denies SI/HI/AVH</li><li><strong>Cognition:</strong> Alert, oriented x3. Concentration impaired.</li><li><strong>Insight:</strong> Good - recognizes need for help</li><li><strong>Judgment:</strong> Fair</li></ul>\",\n  \"case_documents\": [\n    {\n      \"url\": \"https://your-s3-bucket.s3.amazonaws.com/case-documents/john-doe-medical-records.pdf\",\n      \"type\": \"application/pdf\",\n      \"name\": \"Medical Records - Lab Results\"\n    },\n    {\n      \"url\": \"https://your-s3-bucket.s3.amazonaws.com/case-documents/john-doe-previous-treatment.pdf\",\n      \"type\": \"application/pdf\",\n      \"name\": \"Previous Treatment Summary\"\n    }\n  ],\n  \"patient_simulation_config\": {\n    \"patient_profile\": {\n      \"name\": \"John Smith\",\n      \"age\": 35,\n      \"gender\": \"male\",\n      \"condition\": \"Major Depressive Disorder\",\n      \"chief_complaint\": \"I just don't feel like myself anymore\",\n      \"presentation_style\": \"withdrawn, soft-spoken, psychomotor retardation\"\n    },\n    \"scenario_type\": \"clinical_interview\",\n    \"difficulty_level\": \"intermediate\"\n  },\n  \"supervisor_prompts\": [\n    \"Monitor student's empathy and rapport-building skills\",\n    \"Check if student assesses suicide risk appropriately\",\n    \"Evaluate proper mental status exam technique\",\n    \"Ensure student explores precipitating factors\",\n    \"Check if student considers differential diagnosis\"\n  ],\n  \"therapist_prompts\": [\n    \"Guide student on building therapeutic alliance with depressed patients\",\n    \"Explain importance of suicide risk assessment\",\n    \"Teach CBT techniques for depression\",\n    \"Discuss medication options and their rationale\",\n    \"Explain importance of involving family support\"\n  ],\n  \"evaluation_criteria\": [\n    {\n      \"criterion\": \"Clinical Reasoning\",\n      \"weight\": 30\n    },\n    {\n      \"criterion\": \"Communication Skills & Empathy\",\n      \"weight\": 25\n    },\n    {\n      \"criterion\": \"Mental Status Exam Technique\",\n      \"weight\": 20\n    },\n    {\n      \"criterion\": \"Risk Assessment\",\n      \"weight\": 15\n    },\n    {\n      \"criterion\": \"Treatment Planning\",\n      \"weight\": 10\n    }\n  ]\n}",
+              "raw": "{\n  \"title\": \"Major Depressive Disorder - Initial Assessment\",\n  \"description\": \"Patient John, 35-year-old male, presents with 6-week history of depressed mood, anhedonia, and psychomotor retardation.\",\n  \"sequence\": 1,\n  \"case_content\": \"<h2>Patient Presentation</h2><p><strong>Chief Complaint:</strong> \\\"I just don't feel like myself anymore.\\\"</p><h3>History of Present Illness</h3><p>Patient is a 35-year-old male presenting with a 6-week history of persistent depressed mood.</p>\",\n  \"patient_simulation_config\": {\n    \"patient_profile\": {\n      \"name\": \"John Smith\",\n      \"age\": 35,\n      \"gender\": \"male\",\n      \"condition\": \"Major Depressive Disorder\",\n      \"severity\": \"moderate\",\n      \"duration\": \"6 weeks\",\n      \"triggers\": [\"job loss\", \"financial stress\"],\n      \"symptoms\": [\"depressed mood\", \"anhedonia\", \"sleep disturbances\", \"decreased appetite\"],\n      \"history\": \"One previous depressive episode 5 years ago\",\n      \"medication\": \"Previously on sertraline 100mg\",\n      \"social_context\": \"Married, two children, recently unemployed\",\n      \"chief_complaint\": \"I just don't feel like myself anymore\",\n      \"presentation_style\": \"withdrawn, soft-spoken\"\n    },\n    \"scenario_type\": \"initial_clinical_interview\",\n    \"difficulty_level\": \"intermediate\",\n    \"interview_focus\": \"assessment_and_diagnosis\",\n    \"patient_openness\": \"moderately_forthcoming\"\n  },\n  \"supervisor_prompts\": [\"Monitor empathy\", \"Check suicide risk assessment\"],\n  \"therapist_prompts\": [\"Guide on therapeutic alliance\", \"Teach CBT techniques\"],\n  \"evaluation_criteria\": [\n    {\"criterion\": \"Clinical Reasoning\", \"weight\": 30},\n    {\"criterion\": \"Communication Skills\", \"weight\": 25},\n    {\"criterion\": \"Mental Status Exam\", \"weight\": 20}\n  ]\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -277,7 +277,7 @@
               "variable": [
                 {
                   "key": "internshipId",
-                  "value": "PASTE_INTERNSHIP_ID_HERE",
+                  "value": "{{lastInternshipId}}",
                   "description": "Internship ID from previous request"
                 }
               ]
@@ -303,7 +303,7 @@
               "variable": [
                 {
                   "key": "internshipId",
-                  "value": "PASTE_INTERNSHIP_ID_HERE"
+                  "value": "{{lastInternshipId}}"
                 }
               ]
             },
@@ -328,7 +328,7 @@
               "variable": [
                 {
                   "key": "caseId",
-                  "value": "PASTE_CASE_ID_HERE",
+                  "value": "{{lastCaseId}}",
                   "description": "Case MongoDB ObjectId"
                 }
               ]
@@ -353,7 +353,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"title\": \"Major Depressive Disorder - Initial Assessment (Updated)\",\n  \"description\": \"Updated description with more context\",\n  \"case_content\": \"<h2>Updated Patient Presentation</h2><p>Additional information...</p>\"\n}",
+              "raw": "{\n  \"patient_simulation_config\": {\n    \"patient_profile\": {\n      \"name\": \"John Smith\",\n      \"age\": 35,\n      \"gender\": \"male\",\n      \"condition\": \"Major Depressive Disorder\",\n      \"severity\": \"moderate\",\n      \"duration\": \"6 weeks\",\n      \"triggers\": [\"job loss\", \"financial stress\", \"loss of daily routine\"],\n      \"symptoms\": [\"depressed mood\", \"anhedonia\", \"early morning awakening\", \"decreased appetite\", \"psychomotor retardation\", \"difficulty concentrating\", \"feelings of worthlessness\"],\n      \"history\": \"One previous depressive episode 5 years ago, successfully treated with sertraline 100mg\",\n      \"medication\": \"Previously on sertraline 100mg\",\n      \"social_context\": \"Married, two children, recently unemployed\",\n      \"chief_complaint\": \"I just don't feel like myself anymore\",\n      \"presentation_style\": \"withdrawn, soft-spoken\"\n    },\n    \"scenario_type\": \"initial_clinical_interview\",\n    \"difficulty_level\": \"intermediate\",\n    \"interview_focus\": \"assessment_and_diagnosis\",\n    \"patient_openness\": \"moderately_forthcoming\"\n  }\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -367,7 +367,7 @@
               "variable": [
                 {
                   "key": "caseId",
-                  "value": "PASTE_CASE_ID_HERE"
+                  "value": "{{lastCaseId}}"
                 }
               ]
             },
@@ -392,7 +392,7 @@
               "variable": [
                 {
                   "key": "caseId",
-                  "value": "PASTE_CASE_ID_HERE"
+                  "value": "{{lastCaseId}}"
                 }
               ]
             },
@@ -416,7 +416,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"item_id\": \"PASTE_CASE_ID_HERE\",\n  \"sequence\": 2\n}",
+              "raw": "{\n  \"item_id\": \"{{lastCaseId}}\",\n  \"sequence\": 2\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -430,7 +430,7 @@
               "variable": [
                 {
                   "key": "caseId",
-                  "value": "PASTE_CASE_ID_HERE"
+                  "value": "{{lastCaseId}}"
                 }
               ]
             },
@@ -617,7 +617,7 @@
               "variable": [
                 {
                   "key": "sessionId",
-                  "value": "PASTE_SESSION_ID_HERE",
+                  "value": "{{lastSessionId}}",
                   "description": "Session ID from create session response"
                 }
               ]
@@ -643,7 +643,7 @@
               "variable": [
                 {
                   "key": "sessionId",
-                  "value": "PASTE_SESSION_ID_HERE"
+                  "value": "{{lastSessionId}}"
                 }
               ]
             },
@@ -681,7 +681,7 @@
               "variable": [
                 {
                   "key": "sessionId",
-                  "value": "PASTE_SESSION_ID_HERE"
+                  "value": "{{lastSessionId}}"
                 }
               ]
             },
@@ -724,7 +724,7 @@
               "variable": [
                 {
                   "key": "sessionId",
-                  "value": "PASTE_SESSION_ID_HERE"
+                  "value": "{{lastSessionId}}"
                 }
               ]
             },
@@ -792,7 +792,7 @@
               "variable": [
                 {
                   "key": "feedbackId",
-                  "value": "PASTE_FEEDBACK_ID_HERE",
+                  "value": "{{lastFeedbackId}}",
                   "description": "Feedback ID from pending list"
                 }
               ]
@@ -831,7 +831,7 @@
               "variable": [
                 {
                   "key": "feedbackId",
-                  "value": "PASTE_FEEDBACK_ID_HERE"
+                  "value": "{{lastFeedbackId}}"
                 }
               ]
             },
@@ -856,7 +856,7 @@
               "variable": [
                 {
                   "key": "caseId",
-                  "value": "PASTE_CASE_ID_HERE"
+                  "value": "{{lastCaseId}}"
                 }
               ]
             },
@@ -887,7 +887,7 @@
               "variable": [
                 {
                   "key": "internshipId",
-                  "value": "PASTE_INTERNSHIP_ID_HERE"
+                  "value": "{{lastInternshipId}}"
                 }
               ]
             },
@@ -925,7 +925,7 @@
               "variable": [
                 {
                   "key": "internshipId",
-                  "value": "PASTE_INTERNSHIP_ID_HERE"
+                  "value": "{{lastInternshipId}}"
                 }
               ]
             },
@@ -963,7 +963,7 @@
               "variable": [
                 {
                   "key": "internshipId",
-                  "value": "PASTE_INTERNSHIP_ID_HERE"
+                  "value": "{{lastInternshipId}}"
                 }
               ]
             },
@@ -988,7 +988,7 @@
     },
     {
       "key": "studentToken",
-      "value": "PASTE_STUDENT_JWT_TOKEN_HERE",
+      "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY5MDI4NDY2YjhiYzNmMjA4YTE2ZmMwMiIsImVtYWlsIjoidGFsaGFqdW5rQGdtYWlsLmNvbSIsInJvbGVfaWQiOiI2ODYzY2VjNzExYmU5MDE2YjdjY2I4MDIiLCJzY2hvb2xfaWQiOiI2OTAxNGE1OGI4YmMzZjIwOGExNmY1MDYiLCJyb2xlX25hbWUiOiJTVFVERU5UIiwidG9rZW5fdHlwZSI6ImFjY2VzcyIsImlhdCI6MTczMjc0ODgxNywiZXhwIjoxNzM1MzQwODE3fQ.0fxOKnvPvD6WXZ4H5QFWKNlbxeFGVRbS15XEzD6YvXA",
       "type": "string",
       "description": "Student JWT token (login as student to get this)"
     },

@@ -19,6 +19,10 @@ import {
   InternshipCase,
   InternshipCaseSchema,
 } from 'src/database/schemas/tenant/internship-case.schema';
+import {
+  Student,
+  StudentSchema,
+} from 'src/database/schemas/tenant/student.schema';
 import { TenantConnectionService } from 'src/database/tenant-connection.service';
 import { ValidateFeedbackDto } from './dto/validate-feedback.dto';
 import { UpdateFeedbackDto } from './dto/update-feedback.dto';
@@ -106,6 +110,12 @@ export class InternshipFeedbackService {
         throw new NotFoundException('Case not found');
       }
 
+      // Calculate session duration in minutes
+      const sessionStartTime = session.started_at || session.created_at;
+      const sessionEndTime = session.ended_at || new Date();
+      const durationMs = new Date(sessionEndTime).getTime() - new Date(sessionStartTime).getTime();
+      const sessionDurationMinutes = Math.floor(durationMs / 60000); // Convert to minutes
+
       // Generate feedback using Python service
       const pythonResponse = await this.pythonService.generateSupervisorFeedback(
         session.case_id.toString(),
@@ -114,6 +124,7 @@ export class InternshipFeedbackService {
           session_type: session.session_type,
           started_at: session.started_at,
           ended_at: session.ended_at,
+          session_duration_minutes: sessionDurationMinutes,
         },
         caseData.evaluation_criteria || [],
       );
@@ -171,11 +182,15 @@ export class InternshipFeedbackService {
     // Get tenant connection
     const tenantConnection =
       await this.tenantConnectionService.getTenantConnection(school.db_name);
+    
+    // Register models on tenant connection for populate to work
     const FeedbackModel = tenantConnection.model(CaseFeedbackLog.name, CaseFeedbackLogSchema);
+    tenantConnection.model(Student.name, StudentSchema);
+    tenantConnection.model(InternshipCase.name, InternshipCaseSchema);
 
     try {
       const paginationOptions = getPaginationOptions(paginationDto || {});
-
+      
       const query = {
         status: FeedbackStatusEnum.PENDING_VALIDATION,
       };

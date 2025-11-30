@@ -107,13 +107,43 @@ export class InternshipSessionService {
           );
         }
 
+        // Extract scenario config fields only (exclude patient_profile and _id)
+        // Provide sensible defaults for optional fields to ensure compatibility
+        const scenarioConfig: Record<string, any> = {
+          scenario_type: caseData.patient_simulation_config.scenario_type,
+          difficulty_level: caseData.patient_simulation_config.difficulty_level,
+          // Use provided values or sensible defaults
+          interview_focus: (caseData.patient_simulation_config as any).interview_focus || 
+            (caseData.patient_simulation_config.scenario_type === 'initial_clinical_interview' 
+              ? 'assessment_and_diagnosis' 
+              : 'treatment_planning'),
+          patient_openness: (caseData.patient_simulation_config as any).patient_openness || 
+            'moderately_forthcoming',
+        };
+
+        // Validate required scenario fields (scenario_type and difficulty_level are mandatory)
+        if (!scenarioConfig.scenario_type || !scenarioConfig.difficulty_level) {
+          throw new BadRequestException(
+            'Case patient_simulation_config is missing required scenario fields: scenario_type and difficulty_level are required.'
+          );
+        }
+
+        // Log if defaults were used (for debugging)
+        if (!(caseData.patient_simulation_config as any).interview_focus || 
+            !(caseData.patient_simulation_config as any).patient_openness) {
+          this.logger.warn(
+            `Case ${case_id} missing interview_focus or patient_openness, using defaults: ` +
+            `interview_focus=${scenarioConfig.interview_focus}, patient_openness=${scenarioConfig.patient_openness}`
+          );
+        }
+
         // Log what we're sending to Python API for debugging
         this.logger.debug(`Sending to Python API: case_id=${case_id}, patient_profile=${JSON.stringify(caseData.patient_simulation_config.patient_profile)}`);
 
         const pythonResponse = await this.pythonService.initializePatientSession(
           case_id,
           caseData.patient_simulation_config.patient_profile,
-          caseData.patient_simulation_config,
+          scenarioConfig,
         );
         pythonSessionId = pythonResponse.session_id;
       } else if (session_type === SessionTypeEnum.THERAPIST_CONSULTATION) {
@@ -197,6 +227,11 @@ export class InternshipSessionService {
     const SessionModel = tenantConnection.model(StudentCaseSession.name, StudentCaseSessionSchema);
 
     try {
+      // Validate sessionId is a valid ObjectId
+      if (!Types.ObjectId.isValid(sessionId)) {
+        throw new BadRequestException(`Invalid session ID format: ${sessionId}`);
+      }
+
       // Find session
       const session = await SessionModel.findOne({
         _id: new Types.ObjectId(sessionId),
@@ -227,10 +262,22 @@ export class InternshipSessionService {
       let aiRole: MessageRoleEnum = MessageRoleEnum.AI_PATIENT; // Default value
 
       if (session.session_type === SessionTypeEnum.PATIENT_INTERVIEW) {
+        // Build context with required fields for Python API
+        const messageNumber = session.messages.length; // Current message count (includes the one we just added)
+        const sessionStartTime = session.started_at || session.created_at || new Date();
+        const elapsedTimeMs = Date.now() - new Date(sessionStartTime).getTime();
+        const elapsedTimeMinutes = Math.floor(elapsedTimeMs / 60000); // Convert to minutes
+
+        const context = {
+          message_number: messageNumber,
+          elapsed_time_minutes: elapsedTimeMinutes,
+          ...(metadata || {}), // Include any additional metadata
+        };
+
         const pythonResponse = await this.pythonService.sendPatientMessage(
           session.patient_session_id,
           message,
-          metadata || {},
+          context,
         );
         aiResponse = pythonResponse.patient_response;
         aiRole = MessageRoleEnum.AI_PATIENT;

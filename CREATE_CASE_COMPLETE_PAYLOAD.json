@@ -1,0 +1,76 @@
+{
+  "title": "Major Depressive Disorder - Initial Assessment",
+  "description": "Patient John, 35-year-old male, presents with 6-week history of depressed mood, anhedonia, and psychomotor retardation.",
+  "sequence": 1,
+  "case_content": "<h2>Patient Presentation</h2><p><strong>Chief Complaint:</strong> \"I just don't feel like myself anymore.\"</p><h3>History of Present Illness</h3><p>Patient is a 35-year-old male presenting with a 6-week history of persistent depressed mood. Symptoms began shortly after he lost his job as a marketing manager.</p>",
+  "patient_simulation_config": {
+    "patient_profile": {
+      "name": "John Smith",
+      "age": 35,
+      "gender": "male",
+      "condition": "Major Depressive Disorder",
+      "severity": "moderate",
+      "duration": "6 weeks",
+      "triggers": [
+        "job loss",
+        "financial stress",
+        "loss of daily routine"
+      ],
+      "symptoms": [
+        "depressed mood",
+        "anhedonia",
+        "early morning awakening",
+        "decreased appetite with 15-pound weight loss",
+        "psychomotor retardation",
+        "difficulty concentrating",
+        "feelings of worthlessness",
+        "passive death wish"
+      ],
+      "history": "One previous depressive episode 5 years ago, successfully treated with sertraline 100mg for 8 months. No hospitalizations. No suicide attempts.",
+      "medication": "Previously on sertraline 100mg (discontinued after 8 months of remission)",
+      "social_context": "Married for 8 years, supportive wife. Two children ages 6 and 4. Recently unemployed (2 months). Denies alcohol or substance use. Non-smoker.",
+      "chief_complaint": "I just don't feel like myself anymore",
+      "presentation_style": "withdrawn, soft-spoken, psychomotor retardation"
+    },
+    "scenario_type": "initial_clinical_interview",
+    "difficulty_level": "intermediate",
+    "interview_focus": "assessment_and_diagnosis",
+    "patient_openness": "moderately_forthcoming"
+  },
+  "supervisor_prompts": [
+    "Monitor student's empathy and rapport-building skills",
+    "Check if student assesses suicide risk appropriately",
+    "Evaluate proper mental status exam technique",
+    "Ensure student explores precipitating factors",
+    "Check if student considers differential diagnosis"
+  ],
+  "therapist_prompts": [
+    "Guide student on building therapeutic alliance with depressed patients",
+    "Explain importance of suicide risk assessment",
+    "Teach CBT techniques for depression",
+    "Discuss medication options and their rationale",
+    "Explain importance of involving family support"
+  ],
+  "evaluation_criteria": [
+    {
+      "criterion": "Clinical Reasoning",
+      "weight": 30
+    },
+    {
+      "criterion": "Communication Skills & Empathy",
+      "weight": 25
+    },
+    {
+      "criterion": "Mental Status Exam Technique",
+      "weight": 20
+    },
+    {
+      "criterion": "Risk Assessment",
+      "weight": 15
+    },
+    {
+      "criterion": "Treatment Planning",
+      "weight": 10
+    }
+  ]
+}

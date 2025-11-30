@@ -1,0 +1,37 @@
+{
+  "patient_simulation_config": {
+    "patient_profile": {
+      "name": "John Smith",
+      "age": 35,
+      "gender": "male",
+      "condition": "Major Depressive Disorder",
+      "severity": "moderate",
+      "duration": "6 weeks",
+      "triggers": [
+        "job loss",
+        "financial stress",
+        "loss of daily routine"
+      ],
+      "symptoms": [
+        "depressed mood",
+        "anhedonia",
+        "early morning awakening",
+        "decreased appetite with 15-pound weight loss",
+        "psychomotor retardation",
+        "difficulty concentrating",
+        "feelings of worthlessness",
+        "passive death wish"
+      ],
+      "history": "One previous depressive episode 5 years ago, successfully treated with sertraline 100mg for 8 months. No hospitalizations. No suicide attempts.",
+      "medication": "Previously on sertraline 100mg (discontinued after 8 months of remission)",
+      "social_context": "Married for 8 years, supportive wife. Two children ages 6 and 4. Recently unemployed (2 months). Denies alcohol or substance use. Non-smoker.",
+      "chief_complaint": "I just don't feel like myself anymore",
+      "presentation_style": "withdrawn, soft-spoken, psychomotor retardation"
+    },
+    "scenario_type": "initial_clinical_interview",
+    "difficulty_level": "intermediate",
+    "interview_focus": "assessment_and_diagnosis",
+    "patient_openness": "moderately_forthcoming"
+  }
+}
+
