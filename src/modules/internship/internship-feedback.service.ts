@@ -23,6 +23,10 @@ import {
   Student,
   StudentSchema,
 } from 'src/database/schemas/tenant/student.schema';
+import {
+  StudentInternshipProgress,
+  StudentInternshipProgressSchema,
+} from 'src/database/schemas/tenant/student-internship-progress.schema';
 import { TenantConnectionService } from 'src/database/tenant-connection.service';
 import { ValidateFeedbackDto } from './dto/validate-feedback.dto';
 import { UpdateFeedbackDto } from './dto/update-feedback.dto';
@@ -34,6 +38,7 @@ import {
   FeedbackStatusEnum,
   SessionStatusEnum,
 } from 'src/common/constants/internship.constant';
+import { ProgressStatusEnum } from 'src/common/constants/status.constant';
 import { PythonInternshipService } from './python-internship.service';
 import { PaginationDto } from 'src/common/dto/pagination.dto';
 import {
@@ -264,6 +269,17 @@ export class InternshipFeedbackService {
 
       await feedback.save();
 
+      // Update student progress after validation
+      const CaseModel = tenantConnection.model(InternshipCase.name, InternshipCaseSchema);
+      const caseData = await CaseModel.findById(feedback.case_id);
+      if (caseData) {
+        await this.updateStudentProgress(
+          feedback.student_id,
+          caseData.internship_id,
+          tenantConnection,
+        );
+      }
+
       return {
         message: 'Feedback validated successfully',
         data: feedback,
@@ -334,6 +350,17 @@ export class InternshipFeedbackService {
 
       await feedback.save();
 
+      // Update student progress after update
+      const CaseModel = tenantConnection.model(InternshipCase.name, InternshipCaseSchema);
+      const caseData = await CaseModel.findById(feedback.case_id);
+      if (caseData) {
+        await this.updateStudentProgress(
+          feedback.student_id,
+          caseData.internship_id,
+          tenantConnection,
+        );
+      }
+
       return {
         message: 'Feedback updated successfully',
         data: feedback,
@@ -381,6 +408,102 @@ export class InternshipFeedbackService {
     } catch (error) {
       this.logger.error('Error getting feedback', error?.stack || error);
       throw new BadRequestException('Failed to retrieve feedback');
+    }
+  }
+
+  /**
+   * Helper to update student progress after feedback validation
+   */
+  private async updateStudentProgress(
+    studentId: Types.ObjectId,
+    internshipId: Types.ObjectId,
+    tenantConnection: any,
+  ) {
+    const ProgressModel = tenantConnection.model(
+      StudentInternshipProgress.name,
+      StudentInternshipProgressSchema,
+    );
+    const InternshipCaseModel = tenantConnection.model(
+      InternshipCase.name,
+      InternshipCaseSchema,
+    );
+    const FeedbackModel = tenantConnection.model(
+      CaseFeedbackLog.name,
+      CaseFeedbackLogSchema,
+    );
+
+    try {
+      // Count total cases for this internship
+      const totalCases = await InternshipCaseModel.countDocuments({
+        internship_id: internshipId,
+        deleted_at: null,
+      });
+
+      // Count completed cases (cases with validated feedback)
+      const completedFeedbacks = await FeedbackModel.find({
+        student_id: studentId,
+        status: { $in: [FeedbackStatusEnum.VALIDATED, FeedbackStatusEnum.REVISED] },
+      }).distinct('case_id');
+
+      // Filter completed cases to only count cases belonging to this internship
+      const completedCasesForInternship = await InternshipCaseModel.countDocuments({
+        _id: { $in: completedFeedbacks },
+        internship_id: internshipId,
+        deleted_at: null,
+      });
+
+      // Calculate progress percentage
+      const progressPercentage = totalCases > 0 
+        ? Math.round((completedCasesForInternship / totalCases) * 100) 
+        : 0;
+
+      // Determine status based on progress
+      let status = ProgressStatusEnum.IN_PROGRESS;
+      if (progressPercentage === 0) {
+        status = ProgressStatusEnum.NOT_STARTED;
+      } else if (progressPercentage === 100) {
+        status = ProgressStatusEnum.COMPLETED;
+      }
+
+      let progress = await ProgressModel.findOne({
+        student_id: studentId,
+        internship_id: internshipId,
+      });
+
+      if (!progress) {
+        // Create new progress record
+        progress = new ProgressModel({
+          student_id: studentId,
+          internship_id: internshipId,
+          status: status === ProgressStatusEnum.NOT_STARTED ? ProgressStatusEnum.IN_PROGRESS : status,
+          started_at: new Date(),
+          last_accessed_at: new Date(),
+          progress_percentage: progressPercentage,
+          cases_completed: completedCasesForInternship,
+          total_cases: totalCases,
+        });
+      } else {
+        // Update existing progress
+        if (progress.status === ProgressStatusEnum.NOT_STARTED) {
+          progress.status = ProgressStatusEnum.IN_PROGRESS;
+          progress.started_at = new Date();
+        } else {
+          progress.status = status;
+        }
+        progress.last_accessed_at = new Date();
+        progress.progress_percentage = progressPercentage;
+        progress.cases_completed = completedCasesForInternship;
+        progress.total_cases = totalCases;
+        
+        if (status === ProgressStatusEnum.COMPLETED && !progress.completed_at) {
+          progress.completed_at = new Date();
+        }
+      }
+
+      await progress.save();
+      this.logger.log(`Updated progress for student ${studentId} in internship ${internshipId}: ${completedCasesForInternship}/${totalCases} cases completed (${progressPercentage}%)`);
+    } catch (error) {
+      this.logger.error('Error updating student progress', error);
     }
   }
 }

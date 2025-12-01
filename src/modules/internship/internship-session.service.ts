@@ -29,9 +29,14 @@ import {
   SessionTypeEnum,
   SessionStatusEnum,
   MessageRoleEnum,
+  FeedbackStatusEnum,
 } from 'src/common/constants/internship.constant';
 import { ProgressStatusEnum } from 'src/common/constants/status.constant';
 import { PythonInternshipService } from './python-internship.service';
+import {
+  CaseFeedbackLog,
+  CaseFeedbackLogSchema,
+} from 'src/database/schemas/tenant/case-feedback-log.schema';
 
 @Injectable()
 export class InternshipSessionService {
@@ -445,8 +450,48 @@ export class InternshipSessionService {
       StudentInternshipProgress.name,
       StudentInternshipProgressSchema,
     );
+    const InternshipCaseModel = tenantConnection.model(
+      InternshipCase.name,
+      InternshipCaseSchema,
+    );
+    const FeedbackModel = tenantConnection.model(
+      CaseFeedbackLog.name,
+      CaseFeedbackLogSchema,
+    );
 
     try {
+      // Count total cases for this internship
+      const totalCases = await InternshipCaseModel.countDocuments({
+        internship_id: internshipId,
+        deleted_at: null,
+      });
+
+      // Count completed cases (cases with validated feedback)
+      const completedFeedbacks = await FeedbackModel.find({
+        student_id: studentId,
+        status: { $in: [FeedbackStatusEnum.VALIDATED, FeedbackStatusEnum.REVISED] },
+      }).distinct('case_id');
+
+      // Filter completed cases to only count cases belonging to this internship
+      const completedCasesForInternship = await InternshipCaseModel.countDocuments({
+        _id: { $in: completedFeedbacks },
+        internship_id: internshipId,
+        deleted_at: null,
+      });
+
+      // Calculate progress percentage
+      const progressPercentage = totalCases > 0 
+        ? Math.round((completedCasesForInternship / totalCases) * 100) 
+        : 0;
+
+      // Determine status based on progress
+      let status = ProgressStatusEnum.IN_PROGRESS;
+      if (progressPercentage === 0) {
+        status = ProgressStatusEnum.NOT_STARTED;
+      } else if (progressPercentage === 100) {
+        status = ProgressStatusEnum.COMPLETED;
+      }
+
       let progress = await ProgressModel.findOne({
         student_id: studentId,
         internship_id: internshipId,
@@ -457,17 +502,29 @@ export class InternshipSessionService {
         progress = new ProgressModel({
           student_id: studentId,
           internship_id: internshipId,
-          status: ProgressStatusEnum.IN_PROGRESS,
+          status: status === ProgressStatusEnum.NOT_STARTED ? ProgressStatusEnum.IN_PROGRESS : status,
           started_at: new Date(),
           last_accessed_at: new Date(),
+          progress_percentage: progressPercentage,
+          cases_completed: completedCasesForInternship,
+          total_cases: totalCases,
         });
       } else {
         // Update existing progress
         if (progress.status === ProgressStatusEnum.NOT_STARTED) {
           progress.status = ProgressStatusEnum.IN_PROGRESS;
           progress.started_at = new Date();
+        } else {
+          progress.status = status;
         }
         progress.last_accessed_at = new Date();
+        progress.progress_percentage = progressPercentage;
+        progress.cases_completed = completedCasesForInternship;
+        progress.total_cases = totalCases;
+        
+        if (status === ProgressStatusEnum.COMPLETED && !progress.completed_at) {
+          progress.completed_at = new Date();
+        }
       }
 
       await progress.save();

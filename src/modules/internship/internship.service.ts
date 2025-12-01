@@ -267,6 +267,71 @@ export class InternshipService {
 
       // Stage 5: Add progress information for students
       if (user.role.name === RoleEnum.STUDENT) {
+        // Lookup to count total cases for each internship
+        pipeline.push({
+          $lookup: {
+            from: 'internship_cases',
+            let: { internshipId: '$_id' },
+            pipeline: [
+              {
+                $match: {
+                  $expr: {
+                    $and: [
+                      { $eq: ['$internship_id', '$$internshipId'] },
+                      { $eq: ['$deleted_at', null] },
+                    ],
+                  },
+                },
+              },
+              { $count: 'count' },
+            ],
+            as: 'casesCount',
+          },
+        });
+
+        // Lookup to count completed cases (sessions with validated feedback)
+        pipeline.push({
+          $lookup: {
+            from: 'case_feedback_logs',
+            let: { internshipId: '$_id' },
+            pipeline: [
+              {
+                $match: {
+                  $expr: {
+                    $and: [
+                      { $eq: ['$student_id', new Types.ObjectId(user.id)] },
+                    ],
+                  },
+                  status: { $in: ['validated', 'revised'] },
+                },
+              },
+              {
+                $lookup: {
+                  from: 'internship_cases',
+                  localField: 'case_id',
+                  foreignField: '_id',
+                  as: 'caseInfo',
+                },
+              },
+              {
+                $match: {
+                  $expr: {
+                    $eq: [{ $arrayElemAt: ['$caseInfo.internship_id', 0] }, '$$internshipId'],
+                  },
+                },
+              },
+              {
+                $group: {
+                  _id: '$case_id',
+                },
+              },
+              { $count: 'count' },
+            ],
+            as: 'completedCasesCount',
+          },
+        });
+
+        // Lookup existing progress record
         pipeline.push({
           $lookup: {
             from: 'student_internship_progress',
@@ -375,15 +440,49 @@ export class InternshipService {
 
       // Add progress information for students
       if (user.role.name === RoleEnum.STUDENT) {
+        projectFields.total_cases = {
+          $cond: {
+            if: { $gt: [{ $size: '$casesCount' }, 0] },
+            then: { $arrayElemAt: ['$casesCount.count', 0] },
+            else: 0,
+          },
+        };
+        projectFields.cases_completed = {
+          $cond: {
+            if: { $gt: [{ $size: '$completedCasesCount' }, 0] },
+            then: { $arrayElemAt: ['$completedCasesCount.count', 0] },
+            else: 0,
+          },
+        };
         projectFields.progress = {
           $cond: {
             if: { $gt: [{ $size: '$progress' }, 0] },
-            then: { $arrayElemAt: ['$progress', 0] },
+            then: {
+              status: { $arrayElemAt: ['$progress.status', 0] },
+              progress_percentage: {
+                $cond: {
+                  if: { $gt: ['$total_cases', 0] },
+                  then: {
+                    $multiply: [
+                      { $divide: ['$cases_completed', '$total_cases'] },
+                      100,
+                    ],
+                  },
+                  else: 0,
+                },
+              },
+              cases_completed: '$cases_completed',
+              total_cases: '$total_cases',
+              started_at: { $arrayElemAt: ['$progress.started_at', 0] },
+              completed_at: { $arrayElemAt: ['$progress.completed_at', 0] },
+              current_case_id: { $arrayElemAt: ['$progress.current_case_id', 0] },
+              last_accessed_at: { $arrayElemAt: ['$progress.last_accessed_at', 0] },
+            },
             else: {
               status: ProgressStatusEnum.NOT_STARTED,
               progress_percentage: 0,
-              cases_completed: 0,
-              total_cases: 0,
+              cases_completed: '$cases_completed',
+              total_cases: '$total_cases',
             },
           },
         };
