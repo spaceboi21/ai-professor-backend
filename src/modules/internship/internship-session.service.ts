@@ -30,6 +30,7 @@ import {
   SessionStatusEnum,
   MessageRoleEnum,
   FeedbackStatusEnum,
+  FeedbackTypeEnum,
 } from 'src/common/constants/internship.constant';
 import { ProgressStatusEnum } from 'src/common/constants/status.constant';
 import { PythonInternshipService } from './python-internship.service';
@@ -267,6 +268,14 @@ export class InternshipSessionService {
       let aiRole: MessageRoleEnum = MessageRoleEnum.AI_PATIENT; // Default value
 
       if (session.session_type === SessionTypeEnum.PATIENT_INTERVIEW) {
+        // Validate patient_session_id exists
+        if (!session.patient_session_id) {
+          this.logger.error(`Session ${sessionId} has no patient_session_id. Session data: ${JSON.stringify(session)}`);
+          throw new BadRequestException(
+            'Patient session not properly initialized. Please create a new session.'
+          );
+        }
+
         // Build context with required fields for Python API
         const messageNumber = session.messages.length; // Current message count (includes the one we just added)
         const sessionStartTime = session.started_at || session.created_at || new Date();
@@ -278,6 +287,8 @@ export class InternshipSessionService {
           elapsed_time_minutes: elapsedTimeMinutes,
           ...(metadata || {}), // Include any additional metadata
         };
+
+        this.logger.debug(`Sending message to Python API - Session ID: ${session.patient_session_id}, Message: ${message.substring(0, 50)}...`);
 
         const pythonResponse = await this.pythonService.sendPatientMessage(
           session.patient_session_id,
@@ -306,6 +317,16 @@ export class InternshipSessionService {
           this.logger.warn('Failed to get supervisor tip', error);
         }
       } else if (session.session_type === SessionTypeEnum.THERAPIST_CONSULTATION) {
+        // Validate therapist_session_id exists
+        if (!session.therapist_session_id) {
+          this.logger.error(`Session ${sessionId} has no therapist_session_id. Session data: ${JSON.stringify(session)}`);
+          throw new BadRequestException(
+            'Therapist session not properly initialized. Please create a new session.'
+          );
+        }
+
+        this.logger.debug(`Sending message to Python API - Therapist Session ID: ${session.therapist_session_id}, Message: ${message.substring(0, 50)}...`);
+
         const pythonResponse = await this.pythonService.sendTherapistMessage(
           session.therapist_session_id,
           message,
@@ -339,7 +360,26 @@ export class InternshipSessionService {
       };
     } catch (error) {
       this.logger.error('Error sending message', error?.stack || error);
-      throw new BadRequestException('Failed to send message');
+      
+      // Provide more specific error messages based on the error type
+      const errorMessage = error?.message || 'Unknown error';
+      
+      if (errorMessage.includes('Session not found or expired')) {
+        throw new BadRequestException(
+          'Your session has expired or was not found. This can happen if:\n' +
+          '1. The session has been inactive for more than 24 hours\n' +
+          '2. The Python AI service was restarted\n' +
+          '3. MongoDB was temporarily down when the session was created\n\n' +
+          'Please end this session and create a new one to continue.'
+        );
+      }
+      
+      if (errorMessage.includes('validation failed')) {
+        throw new BadRequestException(`Invalid message format: ${errorMessage}`);
+      }
+      
+      // For other errors, provide the original error message
+      throw new BadRequestException(`Failed to send message: ${errorMessage}`);
     }
   }
 
@@ -382,7 +422,7 @@ export class InternshipSessionService {
   }
 
   /**
-   * Complete session
+   * Complete session and automatically generate feedback
    */
   async completeSession(sessionId: string, user: JWTUserPayload) {
     this.logger.log(`Completing session: ${sessionId}`);
@@ -397,6 +437,8 @@ export class InternshipSessionService {
     const tenantConnection =
       await this.tenantConnectionService.getTenantConnection(school.db_name);
     const SessionModel = tenantConnection.model(StudentCaseSession.name, StudentCaseSessionSchema);
+    const CaseModel = tenantConnection.model(InternshipCase.name, InternshipCaseSchema);
+    const FeedbackModel = tenantConnection.model(CaseFeedbackLog.name, CaseFeedbackLogSchema);
 
     try {
       const session = await SessionModel.findOne({
@@ -415,12 +457,15 @@ export class InternshipSessionService {
 
       // End session on Python side
       try {
-        await this.pythonService.endSession(
-          session.patient_session_id || session.therapist_session_id,
-          session.session_type,
-        );
+        const pythonSessionId = session.patient_session_id || session.therapist_session_id;
+        if (pythonSessionId) {
+          await this.pythonService.endSession(pythonSessionId, session.session_type);
+        } else {
+          this.logger.warn(`Session ${sessionId} has no Python session ID to end`);
+        }
       } catch (error) {
         this.logger.warn('Failed to end Python session', error);
+        // Don't fail completion if Python service is down
       }
 
       // Update session status
@@ -428,12 +473,102 @@ export class InternshipSessionService {
       session.ended_at = new Date();
       await session.save();
 
+      this.logger.log(`Session ${sessionId} completed successfully`);
+
+      // Automatically generate feedback
+      let feedbackResult: any = null;
+      try {
+        this.logger.log(`Auto-generating feedback for session: ${sessionId}`);
+
+        // Check if feedback already exists
+        const existingFeedback = await FeedbackModel.findOne({
+          session_id: new Types.ObjectId(sessionId),
+        });
+
+        if (existingFeedback) {
+          this.logger.log(`Feedback already exists for session ${sessionId}`);
+          feedbackResult = existingFeedback;
+        } else {
+          // Get case details for evaluation criteria
+          const caseData = await CaseModel.findOne({
+            _id: session.case_id,
+            deleted_at: null,
+          });
+
+          if (!caseData) {
+            this.logger.error(`Case not found for session ${sessionId}`);
+          } else {
+            // Calculate session duration in minutes
+            const sessionStartTime = session.started_at || session.created_at;
+            const sessionEndTime = session.ended_at;
+            const durationMs = new Date(sessionEndTime).getTime() - new Date(sessionStartTime).getTime();
+            const sessionDurationMinutes = Math.floor(durationMs / 60000);
+
+            // Generate feedback using Python service
+            const pythonResponse = await this.pythonService.generateSupervisorFeedback(
+              session.case_id.toString(),
+              {
+                messages: session.messages,
+                session_type: session.session_type,
+                started_at: session.started_at,
+                ended_at: session.ended_at,
+                session_duration_minutes: sessionDurationMinutes,
+              },
+              caseData.evaluation_criteria || [],
+            );
+
+            // Create feedback log
+            const feedbackData = {
+              student_id: session.student_id,
+              case_id: session.case_id,
+              session_id: new Types.ObjectId(sessionId),
+              feedback_type: 'AUTO_GENERATED',
+              ai_feedback: {
+                overall_score: pythonResponse.feedback.overall_score,
+                strengths: pythonResponse.feedback.strengths,
+                areas_for_improvement: pythonResponse.feedback.areas_for_improvement,
+                technical_assessment: pythonResponse.feedback.technical_assessment,
+                communication_assessment: pythonResponse.feedback.communication_assessment,
+                clinical_reasoning: pythonResponse.feedback.clinical_reasoning,
+                generated_at: new Date(),
+              },
+              professor_feedback: {},
+              status: FeedbackStatusEnum.PENDING_VALIDATION,
+            };
+
+            const newFeedback = new FeedbackModel(feedbackData);
+            feedbackResult = await newFeedback.save();
+
+            // Update session status to pending validation
+            session.status = SessionStatusEnum.PENDING_VALIDATION;
+            await session.save();
+
+            this.logger.log(`Feedback auto-generated successfully: ${feedbackResult._id}`);
+          }
+        }
+      } catch (error) {
+        this.logger.error('Failed to auto-generate feedback', error?.stack || error);
+        // Don't fail the completion if feedback generation fails
+        // The user can manually generate feedback later
+      }
+
       return {
         message: 'Session completed successfully',
-        data: session,
+        data: {
+          session: session,
+          feedback: feedbackResult ? {
+            id: feedbackResult._id,
+            status: feedbackResult.status,
+            overall_score: feedbackResult.ai_feedback?.overall_score,
+          } : null,
+          feedback_generated: !!feedbackResult,
+        },
       };
     } catch (error) {
       this.logger.error('Error completing session', error?.stack || error);
+      if (error instanceof NotFoundException || error instanceof BadRequestException) {
+        throw error;
+      }
       throw new BadRequestException('Failed to complete session');
     }
   }

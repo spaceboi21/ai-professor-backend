@@ -79,11 +79,19 @@ export class InternshipFeedbackService {
 
     try {
       // Find session
-      const session = await SessionModel.findOne({
+      // Professors and admins can generate feedback for any session in their school
+      // Students can only generate feedback for their own sessions
+      const query: any = {
         _id: new Types.ObjectId(sessionId),
-        student_id: new Types.ObjectId(user.id),
         deleted_at: null,
-      });
+      };
+      
+      // If user is a student, restrict to their own sessions
+      if (user.role.name === 'STUDENT') {
+        query.student_id = new Types.ObjectId(user.id);
+      }
+      
+      const session = await SessionModel.findOne(query);
 
       if (!session) {
         throw new NotFoundException('Session not found');
@@ -286,7 +294,18 @@ export class InternshipFeedbackService {
       };
     } catch (error) {
       this.logger.error('Error validating feedback', error?.stack || error);
-      throw new BadRequestException('Failed to validate feedback');
+      
+      // Provide more specific error messages
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
+      
+      const errorMessage = error?.message || 'Unknown error';
+      if (errorMessage.includes('Cast to ObjectId failed')) {
+        throw new BadRequestException('Invalid feedback ID format');
+      }
+      
+      throw new BadRequestException(`Failed to validate feedback: ${errorMessage}`);
     }
   }
 
@@ -367,7 +386,57 @@ export class InternshipFeedbackService {
       };
     } catch (error) {
       this.logger.error('Error updating feedback', error?.stack || error);
-      throw new BadRequestException('Failed to update feedback');
+      
+      // Provide more specific error messages
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
+      
+      const errorMessage = error?.message || 'Unknown error';
+      if (errorMessage.includes('Cast to ObjectId failed')) {
+        throw new BadRequestException('Invalid feedback ID format');
+      }
+      
+      throw new BadRequestException(`Failed to update feedback: ${errorMessage}`);
+    }
+  }
+
+  /**
+   * Get feedback by session ID (Student view)
+   */
+  async getFeedbackBySession(sessionId: string, user: JWTUserPayload) {
+    this.logger.log(`Getting feedback for session: ${sessionId}`);
+
+    // Validate school exists
+    const school = await this.schoolModel.findById(user.school_id);
+    if (!school) {
+      throw new NotFoundException('School not found');
+    }
+
+    // Get tenant connection
+    const tenantConnection =
+      await this.tenantConnectionService.getTenantConnection(school.db_name);
+    const FeedbackModel = tenantConnection.model(CaseFeedbackLog.name, CaseFeedbackLogSchema);
+
+    try {
+      const feedback = await FeedbackModel.findOne({
+        session_id: new Types.ObjectId(sessionId),
+        student_id: new Types.ObjectId(user.id),
+      })
+        .sort({ created_at: -1 })
+        .lean();
+
+      if (!feedback) {
+        throw new NotFoundException('Feedback not found. Please generate feedback first by calling POST /internship/sessions/:sessionId/feedback');
+      }
+
+      return {
+        message: 'Feedback retrieved successfully',
+        data: feedback,
+      };
+    } catch (error) {
+      this.logger.error('Error getting feedback', error?.stack || error);
+      throw new BadRequestException('Failed to retrieve feedback');
     }
   }
 
@@ -392,13 +461,13 @@ export class InternshipFeedbackService {
       const feedback = await FeedbackModel.findOne({
         case_id: new Types.ObjectId(caseId),
         student_id: new Types.ObjectId(user.id),
-        status: { $in: [FeedbackStatusEnum.VALIDATED, FeedbackStatusEnum.REVISED] },
+        // Allow students to see all feedback statuses including PENDING_VALIDATION
       })
         .sort({ created_at: -1 })
         .lean();
 
       if (!feedback) {
-        throw new NotFoundException('Feedback not found or not yet validated');
+        throw new NotFoundException('Feedback not found. Please generate feedback first by calling POST /internship/sessions/:sessionId/feedback');
       }
 
       return {

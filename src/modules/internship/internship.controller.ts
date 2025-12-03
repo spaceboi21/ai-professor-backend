@@ -372,12 +372,25 @@ export class InternshipController {
     return this.feedbackService.updateFeedback(feedbackId, updateDto, user);
   }
 
+  @Get('sessions/:sessionId/feedback')
+  @Roles(RoleEnum.STUDENT, RoleEnum.PROFESSOR, RoleEnum.SCHOOL_ADMIN)
+  @ApiOperation({ summary: 'Get feedback for a session (student view)' })
+  @ApiParam({ name: 'sessionId', type: String, description: 'Session ID' })
+  @ApiResponse({ status: 200, description: 'Feedback retrieved successfully' })
+  @ApiResponse({ status: 404, description: 'Feedback not found. Generate it first.' })
+  async getFeedbackBySession(
+    @Param('sessionId') sessionId: string,
+    @User() user: JWTUserPayload,
+  ) {
+    return this.feedbackService.getFeedbackBySession(sessionId, user);
+  }
+
   @Get('cases/:caseId/feedback')
   @Roles(RoleEnum.STUDENT, RoleEnum.PROFESSOR, RoleEnum.SCHOOL_ADMIN)
   @ApiOperation({ summary: 'Get feedback for a case (student view)' })
   @ApiParam({ name: 'caseId', type: String, description: 'Case ID' })
   @ApiResponse({ status: 200, description: 'Feedback retrieved successfully' })
-  @ApiResponse({ status: 404, description: 'Feedback not found or not yet validated' })
+  @ApiResponse({ status: 404, description: 'Feedback not found. Generate it first.' })
   async getFeedbackByCase(
     @Param('caseId') caseId: string,
     @User() user: JWTUserPayload,
