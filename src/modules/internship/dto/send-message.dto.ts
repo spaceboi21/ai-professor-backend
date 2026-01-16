@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsNotEmpty, IsString, IsOptional, IsObject } from 'class-validator';
+import { IsNotEmpty, IsString, IsOptional, IsObject, IsArray } from 'class-validator';
 
 export class SendMessageDto {
   @ApiProperty({
@@ -9,6 +9,16 @@ export class SendMessageDto {
   @IsNotEmpty()
   @IsString()
   message: string;
+
+  @ApiPropertyOptional({
+    description: 'Non-verbal actions performed by therapist (optional)',
+    example: ['offered tissue', 'maintained eye contact', 'nodded empathetically'],
+    type: [String],
+  })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  therapist_actions?: string[];
 
   @ApiPropertyOptional({
     description: 'Additional metadata',

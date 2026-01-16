@@ -35,13 +35,14 @@ import { getPaginationOptions } from 'src/common/utils/pagination.util';
 import { JwtAuthGuard } from 'src/common/guards/jwt.guard';
 import { User } from 'src/common/decorators/user.decorator';
 import { RoleGuard } from 'src/common/guards/roles.guard';
+import { SimulationGuard } from 'src/common/guards/simulation.guard';
 import { Roles } from 'src/common/decorators/roles.decorator';
 import { RoleEnum } from 'src/common/constants/roles.constant';
 import { AISessionStatusEnum } from 'src/common/constants/ai-chat-session.constant';
 
 @ApiTags('AI Chat')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, RoleGuard)
+@UseGuards(JwtAuthGuard, RoleGuard, SimulationGuard)
 @Controller('ai-chat')
 export class AIChatController {
   constructor(private readonly aiChatService: AIChatService) {}

@@ -25,6 +25,7 @@ import { Roles } from 'src/common/decorators/roles.decorator';
 import { User } from 'src/common/decorators/user.decorator';
 import { JwtAuthGuard } from 'src/common/guards/jwt.guard';
 import { RoleGuard } from 'src/common/guards/roles.guard';
+import { SimulationGuard } from 'src/common/guards/simulation.guard';
 import { JWTUserPayload } from 'src/common/types/jwr-user.type';
 import { PaginationDto } from 'src/common/dto/pagination.dto';
 
@@ -52,7 +53,7 @@ import { UpdateSequenceDto } from './dto/update-sequence.dto';
 @ApiTags('Internships')
 @ApiBearerAuth()
 @Controller('internship')
-@UseGuards(JwtAuthGuard, RoleGuard)
+@UseGuards(JwtAuthGuard, RoleGuard, SimulationGuard)
 export class InternshipController {
   constructor(
     private readonly internshipService: InternshipService,
@@ -314,6 +315,70 @@ export class InternshipController {
     return this.sessionService.completeSession(sessionId, user);
   }
 
+  @Post('sessions/:sessionId/pause')
+  @Roles(RoleEnum.STUDENT, RoleEnum.PROFESSOR, RoleEnum.SCHOOL_ADMIN)
+  @ApiOperation({ summary: 'Pause an active session' })
+  @ApiParam({ name: 'sessionId', type: String, description: 'Session ID' })
+  @ApiResponse({ status: 200, description: 'Session paused successfully' })
+  @ApiResponse({ status: 400, description: 'Bad request' })
+  async pauseSession(
+    @Param('sessionId') sessionId: string,
+    @User() user: JWTUserPayload,
+  ) {
+    return this.sessionService.pauseSession(sessionId, user);
+  }
+
+  @Post('sessions/:sessionId/resume')
+  @Roles(RoleEnum.STUDENT, RoleEnum.PROFESSOR, RoleEnum.SCHOOL_ADMIN)
+  @ApiOperation({ summary: 'Resume a paused session' })
+  @ApiParam({ name: 'sessionId', type: String, description: 'Session ID' })
+  @ApiResponse({ status: 200, description: 'Session resumed successfully' })
+  @ApiResponse({ status: 400, description: 'Bad request' })
+  async resumeSession(
+    @Param('sessionId') sessionId: string,
+    @User() user: JWTUserPayload,
+  ) {
+    return this.sessionService.resumeSession(sessionId, user);
+  }
+
+  @Get('sessions/:sessionId/timer')
+  @Roles(RoleEnum.STUDENT, RoleEnum.PROFESSOR, RoleEnum.SCHOOL_ADMIN)
+  @ApiOperation({ summary: 'Get session timer information' })
+  @ApiParam({ name: 'sessionId', type: String, description: 'Session ID' })
+  @ApiResponse({ status: 200, description: 'Session timer retrieved successfully' })
+  @ApiResponse({ status: 404, description: 'Session not found' })
+  async getSessionTimer(
+    @Param('sessionId') sessionId: string,
+    @User() user: JWTUserPayload,
+  ) {
+    return this.sessionService.getSessionTimer(sessionId, user);
+  }
+
+  @Get('cases/:caseId/sessions/history')
+  @Roles(RoleEnum.STUDENT, RoleEnum.PROFESSOR, RoleEnum.SCHOOL_ADMIN)
+  @ApiOperation({ summary: 'Get session history for a case' })
+  @ApiParam({ name: 'caseId', type: String, description: 'Case ID' })
+  @ApiResponse({ status: 200, description: 'Session history retrieved successfully' })
+  @ApiResponse({ status: 404, description: 'Case not found' })
+  async getSessionHistory(
+    @Param('caseId') caseId: string,
+    @User() user: JWTUserPayload,
+  ) {
+    return this.sessionService.getSessionHistory(caseId, user);
+  }
+
+  @Get('cases/:caseId/sessions/active')
+  @Roles(RoleEnum.STUDENT, RoleEnum.PROFESSOR, RoleEnum.SCHOOL_ADMIN)
+  @ApiOperation({ summary: 'Check if there is an active/paused session for a case' })
+  @ApiParam({ name: 'caseId', type: String, description: 'Case ID' })
+  @ApiResponse({ status: 200, description: 'Active session check completed' })
+  async getActiveSession(
+    @Param('caseId') caseId: string,
+    @User() user: JWTUserPayload,
+  ) {
+    return this.sessionService.getActiveSession(caseId, user);
+  }
+
   // ========== FEEDBACK MANAGEMENT ENDPOINTS ==========
 
   @Post('sessions/:sessionId/feedback')
@@ -370,6 +435,19 @@ export class InternshipController {
     @User() user: JWTUserPayload,
   ) {
     return this.feedbackService.updateFeedback(feedbackId, updateDto, user);
+  }
+
+  @Get('feedback/:feedbackId')
+  @Roles(RoleEnum.STUDENT, RoleEnum.PROFESSOR, RoleEnum.SCHOOL_ADMIN, RoleEnum.SUPER_ADMIN)
+  @ApiOperation({ summary: 'Get feedback by ID' })
+  @ApiParam({ name: 'feedbackId', type: String, description: 'Feedback ID' })
+  @ApiResponse({ status: 200, description: 'Feedback retrieved successfully' })
+  @ApiResponse({ status: 404, description: 'Feedback not found' })
+  async getFeedbackById(
+    @Param('feedbackId') feedbackId: string,
+    @User() user: JWTUserPayload,
+  ) {
+    return this.feedbackService.getFeedbackById(feedbackId, user);
   }
 
   @Get('sessions/:sessionId/feedback')

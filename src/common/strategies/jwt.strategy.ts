@@ -28,6 +28,11 @@ export interface JWTPayload {
   role_name: string;
   preferred_language?: string;
   token_type: 'access';
+  // Simulation-related fields
+  is_simulation?: boolean;
+  simulation_session_id?: string;
+  original_user_id?: string;
+  original_user_role?: string;
 }
 
 config();
@@ -120,7 +125,7 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
         }
 
         this.logger.log(
-          `Successfully validated student: ${payload.email} in school: ${payload.school_id}`,
+          `Successfully validated student: ${payload.email} in school: ${payload.school_id}${payload.is_simulation ? ' (SIMULATION MODE)' : ''}`,
         );
         return {
           id: payload.id,
@@ -128,12 +133,19 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
           school_id: payload.school_id,
           role: {
             id: payload.role_id,
-            name: payload.role_name,
+            name: payload.role_name as RoleEnum,
           },
           preferred_language:
             (payload.preferred_language as LanguageEnum) ||
             studentData.preferred_language ||
             DEFAULT_LANGUAGE,
+          // Include simulation fields if present
+          ...(payload.is_simulation && {
+            is_simulation: payload.is_simulation,
+            simulation_session_id: payload.simulation_session_id,
+            original_user_id: payload.original_user_id,
+            original_user_role: payload.original_user_role as RoleEnum,
+          }),
         };
       } else {
         // For other roles, validate in central userModel
@@ -224,16 +236,37 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
       const tenantConnection =
         await this.tenantConnectionService.getTenantConnection(dbName);
 
-      // Find student in tenant database
+      // Find student in tenant database - search by ID first (more reliable)
       const StudentModel = tenantConnection.model(Student.name, StudentSchema);
-      const encryptedEmail = this.emailEncryptionService.encryptEmail(payload.email);
-      const student = await StudentModel.findOne({
-        email: encryptedEmail,
-        school_id: new Types.ObjectId(payload.school_id),
-      });
+      
+      let student: any = null;
+      
+      // Try to find by ID first (works better for simulation tokens)
+      if (payload.id && Types.ObjectId.isValid(payload.id)) {
+        student = await StudentModel.findOne({
+          _id: new Types.ObjectId(payload.id),
+          school_id: new Types.ObjectId(payload.school_id),
+        });
+        if (student) {
+          this.logger.debug(`Student found by ID: ${payload.id}`);
+        }
+      }
+      
+      // Fallback to email search if ID search failed
+      if (!student) {
+        const encryptedEmail = this.emailEncryptionService.encryptEmail(payload.email);
+        student = await StudentModel.findOne({
+          email: encryptedEmail,
+          school_id: new Types.ObjectId(payload.school_id),
+        });
+        if (student) {
+          this.logger.debug(`Student found by email: ${payload.email}`);
+        }
+      }
+      
       if (!student) {
         this.logger.warn(
-          `Student ${payload.email} not found in tenant database ${dbName}`,
+          `Student ${payload.email} (ID: ${payload.id}) not found in tenant database ${dbName}`,
         );
         return null;
       }

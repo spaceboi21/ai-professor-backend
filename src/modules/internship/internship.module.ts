@@ -12,6 +12,7 @@ import { InternshipSessionService } from './internship-session.service';
 import { InternshipFeedbackService } from './internship-feedback.service';
 import { InternshipLogbookService } from './internship-logbook.service';
 import { PythonInternshipService } from './python-internship.service';
+import { InternshipS3Service } from './s3.service';
 
 // Shared Services
 import { TenantConnectionService } from 'src/database/tenant-connection.service';
@@ -49,6 +50,7 @@ import {
     InternshipFeedbackService,
     InternshipLogbookService,
     PythonInternshipService,
+    InternshipS3Service,
     // Shared services
     TenantConnectionService,
     ErrorMessageService,

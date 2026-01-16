@@ -38,6 +38,7 @@ import {
   CaseFeedbackLog,
   CaseFeedbackLogSchema,
 } from 'src/database/schemas/tenant/case-feedback-log.schema';
+import { normalizePatientSimulationConfig } from './utils/enum-mapping.util';
 
 @Injectable()
 export class InternshipSessionService {
@@ -86,21 +87,47 @@ export class InternshipSessionService {
         throw new NotFoundException('Case not found');
       }
 
-      // Check if student already has an active session for this case
+      // Check if student already has an active or paused session for this case
       const existingActiveSession = await SessionModel.findOne({
         student_id: new Types.ObjectId(user.id),
         case_id: new Types.ObjectId(case_id),
         session_type,
-        status: SessionStatusEnum.ACTIVE,
+        status: { $in: [SessionStatusEnum.ACTIVE, SessionStatusEnum.PAUSED] },
       });
 
       if (existingActiveSession) {
         // Return existing session
         return {
-          message: 'Active session already exists',
+          message: `${existingActiveSession.status === SessionStatusEnum.PAUSED ? 'Paused' : 'Active'} session already exists. Please complete or resume this session before starting a new one.`,
           data: existingActiveSession,
         };
       }
+
+      // Check session limits if configured
+      const sessionConfig = caseData.session_config;
+      if (sessionConfig?.max_sessions_allowed) {
+        // Count how many sessions student has completed for this case
+        const completedSessionsCount = await SessionModel.countDocuments({
+          student_id: new Types.ObjectId(user.id),
+          case_id: new Types.ObjectId(case_id),
+          session_type,
+          status: { $in: [SessionStatusEnum.COMPLETED, SessionStatusEnum.PENDING_VALIDATION] },
+        });
+
+        if (completedSessionsCount >= sessionConfig.max_sessions_allowed) {
+          throw new BadRequestException(
+            `Maximum number of sessions (${sessionConfig.max_sessions_allowed}) reached for this case`,
+          );
+        }
+      }
+
+      // Determine session number (how many attempts so far + 1)
+      const totalPreviousSessions = await SessionModel.countDocuments({
+        student_id: new Types.ObjectId(user.id),
+        case_id: new Types.ObjectId(case_id),
+        session_type,
+      });
+      const sessionNumber = totalPreviousSessions + 1;
 
       // Initialize session with Python backend
       let pythonSessionId: string | null = null;
@@ -113,19 +140,28 @@ export class InternshipSessionService {
           );
         }
 
+        // Normalize the entire config to ensure enum values are in English
+        const normalizedConfig = normalizePatientSimulationConfig(
+          caseData.patient_simulation_config
+        );
+
         // Extract scenario config fields only (exclude patient_profile and _id)
         // Provide sensible defaults for optional fields to ensure compatibility
         const scenarioConfig: Record<string, any> = {
-          scenario_type: caseData.patient_simulation_config.scenario_type,
-          difficulty_level: caseData.patient_simulation_config.difficulty_level,
+          scenario_type: normalizedConfig.scenario_type,
+          difficulty_level: normalizedConfig.difficulty_level,
           // Use provided values or sensible defaults
-          interview_focus: (caseData.patient_simulation_config as any).interview_focus || 
-            (caseData.patient_simulation_config.scenario_type === 'initial_clinical_interview' 
+          interview_focus: normalizedConfig.interview_focus || 
+            (normalizedConfig.scenario_type === 'initial_clinical_interview' 
               ? 'assessment_and_diagnosis' 
               : 'treatment_planning'),
-          patient_openness: (caseData.patient_simulation_config as any).patient_openness || 
+          patient_openness: normalizedConfig.patient_openness || 
             'moderately_forthcoming',
         };
+
+        this.logger.log(
+          `Normalized scenario config for case ${case_id}: ${JSON.stringify(scenarioConfig)}`
+        );
 
         // Validate required scenario fields (scenario_type and difficulty_level are mandatory)
         if (!scenarioConfig.scenario_type || !scenarioConfig.difficulty_level) {
@@ -181,6 +217,10 @@ export class InternshipSessionService {
         session_type,
         status: SessionStatusEnum.ACTIVE,
         started_at: new Date(),
+        session_number: sessionNumber,
+        max_duration_minutes: sessionConfig?.session_duration_minutes || null,
+        total_active_time_seconds: 0,
+        pause_history: [],
         patient_session_id: session_type === SessionTypeEnum.PATIENT_INTERVIEW ? pythonSessionId : null,
         therapist_session_id: session_type === SessionTypeEnum.THERAPIST_CONSULTATION ? pythonSessionId : null,
         messages: [],
@@ -217,7 +257,7 @@ export class InternshipSessionService {
     sendMessageDto: SendMessageDto,
     user: JWTUserPayload,
   ) {
-    const { message, metadata } = sendMessageDto;
+    const { message, metadata, therapist_actions } = sendMessageDto;
 
     this.logger.log(`Sending message in session: ${sessionId} by user: ${user.id}`);
 
@@ -258,7 +298,10 @@ export class InternshipSessionService {
         role: MessageRoleEnum.STUDENT,
         content: message,
         timestamp: new Date(),
-        metadata: metadata || {},
+        metadata: {
+          ...(metadata || {}),
+          therapist_actions: therapist_actions || [],
+        },
       };
 
       session.messages.push(studentMessage);
@@ -294,6 +337,7 @@ export class InternshipSessionService {
           session.patient_session_id,
           message,
           context,
+          therapist_actions,
         );
         aiResponse = pythonResponse.patient_response;
         aiRole = MessageRoleEnum.AI_PATIENT;
@@ -522,7 +566,7 @@ export class InternshipSessionService {
               student_id: session.student_id,
               case_id: session.case_id,
               session_id: new Types.ObjectId(sessionId),
-              feedback_type: 'AUTO_GENERATED',
+              feedback_type: FeedbackTypeEnum.AUTO_GENERATED,
               ai_feedback: {
                 overall_score: pythonResponse.feedback.overall_score,
                 strengths: pythonResponse.feedback.strengths,
@@ -665,6 +709,378 @@ export class InternshipSessionService {
       await progress.save();
     } catch (error) {
       this.logger.error('Error updating student progress', error);
+    }
+  }
+
+  /**
+   * Pause an active session
+   */
+  async pauseSession(sessionId: string, user: JWTUserPayload) {
+    this.logger.log(`Pausing session: ${sessionId}`);
+
+    // Validate school exists
+    const school = await this.schoolModel.findById(user.school_id);
+    if (!school) {
+      throw new NotFoundException('School not found');
+    }
+
+    const tenantConnection =
+      await this.tenantConnectionService.getTenantConnection(school.db_name);
+    const SessionModel = tenantConnection.model(StudentCaseSession.name, StudentCaseSessionSchema);
+    const CaseModel = tenantConnection.model(InternshipCase.name, InternshipCaseSchema);
+
+    try {
+      const session = await SessionModel.findOne({
+        _id: new Types.ObjectId(sessionId),
+        student_id: new Types.ObjectId(user.id),
+      });
+
+      if (!session) {
+        throw new NotFoundException('Session not found');
+      }
+
+      if (session.status !== SessionStatusEnum.ACTIVE) {
+        throw new BadRequestException(
+          `Cannot pause session with status: ${session.status}`,
+        );
+      }
+
+      // Get case to check if pause is allowed
+      const caseData = await CaseModel.findById(session.case_id);
+      if (!caseData?.session_config?.allow_pause) {
+        throw new BadRequestException('Pausing is not allowed for this session');
+      }
+
+      // Calculate time spent in current active period
+      const now = new Date();
+      const lastResumeTime = session.pause_history && session.pause_history.length > 0
+        ? session.pause_history[session.pause_history.length - 1].resumed_at || session.started_at
+        : session.started_at;
+
+      const activeTimeSeconds = Math.floor((now.getTime() - lastResumeTime.getTime()) / 1000);
+      session.total_active_time_seconds += activeTimeSeconds;
+
+      // Update session status and add pause record
+      session.status = SessionStatusEnum.PAUSED;
+      session.paused_at = now;
+      session.pause_history.push({
+        paused_at: now,
+        resumed_at: null,
+        pause_duration_seconds: 0,
+      });
+
+      await session.save();
+
+      this.logger.log(`Session paused successfully: ${sessionId}`);
+
+      return {
+        message: 'Session paused successfully',
+        data: {
+          session_id: session._id,
+          status: session.status,
+          paused_at: session.paused_at,
+          total_active_time_seconds: session.total_active_time_seconds,
+          pause_count: session.pause_history.length,
+        },
+      };
+    } catch (error) {
+      this.logger.error('Error pausing session', error?.stack || error);
+      if (error instanceof NotFoundException || error instanceof BadRequestException) {
+        throw error;
+      }
+      throw new BadRequestException('Failed to pause session');
+    }
+  }
+
+  /**
+   * Resume a paused session
+   */
+  async resumeSession(sessionId: string, user: JWTUserPayload) {
+    this.logger.log(`Resuming session: ${sessionId}`);
+
+    // Validate school exists
+    const school = await this.schoolModel.findById(user.school_id);
+    if (!school) {
+      throw new NotFoundException('School not found');
+    }
+
+    const tenantConnection =
+      await this.tenantConnectionService.getTenantConnection(school.db_name);
+    const SessionModel = tenantConnection.model(StudentCaseSession.name, StudentCaseSessionSchema);
+
+    try {
+      const session = await SessionModel.findOne({
+        _id: new Types.ObjectId(sessionId),
+        student_id: new Types.ObjectId(user.id),
+      });
+
+      if (!session) {
+        throw new NotFoundException('Session not found');
+      }
+
+      if (session.status !== SessionStatusEnum.PAUSED) {
+        throw new BadRequestException(
+          `Cannot resume session with status: ${session.status}`,
+        );
+      }
+
+      const now = new Date();
+
+      // Update the last pause record with resume time
+      if (session.pause_history && session.pause_history.length > 0) {
+        const lastPause = session.pause_history[session.pause_history.length - 1];
+        lastPause.resumed_at = now;
+        lastPause.pause_duration_seconds = Math.floor(
+          (now.getTime() - lastPause.paused_at.getTime()) / 1000,
+        );
+      }
+
+      // Update session status
+      session.status = SessionStatusEnum.ACTIVE;
+      session.paused_at = null as any;
+
+      await session.save();
+
+      this.logger.log(`Session resumed successfully: ${sessionId}`);
+
+      return {
+        message: 'Session resumed successfully',
+        data: {
+          session_id: session._id,
+          status: session.status,
+          resumed_at: now,
+          total_active_time_seconds: session.total_active_time_seconds,
+          pause_count: session.pause_history.length,
+        },
+      };
+    } catch (error) {
+      this.logger.error('Error resuming session', error?.stack || error);
+      if (error instanceof NotFoundException || error instanceof BadRequestException) {
+        throw error;
+      }
+      throw new BadRequestException('Failed to resume session');
+    }
+  }
+
+  /**
+   * Get session timer information
+   */
+  async getSessionTimer(sessionId: string, user: JWTUserPayload) {
+    this.logger.log(`Getting session timer: ${sessionId}`);
+
+    // Validate school exists
+    const school = await this.schoolModel.findById(user.school_id);
+    if (!school) {
+      throw new NotFoundException('School not found');
+    }
+
+    const tenantConnection =
+      await this.tenantConnectionService.getTenantConnection(school.db_name);
+    const SessionModel = tenantConnection.model(StudentCaseSession.name, StudentCaseSessionSchema);
+    const CaseModel = tenantConnection.model(InternshipCase.name, InternshipCaseSchema);
+
+    try {
+      const session = await SessionModel.findOne({
+        _id: new Types.ObjectId(sessionId),
+        student_id: new Types.ObjectId(user.id),
+      });
+
+      if (!session) {
+        throw new NotFoundException('Session not found');
+      }
+
+      const caseData = await CaseModel.findById(session.case_id);
+      const sessionConfig = caseData?.session_config;
+
+      const now = new Date();
+      let currentActiveTime = session.total_active_time_seconds;
+
+      // If session is currently active, add time since last resume
+      if (session.status === SessionStatusEnum.ACTIVE) {
+        const lastResumeTime = session.pause_history && session.pause_history.length > 0
+          ? session.pause_history[session.pause_history.length - 1].resumed_at || session.started_at
+          : session.started_at;
+        currentActiveTime += Math.floor((now.getTime() - lastResumeTime.getTime()) / 1000);
+      }
+
+      // Calculate remaining time if limit configured
+      const maxDurationSeconds = session.max_duration_minutes 
+        ? session.max_duration_minutes * 60 
+        : null;
+      const remainingTimeSeconds = maxDurationSeconds 
+        ? Math.max(0, maxDurationSeconds - currentActiveTime) 
+        : null;
+
+      // Check if near timeout (within warning threshold)
+      const warningThresholdSeconds = (sessionConfig?.warning_before_timeout_minutes || 5) * 60;
+      const isNearTimeout = remainingTimeSeconds !== null && remainingTimeSeconds <= warningThresholdSeconds;
+
+      return {
+        status: session.status,
+        total_active_time_seconds: currentActiveTime,
+        remaining_time_seconds: remainingTimeSeconds,
+        is_near_timeout: isNearTimeout,
+        started_at: session.started_at,
+        paused_at: session.paused_at,
+        pause_count: session.pause_history?.length || 0,
+      };
+    } catch (error) {
+      this.logger.error('Error getting session timer', error?.stack || error);
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
+      throw new BadRequestException('Failed to get session timer');
+    }
+  }
+
+  /**
+   * Get session history for a case (all student's attempts)
+   */
+  async getSessionHistory(caseId: string, user: JWTUserPayload) {
+    this.logger.log(`Getting session history for case: ${caseId}`);
+
+    // Validate school exists
+    const school = await this.schoolModel.findById(user.school_id);
+    if (!school) {
+      throw new NotFoundException('School not found');
+    }
+
+    const tenantConnection =
+      await this.tenantConnectionService.getTenantConnection(school.db_name);
+    const SessionModel = tenantConnection.model(StudentCaseSession.name, StudentCaseSessionSchema);
+    const CaseModel = tenantConnection.model(InternshipCase.name, InternshipCaseSchema);
+
+    try {
+      // Verify case exists
+      const caseData = await CaseModel.findOne({
+        _id: new Types.ObjectId(caseId),
+        deleted_at: null,
+      });
+
+      if (!caseData) {
+        throw new NotFoundException('Case not found');
+      }
+
+      // Get all sessions for this case by this student
+      const sessions = await SessionModel.find({
+        student_id: new Types.ObjectId(user.id),
+        case_id: new Types.ObjectId(caseId),
+      })
+        .sort({ session_number: -1, created_at: -1 })
+        .lean();
+
+      // Calculate statistics
+      const totalSessions = sessions.length;
+      const completedSessions = sessions.filter(
+        s => s.status === SessionStatusEnum.COMPLETED || s.status === SessionStatusEnum.PENDING_VALIDATION,
+      ).length;
+      const activeSessions = sessions.filter(
+        s => s.status === SessionStatusEnum.ACTIVE || s.status === SessionStatusEnum.PAUSED,
+      ).length;
+
+      // Calculate total time spent across all sessions
+      const totalTimeSeconds = sessions.reduce((sum, session) => {
+        let sessionTime = session.total_active_time_seconds || 0;
+        
+        // If session is currently active, add current active time
+        if (session.status === SessionStatusEnum.ACTIVE) {
+          const lastResumeTime = session.pause_history && session.pause_history.length > 0
+            ? session.pause_history[session.pause_history.length - 1].resumed_at || session.started_at
+            : session.started_at;
+          sessionTime += Math.floor((Date.now() - new Date(lastResumeTime).getTime()) / 1000);
+        }
+        
+        return sum + sessionTime;
+      }, 0);
+
+      // Format sessions for response
+      const formattedSessions = sessions.map(session => ({
+        session_id: session._id,
+        session_number: session.session_number,
+        session_type: session.session_type,
+        status: session.status,
+        started_at: session.started_at,
+        ended_at: session.ended_at,
+        paused_at: session.paused_at,
+        total_active_time_seconds: session.total_active_time_seconds || 0,
+        message_count: session.messages?.length || 0,
+        tips_received: session.realtime_tips?.length || 0,
+        pause_count: session.pause_history?.length || 0,
+      }));
+
+      return {
+        case_id: caseId,
+        case_title: caseData.title,
+        student_id: user.id,
+        statistics: {
+          total_sessions: totalSessions,
+          completed_sessions: completedSessions,
+          active_sessions: activeSessions,
+          total_time_seconds: totalTimeSeconds,
+          max_sessions_allowed: caseData.session_config?.max_sessions_allowed || null,
+          sessions_remaining: caseData.session_config?.max_sessions_allowed 
+            ? Math.max(0, caseData.session_config.max_sessions_allowed - completedSessions)
+            : null,
+        },
+        sessions: formattedSessions,
+      };
+    } catch (error) {
+      this.logger.error('Error getting session history', error?.stack || error);
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
+      throw new BadRequestException('Failed to get session history');
+    }
+  }
+
+  /**
+   * Get active/paused session for a case (for resume functionality)
+   */
+  async getActiveSession(caseId: string, user: JWTUserPayload) {
+    this.logger.log(`Getting active session for case: ${caseId}`);
+
+    // Validate school exists
+    const school = await this.schoolModel.findById(user.school_id);
+    if (!school) {
+      throw new NotFoundException('School not found');
+    }
+
+    const tenantConnection =
+      await this.tenantConnectionService.getTenantConnection(school.db_name);
+    const SessionModel = tenantConnection.model(StudentCaseSession.name, StudentCaseSessionSchema);
+
+    try {
+      const activeSession = await SessionModel.findOne({
+        student_id: new Types.ObjectId(user.id),
+        case_id: new Types.ObjectId(caseId),
+        status: { $in: [SessionStatusEnum.ACTIVE, SessionStatusEnum.PAUSED] },
+      }).lean();
+
+      if (!activeSession) {
+        return {
+          has_active_session: false,
+          session: null,
+        };
+      }
+
+      return {
+        has_active_session: true,
+        session: {
+          session_id: activeSession._id,
+          session_number: activeSession.session_number,
+          session_type: activeSession.session_type,
+          status: activeSession.status,
+          started_at: activeSession.started_at,
+          paused_at: activeSession.paused_at,
+          total_active_time_seconds: activeSession.total_active_time_seconds || 0,
+          max_duration_minutes: activeSession.max_duration_minutes,
+          message_count: activeSession.messages?.length || 0,
+          pause_count: activeSession.pause_history?.length || 0,
+        },
+      };
+    } catch (error) {
+      this.logger.error('Error getting active session', error?.stack || error);
+      throw new BadRequestException('Failed to get active session');
     }
   }
 }

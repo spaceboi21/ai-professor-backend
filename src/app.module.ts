@@ -41,6 +41,8 @@ import { AnchorChatModule } from './modules/anchor-chat/anchor-chat.module';
 import { EncryptionModule } from './modules/encryption/encryption.module';
 import { ConversionModule } from './modules/conversion/conversion.module';
 import { InternshipModule } from './modules/internship/internship.module';
+import { SimulationModule } from './modules/simulation/simulation.module';
+import { EnrollmentModule } from './modules/enrollment/enrollment.module';
 
 @Module({
   imports: [
@@ -137,6 +139,8 @@ import { InternshipModule } from './modules/internship/internship.module';
     EncryptionModule,
     ConversionModule,
     InternshipModule,
+    SimulationModule,
+    EnrollmentModule,
     HttpModule,
   ],
   controllers: [AppController],

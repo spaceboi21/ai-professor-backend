@@ -100,7 +100,7 @@ export class PythonService {
       this.logger.log(`Making GET request to Python API: ${url}`);
       const response = await firstValueFrom(
         this.httpService.get(url, {
-          timeout: 30000, // 30 second timeout
+          timeout: 60000, // 60 second timeout (increased from 30s)
           headers: {
             'Content-Type': 'application/json',
           },
@@ -113,6 +113,7 @@ export class PythonService {
       // Re-throw with more context
       const errorMessage =
         error?.response?.data?.message || error?.message || 'Unknown error';
+      this.logger.error(`Python API GET call failed: ${url}`, error?.stack || error);
       throw new Error(`Python API GET call failed (${path}): ${errorMessage}`);
     }
   }
@@ -126,7 +127,7 @@ export class PythonService {
       this.logger.log(`Making POST request to Python API: ${url}`);
       const response = await firstValueFrom(
         this.httpService.post(url, payload, {
-          timeout: 30000, // 30 second timeout
+          timeout: 60000, // 60 second timeout (increased from 30s)
           headers: {
             'Content-Type': 'application/json',
           },
@@ -139,6 +140,7 @@ export class PythonService {
       // Re-throw with more context
       const errorMessage =
         error?.response?.data?.message || error?.message || 'Unknown error';
+      this.logger.error(`Python API POST call failed: ${url}`, error?.stack || error);
       throw new Error(`Python API POST call failed (${path}): ${errorMessage}`);
     }
   }

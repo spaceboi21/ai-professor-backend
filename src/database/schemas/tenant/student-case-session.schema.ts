@@ -46,6 +46,34 @@ export class StudentCaseSession extends Document {
   @Prop({ type: Date, default: null })
   ended_at: Date;
 
+  // Session timing and pause management
+  @Prop({ type: Date, default: null })
+  paused_at: Date | null;
+
+  @Prop({ type: Number, default: 0 })
+  total_active_time_seconds: number; // Total active time (excluding pauses)
+
+  @Prop({
+    type: [{
+      paused_at: { type: Date, required: true },
+      resumed_at: { type: Date, default: null },
+      pause_duration_seconds: { type: Number, default: 0 },
+    }],
+    default: [],
+  })
+  pause_history: Array<{
+    paused_at: Date;
+    resumed_at: Date | null;
+    pause_duration_seconds: number;
+  }>;
+
+  // Multi-session tracking
+  @Prop({ type: Number, default: 1, min: 1 })
+  session_number: number; // Which attempt this is (1st, 2nd, etc.)
+
+  @Prop({ type: Number, default: null })
+  max_duration_minutes: number; // Configured duration limit for this session
+
   @Prop({ type: String, default: null })
   patient_session_id: string; // Python backend session ID
 

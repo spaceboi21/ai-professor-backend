@@ -88,6 +88,18 @@ export enum ActivityTypeEnum {
   LOGIN_FAILED = 'LOGIN_FAILED',
   UNAUTHORIZED_ACCESS = 'UNAUTHORIZED_ACCESS',
   SUSPICIOUS_ACTIVITY = 'SUSPICIOUS_ACTIVITY',
+
+  // Simulation Events
+  SIMULATION_STARTED = 'SIMULATION_STARTED',
+  SIMULATION_ENDED = 'SIMULATION_ENDED',
+  SIMULATION_WRITE_BLOCKED = 'SIMULATION_WRITE_BLOCKED',
+
+  // Enrollment Events
+  STUDENT_ENROLLED = 'STUDENT_ENROLLED',
+  STUDENT_ENROLLED_BULK = 'STUDENT_ENROLLED_BULK',
+  STUDENT_ENROLLED_ACADEMIC_YEAR = 'STUDENT_ENROLLED_ACADEMIC_YEAR',
+  ENROLLMENT_WITHDRAWN = 'ENROLLMENT_WITHDRAWN',
+  ENROLLMENT_COMPLETED = 'ENROLLMENT_COMPLETED',
 }
 
 export enum ActivityCategoryEnum {
@@ -103,6 +115,8 @@ export enum ActivityCategoryEnum {
   SYSTEM_ADMINISTRATION = 'SYSTEM_ADMINISTRATION',
   SECURITY = 'SECURITY',
   NOTIFICATION = 'NOTIFICATION',
+  SIMULATION = 'SIMULATION',
+  ENROLLMENT = 'ENROLLMENT',
 }
 
 export enum ActivityLevelEnum {
@@ -218,6 +232,18 @@ export const ACTIVITY_CATEGORY_MAPPING: Record<
   // Security
   [ActivityTypeEnum.UNAUTHORIZED_ACCESS]: ActivityCategoryEnum.SECURITY,
   [ActivityTypeEnum.SUSPICIOUS_ACTIVITY]: ActivityCategoryEnum.SECURITY,
+
+  // Simulation
+  [ActivityTypeEnum.SIMULATION_STARTED]: ActivityCategoryEnum.SIMULATION,
+  [ActivityTypeEnum.SIMULATION_ENDED]: ActivityCategoryEnum.SIMULATION,
+  [ActivityTypeEnum.SIMULATION_WRITE_BLOCKED]: ActivityCategoryEnum.SIMULATION,
+
+  // Enrollment
+  [ActivityTypeEnum.STUDENT_ENROLLED]: ActivityCategoryEnum.ENROLLMENT,
+  [ActivityTypeEnum.STUDENT_ENROLLED_BULK]: ActivityCategoryEnum.ENROLLMENT,
+  [ActivityTypeEnum.STUDENT_ENROLLED_ACADEMIC_YEAR]: ActivityCategoryEnum.ENROLLMENT,
+  [ActivityTypeEnum.ENROLLMENT_WITHDRAWN]: ActivityCategoryEnum.ENROLLMENT,
+  [ActivityTypeEnum.ENROLLMENT_COMPLETED]: ActivityCategoryEnum.ENROLLMENT,
 };
 
 export const ACTIVITY_LEVEL_MAPPING: Record<
@@ -295,4 +321,16 @@ export const ACTIVITY_LEVEL_MAPPING: Record<
 
   // Critical level activities
   [ActivityTypeEnum.SUSPICIOUS_ACTIVITY]: ActivityLevelEnum.CRITICAL,
+
+  // Simulation level activities
+  [ActivityTypeEnum.SIMULATION_STARTED]: ActivityLevelEnum.INFO,
+  [ActivityTypeEnum.SIMULATION_ENDED]: ActivityLevelEnum.INFO,
+  [ActivityTypeEnum.SIMULATION_WRITE_BLOCKED]: ActivityLevelEnum.WARNING,
+
+  // Enrollment level activities
+  [ActivityTypeEnum.STUDENT_ENROLLED]: ActivityLevelEnum.INFO,
+  [ActivityTypeEnum.STUDENT_ENROLLED_BULK]: ActivityLevelEnum.INFO,
+  [ActivityTypeEnum.STUDENT_ENROLLED_ACADEMIC_YEAR]: ActivityLevelEnum.INFO,
+  [ActivityTypeEnum.ENROLLMENT_WITHDRAWN]: ActivityLevelEnum.WARNING,
+  [ActivityTypeEnum.ENROLLMENT_COMPLETED]: ActivityLevelEnum.INFO,
 };

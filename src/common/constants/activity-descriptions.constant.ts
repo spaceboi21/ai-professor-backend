@@ -139,6 +139,39 @@ export interface ActivityDescriptions {
     success: ActivityDescriptionTranslations;
     failed: ActivityDescriptionTranslations;
   };
+  [ActivityTypeEnum.SIMULATION_STARTED]: {
+    success: ActivityDescriptionTranslations;
+    failed: ActivityDescriptionTranslations;
+  };
+  [ActivityTypeEnum.SIMULATION_ENDED]: {
+    success: ActivityDescriptionTranslations;
+    failed: ActivityDescriptionTranslations;
+  };
+  [ActivityTypeEnum.SIMULATION_WRITE_BLOCKED]: {
+    success: ActivityDescriptionTranslations;
+    failed: ActivityDescriptionTranslations;
+  };
+  // Enrollment Activity Descriptions
+  [ActivityTypeEnum.STUDENT_ENROLLED]: {
+    success: ActivityDescriptionTranslations;
+    failed: ActivityDescriptionTranslations;
+  };
+  [ActivityTypeEnum.STUDENT_ENROLLED_BULK]: {
+    success: ActivityDescriptionTranslations;
+    failed: ActivityDescriptionTranslations;
+  };
+  [ActivityTypeEnum.STUDENT_ENROLLED_ACADEMIC_YEAR]: {
+    success: ActivityDescriptionTranslations;
+    failed: ActivityDescriptionTranslations;
+  };
+  [ActivityTypeEnum.ENROLLMENT_WITHDRAWN]: {
+    success: ActivityDescriptionTranslations;
+    failed: ActivityDescriptionTranslations;
+  };
+  [ActivityTypeEnum.ENROLLMENT_COMPLETED]: {
+    success: ActivityDescriptionTranslations;
+    failed: ActivityDescriptionTranslations;
+  };
 }
 
 export const ACTIVITY_DESCRIPTIONS: ActivityDescriptions = {
@@ -470,6 +503,87 @@ export const ACTIVITY_DESCRIPTIONS: ActivityDescriptions = {
     failed: {
       [LanguageEnum.ENGLISH]: 'File deletion failed',
       [LanguageEnum.FRENCH]: 'Échec de la suppression de fichier',
+    },
+  },
+  [ActivityTypeEnum.SIMULATION_STARTED]: {
+    success: {
+      [LanguageEnum.ENGLISH]: 'Student view simulation started successfully',
+      [LanguageEnum.FRENCH]: 'Simulation de vue étudiant démarrée avec succès',
+    },
+    failed: {
+      [LanguageEnum.ENGLISH]: 'Failed to start student view simulation',
+      [LanguageEnum.FRENCH]: 'Échec du démarrage de la simulation de vue étudiant',
+    },
+  },
+  [ActivityTypeEnum.SIMULATION_ENDED]: {
+    success: {
+      [LanguageEnum.ENGLISH]: 'Student view simulation ended successfully',
+      [LanguageEnum.FRENCH]: 'Simulation de vue étudiant terminée avec succès',
+    },
+    failed: {
+      [LanguageEnum.ENGLISH]: 'Failed to end student view simulation',
+      [LanguageEnum.FRENCH]: 'Échec de la fin de la simulation de vue étudiant',
+    },
+  },
+  [ActivityTypeEnum.SIMULATION_WRITE_BLOCKED]: {
+    success: {
+      [LanguageEnum.ENGLISH]: 'Write operation blocked in simulation mode',
+      [LanguageEnum.FRENCH]: 'Opération d\'écriture bloquée en mode simulation',
+    },
+    failed: {
+      [LanguageEnum.ENGLISH]: 'Write operation blocked in simulation mode',
+      [LanguageEnum.FRENCH]: 'Opération d\'écriture bloquée en mode simulation',
+    },
+  },
+  // Enrollment Activity Descriptions
+  [ActivityTypeEnum.STUDENT_ENROLLED]: {
+    success: {
+      [LanguageEnum.ENGLISH]: 'Student enrolled in module successfully',
+      [LanguageEnum.FRENCH]: 'Étudiant inscrit au module avec succès',
+    },
+    failed: {
+      [LanguageEnum.ENGLISH]: 'Failed to enroll student in module',
+      [LanguageEnum.FRENCH]: 'Échec de l\'inscription de l\'étudiant au module',
+    },
+  },
+  [ActivityTypeEnum.STUDENT_ENROLLED_BULK]: {
+    success: {
+      [LanguageEnum.ENGLISH]: 'Bulk student enrollment completed successfully',
+      [LanguageEnum.FRENCH]: 'Inscription en masse des étudiants terminée avec succès',
+    },
+    failed: {
+      [LanguageEnum.ENGLISH]: 'Bulk student enrollment failed',
+      [LanguageEnum.FRENCH]: 'Échec de l\'inscription en masse des étudiants',
+    },
+  },
+  [ActivityTypeEnum.STUDENT_ENROLLED_ACADEMIC_YEAR]: {
+    success: {
+      [LanguageEnum.ENGLISH]: 'Student enrolled in academic year successfully',
+      [LanguageEnum.FRENCH]: 'Étudiant inscrit à l\'année académique avec succès',
+    },
+    failed: {
+      [LanguageEnum.ENGLISH]: 'Failed to enroll student in academic year',
+      [LanguageEnum.FRENCH]: 'Échec de l\'inscription de l\'étudiant à l\'année académique',
+    },
+  },
+  [ActivityTypeEnum.ENROLLMENT_WITHDRAWN]: {
+    success: {
+      [LanguageEnum.ENGLISH]: 'Enrollment withdrawn successfully',
+      [LanguageEnum.FRENCH]: 'Inscription retirée avec succès',
+    },
+    failed: {
+      [LanguageEnum.ENGLISH]: 'Failed to withdraw enrollment',
+      [LanguageEnum.FRENCH]: 'Échec du retrait de l\'inscription',
+    },
+  },
+  [ActivityTypeEnum.ENROLLMENT_COMPLETED]: {
+    success: {
+      [LanguageEnum.ENGLISH]: 'Enrollment marked as completed',
+      [LanguageEnum.FRENCH]: 'Inscription marquée comme terminée',
+    },
+    failed: {
+      [LanguageEnum.ENGLISH]: 'Failed to mark enrollment as completed',
+      [LanguageEnum.FRENCH]: 'Échec du marquage de l\'inscription comme terminée',
     },
   },
 };

@@ -29,6 +29,7 @@ import { GetFileUploadUrl } from './dto/get-upload-url.dto';
 import { GetBibliographyUploadUrl } from './dto/get-bibliography-upload-url.dto';
 import { GetThumbnailUploadUrl } from './dto/get-thumbnail-upload-url.dto';
 import { GetForumAttachmentUploadUrl } from './dto/get-forum-attachment-upload-url.dto';
+import { GetCaseDocumentUploadUrl } from './dto/get-case-document-upload-url.dto';
 import { UploadService } from './upload.service';
 import { ConfigService } from '@nestjs/config';
 import { existsSync, writeFileSync } from 'fs';
@@ -48,6 +49,16 @@ const allowedBibliographyTypes = [
   '.webm',
   '.ppt',
   '.pptx',
+];
+
+const allowedCaseDocumentTypes = [
+  '.pdf',
+  '.doc',
+  '.docx',
+  '.jpg',
+  '.jpeg',
+  '.png',
+  '.webp',
 ];
 
 function fileFilterForProfile(req, file, cb) {
@@ -242,6 +253,52 @@ export class UploadController {
         method: 'PUT',
         maxSize: getMaxFileSize(this.configService, 'general'),
         expiresIn: 300, // 5 minutes
+      };
+    }
+  }
+
+  @Post('case-document-url')
+  @ApiOperation({
+    summary: 'Generate a secure presigned upload URL for case documents',
+    description:
+      'Returns a temporary upload URL that expires in 10 minutes. File size limit: 50MB. Supports PDF, Word documents, and images.',
+  })
+  @ApiBody({ type: GetCaseDocumentUploadUrl })
+  @ApiResponse({
+    status: 200,
+    description: 'Upload URL generated successfully',
+    schema: {
+      type: 'object',
+      properties: {
+        uploadUrl: { type: 'string', description: 'Presigned upload URL' },
+        fileUrl: { type: 'string', description: 'Final file URL after upload' },
+        expiresIn: {
+          type: 'number',
+          description: 'URL expiry time in seconds',
+        },
+        maxSize: { type: 'number', description: 'Maximum file size in bytes' },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Invalid file type or missing parameters',
+  })
+  async getCaseDocumentUploadUrl(@Body() data: GetCaseDocumentUploadUrl) {
+    const { fileName, mimeType } = data;
+
+    if (this.configService.get('NODE_ENV') === 'production') {
+      return this.uploadService.generateS3UploadUrl(
+        'case-documents',
+        fileName,
+        mimeType,
+      );
+    } else {
+      return {
+        uploadUrl: `${this.configService.get('BACKEND_API_URL')}/upload/case-document`,
+        method: 'PUT',
+        maxSize: 50 * 1024 * 1024, // 50MB for case documents
+        expiresIn: 600, // 10 minutes
       };
     }
   }
@@ -627,6 +684,93 @@ export class UploadController {
   }
 
   @ApiOperation({
+    summary: 'Upload case document via PUT with raw binary body',
+    description: `Send raw file buffer (PDF, DOC, DOCX, images) in the request body with the appropriate Content-Type header. Must use Postman, curl, or frontend — Swagger UI doesn't support raw binary upload.`,
+  })
+  @ApiConsumes(
+    'application/pdf',
+    'application/msword',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'image/jpeg',
+    'image/png',
+    'image/webp',
+    'application/octet-stream',
+  )
+  @ApiQuery({ name: 'filename', required: true })
+  @ApiResponse({ status: 201, description: 'Case document uploaded successfully' })
+  @ApiResponse({ status: 400, description: 'Invalid file' })
+  @Put('case-document')
+  async uploadCaseDocument(
+    @Req() req: Request,
+    @Res() res: Response,
+    @Query('filename') filename: string,
+  ) {
+    if (!filename) {
+      throw new BadRequestException('Filename is required in query');
+    }
+
+    const contentType = req.headers['content-type'];
+    const allowedTypes = [
+      'application/pdf',
+      'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'image/jpeg',
+      'image/png',
+      'image/webp',
+    ];
+
+    if (
+      !contentType ||
+      !this.uploadService.validateContentType(contentType, allowedTypes)
+    ) {
+      throw new BadRequestException(
+        `Invalid or missing Content-Type. Allowed types: ${allowedTypes.join(', ')}`,
+      );
+    }
+
+    const ext = extname(filename) || `.${contentType.split('/')[1]}`;
+    const id = `${Date.now()}-${uuid()}${ext}`;
+    const dir = './uploads/case-documents';
+
+    if (!existsSync(dir)) {
+      mkdirSync(dir, { recursive: true });
+    }
+
+    const filePath = `${dir}/${id}`;
+
+    try {
+      // Use the improved file processing method with 50MB limit
+      const { buffer, size } = await this.uploadService.processFileBuffer(
+        req as any,
+        filePath,
+        50 * 1024 * 1024, // 50MB limit for case documents
+      );
+
+      // Write the file
+      writeFileSync(filePath, buffer);
+
+      const fileUrl = `${this.configService.get('BACKEND_API_URL')}/uploads/case-documents/${id}`;
+
+      res.status(201).json({
+        fileUrl,
+        key: `uploads/case-documents/${id}`,
+        originalName: filename,
+        size: size,
+        mimeType: contentType,
+        message: 'Case document uploaded successfully',
+      });
+    } catch (error) {
+      if (error instanceof BadRequestException) {
+        res.status(400).json({ error: error.message });
+      } else {
+        res
+          .status(500)
+          .json({ error: 'Upload failed', details: error.message });
+      }
+    }
+  }
+
+  @ApiOperation({
     summary: 'Upload thumbnail via PUT with raw binary body',
     description: `Send raw image buffer (JPEG, PNG, WebP) in the request body with the appropriate Content-Type header. Must use Postman, curl, or frontend — Swagger UI doesn't support raw binary upload.`,
   })
@@ -701,6 +845,56 @@ export class UploadController {
           .json({ error: 'Upload failed', details: error.message });
       }
     }
+  }
+
+  @Get('case-documents/:filename')
+  @ApiOperation({
+    summary: 'Get case document file (development only)',
+    description:
+      'Retrieve a case document file by filename. This endpoint is for development environment only.',
+  })
+  @ApiParam({ name: 'filename', description: 'Case document filename' })
+  @ApiResponse({ status: 200, description: 'File retrieved successfully' })
+  @ApiResponse({ status: 404, description: 'File not found' })
+  async getCaseDocument(
+    @Param('filename') filename: string,
+    @Res() res: Response,
+  ) {
+    // Security: Validate filename to prevent directory traversal
+    if (
+      filename.includes('..') ||
+      filename.includes('/') ||
+      filename.includes('\\')
+    ) {
+      throw new BadRequestException('Invalid filename');
+    }
+
+    const filePath = `./uploads/case-documents/${filename}`;
+
+    if (!existsSync(filePath)) {
+      throw new NotFoundException('File not found');
+    }
+
+    // Determine content type based on file extension
+    const ext = extname(filename).toLowerCase();
+    let contentType = 'application/octet-stream';
+
+    if (ext === '.pdf') contentType = 'application/pdf';
+    else if (ext === '.doc') contentType = 'application/msword';
+    else if (ext === '.docx')
+      contentType =
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+    else if (['.jpg', '.jpeg'].includes(ext)) contentType = 'image/jpeg';
+    else if (ext === '.png') contentType = 'image/png';
+    else if (ext === '.webp') contentType = 'image/webp';
+
+    res.setHeader('Content-Type', contentType);
+    res.setHeader('Content-Disposition', `inline; filename="${filename}"`);
+
+    // Stream the file
+    const fs = require('fs');
+    const fileStream = fs.createReadStream(filePath);
+    fileStream.pipe(res);
   }
 
   @Get('forum-attachments/:filename')

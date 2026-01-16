@@ -1719,6 +1719,114 @@ export const ERROR_MESSAGES: {
         "L'identifiant de l'école est requis pour l'administrateur d'école",
     },
   },
+
+  // Simulation Related
+  SIMULATION: {
+    UNAUTHORIZED_ROLE: {
+      [LanguageEnum.ENGLISH]: 'Only Teachers and Administrators can use student view simulation',
+      [LanguageEnum.FRENCH]: "Seuls les enseignants et les administrateurs peuvent utiliser la simulation de vue étudiant",
+    },
+    ALREADY_IN_SIMULATION: {
+      [LanguageEnum.ENGLISH]: 'You are already in simulation mode. Please end the current simulation first.',
+      [LanguageEnum.FRENCH]: "Vous êtes déjà en mode simulation. Veuillez d'abord terminer la simulation actuelle.",
+    },
+    ACTIVE_SESSION_EXISTS: {
+      [LanguageEnum.ENGLISH]: 'An active simulation session already exists. Please end it before starting a new one.',
+      [LanguageEnum.FRENCH]: "Une session de simulation active existe déjà. Veuillez la terminer avant d'en commencer une nouvelle.",
+    },
+    SCHOOL_ID_REQUIRED: {
+      [LanguageEnum.ENGLISH]: 'School ID is required for super admin to start simulation',
+      [LanguageEnum.FRENCH]: "L'identifiant de l'école est requis pour que le super administrateur puisse démarrer la simulation",
+    },
+    SCHOOL_NOT_FOUND: {
+      [LanguageEnum.ENGLISH]: 'School not found for simulation',
+      [LanguageEnum.FRENCH]: "École non trouvée pour la simulation",
+    },
+    NOT_IN_SIMULATION: {
+      [LanguageEnum.ENGLISH]: 'You are not currently in simulation mode',
+      [LanguageEnum.FRENCH]: "Vous n'êtes pas actuellement en mode simulation",
+    },
+    SESSION_NOT_FOUND: {
+      [LanguageEnum.ENGLISH]: 'Simulation session not found',
+      [LanguageEnum.FRENCH]: "Session de simulation non trouvée",
+    },
+    SESSION_ALREADY_ENDED: {
+      [LanguageEnum.ENGLISH]: 'This simulation session has already ended',
+      [LanguageEnum.FRENCH]: "Cette session de simulation est déjà terminée",
+    },
+    WRITE_BLOCKED: {
+      [LanguageEnum.ENGLISH]: 'Write operations are not allowed in simulation mode. This is a read-only view.',
+      [LanguageEnum.FRENCH]: "Les opérations d'écriture ne sont pas autorisées en mode simulation. Ceci est une vue en lecture seule.",
+    },
+    INVALID_SESSION: {
+      [LanguageEnum.ENGLISH]: 'Invalid simulation session',
+      [LanguageEnum.FRENCH]: "Session de simulation invalide",
+    },
+  },
+
+  // Enrollment Related
+  ENROLLMENT: {
+    SCHOOL_NOT_FOUND: {
+      [LanguageEnum.ENGLISH]: 'School not found',
+      [LanguageEnum.FRENCH]: 'École non trouvée',
+    },
+    STUDENT_NOT_FOUND: {
+      [LanguageEnum.ENGLISH]: 'Student not found',
+      [LanguageEnum.FRENCH]: 'Étudiant non trouvé',
+    },
+    MODULE_NOT_FOUND: {
+      [LanguageEnum.ENGLISH]: 'Module not found',
+      [LanguageEnum.FRENCH]: 'Module non trouvé',
+    },
+    MODULE_NOT_PUBLISHED: {
+      [LanguageEnum.ENGLISH]: 'Module is not published and cannot be enrolled',
+      [LanguageEnum.FRENCH]: "Le module n'est pas publié et ne peut pas être inscrit",
+    },
+    ALREADY_ENROLLED: {
+      [LanguageEnum.ENGLISH]: 'Student is already enrolled in this module',
+      [LanguageEnum.FRENCH]: 'L\'étudiant est déjà inscrit à ce module',
+    },
+    ENROLLMENT_NOT_FOUND: {
+      [LanguageEnum.ENGLISH]: 'Enrollment not found',
+      [LanguageEnum.FRENCH]: 'Inscription non trouvée',
+    },
+    ENROLLMENT_ALREADY_WITHDRAWN: {
+      [LanguageEnum.ENGLISH]: 'Enrollment has already been withdrawn',
+      [LanguageEnum.FRENCH]: 'L\'inscription a déjà été retirée',
+    },
+    ENROLLMENT_ALREADY_COMPLETED: {
+      [LanguageEnum.ENGLISH]: 'Enrollment has already been completed',
+      [LanguageEnum.FRENCH]: 'L\'inscription a déjà été terminée',
+    },
+    NO_MODULES_FOR_YEAR: {
+      [LanguageEnum.ENGLISH]: 'No modules found for the specified academic year',
+      [LanguageEnum.FRENCH]: 'Aucun module trouvé pour l\'année académique spécifiée',
+    },
+    SCHOOL_ID_REQUIRED: {
+      [LanguageEnum.ENGLISH]: 'School ID is required for super admin',
+      [LanguageEnum.FRENCH]: "L'identifiant de l'école est requis pour le super administrateur",
+    },
+    UNAUTHORIZED_ENROLLMENT: {
+      [LanguageEnum.ENGLISH]: 'You are not authorized to manage enrollments',
+      [LanguageEnum.FRENCH]: 'Vous n\'êtes pas autorisé à gérer les inscriptions',
+    },
+    ENROLLMENT_FAILED: {
+      [LanguageEnum.ENGLISH]: 'Failed to enroll student',
+      [LanguageEnum.FRENCH]: 'Échec de l\'inscription de l\'étudiant',
+    },
+    WITHDRAWAL_FAILED: {
+      [LanguageEnum.ENGLISH]: 'Failed to withdraw enrollment',
+      [LanguageEnum.FRENCH]: 'Échec du retrait de l\'inscription',
+    },
+    BULK_ENROLLMENT_FAILED: {
+      [LanguageEnum.ENGLISH]: 'Bulk enrollment operation failed',
+      [LanguageEnum.FRENCH]: 'L\'opération d\'inscription en masse a échoué',
+    },
+    INVALID_ACADEMIC_YEAR: {
+      [LanguageEnum.ENGLISH]: 'Invalid academic year. Must be between 1 and 5',
+      [LanguageEnum.FRENCH]: 'Année académique invalide. Doit être comprise entre 1 et 5',
+    },
+  },
 };
 
 // Success Messages
@@ -2269,6 +2377,70 @@ export const SUCCESS_MESSAGES: {
     AI_SESSION_COMPLETED_SUCCESSFULLY: {
       [LanguageEnum.ENGLISH]: 'AI session completed successfully',
       [LanguageEnum.FRENCH]: 'Session IA terminée avec succès',
+    },
+  },
+
+  // Simulation Related Success Messages
+  SIMULATION: {
+    STARTED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'Student view simulation started successfully',
+      [LanguageEnum.FRENCH]: 'Simulation de vue étudiant démarrée avec succès',
+    },
+    ENDED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'Student view simulation ended successfully',
+      [LanguageEnum.FRENCH]: 'Simulation de vue étudiant terminée avec succès',
+    },
+    STUDENTS_RETRIEVED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'Students available for simulation retrieved successfully',
+      [LanguageEnum.FRENCH]: 'Étudiants disponibles pour la simulation récupérés avec succès',
+    },
+    HISTORY_RETRIEVED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'Simulation history retrieved successfully',
+      [LanguageEnum.FRENCH]: 'Historique de simulation récupéré avec succès',
+    },
+    STATUS_RETRIEVED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'Simulation status retrieved successfully',
+      [LanguageEnum.FRENCH]: 'Statut de simulation récupéré avec succès',
+    },
+  },
+
+  // Enrollment Related Success Messages
+  ENROLLMENT: {
+    ENROLLED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'Student enrolled successfully',
+      [LanguageEnum.FRENCH]: 'Étudiant inscrit avec succès',
+    },
+    BULK_ENROLLED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'Students enrolled successfully',
+      [LanguageEnum.FRENCH]: 'Étudiants inscrits avec succès',
+    },
+    ACADEMIC_YEAR_ENROLLED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'Student enrolled in academic year successfully',
+      [LanguageEnum.FRENCH]: 'Étudiant inscrit à l\'année académique avec succès',
+    },
+    WITHDRAWN_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'Enrollment withdrawn successfully',
+      [LanguageEnum.FRENCH]: 'Inscription retirée avec succès',
+    },
+    ENROLLMENTS_RETRIEVED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'Enrollments retrieved successfully',
+      [LanguageEnum.FRENCH]: 'Inscriptions récupérées avec succès',
+    },
+    ENROLLMENT_STATUS_RETRIEVED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'Enrollment status retrieved successfully',
+      [LanguageEnum.FRENCH]: 'Statut d\'inscription récupéré avec succès',
+    },
+    ENROLLMENT_HISTORY_RETRIEVED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'Enrollment history retrieved successfully',
+      [LanguageEnum.FRENCH]: 'Historique des inscriptions récupéré avec succès',
+    },
+    AVAILABLE_STUDENTS_RETRIEVED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'Available students retrieved successfully',
+      [LanguageEnum.FRENCH]: 'Étudiants disponibles récupérés avec succès',
+    },
+    AVAILABLE_MODULES_RETRIEVED_SUCCESSFULLY: {
+      [LanguageEnum.ENGLISH]: 'Available modules retrieved successfully',
+      [LanguageEnum.FRENCH]: 'Modules disponibles récupérés avec succès',
     },
   },
 };

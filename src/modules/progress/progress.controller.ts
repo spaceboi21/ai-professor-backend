@@ -20,6 +20,7 @@ import {
 import { ProgressService } from './progress.service';
 import { JwtAuthGuard } from 'src/common/guards/jwt.guard';
 import { RoleGuard } from 'src/common/guards/roles.guard';
+import { SimulationGuard } from 'src/common/guards/simulation.guard';
 import { Roles } from 'src/common/decorators/roles.decorator';
 import { RoleEnum } from 'src/common/constants/roles.constant';
 import { User } from 'src/common/decorators/user.decorator';
@@ -40,7 +41,7 @@ import { StudentDashboardDto } from './dto/student-dashboard.dto';
 
 @ApiTags('Progress Tracking')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, RoleGuard)
+@UseGuards(JwtAuthGuard, RoleGuard, SimulationGuard)
 @Controller('progress')
 export class ProgressController {
   private readonly logger = new Logger(ProgressController.name);

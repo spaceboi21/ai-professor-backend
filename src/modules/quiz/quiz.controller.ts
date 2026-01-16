@@ -29,6 +29,7 @@ import { Roles } from 'src/common/decorators/roles.decorator';
 import { User } from 'src/common/decorators/user.decorator';
 import { JwtAuthGuard } from 'src/common/guards/jwt.guard';
 import { RoleGuard } from 'src/common/guards/roles.guard';
+import { SimulationGuard } from 'src/common/guards/simulation.guard';
 import { JWTUserPayload } from 'src/common/types/jwr-user.type';
 import { CreateQuizGroupDto } from './dto/create-quiz-group.dto';
 import { CreateQuizDto } from './dto/create-quiz.dto';
@@ -50,7 +51,7 @@ import { QuizQuestion } from 'src/common/types/quiz.type';
 
 @ApiTags('Quiz Management & Analytics')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, RoleGuard)
+@UseGuards(JwtAuthGuard, RoleGuard, SimulationGuard)
 @Controller('quiz')
 export class QuizController {
   constructor(

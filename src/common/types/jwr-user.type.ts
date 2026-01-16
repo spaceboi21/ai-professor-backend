@@ -11,4 +11,10 @@ export interface JWTUserPayload {
     name: RoleEnum;
   };
   preferred_language: LanguageEnum;
+  
+  // Simulation-related fields (only present when in simulation mode)
+  is_simulation?: boolean;
+  simulation_session_id?: string;
+  original_user_id?: string;
+  original_user_role?: RoleEnum;
 }

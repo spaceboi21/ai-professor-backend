@@ -39,6 +39,7 @@ import {
   SessionStatusEnum,
 } from 'src/common/constants/internship.constant';
 import { ProgressStatusEnum } from 'src/common/constants/status.constant';
+import { RoleEnum } from 'src/common/constants/roles.constant';
 import { PythonInternshipService } from './python-internship.service';
 import { PaginationDto } from 'src/common/dto/pagination.dto';
 import {
@@ -436,6 +437,63 @@ export class InternshipFeedbackService {
       };
     } catch (error) {
       this.logger.error('Error getting feedback', error?.stack || error);
+      throw new BadRequestException('Failed to retrieve feedback');
+    }
+  }
+
+  /**
+   * Get feedback by ID (Any authenticated user)
+   */
+  async getFeedbackById(feedbackId: string, user: JWTUserPayload) {
+    this.logger.log(`Getting feedback by ID: ${feedbackId}`);
+
+    // Validate school exists
+    const school = await this.schoolModel.findById(user.school_id);
+    if (!school) {
+      throw new NotFoundException('School not found');
+    }
+
+    // Get tenant connection
+    const tenantConnection =
+      await this.tenantConnectionService.getTenantConnection(school.db_name);
+    const FeedbackModel = tenantConnection.model(CaseFeedbackLog.name, CaseFeedbackLogSchema);
+    const StudentModel = tenantConnection.model(Student.name, StudentSchema);
+    const CaseModel = tenantConnection.model(InternshipCase.name, InternshipCaseSchema);
+    const SessionModel = tenantConnection.model(StudentCaseSession.name, StudentCaseSessionSchema);
+
+    try {
+      const feedback = await FeedbackModel.findOne({
+        _id: new Types.ObjectId(feedbackId),
+      }).lean();
+
+      if (!feedback) {
+        throw new NotFoundException('Feedback not found');
+      }
+
+      // For students, only show their own feedback
+      if (user.role.name === RoleEnum.STUDENT && feedback.student_id.toString() !== user.id) {
+        throw new NotFoundException('Feedback not found');
+      }
+
+      // Populate related data
+      const student = await StudentModel.findById(feedback.student_id).select('first_name last_name email').lean();
+      const caseData = await CaseModel.findById(feedback.case_id).select('title description').lean();
+      const session = await SessionModel.findById(feedback.session_id).select('session_type started_at ended_at').lean();
+
+      return {
+        message: 'Feedback retrieved successfully',
+        data: {
+          ...feedback,
+          student_info: student,
+          case_info: caseData,
+          session_info: session,
+        },
+      };
+    } catch (error) {
+      this.logger.error('Error getting feedback by ID', error?.stack || error);
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
       throw new BadRequestException('Failed to retrieve feedback');
     }
   }

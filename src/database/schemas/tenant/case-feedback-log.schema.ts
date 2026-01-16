@@ -26,7 +26,7 @@ export class CaseFeedbackLog extends Document {
 
   @Prop({
     required: true,
-    enum: FeedbackTypeEnum,
+    enum: Object.values(FeedbackTypeEnum),
     default: FeedbackTypeEnum.AUTO_GENERATED,
   })
   feedback_type: FeedbackTypeEnum;
@@ -74,7 +74,7 @@ export class CaseFeedbackLog extends Document {
   };
 
   @Prop({
-    enum: FeedbackStatusEnum,
+    enum: Object.values(FeedbackStatusEnum),
     default: FeedbackStatusEnum.PENDING_VALIDATION,
   })
   status: FeedbackStatusEnum;

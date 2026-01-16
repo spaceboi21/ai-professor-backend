@@ -25,6 +25,9 @@ import { attachUserDetailsToEntity } from 'src/common/utils/user-details.util';
 import { ErrorMessageService } from 'src/common/services/error-message.service';
 import { DEFAULT_LANGUAGE } from 'src/common/constants/language.constant';
 import { PythonInternshipService } from './python-internship.service';
+import { InternshipS3Service } from './s3.service';
+import { normalizePatientSimulationConfig } from './utils/enum-mapping.util';
+import { UploadCaseDocumentDto } from './dto/upload-case-document.dto';
 
 @Injectable()
 export class InternshipCaseService {
@@ -38,6 +41,7 @@ export class InternshipCaseService {
     private readonly tenantConnectionService: TenantConnectionService,
     private readonly errorMessageService: ErrorMessageService,
     private readonly pythonInternshipService: PythonInternshipService,
+    private readonly s3Service: InternshipS3Service,
   ) {}
 
   /**
@@ -101,9 +105,20 @@ export class InternshipCaseService {
         throw new NotFoundException('Internship not found');
       }
 
+      // Normalize patient_simulation_config to ensure enum values are in English
+      const normalizedDto = { ...createCaseDto };
+      if (normalizedDto.patient_simulation_config) {
+        normalizedDto.patient_simulation_config = normalizePatientSimulationConfig(
+          normalizedDto.patient_simulation_config
+        );
+        this.logger.log(
+          `Normalized patient_simulation_config: scenario_type=${normalizedDto.patient_simulation_config?.scenario_type}, difficulty_level=${normalizedDto.patient_simulation_config?.difficulty_level}`
+        );
+      }
+
       // Prepare case data
       const caseData = {
-        ...createCaseDto,
+        ...normalizedDto,
         internship_id: new Types.ObjectId(internshipId),
         created_by: new Types.ObjectId(user.id),
         created_by_role: user.role.name as RoleEnum,
@@ -189,9 +204,28 @@ export class InternshipCaseService {
         .sort({ sequence: 1 })
         .lean();
 
+      // Filter sensitive fields for students
+      let filteredCases: any[] = cases;
+      if (user.role.name === RoleEnum.STUDENT) {
+        filteredCases = cases.map(caseData => ({
+          _id: caseData._id,
+          internship_id: caseData.internship_id,
+          title: caseData.title,
+          description: caseData.description,
+          case_documents: caseData.case_documents || [],
+          sequence: caseData.sequence,
+          created_by: caseData.created_by,
+          created_at: caseData.created_at,
+          updated_at: caseData.updated_at,
+          // Safe metadata that doesn't reveal answers
+          difficulty: caseData.patient_simulation_config?.difficulty_level || null,
+          // Do NOT include sensitive teacher/admin fields
+        }));
+      }
+
       return {
         message: 'Cases retrieved successfully',
-        data: cases,
+        data: filteredCases,
       };
     } catch (error) {
       this.logger.error('Error finding cases', error?.stack || error);
@@ -232,6 +266,37 @@ export class InternshipCaseService {
         this.userModel,
       );
 
+      // Filter sensitive fields for students
+      // Students should only see: title, description, case_documents, and sequence
+      // They should NOT see: case_content (the prompt), supervisor_prompts, therapist_prompts, 
+      // evaluation_criteria, or patient_simulation_config (internal AI configuration)
+      if (user.role.name === RoleEnum.STUDENT) {
+        const studentSafeCase = {
+          _id: caseWithUser._id,
+          internship_id: caseWithUser.internship_id,
+          title: caseWithUser.title,
+          description: caseWithUser.description,
+          case_documents: caseWithUser.case_documents || [],
+          sequence: caseWithUser.sequence,
+          created_by: caseWithUser.created_by,
+          created_at: caseWithUser.created_at,
+          updated_at: caseWithUser.updated_at,
+          // Safe metadata that doesn't reveal answers
+          difficulty: caseWithUser.patient_simulation_config?.difficulty_level || null,
+          // Do NOT include:
+          // - case_content (teacher's detailed prompt)
+          // - patient_simulation_config (full AI configuration)
+          // - supervisor_prompts (teacher's evaluation prompts)
+          // - therapist_prompts (teacher's guidance prompts)
+          // - evaluation_criteria (grading rubric)
+        };
+
+        return {
+          message: 'Case retrieved successfully',
+          data: studentSafeCase,
+        };
+      }
+
       return {
         message: 'Case retrieved successfully',
         data: caseWithUser,
@@ -267,9 +332,20 @@ export class InternshipCaseService {
     const CaseModel = tenantConnection.model(InternshipCase.name, InternshipCaseSchema);
 
     try {
+      // Normalize patient_simulation_config to ensure enum values are in English
+      const normalizedDto = { ...updateCaseDto };
+      if (normalizedDto.patient_simulation_config) {
+        normalizedDto.patient_simulation_config = normalizePatientSimulationConfig(
+          normalizedDto.patient_simulation_config
+        );
+        this.logger.log(
+          `Normalized patient_simulation_config: scenario_type=${normalizedDto.patient_simulation_config?.scenario_type}, difficulty_level=${normalizedDto.patient_simulation_config?.difficulty_level}`
+        );
+      }
+
       const updatedCase = await CaseModel.findOneAndUpdate(
         { _id: new Types.ObjectId(caseId), deleted_at: null },
-        { ...updateCaseDto, updated_at: new Date() },
+        { ...normalizedDto, updated_at: new Date() },
         { new: true },
       ).lean();
 
@@ -525,6 +601,248 @@ export class InternshipCaseService {
     }
 
     return reorderedCases;
+  }
+
+  /**
+   * Upload document to S3 and attach to case
+   */
+  async uploadCaseDocument(
+    uploadDto: UploadCaseDocumentDto,
+    user: JWTUserPayload,
+  ) {
+    this.logger.log(`Uploading document for case: ${uploadDto.case_id}`);
+
+    // Validate school exists
+    const school = await this.schoolModel.findById(user.school_id);
+    if (!school) {
+      throw new NotFoundException('School not found');
+    }
+
+    // Get tenant connection
+    const tenantConnection =
+      await this.tenantConnectionService.getTenantConnection(school.db_name);
+    const CaseModel = tenantConnection.model(InternshipCase.name, InternshipCaseSchema);
+
+    try {
+      // Verify case exists and user has access
+      const caseData = await CaseModel.findOne({
+        _id: new Types.ObjectId(uploadDto.case_id),
+        deleted_at: null,
+      });
+
+      if (!caseData) {
+        throw new NotFoundException('Case not found');
+      }
+
+      // Decode base64 file content
+      const fileBuffer = Buffer.from(uploadDto.file_content, 'base64');
+
+      // Upload to S3
+      const s3Result = await this.s3Service.uploadDocument(fileBuffer, {
+        name: uploadDto.file_name,
+        type: uploadDto.mime_type,
+        size: uploadDto.file_size || fileBuffer.length,
+        case_id: uploadDto.case_id,
+      });
+
+      // Add document to case
+      const documentEntry = {
+        url: s3Result.public_url,
+        s3_key: s3Result.s3_key,
+        type: uploadDto.mime_type,
+        name: uploadDto.file_name,
+        size: uploadDto.file_size || fileBuffer.length,
+        uploaded_at: new Date(),
+      };
+
+      caseData.case_documents.push(documentEntry);
+      await caseData.save();
+
+      this.logger.log(`Document uploaded and attached to case: ${uploadDto.case_id}`);
+
+      // Re-ingest case to Python AI with new document
+      try {
+        await this.pythonInternshipService.ingestCase({
+          case_id: caseData._id.toString(),
+          case_title: caseData.title,
+          case_content: caseData.case_content || '',
+          case_documents: caseData.case_documents.map(doc => ({
+            url: doc.url,
+            type: doc.type,
+            name: doc.name,
+          })),
+          metadata: {
+            created_by: user.id,
+            internship_id: caseData.internship_id.toString(),
+            difficulty: caseData.patient_simulation_config?.difficulty_level,
+            condition: caseData.patient_simulation_config?.patient_profile?.condition,
+            updated_at: new Date(),
+          },
+        });
+
+        // Mark as ingested
+        await CaseModel.updateOne(
+          { _id: caseData._id },
+          { 
+            pinecone_ingested: true,
+            pinecone_ingested_at: new Date(),
+          }
+        );
+
+        this.logger.log(`Case ${caseData._id} re-ingested to Pinecone with new document`);
+      } catch (error) {
+        this.logger.error(`Failed to re-ingest case to Pinecone: ${error.message}`);
+        // Don't fail the operation - document is already uploaded to S3
+      }
+
+      return {
+        message: 'Document uploaded successfully',
+        data: {
+          document: documentEntry,
+          case_id: caseData._id,
+        },
+      };
+    } catch (error) {
+      this.logger.error('Error uploading document', error?.stack || error);
+      if (error instanceof NotFoundException || error instanceof BadRequestException) {
+        throw error;
+      }
+      throw new BadRequestException('Failed to upload document');
+    }
+  }
+
+  /**
+   * Get presigned URL for document download
+   */
+  async getDocumentUrl(
+    caseId: string,
+    documentIndex: number,
+    user: JWTUserPayload,
+  ) {
+    this.logger.log(`Getting document URL for case: ${caseId}, document: ${documentIndex}`);
+
+    // Validate school exists
+    const school = await this.schoolModel.findById(user.school_id);
+    if (!school) {
+      throw new NotFoundException('School not found');
+    }
+
+    // Get tenant connection
+    const tenantConnection =
+      await this.tenantConnectionService.getTenantConnection(school.db_name);
+    const CaseModel = tenantConnection.model(InternshipCase.name, InternshipCaseSchema);
+
+    try {
+      const caseData = await CaseModel.findOne({
+        _id: new Types.ObjectId(caseId),
+        deleted_at: null,
+      }).lean();
+
+      if (!caseData) {
+        throw new NotFoundException('Case not found');
+      }
+
+      // Check if document exists
+      if (!caseData.case_documents || !caseData.case_documents[documentIndex]) {
+        throw new NotFoundException('Document not found');
+      }
+
+      const document = caseData.case_documents[documentIndex];
+
+      // If document has S3 key, generate presigned URL
+      if (document.s3_key) {
+        const presignedUrl = await this.s3Service.getPresignedUrl(document.s3_key, 3600); // 1 hour
+
+        return {
+          message: 'Document URL generated successfully',
+          data: {
+            url: presignedUrl,
+            name: document.name,
+            type: document.type,
+            size: document.size,
+            expires_in: 3600,
+          },
+        };
+      }
+
+      // Fallback: return the stored URL (for old documents without S3)
+      return {
+        message: 'Document URL retrieved successfully',
+        data: {
+          url: document.url,
+          name: document.name,
+          type: document.type,
+          size: document.size,
+        },
+      };
+    } catch (error) {
+      this.logger.error('Error getting document URL', error?.stack || error);
+      if (error instanceof NotFoundException || error instanceof BadRequestException) {
+        throw error;
+      }
+      throw new BadRequestException('Failed to get document URL');
+    }
+  }
+
+  /**
+   * Delete document from case and S3
+   */
+  async deleteDocument(
+    caseId: string,
+    documentIndex: number,
+    user: JWTUserPayload,
+  ) {
+    this.logger.log(`Deleting document from case: ${caseId}, document: ${documentIndex}`);
+
+    // Validate school exists
+    const school = await this.schoolModel.findById(user.school_id);
+    if (!school) {
+      throw new NotFoundException('School not found');
+    }
+
+    // Get tenant connection
+    const tenantConnection =
+      await this.tenantConnectionService.getTenantConnection(school.db_name);
+    const CaseModel = tenantConnection.model(InternshipCase.name, InternshipCaseSchema);
+
+    try {
+      const caseData = await CaseModel.findOne({
+        _id: new Types.ObjectId(caseId),
+        deleted_at: null,
+      });
+
+      if (!caseData) {
+        throw new NotFoundException('Case not found');
+      }
+
+      // Check if document exists
+      if (!caseData.case_documents || !caseData.case_documents[documentIndex]) {
+        throw new NotFoundException('Document not found');
+      }
+
+      const document = caseData.case_documents[documentIndex];
+
+      // Delete from S3 if it has S3 key
+      if (document.s3_key) {
+        await this.s3Service.deleteDocument(document.s3_key);
+      }
+
+      // Remove from array
+      caseData.case_documents.splice(documentIndex, 1);
+      await caseData.save();
+
+      this.logger.log(`Document deleted from case: ${caseId}`);
+
+      return {
+        message: 'Document deleted successfully',
+      };
+    } catch (error) {
+      this.logger.error('Error deleting document', error?.stack || error);
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
+      throw new BadRequestException('Failed to delete document');
+    }
   }
 }
 

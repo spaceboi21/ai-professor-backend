@@ -102,11 +102,13 @@ export class PythonInternshipService {
     sessionId: string,
     studentMessage: string,
     context: Record<string, any>,
+    therapistActions?: string[],
   ): Promise<PatientMessageResponse> {
     const payload = {
       session_id: sessionId,
       student_message: studentMessage,
       context,
+      therapist_actions: therapistActions || [],
     };
 
     return this._post('/internship/patient/message', payload);

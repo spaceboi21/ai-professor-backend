@@ -1,0 +1,130 @@
+╔═══════════════════════════════════════════════════════════════════════════╗
+║                    WHAT TO TELL YOUR OTHER TEAMS                          ║
+╚═══════════════════════════════════════════════════════════════════════════╝
+
+📁 COPY/PASTE THIS INTO EACH TEAM'S CURSOR:
+
+═══════════════════════════════════════════════════════════════════════════════
+1️⃣  FOR YOUR FRONTEND DEVELOPERS (Student + Admin Interface)
+═══════════════════════════════════════════════════════════════════════════════
+
+Open file: PROMPTS_FOR_OTHER_TEAMS.md
+Copy: The entire "PROMPT FOR FRONTEND TEAM" section (starts with "PROMPT START")
+Paste: Into their Cursor AI chat
+
+What they need to build:
+✓ Check for active/paused sessions before starting new ones (CRITICAL!)
+✓ Pause/Resume buttons
+✓ Session timer (polls every 15 seconds)
+✓ Non-verbal actions buttons (optional)
+✓ Session history page
+✓ Professor config form (session duration, limits, etc.)
+
+Time: 3-5 days
+
+═══════════════════════════════════════════════════════════════════════════════
+2️⃣  FOR YOUR PYTHON AI BACKEND DEVELOPERS
+═══════════════════════════════════════════════════════════════════════════════
+
+Open file: PROMPTS_FOR_OTHER_TEAMS.md
+Copy: The entire "PROMPT FOR PYTHON AI BACKEND TEAM" section (starts with "PROMPT START")
+Paste: Into their Cursor AI chat
+
+What they need to do:
+✓ Add ONE optional field to PatientMessageRequest: therapist_actions
+✓ Include actions in AI prompt
+✓ Make patient acknowledge actions (e.g., "thanks for tissue")
+✓ Adjust rapport based on actions
+
+Time: 1-2 hours
+
+═══════════════════════════════════════════════════════════════════════════════
+3️⃣  YOUR NESTJS BACKEND (Current Server)
+═══════════════════════════════════════════════════════════════════════════════
+
+Status: ✅ DONE - Nothing needed!
+
+Your backend is ready and already running via nginx/gunicorn.
+No restart needed.
+
+═══════════════════════════════════════════════════════════════════════════════
+📋 QUICK CHECKLIST
+═══════════════════════════════════════════════════════════════════════════════
+
+Backend (NestJS):     ✅ Complete
+Python AI Backend:    ⚠️  Needs 1-2 hours work
+Frontend (Student):   ⚠️  Needs 3-5 days work
+Frontend (Admin):     ⚠️  Needs 1-2 hours work
+
+═══════════════════════════════════════════════════════════════════════════════
+🔗 IMPORTANT API ENDPOINTS FOR FRONTEND
+═══════════════════════════════════════════════════════════════════════════════
+
+Most Important (MUST implement first):
+→ GET /api/internship/cases/{caseId}/sessions/active  ← CHECK BEFORE STARTING!
+
+Session Management:
+→ POST /api/internship/sessions/{sessionId}/pause
+→ POST /api/internship/sessions/{sessionId}/resume
+→ GET  /api/internship/sessions/{sessionId}/timer     ← Poll every 15 seconds
+→ GET  /api/internship/cases/{caseId}/sessions/history
+
+Updated Endpoint:
+→ POST /api/internship/sessions/{sessionId}/message
+  Body: { message: "...", therapist_actions: ["offered tissue"] }
+
+═══════════════════════════════════════════════════════════════════════════════
+⚠️  CRITICAL: WHAT PYTHON TEAM MUST KNOW
+═══════════════════════════════════════════════════════════════════════════════
+
+Your NestJS backend NOW sends this:
+
+POST /api/v1/internship/patient/message
+{
+  "session_id": "...",
+  "student_message": "...",
+  "context": {...},
+  "therapist_actions": ["offered tissue", "maintained eye contact"]  ← NEW
+}
+
+Python must:
+1. Accept this optional field (default: empty list)
+2. Include actions in AI prompt
+3. Have patient acknowledge actions
+4. Keep backward compatible (old requests still work)
+
+═══════════════════════════════════════════════════════════════════════════════
+📁 FILES TO SHARE
+═══════════════════════════════════════════════════════════════════════════════
+
+Give to Frontend Team:
+  → PROMPTS_FOR_OTHER_TEAMS.md (Frontend section)
+  → API_QUICK_REFERENCE_SESSION_MANAGEMENT.md
+  → Your NestJS API URL + /api/docs endpoint
+
+Give to Python Team:
+  → PROMPTS_FOR_OTHER_TEAMS.md (Python section)
+  → PYTHON_BACKEND_INTEGRATION_THERAPIST_ACTIONS.md
+
+═══════════════════════════════════════════════════════════════════════════════
+🎯 SUMMARY IN 3 SENTENCES
+═══════════════════════════════════════════════════════════════════════════════
+
+1. Your NestJS backend is complete with pause/resume, timers, and session 
+   management features.
+
+2. Python backend needs to accept an optional therapist_actions field and 
+   have the AI patient acknowledge the actions (1-2 hours).
+
+3. Frontend needs to implement pause/resume UI, session timers, and check 
+   for active sessions before starting new ones (3-5 days).
+
+═══════════════════════════════════════════════════════════════════════════════
+✅ DONE! TEAMS READY TO START!
+═══════════════════════════════════════════════════════════════════════════════
+
+Questions? See:
+  → QUICK_COORDINATION_GUIDE.md (detailed coordination info)
+  → IMPLEMENTATION_COMPLETE.md (complete overview)
+  → API docs at: your-backend-url/api/docs
+

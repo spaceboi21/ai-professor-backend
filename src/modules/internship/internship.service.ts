@@ -541,10 +541,40 @@ export class InternshipService {
     const InternshipModel = tenantConnection.model(Internship.name, InternshipSchema);
 
     try {
-      const internship = await InternshipModel.findOne({
+      // Build query with proper access control
+      const query: any = {
         _id: new Types.ObjectId(id.toString()),
         deleted_at: null,
-      }).lean();
+      };
+
+      // Students can only access published internships in their year
+      if (user.role.name === RoleEnum.STUDENT) {
+        const StudentModel = tenantConnection.model(Student.name, StudentSchema);
+        const student = await StudentModel.findOne({
+          _id: new Types.ObjectId(user.id),
+          deleted_at: null,
+        }).select('year');
+
+        if (!student) {
+          throw new NotFoundException(
+            this.errorMessageService.getMessageWithLanguage(
+              'STUDENT',
+              'NOT_FOUND',
+              user?.preferred_language || DEFAULT_LANGUAGE,
+            ),
+          );
+        }
+
+        // Add student-specific filters
+        query.published = true;
+        query.year = student.year;
+        
+        this.logger.log(
+          `Student ${user.id} (year ${student.year}) attempting to access internship ${id}`
+        );
+      }
+
+      const internship = await InternshipModel.findOne(query).lean();
 
       if (!internship) {
         throw new NotFoundException(

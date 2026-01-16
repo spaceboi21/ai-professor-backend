@@ -1808,6 +1808,31 @@ export class ModulesService {
       this.logger.log('Fetching modules from Python service');
       const response = await this.pythonService.getModules();
       this.logger.log('Successfully fetched modules from Python service');
+      
+      // Sanitize module data to prevent null/undefined errors on frontend
+      if (response?.modules && Array.isArray(response.modules)) {
+        response.modules = response.modules.map(module => ({
+          ...module,
+          module_id: module.module_id || '',
+          module_title: module.module_title || '',
+          author: module.author || '',
+          teaching_unit: module.teaching_unit || '',
+          semester: module.semester || '',
+          difficulty_level: module.difficulty_level || '',
+          estimated_duration: module.estimated_duration || 0,
+          pedagogical_tags: module.pedagogical_tags || [],
+          keywords: module.keywords || [],
+          theoretical_concepts: module.theoretical_concepts || [],
+          bibliography: module.bibliography || [],
+          prerequisites: module.prerequisites || [],
+          description: module.description || '',
+          upload_date: module.upload_date || '',
+          namespace: module.namespace || '',
+          total_chunks: module.total_chunks || 0,
+          vector_count: module.vector_count || 0,
+        }));
+      }
+      
       return response;
     } catch (error) {
       this.logger.error(

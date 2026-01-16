@@ -16,6 +16,7 @@ export enum SessionTypeEnum {
 // Session Status
 export enum SessionStatusEnum {
   ACTIVE = 'ACTIVE',
+  PAUSED = 'PAUSED',
   COMPLETED = 'COMPLETED',
   PENDING_VALIDATION = 'PENDING_VALIDATION',
 }
