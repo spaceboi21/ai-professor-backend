@@ -14,23 +14,19 @@
  */
 
 const mongoose = require('mongoose');
-require('dotenv').config();
+const path = require('path');
+require('dotenv').config({ path: path.resolve(__dirname, '../.env') });
 
-// MongoDB connection
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017';
-const DATABASE_NAME = process.env.MONGODB_DATABASE_NAME || 'ai-professor-central';
+// MongoDB connection - use CENTRAL_DB_URI which includes database name
+const MONGODB_URI = process.env.CENTRAL_DB_URI || 'mongodb://localhost:27017/central_database';
 
 async function migrateCases() {
-  try {
-    console.log('🚀 Starting migration of InternshipCase documents...\n');
+    try {
+      console.log('🚀 Starting migration of InternshipCase documents...\n');
 
-    // Connect to MongoDB
-    await mongoose.connect(MONGODB_URI, {
-      dbName: DATABASE_NAME,
-      useNewUrlParser: true,
-      useUnifiedTopology: true,
-    });
-    console.log('✅ Connected to MongoDB\n');
+      // Connect to MongoDB (URI already includes database name)
+      await mongoose.connect(MONGODB_URI);
+      console.log('✅ Connected to MongoDB\n');
 
     // Get central database
     const centralDb = mongoose.connection.db;
