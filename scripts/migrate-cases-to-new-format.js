@@ -47,10 +47,12 @@ async function migrateCases() {
 
         // Connect to tenant database
         const tenantDb = mongoose.connection.useDb(school.db_name);
-        const casesCollection = tenantDb.collection('internship_cases');
+        
+        // FIXED: Collection name is 'internshipcases' (no underscore)
+        const casesCollection = tenantDb.collection('internshipcases');
 
-        // Get all non-deleted cases
-        const cases = await casesCollection.find({ deleted_at: null }).toArray();
+        // Get all cases (including soft-deleted ones - we'll migrate everything)
+        const cases = await casesCollection.find({}).toArray();
         console.log(`   Found ${cases.length} cases`);
 
         if (cases.length === 0) {
