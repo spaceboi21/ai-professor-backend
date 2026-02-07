@@ -193,16 +193,22 @@ export class InternshipFeedbackService {
       );
 
       // NEW: Use assessment_criteria (or fallback to evaluation_criteria for backward compat)
+      // IMPORTANT: Convert null to empty strings for Python API validation
       const assessmentCriteria = caseData.assessment_criteria && caseData.assessment_criteria.length > 0
-        ? caseData.assessment_criteria
+        ? caseData.assessment_criteria.map(criterion => ({
+            ...criterion,
+            reference_literature: criterion.reference_literature || '',
+            ko_example: criterion.ko_example || '',
+            ok_example: criterion.ok_example || '',
+          }))
         : (caseData.evaluation_criteria || []).map(criterion => ({
             criterion_id: criterion.criterion.toLowerCase().replace(/\s+/g, '_'),
             name: criterion.criterion,
             description: `Évaluation de ${criterion.criterion}`,
             max_points: criterion.weight,
-            reference_literature: null,
-            ko_example: null,
-            ok_example: null,
+            reference_literature: '',
+            ko_example: '',
+            ok_example: '',
           }));
 
       // NEW: Call comprehensive assessment endpoint
@@ -231,7 +237,7 @@ export class InternshipFeedbackService {
           patient_base: {
             name: caseData.patient_simulation_config?.patient_profile?.name || 'Patient',
             age: caseData.patient_simulation_config?.patient_profile?.age || null,
-            trauma_summary: caseData.patient_simulation_config?.patient_profile?.trauma_summary || null,
+            trauma_summary: caseData.patient_simulation_config?.patient_profile?.trauma_summary || '',
             key_symptoms: caseData.patient_simulation_config?.patient_profile?.key_symptoms || [],
             current_sud_voc: caseData.patient_simulation_config?.patient_profile?.current_sud_voc || {},
           },
