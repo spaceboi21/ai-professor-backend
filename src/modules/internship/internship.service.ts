@@ -206,30 +206,12 @@ export class InternshipService {
       ];
 
       // Stage 2: Add role-based filtering
-      // Students can only see published internships
+      // Students can only see published internships (all years)
       if (user.role.name === RoleEnum.STUDENT) {
-        // Get student's year from tenant database
-        const StudentModel = tenantConnection.model(Student.name, StudentSchema);
-        const student = await StudentModel.findOne({
-          _id: new Types.ObjectId(user.id),
-          deleted_at: null,
-        }).select('year');
-
-        if (!student) {
-          throw new NotFoundException(
-            this.errorMessageService.getMessageWithLanguage(
-              'STUDENT',
-              'NOT_FOUND',
-              user?.preferred_language || DEFAULT_LANGUAGE,
-            ),
-          );
-        }
-
-        // Filter internships by student's year and published status
+        // Students can see all published internships regardless of year
         pipeline.push({
           $match: {
             published: true,
-            year: student.year,
           },
         });
       }
@@ -547,30 +529,14 @@ export class InternshipService {
         deleted_at: null,
       };
 
-      // Students can only access published internships in their year
+      // Students can only access published internships (all years)
       if (user.role.name === RoleEnum.STUDENT) {
-        const StudentModel = tenantConnection.model(Student.name, StudentSchema);
-        const student = await StudentModel.findOne({
-          _id: new Types.ObjectId(user.id),
-          deleted_at: null,
-        }).select('year');
-
-        if (!student) {
-          throw new NotFoundException(
-            this.errorMessageService.getMessageWithLanguage(
-              'STUDENT',
-              'NOT_FOUND',
-              user?.preferred_language || DEFAULT_LANGUAGE,
-            ),
-          );
-        }
-
         // Add student-specific filters
         query.published = true;
-        query.year = student.year;
+        // Year restriction removed - students can access all published internships
         
         this.logger.log(
-          `Student ${user.id} (year ${student.year}) attempting to access internship ${id}`
+          `Student ${user.id} attempting to access internship ${id}`
         );
       }
 

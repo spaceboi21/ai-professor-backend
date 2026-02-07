@@ -35,6 +35,8 @@ import { InternshipCaseService } from './internship-case.service';
 import { InternshipSessionService } from './internship-session.service';
 import { InternshipFeedbackService } from './internship-feedback.service';
 import { InternshipLogbookService } from './internship-logbook.service';
+import { InternshipStageTrackingService } from './internship-stage-tracking.service';
+import { StageExportService } from './stage-export.service';
 
 // DTOs
 import { CreateInternshipDto } from './dto/create-internship.dto';
@@ -49,6 +51,13 @@ import { UpdateFeedbackDto } from './dto/update-feedback.dto';
 import { AddLogbookEntryDto } from './dto/add-logbook-entry.dto';
 import { InternshipFilterDto } from './dto/internship-filter.dto';
 import { UpdateSequenceDto } from './dto/update-sequence.dto';
+import {
+  UpdateStageProgressDto,
+  ValidateStageDto,
+  UpdateThresholdsDto,
+  DashboardFiltersDto,
+  ExportStageProgressDto,
+} from './dto/stage-tracking.dto';
 
 @ApiTags('Internships')
 @ApiBearerAuth()
@@ -61,6 +70,8 @@ export class InternshipController {
     private readonly sessionService: InternshipSessionService,
     private readonly feedbackService: InternshipFeedbackService,
     private readonly logbookService: InternshipLogbookService,
+    private readonly stageTrackingService: InternshipStageTrackingService,
+    private readonly stageExportService: StageExportService,
   ) {}
 
   // ========== INTERNSHIP MANAGEMENT ENDPOINTS ==========
@@ -379,6 +390,51 @@ export class InternshipController {
     return this.sessionService.getActiveSession(caseId, user);
   }
 
+  // ========== CROSS-SESSION MEMORY ENDPOINTS ==========
+
+  @Get(':internshipId/memory')
+  @Roles(RoleEnum.STUDENT, RoleEnum.PROFESSOR, RoleEnum.SCHOOL_ADMIN)
+  @ApiOperation({ 
+    summary: 'Get cross-session memory for an internship',
+    description: 'Retrieves the complete memory context including previous sessions, techniques learned, patient memory (safe place, trauma targets, etc.), and student progress tracking. This enables continuity across therapy sessions.'
+  })
+  @ApiParam({ name: 'internshipId', type: String, description: 'Internship ID' })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Memory retrieved successfully',
+    schema: {
+      example: {
+        found: true,
+        memory: {
+          total_sessions: 3,
+          current_session_number: 3,
+          patient_memory: {
+            techniques_learned: ['safe_place', 'container', 'bilateral_stimulation'],
+            safe_place_details: 'A quiet beach with warm sand and gentle waves',
+            trauma_targets: [],
+            current_sud_baseline: 6,
+            bilateral_stimulation_preferences: 'visual'
+          },
+          student_progress: {
+            skills_demonstrated: {
+              empathy: 5,
+              active_listening: 8,
+              trauma_processing: 3
+            },
+            areas_of_strength: ['rapport_building', 'safe_place_installation'],
+            areas_for_improvement: ['pacing', 'trauma_target_identification']
+          }
+        }
+      }
+    }
+  })
+  async getInternshipMemory(
+    @Param('internshipId') internshipId: string,
+    @User() user: JWTUserPayload,
+  ) {
+    return this.sessionService.getInternshipMemory(internshipId, user);
+  }
+
   // ========== FEEDBACK MANAGEMENT ENDPOINTS ==========
 
   @Post('sessions/:sessionId/feedback')
@@ -524,6 +580,159 @@ export class InternshipController {
     @User() user: JWTUserPayload,
   ) {
     return this.logbookService.updateProgressSummary(internshipId, summary, user);
+  }
+
+  // ========== STAGE TRACKING ENDPOINTS ==========
+
+  @Get('stage-tracking/:internshipId/dashboard')
+  @Roles(RoleEnum.SUPER_ADMIN, RoleEnum.SCHOOL_ADMIN, RoleEnum.PROFESSOR)
+  @ApiOperation({ 
+    summary: 'Get stage tracking dashboard for all students',
+    description: 'Get overview of all students progress through 3 stages with statistics'
+  })
+  @ApiParam({ name: 'internshipId', type: String, description: 'Internship ID' })
+  @ApiResponse({ status: 200, description: 'Dashboard data retrieved successfully' })
+  async getStageDashboard(
+    @Param('internshipId') internshipId: string,
+    @Query() filters: DashboardFiltersDto,
+    @User() user: JWTUserPayload,
+  ) {
+    return this.stageTrackingService.getDashboardData(internshipId, filters, user);
+  }
+
+  @Get('stage-tracking/:internshipId/student/:studentId')
+  @Roles(RoleEnum.SUPER_ADMIN, RoleEnum.SCHOOL_ADMIN, RoleEnum.PROFESSOR, RoleEnum.STUDENT)
+  @ApiOperation({ 
+    summary: 'Get detailed student view with timeline',
+    description: 'Get detailed view of student progress with session timeline, SUD/VoC evolution, and metrics'
+  })
+  @ApiParam({ name: 'internshipId', type: String, description: 'Internship ID' })
+  @ApiParam({ name: 'studentId', type: String, description: 'Student ID' })
+  @ApiResponse({ status: 200, description: 'Student detailed view retrieved successfully' })
+  async getStudentDetailedView(
+    @Param('internshipId') internshipId: string,
+    @Param('studentId') studentId: string,
+    @User() user: JWTUserPayload,
+  ) {
+    return this.stageTrackingService.getStudentDetailedView(
+      studentId,
+      internshipId,
+      user,
+    );
+  }
+
+  @Get('stage-tracking/:internshipId/student/:studentId/progress')
+  @Roles(RoleEnum.SUPER_ADMIN, RoleEnum.SCHOOL_ADMIN, RoleEnum.PROFESSOR, RoleEnum.STUDENT)
+  @ApiOperation({ 
+    summary: 'Get or create stage progress for a student',
+    description: 'Get the current stage progress for a student (creates if doesn\'t exist)'
+  })
+  @ApiParam({ name: 'internshipId', type: String, description: 'Internship ID' })
+  @ApiParam({ name: 'studentId', type: String, description: 'Student ID' })
+  @ApiResponse({ status: 200, description: 'Stage progress retrieved successfully' })
+  async getStageProgress(
+    @Param('internshipId') internshipId: string,
+    @Param('studentId') studentId: string,
+    @User() user: JWTUserPayload,
+  ) {
+    return this.stageTrackingService.getOrCreateStageProgress(
+      studentId,
+      internshipId,
+      user,
+    );
+  }
+
+  @Patch('stage-tracking/:internshipId/student/:studentId/progress')
+  @Roles(RoleEnum.SUPER_ADMIN, RoleEnum.SCHOOL_ADMIN, RoleEnum.PROFESSOR)
+  @ApiOperation({ 
+    summary: 'Update stage progress manually',
+    description: 'Manually update stage progress (status, score, metrics) for a student'
+  })
+  @ApiParam({ name: 'internshipId', type: String, description: 'Internship ID' })
+  @ApiParam({ name: 'studentId', type: String, description: 'Student ID' })
+  @ApiBody({ type: UpdateStageProgressDto })
+  @ApiResponse({ status: 200, description: 'Stage progress updated successfully' })
+  async updateStageProgress(
+    @Param('internshipId') internshipId: string,
+    @Param('studentId') studentId: string,
+    @Body() updateDto: UpdateStageProgressDto,
+    @User() user: JWTUserPayload,
+  ) {
+    return this.stageTrackingService.updateStageProgress(
+      studentId,
+      internshipId,
+      updateDto,
+      user,
+    );
+  }
+
+  @Post('stage-tracking/:internshipId/student/:studentId/validate')
+  @Roles(RoleEnum.SUPER_ADMIN, RoleEnum.SCHOOL_ADMIN, RoleEnum.PROFESSOR)
+  @ApiOperation({ 
+    summary: 'Validate a stage for a student',
+    description: 'Professor validates or marks a stage as needs revision'
+  })
+  @ApiParam({ name: 'internshipId', type: String, description: 'Internship ID' })
+  @ApiParam({ name: 'studentId', type: String, description: 'Student ID' })
+  @ApiBody({ type: ValidateStageDto })
+  @ApiResponse({ status: 200, description: 'Stage validated successfully' })
+  async validateStage(
+    @Param('internshipId') internshipId: string,
+    @Param('studentId') studentId: string,
+    @Body() validateDto: ValidateStageDto,
+    @User() user: JWTUserPayload,
+  ) {
+    return this.stageTrackingService.validateStage(
+      studentId,
+      internshipId,
+      validateDto,
+      user,
+    );
+  }
+
+  @Patch('stage-tracking/:internshipId/student/:studentId/thresholds')
+  @Roles(RoleEnum.SUPER_ADMIN, RoleEnum.SCHOOL_ADMIN, RoleEnum.PROFESSOR)
+  @ApiOperation({ 
+    summary: 'Update thresholds for a student',
+    description: 'Configure minimum score, minimum sessions, and validation requirements'
+  })
+  @ApiParam({ name: 'internshipId', type: String, description: 'Internship ID' })
+  @ApiParam({ name: 'studentId', type: String, description: 'Student ID' })
+  @ApiBody({ type: UpdateThresholdsDto })
+  @ApiResponse({ status: 200, description: 'Thresholds updated successfully' })
+  async updateThresholds(
+    @Param('internshipId') internshipId: string,
+    @Param('studentId') studentId: string,
+    @Body() thresholdsDto: UpdateThresholdsDto,
+    @User() user: JWTUserPayload,
+  ) {
+    return this.stageTrackingService.updateThresholds(
+      studentId,
+      internshipId,
+      thresholdsDto,
+      user,
+    );
+  }
+
+  @Post('stage-tracking/:internshipId/export')
+  @Roles(RoleEnum.SUPER_ADMIN, RoleEnum.SCHOOL_ADMIN, RoleEnum.PROFESSOR)
+  @ApiOperation({ 
+    summary: 'Export stage progress data',
+    description: 'Export stage progress to CSV or PDF format'
+  })
+  @ApiParam({ name: 'internshipId', type: String, description: 'Internship ID' })
+  @ApiBody({ type: ExportStageProgressDto })
+  @ApiResponse({ status: 200, description: 'Export generated successfully' })
+  async exportStageProgress(
+    @Param('internshipId') internshipId: string,
+    @Body() exportDto: ExportStageProgressDto,
+    @User() user: JWTUserPayload,
+  ) {
+    return this.stageExportService.exportStageProgress(
+      internshipId,
+      exportDto,
+      user,
+    );
   }
 }
 

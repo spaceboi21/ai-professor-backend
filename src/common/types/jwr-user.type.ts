@@ -12,6 +12,10 @@ export interface JWTUserPayload {
   };
   preferred_language: LanguageEnum;
   
+  // Multi-account support fields
+  username?: string;
+  account_code?: string;
+  
   // Simulation-related fields (only present when in simulation mode)
   is_simulation?: boolean;
   simulation_session_id?: string;

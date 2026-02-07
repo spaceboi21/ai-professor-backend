@@ -83,14 +83,14 @@ export class InternshipCase extends Document {
   // Session configuration
   @Prop({
     type: {
-      session_duration_minutes: { type: Number, default: 60 }, // Default 60 minutes
+      session_duration_minutes: { type: Number, default: 90 }, // Default 90 minutes for IA Stage
       max_sessions_allowed: { type: Number, default: null }, // null = unlimited
       allow_pause: { type: Boolean, default: true },
       auto_end_on_timeout: { type: Boolean, default: false },
       warning_before_timeout_minutes: { type: Number, default: 5 },
     },
     default: {
-      session_duration_minutes: 60,
+      session_duration_minutes: 90,
       max_sessions_allowed: null,
       allow_pause: true,
       auto_end_on_timeout: false,

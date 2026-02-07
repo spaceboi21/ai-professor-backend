@@ -44,8 +44,10 @@ import {
   ModuleAssignmentService,
   ManageModuleAssignmentsResponse,
 } from './module-assignment.service';
+import { DatabaseAuditService } from './database-audit.service';
 import { PaginationDto } from 'src/common/dto/pagination.dto';
 import { DifficultyEnum } from 'src/common/constants/difficulty.constant';
+import { MigrateChaptersDto, DeleteOrphanedModulesDto } from './dto/migrate-chapters.dto';
 
 @ApiTags('Modules')
 @ApiBearerAuth()
@@ -55,6 +57,7 @@ export class ModulesController {
   constructor(
     private readonly modulesService: ModulesService,
     private readonly moduleAssignmentService: ModuleAssignmentService,
+    private readonly databaseAuditService: DatabaseAuditService,
   ) {}
 
   @Post()
@@ -572,6 +575,141 @@ export class ModulesController {
       bulkUpdateDto.updates,
       user,
       bulkUpdateDto.school_id,
+    );
+  }
+
+  // ==================== DATABASE AUDIT & MAINTENANCE ENDPOINTS ====================
+
+  @Get('audit/database')
+  @Roles(RoleEnum.SUPER_ADMIN, RoleEnum.SCHOOL_ADMIN)
+  @ApiOperation({
+    summary: '[ADMIN] Audit school database for module/chapter issues',
+    description:
+      'Scans the school database to identify: orphaned modules (0 chapters), duplicate module titles, and data integrity issues. Use this before running migrations or cleanup.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Database audit completed successfully',
+    schema: {
+      example: {
+        school_id: '507f1f77bcf86cd799439011',
+        school_name: 'Psychology University',
+        total_modules: 15,
+        modules_with_chapters: 12,
+        modules_without_chapters: 3,
+        orphaned_modules: [
+          {
+            module_id: '690bee8cafd51a0922669890',
+            title: 'Introduction to Psychology',
+            chapter_count: 0,
+            created_at: '2024-01-15T10:30:00Z',
+            year: 1,
+          },
+        ],
+        duplicate_module_titles: [
+          {
+            title: 'introduction to psychology',
+            modules: [
+              {
+                module_id: '68bd8c756d00b1177b17ee7c',
+                title: 'Introduction to Psychology',
+                chapter_count: 4,
+                created_at: '2023-12-01T10:00:00Z',
+                year: 1,
+              },
+              {
+                module_id: '690bee8cafd51a0922669890',
+                title: 'Introduction to Psychology',
+                chapter_count: 0,
+                created_at: '2024-01-15T10:30:00Z',
+                year: 1,
+              },
+            ],
+            total_duplicates: 2,
+            has_chapters_conflict: true,
+          },
+        ],
+        recommendations: [
+          'Found 3 modules with 0 chapters. Consider deleting or migrating data.',
+          'Found 1 duplicate module titles where some have chapters and some don\'t. Use the migration endpoint to consolidate.',
+        ],
+      },
+    },
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden - Admin access required' })
+  async auditDatabase(@User() user: JWTUserPayload) {
+    return this.databaseAuditService.auditSchoolModules(user);
+  }
+
+  @Post('audit/migrate-chapters')
+  @Roles(RoleEnum.SUPER_ADMIN, RoleEnum.SCHOOL_ADMIN)
+  @ApiOperation({
+    summary: '[ADMIN] Migrate chapters from one module to another',
+    description:
+      'Moves all chapters from a source module to a target module. Useful for consolidating duplicate modules. Optionally deletes the source module after migration.',
+  })
+  @ApiBody({ type: MigrateChaptersDto })
+  @ApiResponse({
+    status: 200,
+    description: 'Chapters migrated successfully',
+    schema: {
+      example: {
+        success: true,
+        message: 'Successfully migrated 4 chapters from Introduction to Psychology to Introduction to Psychology',
+        chapters_migrated: 4,
+        source_module_id: '68bd8c756d00b1177b17ee7c',
+        target_module_id: '690bee8cafd51a0922669890',
+      },
+    },
+  })
+  @ApiResponse({ status: 400, description: 'Bad request' })
+  @ApiResponse({ status: 404, description: 'Module not found' })
+  async migrateChapters(
+    @Body() migrateDto: MigrateChaptersDto,
+    @User() user: JWTUserPayload,
+  ) {
+    return this.databaseAuditService.migrateChapters(
+      migrateDto.source_module_id,
+      migrateDto.target_module_id,
+      user,
+      migrateDto.delete_source_module || false,
+    );
+  }
+
+  @Delete('audit/orphaned-modules')
+  @Roles(RoleEnum.SUPER_ADMIN, RoleEnum.SCHOOL_ADMIN)
+  @ApiOperation({
+    summary: '[ADMIN] Delete orphaned modules (modules with 0 chapters)',
+    description:
+      'Removes all modules that have no associated chapters. By default, performs soft delete (sets deleted_at). Use hard_delete=true to permanently remove.',
+  })
+  @ApiBody({ type: DeleteOrphanedModulesDto })
+  @ApiResponse({
+    status: 200,
+    description: 'Orphaned modules deleted successfully',
+    schema: {
+      example: {
+        success: true,
+        message: 'Successfully soft-deleted 3 orphaned modules',
+        modules_deleted: 3,
+        deleted_module_ids: [
+          '690bee8cafd51a0922669890',
+          '690bee8cafd51a0922669891',
+          '690bee8cafd51a0922669892',
+        ],
+      },
+    },
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden - Admin access required' })
+  async deleteOrphanedModules(
+    @Body() deleteDto: DeleteOrphanedModulesDto,
+    @User() user: JWTUserPayload,
+  ) {
+    return this.databaseAuditService.deleteOrphanedModules(
+      user,
+      deleteDto.hard_delete || false,
     );
   }
 

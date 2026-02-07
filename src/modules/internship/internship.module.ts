@@ -11,6 +11,8 @@ import { InternshipCaseService } from './internship-case.service';
 import { InternshipSessionService } from './internship-session.service';
 import { InternshipFeedbackService } from './internship-feedback.service';
 import { InternshipLogbookService } from './internship-logbook.service';
+import { InternshipStageTrackingService } from './internship-stage-tracking.service';
+import { StageExportService } from './stage-export.service';
 import { PythonInternshipService } from './python-internship.service';
 import { InternshipS3Service } from './s3.service';
 
@@ -49,6 +51,8 @@ import {
     InternshipSessionService,
     InternshipFeedbackService,
     InternshipLogbookService,
+    InternshipStageTrackingService,
+    StageExportService,
     PythonInternshipService,
     InternshipS3Service,
     // Shared services
@@ -62,6 +66,7 @@ import {
     InternshipSessionService,
     InternshipFeedbackService,
     InternshipLogbookService,
+    InternshipStageTrackingService,
     PythonInternshipService,
   ],
 })

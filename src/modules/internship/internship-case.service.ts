@@ -180,16 +180,40 @@ export class InternshipCaseService {
   }
 
   /**
+   * Normalize a case document for API response (ensures _id, id, and caseId for frontend).
+   */
+  private normalizeCaseForResponse(caseData: any): any {
+    const idStr = caseData._id?.toString?.() ?? caseData._id;
+    return {
+      ...caseData,
+      _id: caseData._id,
+      id: idStr,
+      caseId: idStr,
+    };
+  }
+
+  /**
    * Get all cases for an internship
+   * Response: { message, data: Array<{ _id, id, caseId, internship_id, title, ... }> }
    */
   async findCasesByInternship(internshipId: string, user: JWTUserPayload) {
-    this.logger.log(`Finding cases for internship: ${internshipId}`);
+    this.logger.log(`[Cases] Finding cases for internship: ${internshipId}, user: ${user.id}, school_id: ${user.school_id}`);
+
+    // Validate internshipId is a valid MongoDB ObjectId (24 hex chars)
+    if (!internshipId || !Types.ObjectId.isValid(internshipId)) {
+      this.logger.warn(`[Cases] Invalid internshipId: "${internshipId}" (must be 24-char hex ObjectId)`);
+      throw new BadRequestException(
+        'Invalid internship ID. Use the internship _id from GET /api/internship.',
+      );
+    }
 
     // Validate school exists
     const school = await this.schoolModel.findById(user.school_id);
     if (!school) {
       throw new NotFoundException('School not found');
     }
+
+    this.logger.log(`[Cases] Using tenant DB: ${school.db_name}`);
 
     // Get tenant connection for the school
     const tenantConnection =
@@ -204,23 +228,34 @@ export class InternshipCaseService {
         .sort({ sequence: 1 })
         .lean();
 
-      // Filter sensitive fields for students
+      if (cases.length === 0) {
+        this.logger.warn(
+          `[Cases] No cases found for internshipId=${internshipId} in DB ${school.db_name}. ` +
+            'Check: (1) internshipId is the internship _id from GET /api/internship, (2) cases exist in tenant DB collection.',
+        );
+      } else {
+        this.logger.log(`[Cases] Found ${cases.length} case(s) for internship ${internshipId}`);
+      }
+
+      // Filter sensitive fields for students and normalize _id/id/caseId for all roles
       let filteredCases: any[] = cases;
       if (user.role.name === RoleEnum.STUDENT) {
-        filteredCases = cases.map(caseData => ({
-          _id: caseData._id,
-          internship_id: caseData.internship_id,
-          title: caseData.title,
-          description: caseData.description,
-          case_documents: caseData.case_documents || [],
-          sequence: caseData.sequence,
-          created_by: caseData.created_by,
-          created_at: caseData.created_at,
-          updated_at: caseData.updated_at,
-          // Safe metadata that doesn't reveal answers
-          difficulty: caseData.patient_simulation_config?.difficulty_level || null,
-          // Do NOT include sensitive teacher/admin fields
-        }));
+        filteredCases = cases.map(caseData =>
+          this.normalizeCaseForResponse({
+            _id: caseData._id,
+            internship_id: caseData.internship_id,
+            title: caseData.title,
+            description: caseData.description,
+            case_documents: caseData.case_documents || [],
+            sequence: caseData.sequence,
+            created_by: caseData.created_by,
+            created_at: caseData.created_at,
+            updated_at: caseData.updated_at,
+            difficulty: caseData.patient_simulation_config?.difficulty_level || null,
+          }),
+        );
+      } else {
+        filteredCases = cases.map(caseData => this.normalizeCaseForResponse(caseData));
       }
 
       return {
@@ -228,16 +263,27 @@ export class InternshipCaseService {
         data: filteredCases,
       };
     } catch (error) {
-      this.logger.error('Error finding cases', error?.stack || error);
+      this.logger.error(
+        `[Cases] Error finding cases for internship ${internshipId}:`,
+        error?.stack || error,
+      );
       throw new BadRequestException('Failed to retrieve cases');
     }
   }
 
   /**
    * Get single case by ID
+   * Response data includes _id, id, and caseId for frontend compatibility.
    */
   async findCaseById(caseId: string, user: JWTUserPayload) {
-    this.logger.log(`Finding case by id: ${caseId}`);
+    this.logger.log(`[Cases] Finding case by id: ${caseId}`);
+
+    if (!caseId || !Types.ObjectId.isValid(caseId)) {
+      this.logger.warn(`[Cases] Invalid caseId: "${caseId}"`);
+      throw new BadRequestException(
+        'Invalid case ID. Use the case _id or id from GET /api/internship/:internshipId/cases.',
+      );
+    }
 
     // Validate school exists
     const school = await this.schoolModel.findById(user.school_id);
@@ -257,6 +303,7 @@ export class InternshipCaseService {
       }).lean();
 
       if (!caseData) {
+        this.logger.warn(`[Cases] Case not found: ${caseId} in DB ${school.db_name}`);
         throw new NotFoundException('Case not found');
       }
 
@@ -268,10 +315,10 @@ export class InternshipCaseService {
 
       // Filter sensitive fields for students
       // Students should only see: title, description, case_documents, and sequence
-      // They should NOT see: case_content (the prompt), supervisor_prompts, therapist_prompts, 
+      // They should NOT see: case_content (the prompt), supervisor_prompts, therapist_prompts,
       // evaluation_criteria, or patient_simulation_config (internal AI configuration)
       if (user.role.name === RoleEnum.STUDENT) {
-        const studentSafeCase = {
+        const studentSafeCase = this.normalizeCaseForResponse({
           _id: caseWithUser._id,
           internship_id: caseWithUser.internship_id,
           title: caseWithUser.title,
@@ -281,15 +328,8 @@ export class InternshipCaseService {
           created_by: caseWithUser.created_by,
           created_at: caseWithUser.created_at,
           updated_at: caseWithUser.updated_at,
-          // Safe metadata that doesn't reveal answers
           difficulty: caseWithUser.patient_simulation_config?.difficulty_level || null,
-          // Do NOT include:
-          // - case_content (teacher's detailed prompt)
-          // - patient_simulation_config (full AI configuration)
-          // - supervisor_prompts (teacher's evaluation prompts)
-          // - therapist_prompts (teacher's guidance prompts)
-          // - evaluation_criteria (grading rubric)
-        };
+        });
 
         return {
           message: 'Case retrieved successfully',
@@ -299,11 +339,11 @@ export class InternshipCaseService {
 
       return {
         message: 'Case retrieved successfully',
-        data: caseWithUser,
+        data: this.normalizeCaseForResponse(caseWithUser),
       };
     } catch (error) {
-      this.logger.error('Error finding case', error?.stack || error);
-      if (error instanceof NotFoundException) {
+      this.logger.error(`[Cases] Error finding case ${caseId}:`, error?.stack || error);
+      if (error instanceof NotFoundException || error instanceof BadRequestException) {
         throw error;
       }
       throw new BadRequestException('Failed to retrieve case');

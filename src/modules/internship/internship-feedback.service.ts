@@ -41,6 +41,7 @@ import {
 import { ProgressStatusEnum } from 'src/common/constants/status.constant';
 import { RoleEnum } from 'src/common/constants/roles.constant';
 import { PythonInternshipService } from './python-internship.service';
+import { InternshipStageTrackingService } from './internship-stage-tracking.service';
 import { PaginationDto } from 'src/common/dto/pagination.dto';
 import {
   getPaginationOptions,
@@ -57,6 +58,7 @@ export class InternshipFeedbackService {
     private readonly tenantConnectionService: TenantConnectionService,
     private readonly errorMessageService: ErrorMessageService,
     private readonly pythonService: PythonInternshipService,
+    private readonly stageTrackingService: InternshipStageTrackingService,
   ) {}
 
   /**
@@ -168,6 +170,23 @@ export class InternshipFeedbackService {
       // Update session status to pending validation
       session.status = SessionStatusEnum.PENDING_VALIDATION;
       await session.save();
+
+      // Auto-update stage progress
+      try {
+        await this.stageTrackingService.autoUpdateStageProgress(
+          session.student_id.toString(),
+          session.internship_id.toString(),
+          session.case_id.toString(),
+          sessionId,
+          school.db_name,
+        );
+        this.logger.log(`Stage progress auto-updated for session: ${sessionId}`);
+      } catch (error) {
+        this.logger.error(
+          `Failed to auto-update stage progress: ${error.message}`,
+        );
+        // Don't fail the feedback generation if stage tracking fails
+      }
 
       this.logger.log(`Feedback generated: ${savedFeedback._id}`);
 
@@ -558,6 +577,10 @@ export class InternshipFeedbackService {
       CaseFeedbackLog.name,
       CaseFeedbackLogSchema,
     );
+    const SessionModel = tenantConnection.model(
+      StudentCaseSession.name,
+      StudentCaseSessionSchema,
+    );
 
     try {
       // Count total cases for this internship
@@ -566,15 +589,30 @@ export class InternshipFeedbackService {
         deleted_at: null,
       });
 
-      // Count completed cases (cases with validated feedback)
+      // Count completed cases (cases with validated feedback OR completed sessions)
       const completedFeedbacks = await FeedbackModel.find({
         student_id: studentId,
         status: { $in: [FeedbackStatusEnum.VALIDATED, FeedbackStatusEnum.REVISED] },
       }).distinct('case_id');
 
+      // Also count cases with at least one completed session (as fallback)
+      const completedSessionCases = await SessionModel.find({
+        student_id: studentId,
+        status: { $in: [SessionStatusEnum.COMPLETED, SessionStatusEnum.PENDING_VALIDATION] },
+        deleted_at: null,
+      }).distinct('case_id');
+
+      // Merge both lists (use Set to avoid duplicates)
+      const allCompletedCaseIds = [
+        ...new Set([
+          ...completedFeedbacks.map(id => id.toString()),
+          ...completedSessionCases.map(id => id.toString())
+        ])
+      ].map(id => new Types.ObjectId(id));
+
       // Filter completed cases to only count cases belonging to this internship
       const completedCasesForInternship = await InternshipCaseModel.countDocuments({
-        _id: { $in: completedFeedbacks },
+        _id: { $in: allCompletedCaseIds },
         internship_id: internshipId,
         deleted_at: null,
       });

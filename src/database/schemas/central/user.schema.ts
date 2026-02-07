@@ -20,8 +20,14 @@ import {
 export class User extends Document {
   declare _id: Types.ObjectId;
 
-  @Prop({ required: true, unique: true, index: true })
+  @Prop({ required: true, index: true }) // Removed unique constraint for multi-account support
   email: string;
+
+  @Prop({ index: true }) // Username as secondary identifier
+  username: string;
+
+  @Prop({ index: true }) // Account code as secondary identifier
+  account_code: string;
 
   @Prop()
   profile_pic: string;
@@ -72,3 +78,13 @@ export class User extends Document {
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);
+
+// Create compound unique index for email + school + role combination
+// This ensures a user can't have duplicate accounts with same email, school, and role
+UserSchema.index(
+  { email: 1, school_id: 1, role: 1, deleted_at: 1 },
+  { 
+    unique: true,
+    partialFilterExpression: { deleted_at: null }
+  }
+);

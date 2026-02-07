@@ -68,6 +68,63 @@ export interface SessionAnalysisResponse {
   message?: string;
 }
 
+// Cross-session memory interfaces
+export interface InternshipMemoryResponse {
+  found: boolean;
+  memory?: {
+    internship_id: string;
+    user_id: string;
+    total_sessions: number;
+    current_session_number: number;
+    sessions: any[];
+    patient_memory: {
+      techniques_learned: string[];
+      safe_place_details: string | null;
+      trauma_targets: any[];
+      current_sud_baseline: number | null;
+      bilateral_stimulation_preferences: string | null;
+    };
+    student_progress: {
+      skills_demonstrated: Record<string, number>;
+      areas_of_strength: string[];
+      areas_for_improvement: string[];
+      supervisor_notes: Array<{
+        note: string;
+        session_number: number;
+        timestamp: string;
+      }>;
+    };
+  };
+}
+
+export interface SaveSessionSummaryRequest {
+  internship_id: string;
+  user_id: string;
+  session_summary: {
+    session_number: number;
+    session_type: string;
+    duration_minutes: number;
+    key_activities: string[];
+    outcomes: string;
+    student_skills_demonstrated: string[];
+    feedback_highlights: string;
+  };
+}
+
+export interface UpdatePatientMemoryRequest {
+  internship_id: string;
+  user_id: string;
+  technique_learned?: string;
+  safe_place_details?: string;
+  trauma_target?: {
+    description: string;
+    sud: number;
+    emotion: string;
+  };
+  sud_level?: number;
+  bls_preference?: string;
+}
+
 @Injectable()
 export class PythonInternshipService {
   private readonly logger = new Logger(PythonInternshipService.name);
@@ -84,12 +141,23 @@ export class PythonInternshipService {
     caseId: string,
     patientProfile: Record<string, any>,
     scenarioConfig: Record<string, any>,
+    internshipId?: string,
+    userId?: string,
   ): Promise<PatientInitializeResponse> {
-    const payload = {
+    const payload: any = {
       case_id: caseId,
       patient_profile: patientProfile,
       scenario_config: scenarioConfig,
     };
+
+    // Add cross-session memory context if provided
+    if (internshipId && userId) {
+      payload.internship_id = internshipId;
+      payload.user_id = userId;
+      this.logger.log(
+        `Initializing patient with memory context: internship=${internshipId}, user=${userId}`,
+      );
+    }
 
     return this._post('/internship/patient/initialize', payload);
   }
@@ -267,6 +335,117 @@ export class PythonInternshipService {
       );
       // Don't throw - we still want MongoDB deletion to succeed
       return { success: false, error: error.message, case_id: caseId };
+    }
+  }
+
+  /**
+   * Get internship memory for cross-session continuity
+   * GET /api/v1/internship/memory/{internship_id}/{user_id}
+   */
+  async getInternshipMemory(
+    internshipId: string,
+    userId: string,
+  ): Promise<InternshipMemoryResponse> {
+    try {
+      this.logger.log(
+        `Getting internship memory: internship_id=${internshipId}, user_id=${userId}`,
+      );
+      
+      const response = await this._get(
+        `/internship/memory/${internshipId}/${userId}`,
+      );
+      
+      if (response.found) {
+        this.logger.log(
+          `Memory found: ${response.memory.total_sessions} sessions, ` +
+          `${response.memory.patient_memory.techniques_learned.length} techniques learned`,
+        );
+      } else {
+        this.logger.log('No existing memory found - this is the first session');
+      }
+      
+      return response;
+    } catch (error) {
+      this.logger.error(`Failed to get internship memory: ${error.message}`);
+      // Return empty memory instead of throwing - graceful degradation
+      return { found: false };
+    }
+  }
+
+  /**
+   * Save session summary to cross-session memory
+   * POST /api/v1/internship/memory/session-summary
+   */
+  async saveSessionSummary(
+    request: SaveSessionSummaryRequest,
+  ): Promise<any> {
+    try {
+      this.logger.log(
+        `Saving session summary: internship_id=${request.internship_id}, ` +
+        `session_number=${request.session_summary.session_number}`,
+      );
+      
+      // Extract query params
+      const { internship_id, user_id, session_summary } = request;
+      
+      // Build query string
+      const queryParams = new URLSearchParams({
+        internship_id,
+        user_id,
+      }).toString();
+      
+      const response = await this._post(
+        `/internship/memory/session-summary?${queryParams}`,
+        { session_summary },
+      );
+      
+      this.logger.log(
+        `Session summary saved successfully: session ${session_summary.session_number}`,
+      );
+      
+      return response;
+    } catch (error) {
+      this.logger.error(`Failed to save session summary: ${error.message}`);
+      // Don't throw - session is already completed in NestJS
+      // Just log the error
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * Update patient memory (techniques learned, safe place, trauma targets, etc.)
+   * POST /api/v1/internship/memory/update-patient-memory
+   */
+  async updatePatientMemory(
+    request: UpdatePatientMemoryRequest,
+  ): Promise<any> {
+    try {
+      this.logger.log(
+        `Updating patient memory: internship_id=${request.internship_id}, ` +
+        `technique=${request.technique_learned || 'N/A'}`,
+      );
+      
+      // Extract query params
+      const { internship_id, user_id, ...bodyData } = request;
+      
+      // Build query string
+      const queryParams = new URLSearchParams({
+        internship_id,
+        user_id,
+      }).toString();
+      
+      const response = await this._post(
+        `/internship/memory/update-patient-memory?${queryParams}`,
+        bodyData,
+      );
+      
+      this.logger.log('Patient memory updated successfully');
+      
+      return response;
+    } catch (error) {
+      this.logger.error(`Failed to update patient memory: ${error.message}`);
+      // Don't throw - memory update is optional
+      return { success: false, error: error.message };
     }
   }
 

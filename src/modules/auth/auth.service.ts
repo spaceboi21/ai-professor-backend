@@ -1286,4 +1286,344 @@ export class AuthService {
       };
     }
   }
+
+  /**
+   * Check if email has multiple accounts
+   */
+  async checkMultipleAccounts(email: string): Promise<{
+    has_multiple_accounts: boolean;
+    accounts_count: number;
+    accounts: any[];
+  }> {
+    this.logger.log(`Checking multiple accounts for email: ${email}`);
+
+    const encryptedEmail = this.emailEncryptionService.encryptEmail(email);
+
+    const accounts = await this.userModel
+      .find({
+        email: encryptedEmail,
+        deleted_at: null,
+        status: StatusEnum.ACTIVE,
+      })
+      .populate('role', 'name')
+      .populate('school_id', 'name')
+      .select('_id first_name last_name username account_code role school_id status')
+      .lean();
+
+    const accountList = accounts.map((account: any) => ({
+      account_id: account._id.toString(),
+      school_name: account.school_id?.name || 'N/A',
+      school_id: account.school_id?._id?.toString() || null,
+      role_name: account.role?.name || 'Unknown',
+      username: account.username || null,
+      account_code: account.account_code || null,
+      first_name: account.first_name,
+      last_name: account.last_name,
+      status: account.status,
+    }));
+
+    return {
+      has_multiple_accounts: accounts.length > 1,
+      accounts_count: accounts.length,
+      accounts: accountList,
+    };
+  }
+
+  /**
+   * Unified login with account selection support
+   */
+  async unifiedLogin(
+    email: string,
+    password: string,
+    accountId?: string,
+    rememberMe: boolean = false,
+    preferred_language?: LanguageEnum,
+    req?: Request,
+  ): Promise<any> {
+    this.logger.log(`Unified login attempt for: ${email}`);
+
+    const encryptedEmail = this.emailEncryptionService.encryptEmail(email);
+
+    // Find all active accounts with this email
+    const accounts = await this.userModel
+      .find({
+        email: encryptedEmail,
+        deleted_at: null,
+        status: StatusEnum.ACTIVE,
+      })
+      .select('+password')
+      .populate('role', 'name')
+      .populate('school_id', 'name db_name')
+      .lean();
+
+    if (accounts.length === 0) {
+      throw new UnauthorizedException({
+        message: {
+          en: 'User not found or account is inactive',
+          fr: 'Utilisateur introuvable ou compte inactif',
+        },
+      });
+    }
+
+    // Verify password with first account (all accounts should have same password)
+    const isPasswordMatch = await this.bcryptUtil.comparePassword(
+      password,
+      accounts[0].password,
+    );
+
+    if (!isPasswordMatch) {
+      throw new BadRequestException({
+        message: {
+          en: 'Invalid email or password',
+          fr: 'Email ou mot de passe invalide',
+        },
+      });
+    }
+
+    // If multiple accounts exist and no account ID provided, return account selection
+    if (accounts.length > 1 && !accountId) {
+      const accountList = accounts.map((account: any) => ({
+        account_id: account._id.toString(),
+        school_name: account.school_id?.name || 'N/A',
+        school_id: account.school_id?._id?.toString() || null,
+        role_name: account.role?.name || 'Unknown',
+        username: account.username || null,
+        account_code: account.account_code || null,
+        first_name: account.first_name,
+        last_name: account.last_name,
+        status: account.status,
+      }));
+
+      return {
+        requires_account_selection: true,
+        accounts_count: accounts.length,
+        accounts: accountList,
+        message: 'Multiple accounts found. Please select an account to continue.',
+      };
+    }
+
+    // Select the account
+    let selectedAccount;
+    if (accountId) {
+      selectedAccount = accounts.find(acc => acc._id.toString() === accountId);
+      if (!selectedAccount) {
+        throw new BadRequestException('Invalid account selection');
+      }
+    } else {
+      // Single account, use it
+      selectedAccount = accounts[0];
+    }
+
+    // Update preferred language if provided
+    let updatedPreferredLanguage = selectedAccount.preferred_language;
+    if (preferred_language && preferred_language !== selectedAccount.preferred_language) {
+      await this.userModel.findByIdAndUpdate(selectedAccount._id, {
+        preferred_language,
+        last_logged_in: new Date(),
+      });
+      updatedPreferredLanguage = preferred_language;
+    } else {
+      await this.userModel.findByIdAndUpdate(selectedAccount._id, {
+        last_logged_in: new Date(),
+      });
+    }
+
+    // Generate tokens
+    const tokenPair = this.tokenUtil.generateTokenPair({
+      email: email, // Decrypted email
+      id: selectedAccount._id.toString(),
+      role_id: selectedAccount.role._id.toString(),
+      role_name: selectedAccount.role.name as RoleEnum,
+      school_id: selectedAccount.school_id?._id?.toString(),
+      username: selectedAccount.username,
+      account_code: selectedAccount.account_code,
+    });
+
+    // Log activity
+    if (req) {
+      try {
+        const description = getActivityDescription(ActivityTypeEnum.USER_LOGIN, true);
+        await this.activityLogService.createActivityLog({
+          activity_type: ActivityTypeEnum.USER_LOGIN,
+          description: {
+            en: description.en,
+            fr: description.fr,
+          },
+          performed_by: selectedAccount._id,
+          performed_by_role: selectedAccount.role.name as RoleEnum,
+          school_id: selectedAccount.school_id?._id,
+          school_name: selectedAccount.school_id?.name,
+          ip_address: req.ip || 'unknown',
+          user_agent: req.headers['user-agent'] || 'unknown',
+          is_success: true,
+          endpoint: req.url || '/api/auth/unified-login',
+          http_method: req.method || 'POST',
+          http_status_code: 200,
+          status: 'SUCCESS',
+          metadata: {
+            login_type: 'unified',
+            user_role: selectedAccount.role.name,
+            account_id: selectedAccount._id.toString(),
+          },
+        });
+      } catch (error) {
+        this.logger.error('Failed to log unified login activity:', error);
+        // Don't throw error to not break login flow
+      }
+    }
+
+    return {
+      message: 'Login successful',
+      data: {
+        access_token: tokenPair.access_token,
+        refresh_token: tokenPair.refresh_token,
+        user: {
+          id: selectedAccount._id.toString(),
+          email: email,
+          first_name: selectedAccount.first_name,
+          last_name: selectedAccount.last_name,
+          username: selectedAccount.username,
+          account_code: selectedAccount.account_code,
+          role: {
+            _id: selectedAccount.role._id.toString(),
+            name: selectedAccount.role.name,
+          },
+          school: selectedAccount.school_id
+            ? {
+                _id: selectedAccount.school_id._id.toString(),
+                name: selectedAccount.school_id.name,
+              }
+            : null,
+          preferred_language: updatedPreferredLanguage,
+          status: selectedAccount.status,
+        },
+      },
+    };
+  }
+
+  /**
+   * Forgot password with multi-account support
+   */
+  async forgotPasswordMultiAccount(forgotPasswordDto: ForgotPasswordDto) {
+    const { email } = forgotPasswordDto;
+    this.logger.log(`Forgot password request for: ${email}`);
+
+    const encryptedEmail = this.emailEncryptionService.encryptEmail(email);
+
+    // Find all active accounts with this email
+    const accounts = await this.userModel
+      .find({
+        email: encryptedEmail,
+        deleted_at: null,
+        status: StatusEnum.ACTIVE,
+      })
+      .populate('role', 'name')
+      .populate('school_id', 'name')
+      .select('_id first_name last_name username account_code role school_id preferred_language')
+      .lean();
+
+    if (accounts.length === 0) {
+      // Don't reveal if email exists or not (security)
+      return {
+        message: {
+          en: 'If an account with that email exists, a password reset link has been sent.',
+          fr: 'Si un compte avec cet email existe, un lien de réinitialisation a été envoyé.',
+        },
+      };
+    }
+
+    // If single account, send direct reset link
+    if (accounts.length === 1) {
+      const resetToken = this.jwtUtil.generateToken({
+        id: accounts[0]._id.toString(),
+        email: email,
+        role_id: (accounts[0].role as any)._id.toString(),
+        role_name: (accounts[0].role as any).name as RoleEnum,
+        school_id: (accounts[0].school_id as any)?._id?.toString(),
+      });
+
+      const backendUrl = this.configService.get<string>('BACKEND_URL') || 'http://localhost:3000';
+      const userLanguage = accounts[0].preferred_language || DEFAULT_LANGUAGE;
+      const resetPasswordLink =
+        userLanguage === LanguageEnum.FRENCH
+          ? `${backendUrl}/static/reset-password-fr.html?token=${resetToken}`
+          : `${backendUrl}/static/reset-password.html?token=${resetToken}`;
+
+      await this.mailService.sendPasswordResetEmail(
+        email,
+        `${accounts[0].first_name} ${accounts[0].last_name}`,
+        resetPasswordLink,
+        accounts[0].preferred_language,
+      );
+
+      return {
+        message: {
+          en: 'Password reset link has been sent to your email.',
+          fr: 'Un lien de réinitialisation du mot de passe a été envoyé à votre email.',
+        },
+      };
+    }
+
+    // Multiple accounts - return account selection required
+    const accountList = accounts.map((account: any) => ({
+      account_id: account._id.toString(),
+      school_name: account.school_id?.name || 'N/A',
+      role_name: account.role?.name || 'Unknown',
+      username: account.username || null,
+      account_code: account.account_code || null,
+      first_name: account.first_name,
+      last_name: account.last_name,
+    }));
+
+    return {
+      requires_account_selection: true,
+      accounts_count: accounts.length,
+      accounts: accountList,
+      message: {
+        en: 'Multiple accounts found. Please select which account to reset.',
+        fr: 'Plusieurs comptes trouvés. Veuillez sélectionner le compte à réinitialiser.',
+      },
+    };
+  }
+
+  /**
+   * Reset password for specific account
+   */
+  async resetPasswordForAccount(
+    accountId: string,
+    newPassword: string,
+    resetToken: string,
+  ) {
+    this.logger.log(`Password reset for account: ${accountId}`);
+
+    try {
+      // Verify reset token
+      const decoded = this.jwtUtil.verifyToken(resetToken);
+      if (decoded.id !== accountId) {
+        throw new BadRequestException('Invalid reset token for this account');
+      }
+
+      // Hash new password
+      const hashedPassword = await this.bcryptUtil.hashPassword(newPassword);
+
+      // Update password
+      await this.userModel.findByIdAndUpdate(accountId, {
+        password: hashedPassword,
+        updated_at: new Date(),
+      });
+
+      return {
+        message: {
+          en: 'Password reset successful. You can now login with your new password.',
+          fr: 'Réinitialisation du mot de passe réussie. Vous pouvez maintenant vous connecter.',
+        },
+      };
+    } catch (error) {
+      this.logger.error('Error resetting password for account:', error);
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
+      throw new BadRequestException('Invalid or expired reset token');
+    }
+  }
 }

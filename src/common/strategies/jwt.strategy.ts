@@ -28,6 +28,9 @@ export interface JWTPayload {
   role_name: string;
   preferred_language?: string;
   token_type: 'access';
+  // Multi-account support fields
+  username?: string;
+  account_code?: string;
   // Simulation-related fields
   is_simulation?: boolean;
   simulation_session_id?: string;
@@ -139,6 +142,9 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
             (payload.preferred_language as LanguageEnum) ||
             studentData.preferred_language ||
             DEFAULT_LANGUAGE,
+          // Include multi-account fields if present
+          ...(payload.username && { username: payload.username }),
+          ...(payload.account_code && { account_code: payload.account_code }),
           // Include simulation fields if present
           ...(payload.is_simulation && {
             is_simulation: payload.is_simulation,
@@ -208,6 +214,9 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
             (payload.preferred_language as LanguageEnum) ||
             user.preferred_language ||
             DEFAULT_LANGUAGE,
+          // Include multi-account fields from user document
+          ...(user.username && { username: user.username }),
+          ...(user.account_code && { account_code: user.account_code }),
         };
       }
     } catch (error) {

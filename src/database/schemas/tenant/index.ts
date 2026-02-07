@@ -14,3 +14,4 @@ export * from './ai-chat-message.schema';
 export * from './ai-chat-feedback.schema';
 export * from './ai-resource.schema';
 export * from './learning-log-review.schema';
+export * from './internship-stage-progress.schema';

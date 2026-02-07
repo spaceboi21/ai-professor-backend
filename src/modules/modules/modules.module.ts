@@ -3,6 +3,7 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { ModulesService } from './modules.service';
 import { ModulesController } from './modules.controller';
 import { ModuleAssignmentService } from './module-assignment.service';
+import { DatabaseAuditService } from './database-audit.service';
 import { User, UserSchema } from 'src/database/schemas/central/user.schema';
 import {
   School,
@@ -25,7 +26,13 @@ import { HttpModule } from '@nestjs/axios';
     HttpModule,
   ],
   controllers: [ModulesController],
-  providers: [ModulesService, ModuleAssignmentService, NotificationsService, PythonService],
+  providers: [
+    ModulesService,
+    ModuleAssignmentService,
+    DatabaseAuditService,
+    NotificationsService,
+    PythonService,
+  ],
   exports: [ModulesService, ModuleAssignmentService],
 })
 export class ModulesModule {}

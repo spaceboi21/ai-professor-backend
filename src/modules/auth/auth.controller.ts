@@ -29,6 +29,11 @@ import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { UpdatePreferredLanguageDto } from './dto/update-preferred-language.dto';
 import { LoginResponseDto } from './dto/login-response.dto';
 import { UserMeResponseDto } from './dto/user-me-response.dto';
+import {
+  CheckMultipleAccountsDto,
+  SelectAccountDto,
+  MultipleAccountsResponseDto,
+} from './dto/account-selection.dto';
 
 @ApiTags('Auth')
 @Controller('auth')
@@ -181,6 +186,168 @@ export class AuthController {
     return this.authService.updatePreferredLanguage(
       user,
       updatePreferredLanguageDto,
+    );
+  }
+
+  /**
+   * Check if email has multiple accounts (Step 1 of login)
+   */
+  @Post('check-multiple-accounts')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Check if email has multiple accounts',
+    description: 'Step 1: Check if user needs to select account',
+  })
+  @ApiBody({ type: CheckMultipleAccountsDto })
+  @ApiResponse({
+    status: 200,
+    description: 'Account check completed',
+    type: MultipleAccountsResponseDto,
+  })
+  async checkMultipleAccounts(@Body() dto: CheckMultipleAccountsDto) {
+    return this.authService.checkMultipleAccounts(dto.email);
+  }
+
+  /**
+   * Unified login endpoint (handles both single and multi-account)
+   */
+  @Post('unified-login')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Unified login for all user types',
+    description: 'Handles single account and multi-account scenarios',
+  })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        email: { type: 'string', example: 'user@example.com' },
+        password: { type: 'string', example: 'Password123!' },
+        account_id: {
+          type: 'string',
+          example: '507f1f77bcf86cd799439011',
+        },
+        remember_me: { type: 'boolean', example: false },
+        preferred_language: { type: 'string', example: 'en' },
+      },
+      required: ['email', 'password'],
+    },
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Login successful or account selection required',
+  })
+  @ApiResponse({ status: 400, description: 'Invalid credentials' })
+  @ApiResponse({ status: 404, description: 'User not found' })
+  async unifiedLogin(
+    @Body()
+    body: {
+      email: string;
+      password: string;
+      account_id?: string;
+      remember_me?: boolean;
+      preferred_language?: string;
+    },
+    @Req() req: Request,
+  ) {
+    return this.authService.unifiedLogin(
+      body.email,
+      body.password,
+      body.account_id,
+      body.remember_me || false,
+      body.preferred_language as any,
+      req,
+    );
+  }
+
+  /**
+   * Select account after multi-account detection
+   */
+  @Post('select-account')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Select account when multiple accounts exist',
+    description: 'Step 2: Login to selected account',
+  })
+  @ApiBody({ type: SelectAccountDto })
+  @ApiResponse({
+    status: 200,
+    description: 'Login successful',
+    type: LoginResponseDto,
+  })
+  @ApiResponse({ status: 400, description: 'Invalid account selection' })
+  async selectAccount(@Body() dto: SelectAccountDto, @Req() req: Request) {
+    return this.authService.unifiedLogin(
+      dto.email,
+      dto.password,
+      dto.account_id,
+      false,
+      undefined,
+      req,
+    );
+  }
+
+  /**
+   * Forgot password with multi-account support
+   */
+  @Post('forgot-password-multi')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Forgot password with multi-account support',
+    description: 'Handles password reset for emails with multiple accounts',
+  })
+  @ApiBody({ type: ForgotPasswordDto })
+  @ApiResponse({
+    status: 200,
+    description: 'Password reset initiated or account selection required',
+  })
+  async forgotPasswordMulti(@Body() dto: ForgotPasswordDto) {
+    return this.authService.forgotPasswordMultiAccount(dto);
+  }
+
+  /**
+   * Reset password for specific account
+   */
+  @Post('reset-password-account')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Reset password for specific account',
+    description: 'Resets password for a specific account when multiple exist',
+  })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        account_id: {
+          type: 'string',
+          example: '507f1f77bcf86cd799439011',
+        },
+        new_password: { type: 'string', example: 'NewPassword123!' },
+        reset_token: {
+          type: 'string',
+          example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
+        },
+      },
+      required: ['account_id', 'new_password', 'reset_token'],
+    },
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Password reset successful',
+  })
+  @ApiResponse({ status: 400, description: 'Invalid or expired token' })
+  async resetPasswordForAccount(
+    @Body()
+    body: {
+      account_id: string;
+      new_password: string;
+      reset_token: string;
+    },
+  ) {
+    return this.authService.resetPasswordForAccount(
+      body.account_id,
+      body.new_password,
+      body.reset_token,
     );
   }
 }

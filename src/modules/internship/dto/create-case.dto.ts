@@ -43,6 +43,57 @@ class EvaluationCriterionDto {
   weight: number;
 }
 
+class SessionConfigDto {
+  @ApiPropertyOptional({ 
+    description: 'Session duration in minutes', 
+    example: 90,
+    default: 90 
+  })
+  @IsOptional()
+  @IsNumber()
+  @Type(() => Number)
+  @Min(15)
+  @Max(300)
+  session_duration_minutes?: number;
+
+  @ApiPropertyOptional({ 
+    description: 'Maximum sessions allowed (null = unlimited)', 
+    example: null 
+  })
+  @IsOptional()
+  @IsNumber()
+  @Type(() => Number)
+  max_sessions_allowed?: number | null;
+
+  @ApiPropertyOptional({ 
+    description: 'Allow session pause', 
+    example: true,
+    default: true 
+  })
+  @IsOptional()
+  allow_pause?: boolean;
+
+  @ApiPropertyOptional({ 
+    description: 'Auto-end session on timeout', 
+    example: false,
+    default: false 
+  })
+  @IsOptional()
+  auto_end_on_timeout?: boolean;
+
+  @ApiPropertyOptional({ 
+    description: 'Warning before timeout (in minutes)', 
+    example: 5,
+    default: 5 
+  })
+  @IsOptional()
+  @IsNumber()
+  @Type(() => Number)
+  @Min(1)
+  @Max(30)
+  warning_before_timeout_minutes?: number;
+}
+
 export class CreateCaseDto {
   @ApiProperty({
     description: 'Title of the case',
@@ -130,5 +181,22 @@ export class CreateCaseDto {
   @ValidateNested({ each: true })
   @Type(() => EvaluationCriterionDto)
   evaluation_criteria?: EvaluationCriterionDto[];
+
+  @ApiPropertyOptional({
+    description: 'Session configuration (duration, pause settings, etc.)',
+    type: SessionConfigDto,
+    example: {
+      session_duration_minutes: 90,
+      max_sessions_allowed: null,
+      allow_pause: true,
+      auto_end_on_timeout: false,
+      warning_before_timeout_minutes: 5,
+    },
+  })
+  @IsOptional()
+  @IsObject()
+  @ValidateNested()
+  @Type(() => SessionConfigDto)
+  session_config?: SessionConfigDto;
 }
 

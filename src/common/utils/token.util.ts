@@ -11,6 +11,8 @@ export interface AccessTokenPayload {
   role_id: string;
   role_name: RoleEnum;
   school_id?: string;
+  username?: string;
+  account_code?: string;
   token_type: 'access';
   exp?: number;
 }
@@ -21,6 +23,8 @@ export interface RefreshTokenPayload {
   role_id: string;
   role_name: RoleEnum;
   school_id?: string;
+  username?: string;
+  account_code?: string;
   token_type: 'refresh';
   exp?: number;
 }

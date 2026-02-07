@@ -129,8 +129,27 @@ export class InternshipSessionService {
       });
       const sessionNumber = totalPreviousSessions + 1;
 
-      // Initialize session with Python backend
+      // Fetch cross-session memory for continuity
+      const internshipIdStr = caseData.internship_id.toString();
+      const userIdStr = typeof user.id === 'string' ? user.id : user.id.toString();
+      const memory = await this.pythonService.getInternshipMemory(
+        internshipIdStr,
+        userIdStr,
+      );
+
+      // Log memory status
+      if (memory.found && memory.memory) {
+        this.logger.log(
+          `Found existing memory: ${memory.memory.total_sessions} previous sessions, ` +
+          `${memory.memory.patient_memory?.techniques_learned?.length || 0} techniques learned`,
+        );
+      } else {
+        this.logger.log('No existing memory - this is the first session in this internship');
+      }
+
+      // Initialize session with Python backend (with graceful fallback)
       let pythonSessionId: string | null = null;
+      let pythonBackendAvailable = true;
 
       if (session_type === SessionTypeEnum.PATIENT_INTERVIEW) {
         // Validate patient_simulation_config exists and has required fields
@@ -182,12 +201,26 @@ export class InternshipSessionService {
         // Log what we're sending to Python API for debugging
         this.logger.debug(`Sending to Python API: case_id=${case_id}, patient_profile=${JSON.stringify(caseData.patient_simulation_config.patient_profile)}`);
 
-        const pythonResponse = await this.pythonService.initializePatientSession(
-          case_id,
-          caseData.patient_simulation_config.patient_profile,
-          scenarioConfig,
-        );
-        pythonSessionId = pythonResponse.session_id;
+        // Try to initialize with cross-session memory context, with graceful fallback
+        try {
+          const pythonResponse = await this.pythonService.initializePatientSession(
+            case_id,
+            caseData.patient_simulation_config.patient_profile,
+            scenarioConfig,
+            internshipIdStr,  // Pass internship ID for memory
+            userIdStr,        // Pass user ID for memory
+          );
+          pythonSessionId = pythonResponse.session_id;
+          this.logger.log(`✅ Python backend initialized successfully: session_id=${pythonSessionId}`);
+        } catch (error) {
+          // Log error but allow session creation to continue
+          this.logger.warn(
+            `⚠️ Python AI backend temporarily unavailable: ${error.message}\n` +
+            `Session will be created in DEGRADED mode (no AI patient responses until backend recovers)`
+          );
+          pythonBackendAvailable = false;
+          pythonSessionId = null;
+        }
       } else if (session_type === SessionTypeEnum.THERAPIST_CONSULTATION) {
         // Get previous patient session for context
         const patientSession = await SessionModel.findOne({
@@ -201,12 +234,23 @@ export class InternshipSessionService {
 
         const sessionHistory = patientSession?.messages || [];
 
-        const pythonResponse = await this.pythonService.initializeTherapistSession(
-          case_id,
-          sessionHistory,
-          { student_id: user.id },
-        );
-        pythonSessionId = pythonResponse.session_id;
+        try {
+          const pythonResponse = await this.pythonService.initializeTherapistSession(
+            case_id,
+            sessionHistory,
+            { student_id: user.id },
+          );
+          pythonSessionId = pythonResponse.session_id;
+          this.logger.log(`✅ Python backend initialized successfully: session_id=${pythonSessionId}`);
+        } catch (error) {
+          // Log error but allow session creation to continue
+          this.logger.warn(
+            `⚠️ Python AI backend temporarily unavailable: ${error.message}\n` +
+            `Session will be created in DEGRADED mode (no AI therapist responses until backend recovers)`
+          );
+          pythonBackendAvailable = false;
+          pythonSessionId = null;
+        }
       }
 
       // Create session in database
@@ -240,8 +284,20 @@ export class InternshipSessionService {
       this.logger.log(`Session created: ${savedSession._id}`);
 
       return {
-        message: 'Session created successfully',
+        message: pythonBackendAvailable 
+          ? 'Session created successfully' 
+          : 'Session created successfully (AI backend temporarily unavailable - you can send messages but AI responses may be delayed)',
         data: savedSession,
+        memory_context: {
+          has_previous_sessions: memory.found,
+          total_previous_sessions: memory.found && memory.memory ? memory.memory.total_sessions : 0,
+          techniques_learned: memory.found && memory.memory ? (memory.memory.patient_memory?.techniques_learned || []) : [],
+          safe_place_details: memory.found && memory.memory ? (memory.memory.patient_memory?.safe_place_details || null) : null,
+        },
+        degraded_mode: !pythonBackendAvailable,
+        degraded_reason: !pythonBackendAvailable 
+          ? 'AI simulation backend is temporarily unavailable. Sessions can still be created, but AI responses will not be available until the backend recovers.' 
+          : null,
       };
     } catch (error) {
       this.logger.error('Error creating session', error?.stack || error);
@@ -311,27 +367,102 @@ export class InternshipSessionService {
       let aiRole: MessageRoleEnum = MessageRoleEnum.AI_PATIENT; // Default value
 
       if (session.session_type === SessionTypeEnum.PATIENT_INTERVIEW) {
-        // Validate patient_session_id exists
+        // Check if patient_session_id exists (null means degraded mode)
         if (!session.patient_session_id) {
-          this.logger.error(`Session ${sessionId} has no patient_session_id. Session data: ${JSON.stringify(session)}`);
-          throw new BadRequestException(
-            'Patient session not properly initialized. Please create a new session.'
+          this.logger.warn(
+            `Session ${sessionId} created in degraded mode (no patient_session_id). ` +
+            `Attempting to initialize Python session now...`
           );
+          
+          // Try to initialize Python session now
+          try {
+            const CaseModel = tenantConnection.model(InternshipCase.name, InternshipCaseSchema);
+            const caseData = await CaseModel.findById(session.case_id);
+            
+            if (caseData?.patient_simulation_config) {
+              const normalizedConfig = normalizePatientSimulationConfig(
+                caseData.patient_simulation_config
+              );
+              
+              const scenarioConfig: Record<string, any> = {
+                scenario_type: normalizedConfig.scenario_type,
+                difficulty_level: normalizedConfig.difficulty_level,
+                interview_focus: normalizedConfig.interview_focus || 'assessment_and_diagnosis',
+                patient_openness: normalizedConfig.patient_openness || 'moderately_forthcoming',
+              };
+              
+              const internshipIdStr = session.internship_id.toString();
+              const userIdStr = typeof user.id === 'string' ? user.id : user.id.toString();
+              
+              const pythonResponse = await this.pythonService.initializePatientSession(
+                session.case_id.toString(),
+                caseData.patient_simulation_config.patient_profile,
+                scenarioConfig,
+                internshipIdStr,
+                userIdStr,
+              );
+              
+              // Update session with patient_session_id
+              session.patient_session_id = pythonResponse.session_id;
+              this.logger.log(`✅ Python backend recovered! Session ${sessionId} now has patient_session_id: ${pythonResponse.session_id}`);
+            }
+          } catch (error) {
+            this.logger.error(`Failed to initialize Python session on message send: ${error.message}`);
+            throw new BadRequestException(
+              'AI patient simulation is temporarily unavailable. ' +
+              'The AI backend is currently down or restarting. ' +
+              'Please try again in a few moments, or contact support if the issue persists.'
+            );
+          }
         }
 
-        // Build context with required fields for Python API
-        const messageNumber = session.messages.length; // Current message count (includes the one we just added)
-        const sessionStartTime = session.started_at || session.created_at || new Date();
-        const elapsedTimeMs = Date.now() - new Date(sessionStartTime).getTime();
-        const elapsedTimeMinutes = Math.floor(elapsedTimeMs / 60000); // Convert to minutes
+      // Build rich context with EMDR phase information
+      const messageNumber = session.messages.length; // Current message count (includes the one we just added)
+      const sessionStartTime = session.started_at || session.created_at || new Date();
+      const elapsedTimeMs = Date.now() - new Date(sessionStartTime).getTime();
+      const elapsedTimeMinutes = Math.floor(elapsedTimeMs / 60000); // Convert to minutes
 
-        const context = {
-          message_number: messageNumber,
-          elapsed_time_minutes: elapsedTimeMinutes,
-          ...(metadata || {}), // Include any additional metadata
-        };
+      // Fetch memory to get current phase/stage information
+      const internshipIdStr = session.internship_id.toString();
+      const userIdStr = typeof user.id === 'string' ? user.id : user.id.toString();
+      let memory: any = null;
+      try {
+        const memoryResponse = await this.pythonService.getInternshipMemory(
+          internshipIdStr,
+          userIdStr,
+        );
+        memory = memoryResponse.found ? memoryResponse.memory : null;
+      } catch (error) {
+        this.logger.warn('Failed to fetch memory for context', error);
+      }
 
-        this.logger.debug(`Sending message to Python API - Session ID: ${session.patient_session_id}, Message: ${message.substring(0, 50)}...`);
+      // Determine current EMDR phase based on memory and message history
+      const currentPhase = this.determineCurrentEMDRPhase(session.messages, memory);
+
+      const context = {
+        message_number: messageNumber,
+        elapsed_time_minutes: elapsedTimeMinutes,
+        
+        // EMDR Phase Context
+        current_emdr_phase: currentPhase, // e.g., "desensitization", "anamnesis", "safe_place"
+        techniques_learned: memory?.patient_memory?.techniques_learned || [],
+        safe_place_established: memory?.patient_memory?.safe_place_details ? true : false,
+        trauma_targets_identified: memory?.patient_memory?.trauma_targets?.length || 0,
+        current_sud_level: memory?.patient_memory?.current_sud_baseline || null,
+        bls_preference: memory?.patient_memory?.bilateral_stimulation_preferences || null,
+        
+        // Session context
+        session_number: session.session_number,
+        total_previous_sessions: memory?.total_sessions || 0,
+        
+        ...(metadata || {}), // Include any additional metadata
+      };
+
+      this.logger.debug(
+        `Sending message to Python API - Session: ${session.patient_session_id}, ` +
+        `Phase: ${currentPhase}, Techniques: [${context.techniques_learned.join(', ') || 'none'}], ` +
+        `SUD: ${context.current_sud_level || 'not set'}, Message: ${message.substring(0, 50)}...`
+      );
 
         const pythonResponse = await this.pythonService.sendPatientMessage(
           session.patient_session_id,
@@ -361,12 +492,44 @@ export class InternshipSessionService {
           this.logger.warn('Failed to get supervisor tip', error);
         }
       } else if (session.session_type === SessionTypeEnum.THERAPIST_CONSULTATION) {
-        // Validate therapist_session_id exists
+        // Check if therapist_session_id exists (null means degraded mode)
         if (!session.therapist_session_id) {
-          this.logger.error(`Session ${sessionId} has no therapist_session_id. Session data: ${JSON.stringify(session)}`);
-          throw new BadRequestException(
-            'Therapist session not properly initialized. Please create a new session.'
+          this.logger.warn(
+            `Session ${sessionId} created in degraded mode (no therapist_session_id). ` +
+            `Attempting to initialize Python session now...`
           );
+          
+          // Try to initialize Python session now
+          try {
+            const SessionModelForHistory = tenantConnection.model(StudentCaseSession.name, StudentCaseSessionSchema);
+            const patientSession = await SessionModelForHistory.findOne({
+              student_id: new Types.ObjectId(user.id),
+              case_id: session.case_id,
+              session_type: SessionTypeEnum.PATIENT_INTERVIEW,
+              status: SessionStatusEnum.COMPLETED,
+            })
+              .sort({ ended_at: -1 })
+              .lean();
+
+            const sessionHistory = patientSession?.messages || [];
+            
+            const pythonResponse = await this.pythonService.initializeTherapistSession(
+              session.case_id.toString(),
+              sessionHistory,
+              { student_id: user.id },
+            );
+            
+            // Update session with therapist_session_id
+            session.therapist_session_id = pythonResponse.session_id;
+            this.logger.log(`✅ Python backend recovered! Session ${sessionId} now has therapist_session_id: ${pythonResponse.session_id}`);
+          } catch (error) {
+            this.logger.error(`Failed to initialize Python therapist session on message send: ${error.message}`);
+            throw new BadRequestException(
+              'AI therapist consultation is temporarily unavailable. ' +
+              'The AI backend is currently down or restarting. ' +
+              'Please try again in a few moments, or contact support if the issue persists.'
+            );
+          }
         }
 
         this.logger.debug(`Sending message to Python API - Therapist Session ID: ${session.therapist_session_id}, Message: ${message.substring(0, 50)}...`);
@@ -392,6 +555,17 @@ export class InternshipSessionService {
 
       // Save session
       await session.save();
+
+      // Detect and save techniques learned in this exchange
+      if (aiResponse && session.session_type === SessionTypeEnum.PATIENT_INTERVIEW) {
+        const userIdStr = typeof user.id === 'string' ? user.id : user.id.toString();
+        await this.detectAndSaveTechniques(
+          session.internship_id.toString(),
+          userIdStr,
+          message,
+          aiResponse,
+        );
+      }
 
       return {
         message: 'Message sent successfully',
@@ -596,6 +770,55 @@ export class InternshipSessionService {
         // The user can manually generate feedback later
       }
 
+      // Save session summary to cross-session memory
+      try {
+        const sessionDuration = session.total_active_time_seconds 
+          ? Math.floor(session.total_active_time_seconds / 60)
+          : Math.floor(
+              (new Date(session.ended_at).getTime() - new Date(session.started_at).getTime()) / 60000
+            );
+
+        const keyActivities = this.extractKeyActivities(session.messages);
+        const studentSkills = feedbackResult?.ai_feedback?.strengths 
+          ? this.extractSkills(feedbackResult.ai_feedback.strengths)
+          : [];
+
+        const userIdStr = typeof user.id === 'string' ? user.id : user.id.toString();
+        await this.pythonService.saveSessionSummary({
+          internship_id: session.internship_id.toString(),
+          user_id: userIdStr,
+          session_summary: {
+            session_number: session.session_number,
+            session_type: session.session_type,
+            duration_minutes: sessionDuration,
+            key_activities: keyActivities,
+            outcomes: feedbackResult?.ai_feedback?.overall_score 
+              ? `Session completed with score ${feedbackResult.ai_feedback.overall_score}/100`
+              : 'Session completed',
+            student_skills_demonstrated: studentSkills,
+            feedback_highlights: feedbackResult?.ai_feedback
+              ? `Score: ${feedbackResult.ai_feedback.overall_score}/100. ` +
+                `${feedbackResult.ai_feedback.strengths?.length || 0} strengths, ` +
+                `${feedbackResult.ai_feedback.areas_for_improvement?.length || 0} areas to improve.`
+              : 'Feedback pending',
+          },
+        });
+
+        this.logger.log(
+          `Session summary saved to cross-session memory: session ${session.session_number}`,
+        );
+      } catch (error) {
+        this.logger.warn('Failed to save session summary to memory', error);
+        // Don't fail completion if memory save fails
+      }
+
+      // Update student progress
+      await this.updateStudentProgress(
+        session.student_id,
+        session.internship_id,
+        tenantConnection,
+      );
+
       return {
         message: 'Session completed successfully',
         data: {
@@ -618,6 +841,309 @@ export class InternshipSessionService {
   }
 
   /**
+   * Get cross-session memory for student's progress tracking
+   */
+  async getInternshipMemory(internshipId: string, user: JWTUserPayload) {
+    const userIdStr = typeof user.id === 'string' ? user.id : user.id.toString();
+    this.logger.log(`Getting memory for internship: ${internshipId}, user: ${userIdStr}`);
+
+    try {
+      const memory = await this.pythonService.getInternshipMemory(
+        internshipId,
+        userIdStr,
+      );
+
+      // Optional: Sync memory to MongoDB for backup (non-blocking)
+      if (memory.found && memory.memory) {
+        this.syncMemoryToDatabase(internshipId, userIdStr, memory.memory).catch(err => {
+          this.logger.warn('Failed to sync memory to database (non-critical)', err);
+        });
+      }
+
+      if (memory.found) {
+        return {
+          message: 'Memory retrieved successfully',
+          data: memory.memory,
+        };
+      } else {
+        return {
+          message: 'No previous sessions found',
+          data: null,
+        };
+      }
+    } catch (error) {
+      this.logger.error('Error retrieving memory', error?.stack || error);
+      throw new BadRequestException('Failed to retrieve memory');
+    }
+  }
+
+  /**
+   * Sync memory to MongoDB for backup (optional, non-blocking)
+   */
+  private async syncMemoryToDatabase(
+    internshipId: string,
+    userId: string,
+    memoryData: any,
+  ): Promise<void> {
+    try {
+      // Note: This requires InternshipMemory model to be injected
+      // For now, just log - you can implement full sync later if needed
+      this.logger.debug(
+        `Memory sync to DB: internship=${internshipId}, user=${userId}, ` +
+        `sessions=${memoryData.total_sessions}`,
+      );
+      
+      // TODO: Implement full database sync if needed:
+      // const MemoryModel = tenantConnection.model(InternshipMemory.name, InternshipMemorySchema);
+      // await MemoryModel.findOneAndUpdate(
+      //   { internship_id: new Types.ObjectId(internshipId), user_id: userId },
+      //   { memory_snapshot: memoryData, last_synced_at: new Date() },
+      //   { upsert: true }
+      // );
+    } catch (error) {
+      this.logger.warn('Memory sync failed (non-critical)', error);
+    }
+  }
+
+  /**
+   * Detect and save techniques learned during session
+   */
+  private async detectAndSaveTechniques(
+    internshipId: string,
+    userId: string,
+    studentMessage: string,
+    patientResponse: string,
+  ): Promise<void> {
+    try {
+      const combinedText = `${studentMessage} ${patientResponse}`.toLowerCase();
+
+      // Detect safe place installation (EMDR technique)
+      if (
+        combinedText.includes('lieu sûr') ||
+        combinedText.includes('safe place') ||
+        combinedText.includes('endroit sûr') ||
+        combinedText.includes('lieu de sécurité')
+      ) {
+        // Try to extract safe place description from patient response
+        const safePlacePatterns = [
+          /(?:plage|forêt|jardin|montagne|chambre|maison|lac|rivière|océan|nature)[^.!?]{0,100}[.!?]/i,
+          /je (?:vois|imagine|visualise)[^.!?]{10,100}[.!?]/i,
+          /c'est (?:un|une)[^.!?]{10,100}[.!?]/i,
+        ];
+
+        let safePlaceDetails: string | null = null;
+        for (const pattern of safePlacePatterns) {
+          const match = patientResponse.match(pattern);
+          if (match) {
+            safePlaceDetails = match[0].trim();
+            break;
+          }
+        }
+
+        if (safePlaceDetails) {
+          this.logger.log(`Detected safe place: ${safePlaceDetails.substring(0, 50)}...`);
+          await this.pythonService.updatePatientMemory({
+            internship_id: internshipId,
+            user_id: userId,
+            technique_learned: 'safe_place',
+            safe_place_details: safePlaceDetails,
+          });
+        } else {
+          // Just mark that safe place was discussed
+          await this.pythonService.updatePatientMemory({
+            internship_id: internshipId,
+            user_id: userId,
+            technique_learned: 'safe_place',
+          });
+        }
+      }
+
+      // Detect container technique (EMDR)
+      if (
+        combinedText.includes('container') ||
+        combinedText.includes('coffre') ||
+        combinedText.includes('boîte') ||
+        combinedText.includes('conteneur')
+      ) {
+        this.logger.log('Detected container technique');
+        await this.pythonService.updatePatientMemory({
+          internship_id: internshipId,
+          user_id: userId,
+          technique_learned: 'container',
+        });
+      }
+
+      // Detect trauma target identification
+      if (
+        combinedText.includes('cible') ||
+        combinedText.includes('target') ||
+        combinedText.includes('image perturbante') ||
+        combinedText.includes('souvenir traumatique')
+      ) {
+        // Try to extract SUD level
+        const sudMatch = combinedText.match(/(?:sud|échelle)[^\d]*(\d+)/i);
+        if (sudMatch) {
+          const sudLevel = parseInt(sudMatch[1], 10);
+          if (sudLevel >= 0 && sudLevel <= 10) {
+            this.logger.log(`Detected trauma target with SUD level: ${sudLevel}`);
+            await this.pythonService.updatePatientMemory({
+              internship_id: internshipId,
+              user_id: userId,
+              sud_level: sudLevel,
+            });
+          }
+        }
+
+        // Mark that trauma target work was done
+        await this.pythonService.updatePatientMemory({
+          internship_id: internshipId,
+          user_id: userId,
+          technique_learned: 'trauma_target_identification',
+        });
+      }
+
+      // Detect bilateral stimulation (BLS)
+      if (
+        combinedText.includes('stimulation bilatérale') ||
+        combinedText.includes('sba') ||
+        combinedText.includes('bilateral stimulation') ||
+        combinedText.includes('mouvements oculaires') ||
+        combinedText.includes('eye movement')
+      ) {
+        // Try to detect BLS type preference
+        let blsPreference: string | undefined = undefined;
+        if (combinedText.includes('visuel') || combinedText.includes('yeux') || combinedText.includes('eye')) {
+          blsPreference = 'visual';
+        } else if (combinedText.includes('auditif') || combinedText.includes('son') || combinedText.includes('auditory')) {
+          blsPreference = 'auditory';
+        } else if (combinedText.includes('tactile') || combinedText.includes('tapping')) {
+          blsPreference = 'tactile';
+        }
+
+        this.logger.log(`Detected BLS technique${blsPreference ? ` (${blsPreference})` : ''}`);
+        const updatePayload: any = {
+          internship_id: internshipId,
+          user_id: userId,
+          technique_learned: 'bilateral_stimulation',
+        };
+        if (blsPreference) {
+          updatePayload.bls_preference = blsPreference;
+        }
+        await this.pythonService.updatePatientMemory(updatePayload);
+      }
+
+      // Detect resource installation
+      if (
+        combinedText.includes('ressource') ||
+        combinedText.includes('resource') ||
+        combinedText.includes('renforcement positif')
+      ) {
+        this.logger.log('Detected resource installation technique');
+        await this.pythonService.updatePatientMemory({
+          internship_id: internshipId,
+          user_id: userId,
+          technique_learned: 'resource_installation',
+        });
+      }
+
+      // Detect desensitization phase
+      if (
+        combinedText.includes('désensibilisation') ||
+        combinedText.includes('desensitization') ||
+        combinedText.includes('retraitement') ||
+        combinedText.includes('reprocessing')
+      ) {
+        this.logger.log('Detected desensitization/reprocessing technique');
+        await this.pythonService.updatePatientMemory({
+          internship_id: internshipId,
+          user_id: userId,
+          technique_learned: 'desensitization',
+        });
+      }
+    } catch (error) {
+      // Log error but don't throw - technique detection is optional
+      this.logger.warn('Error detecting techniques', error);
+    }
+  }
+
+  /**
+   * Extract key activities from conversation history
+   */
+  private extractKeyActivities(messages: any[]): string[] {
+    const activities: string[] = [];
+    const fullText = messages.map(m => m.content).join(' ').toLowerCase();
+
+    // EMDR techniques
+    if (fullText.includes('lieu sûr') || fullText.includes('safe place')) {
+      activities.push('safe_place_installation');
+    }
+    if (fullText.includes('sba') || fullText.includes('stimulation bilatérale') || fullText.includes('bilateral')) {
+      activities.push('bilateral_stimulation');
+    }
+    if (fullText.includes('cible') || fullText.includes('target')) {
+      activities.push('trauma_target_identification');
+    }
+    if (fullText.includes('désensibilisation') || fullText.includes('desensitization')) {
+      activities.push('trauma_desensitization');
+    }
+    if (fullText.includes('container') || fullText.includes('coffre')) {
+      activities.push('container_technique');
+    }
+    if (fullText.includes('ressource') || fullText.includes('resource')) {
+      activities.push('resource_installation');
+    }
+
+    // General clinical skills
+    if (fullText.includes('rapport') || fullText.includes('alliance')) {
+      activities.push('therapeutic_alliance_building');
+    }
+    if (fullText.includes('évaluation') || fullText.includes('assessment')) {
+      activities.push('clinical_assessment');
+    }
+    if (fullText.includes('histoire') || fullText.includes('anamnèse') || fullText.includes('history')) {
+      activities.push('patient_history_taking');
+    }
+
+    // Default if nothing specific detected
+    if (activities.length === 0) {
+      activities.push('clinical_interview');
+    }
+
+    return activities;
+  }
+
+  /**
+   * Extract skill names from feedback strengths
+   */
+  private extractSkills(strengths: any[]): string[] {
+    if (!Array.isArray(strengths)) {
+      return [];
+    }
+
+    const skills: string[] = [];
+    
+    for (const strength of strengths) {
+      if (typeof strength === 'string') {
+        // Simple string strength
+        const skillName = strength.toLowerCase()
+          .replace(/[^a-z0-9_\s]/g, '')
+          .replace(/\s+/g, '_')
+          .substring(0, 50);
+        skills.push(skillName);
+      } else if (strength.category) {
+        // Structured strength with category
+        skills.push(strength.category);
+      } else if (strength.skill) {
+        skills.push(strength.skill);
+      } else if (strength.area) {
+        skills.push(strength.area);
+      }
+    }
+
+    return skills.filter(Boolean);
+  }
+
+  /**
    * Helper to update student progress
    */
   private async updateStudentProgress(
@@ -637,6 +1163,10 @@ export class InternshipSessionService {
       CaseFeedbackLog.name,
       CaseFeedbackLogSchema,
     );
+    const SessionModel = tenantConnection.model(
+      StudentCaseSession.name,
+      StudentCaseSessionSchema,
+    );
 
     try {
       // Count total cases for this internship
@@ -645,15 +1175,31 @@ export class InternshipSessionService {
         deleted_at: null,
       });
 
-      // Count completed cases (cases with validated feedback)
+      // Count completed cases (cases with completed sessions OR validated feedback)
+      // OPTION 1: Count cases with validated feedback
       const completedFeedbacks = await FeedbackModel.find({
         student_id: studentId,
         status: { $in: [FeedbackStatusEnum.VALIDATED, FeedbackStatusEnum.REVISED] },
       }).distinct('case_id');
 
+      // OPTION 2: Count cases with at least one completed session (as fallback)
+      const completedSessionCases = await SessionModel.find({
+        student_id: studentId,
+        status: { $in: [SessionStatusEnum.COMPLETED, SessionStatusEnum.PENDING_VALIDATION] },
+        deleted_at: null,
+      }).distinct('case_id');
+
+      // Merge both lists (use Set to avoid duplicates)
+      const allCompletedCaseIds = [
+        ...new Set([
+          ...completedFeedbacks.map(id => id.toString()),
+          ...completedSessionCases.map(id => id.toString())
+        ])
+      ].map(id => new Types.ObjectId(id));
+
       // Filter completed cases to only count cases belonging to this internship
       const completedCasesForInternship = await InternshipCaseModel.countDocuments({
-        _id: { $in: completedFeedbacks },
+        _id: { $in: allCompletedCaseIds },
         internship_id: internshipId,
         deleted_at: null,
       });
@@ -822,6 +1368,66 @@ export class InternshipSessionService {
         throw new BadRequestException(
           `Cannot resume session with status: ${session.status}`,
         );
+      }
+
+      // Check if Python session still exists (for patient interviews)
+      if (session.session_type === SessionTypeEnum.PATIENT_INTERVIEW && session.patient_session_id) {
+        try {
+          // Try to get session health by fetching memory (if this fails, session is dead)
+          const internshipIdStr = session.internship_id.toString();
+          const userIdStr = typeof user.id === 'string' ? user.id : user.id.toString();
+          await this.pythonService.getInternshipMemory(internshipIdStr, userIdStr);
+          
+          this.logger.log(`Python session ${session.patient_session_id} is still active`);
+        } catch (error) {
+          this.logger.warn(
+            `Python session ${session.patient_session_id} may have expired. Re-initializing...`
+          );
+          
+          // Re-initialize Python session with conversation history
+          try {
+            const CaseModel = tenantConnection.model(InternshipCase.name, InternshipCaseSchema);
+            const caseData = await CaseModel.findById(session.case_id);
+            
+            if (caseData?.patient_simulation_config) {
+              const normalizedConfig = normalizePatientSimulationConfig(
+                caseData.patient_simulation_config
+              );
+              
+              const scenarioConfig: Record<string, any> = {
+                scenario_type: normalizedConfig.scenario_type,
+                difficulty_level: normalizedConfig.difficulty_level,
+                interview_focus: normalizedConfig.interview_focus || 'assessment_and_diagnosis',
+                patient_openness: normalizedConfig.patient_openness || 'moderately_forthcoming',
+              };
+              
+              const internshipIdStr = session.internship_id.toString();
+              const userIdStr = typeof user.id === 'string' ? user.id : user.id.toString();
+              
+              const pythonResponse = await this.pythonService.initializePatientSession(
+                session.case_id.toString(),
+                caseData.patient_simulation_config.patient_profile,
+                scenarioConfig,
+                internshipIdStr,
+                userIdStr,
+              );
+              
+              // Update session with new patient_session_id
+              session.patient_session_id = pythonResponse.session_id;
+              
+              this.logger.log(
+                `✅ Python session re-initialized successfully: ${pythonResponse.session_id}`
+              );
+            }
+          } catch (reInitError) {
+            this.logger.error(`Failed to re-initialize Python session: ${reInitError.message}`);
+            throw new BadRequestException(
+              'Failed to resume session. The AI backend session has expired. ' +
+              'Your conversation history has been preserved. Please try resuming again, ' +
+              'and if the issue persists, you may need to close and create a new session.'
+            );
+          }
+        }
       }
 
       const now = new Date();
@@ -1082,6 +1688,98 @@ export class InternshipSessionService {
       this.logger.error('Error getting active session', error?.stack || error);
       throw new BadRequestException('Failed to get active session');
     }
+  }
+
+  /**
+   * Determine current EMDR phase from conversation history and memory
+   */
+  private determineCurrentEMDRPhase(messages: any[], memory: any): string {
+    const recentMessages = messages.slice(-10); // Last 10 messages
+    const messageContent = recentMessages
+      .map(m => m.content.toLowerCase())
+      .join(' ');
+    
+    // Phase 8: Reevaluation (if checking progress from previous sessions)
+    if (memory?.total_sessions > 1 && messages.length < 5) {
+      return 'reevaluation';
+    }
+    
+    // Phase 5: Installation (VoC, positive cognition)
+    if (
+      messageContent.includes('cognition positive') ||
+      messageContent.includes('positive cognition') ||
+      messageContent.includes('voc') ||
+      messageContent.includes('validity') ||
+      messageContent.includes('validité')
+    ) {
+      return 'installation';
+    }
+    
+    // Phase 6: Body Scan
+    if (
+      messageContent.includes('body scan') ||
+      messageContent.includes('sensation corporelle') ||
+      messageContent.includes('balayage corporel') ||
+      messageContent.includes('scan corporel')
+    ) {
+      return 'body_scan';
+    }
+    
+    // Phase 7: Closure
+    if (
+      messageContent.includes('clôture') ||
+      messageContent.includes('closure') ||
+      messageContent.includes('fin de séance') ||
+      messageContent.includes('end session')
+    ) {
+      return 'closure';
+    }
+    
+    // Phase 4: Desensitization (BLS, trauma reprocessing)
+    if (
+      messageContent.includes('sba') ||
+      messageContent.includes('stimulation') ||
+      messageContent.includes('désensibilisation') ||
+      messageContent.includes('desensitization') ||
+      messageContent.includes('retraitement') ||
+      messageContent.includes('reprocessing') ||
+      messageContent.includes('bilateral') ||
+      messageContent.includes('what do you notice') ||
+      messageContent.includes('que remarquez-vous') ||
+      memory?.patient_memory?.techniques_learned?.includes('bilateral_stimulation')
+    ) {
+      return 'desensitization';
+    }
+    
+    // Phase 3: Assessment (SUD, target identification)
+    if (
+      messageContent.includes('sud') ||
+      messageContent.includes('cible') ||
+      messageContent.includes('target') ||
+      messageContent.includes('souvenir traumatique') ||
+      messageContent.includes('traumatic memory') ||
+      messageContent.includes('échelle') ||
+      memory?.patient_memory?.trauma_targets?.length > 0
+    ) {
+      return 'assessment';
+    }
+    
+    // Phase 2: Preparation (safe place, resources)
+    if (
+      messageContent.includes('lieu sûr') ||
+      messageContent.includes('safe place') ||
+      messageContent.includes('ressource') ||
+      messageContent.includes('resource') ||
+      messageContent.includes('container') ||
+      messageContent.includes('coffre') ||
+      memory?.patient_memory?.techniques_learned?.includes('safe_place')
+    ) {
+      return 'preparation';
+    }
+    
+    // Phase 1: Anamnesis (history taking, rapport building)
+    // Default for new sessions
+    return 'anamnesis';
   }
 }
 

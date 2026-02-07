@@ -96,9 +96,19 @@ export class ChaptersController {
   @ApiResponse({ status: 400, description: 'Bad request' })
   async findAllChapters(
     @User() user: JWTUserPayload,
-    @Query('module_id', ParseObjectIdPipe) module_id?: string | Types.ObjectId,
+    @Query('module_id') module_id_raw?: string,
     @Query() paginationDto?: PaginationDto,
   ) {
+    // Only validate module_id if it's provided
+    let module_id: string | Types.ObjectId | undefined = undefined;
+    if (module_id_raw && module_id_raw !== 'undefined') {
+      // Validate it's a valid ObjectId
+      if (!Types.ObjectId.isValid(module_id_raw)) {
+        throw new BadRequestException(`Invalid module_id: ${module_id_raw}`);
+      }
+      module_id = module_id_raw;
+    }
+    
     return this.chaptersService.findAllChapters(user, module_id, paginationDto);
   }
 
