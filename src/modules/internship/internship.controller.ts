@@ -34,6 +34,7 @@ import { InternshipService } from './internship.service';
 import { InternshipCaseService } from './internship-case.service';
 import { InternshipSessionService } from './internship-session.service';
 import { InternshipFeedbackService } from './internship-feedback.service';
+import { InternshipCaseAttemptsService } from './internship-case-attempts.service'; // NEW
 import { InternshipLogbookService } from './internship-logbook.service';
 import { InternshipStageTrackingService } from './internship-stage-tracking.service';
 import { StageExportService } from './stage-export.service';
@@ -69,6 +70,7 @@ export class InternshipController {
     private readonly caseService: InternshipCaseService,
     private readonly sessionService: InternshipSessionService,
     private readonly feedbackService: InternshipFeedbackService,
+    private readonly caseAttemptsService: InternshipCaseAttemptsService, // NEW
     private readonly logbookService: InternshipLogbookService,
     private readonly stageTrackingService: InternshipStageTrackingService,
     private readonly stageExportService: StageExportService,
@@ -530,6 +532,197 @@ export class InternshipController {
     @User() user: JWTUserPayload,
   ) {
     return this.feedbackService.getFeedbackByCase(caseId, user);
+  }
+
+  // ========== ATTEMPT TRACKING ENDPOINTS (NEW) ==========
+
+  @Get('cases/:caseId/attempts')
+  @Roles(RoleEnum.STUDENT, RoleEnum.PROFESSOR, RoleEnum.SCHOOL_ADMIN)
+  @ApiOperation({ 
+    summary: 'Get attempt history for a case',
+    description: 'Retrieves all attempts made by a student on a specific case, including scores, grades, pass/fail status, and learning outcomes. Supports unlimited retries tracking.'
+  })
+  @ApiParam({ name: 'caseId', type: String, description: 'Case ID' })
+  @ApiQuery({ name: 'student_id', required: false, type: String, description: 'Student ID (optional for professors/admins, auto-detected for students)' })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Attempt history retrieved successfully',
+    schema: {
+      example: {
+        total_attempts: 3,
+        best_score: 85,
+        average_score: 78,
+        current_status: 'passed',
+        attempts: [
+          {
+            attempt_number: 1,
+            assessment_score: 70,
+            grade: 'C',
+            pass_fail: 'PASS',
+            key_learnings: ['Good empathy', 'Protocol adherence'],
+            mistakes_made: ['Interrupted patient', 'Missed SUD assessment'],
+            completed_at: '2026-02-07T10:00:00Z'
+          }
+        ]
+      }
+    }
+  })
+  async getCaseAttempts(
+    @Param('caseId') caseId: string,
+    @Query('student_id') studentId: string | undefined,
+    @User() user: JWTUserPayload,
+  ) {
+    const school = await this.internshipService['schoolModel'].findById(user.school_id);
+    if (!school) {
+      throw new Error('School not found');
+    }
+
+    // If student, use their ID. If professor/admin, require student_id query param
+    const targetStudentId = user.role.name === RoleEnum.STUDENT 
+      ? user.id 
+      : studentId;
+
+    if (!targetStudentId) {
+      throw new Error('student_id query parameter required for professors/admins');
+    }
+
+    return this.caseAttemptsService.getAttemptHistory(
+      school.db_name,
+      new Types.ObjectId(targetStudentId),
+      new Types.ObjectId(caseId),
+    );
+  }
+
+  @Get('student/:studentId/attempts')
+  @Roles(RoleEnum.STUDENT, RoleEnum.PROFESSOR, RoleEnum.SCHOOL_ADMIN)
+  @ApiOperation({ 
+    summary: 'Get all attempts for a student across all cases',
+    description: 'Retrieves comprehensive attempt statistics for a student including overall averages, case-by-case breakdown, and progression metrics.'
+  })
+  @ApiParam({ name: 'studentId', type: String, description: 'Student ID' })
+  @ApiQuery({ name: 'internship_id', required: true, type: String, description: 'Internship ID' })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Student attempts retrieved successfully',
+    schema: {
+      example: {
+        student_id: '507f1f77bcf86cd799439011',
+        internship_id: '507f1f77bcf86cd799439012',
+        overall_stats: {
+          total_cases_attempted: 5,
+          cases_passed: 4,
+          cases_in_progress: 1,
+          overall_average_score: 82,
+          total_attempts: 8
+        },
+        cases: [
+          {
+            case_id: '507f1f77bcf86cd799439013',
+            case_title: 'Mathilde Perez',
+            total_attempts: 2,
+            best_score: 85,
+            current_status: 'passed'
+          }
+        ]
+      }
+    }
+  })
+  async getStudentAttempts(
+    @Param('studentId') studentId: string,
+    @Query('internship_id') internshipId: string,
+    @User() user: JWTUserPayload,
+  ) {
+    // Students can only view their own attempts
+    if (user.role.name === RoleEnum.STUDENT && studentId !== user.id) {
+      throw new Error('Students can only view their own attempts');
+    }
+
+    const school = await this.internshipService['schoolModel'].findById(user.school_id);
+    if (!school) {
+      throw new Error('School not found');
+    }
+
+    return this.caseAttemptsService.getStudentAllAttempts(
+      school.db_name,
+      new Types.ObjectId(studentId),
+      new Types.ObjectId(internshipId),
+    );
+  }
+
+  @Get('patient-progression/:patientBaseId/:studentId')
+  @Roles(RoleEnum.STUDENT, RoleEnum.PROFESSOR, RoleEnum.SCHOOL_ADMIN)
+  @ApiOperation({ 
+    summary: 'Get patient progression across cases (Steps 2-3)',
+    description: 'Retrieves the evolution of the same patient across multiple cases, showing SUD/VOC progression, techniques mastered, trauma targets resolved, and session-by-session improvements. Only applicable for Step 2 (progressive) and Step 3 (realistic) cases.'
+  })
+  @ApiParam({ name: 'patientBaseId', type: String, description: 'Patient Base ID (e.g., "brigitte_fenurel")' })
+  @ApiParam({ name: 'studentId', type: String, description: 'Student ID' })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Patient progression retrieved successfully',
+    schema: {
+      example: {
+        found: true,
+        patient_base_id: 'brigitte_fenurel',
+        progression_history: [
+          {
+            case_id: '507f1f77bcf86cd799439014',
+            case_title: 'Brigitte Fenurel - Phase 1-2',
+            step: 2,
+            sequence_in_step: 1,
+            emdr_phase_focus: 'Phase 1-2',
+            attempts: [
+              {
+                attempt_number: 1,
+                assessment_score: 80,
+                pass_fail: 'PASS',
+                completed_at: '2026-02-05T10:00:00Z'
+              }
+            ],
+            best_score: 80,
+            current_status: 'passed'
+          },
+          {
+            case_id: '507f1f77bcf86cd799439015',
+            case_title: 'Brigitte Fenurel - Phase 3-4',
+            step: 2,
+            sequence_in_step: 2,
+            emdr_phase_focus: 'Phase 3-4',
+            attempts: [
+              {
+                attempt_number: 1,
+                assessment_score: 85,
+                pass_fail: 'PASS',
+                completed_at: '2026-02-06T10:00:00Z'
+              }
+            ],
+            best_score: 85,
+            current_status: 'passed'
+          }
+        ]
+      }
+    }
+  })
+  async getPatientProgression(
+    @Param('patientBaseId') patientBaseId: string,
+    @Param('studentId') studentId: string,
+    @User() user: JWTUserPayload,
+  ) {
+    // Students can only view their own progression
+    if (user.role.name === RoleEnum.STUDENT && studentId !== user.id) {
+      throw new Error('Students can only view their own progression');
+    }
+
+    const school = await this.internshipService['schoolModel'].findById(user.school_id);
+    if (!school) {
+      throw new Error('School not found');
+    }
+
+    return this.caseAttemptsService.getPatientProgression(
+      school.db_name,
+      new Types.ObjectId(studentId),
+      patientBaseId,
+    );
   }
 
   // ========== LOGBOOK ENDPOINTS ==========
