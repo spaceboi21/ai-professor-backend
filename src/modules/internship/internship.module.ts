@@ -10,6 +10,7 @@ import { InternshipService } from './internship.service';
 import { InternshipCaseService } from './internship-case.service';
 import { InternshipSessionService } from './internship-session.service';
 import { InternshipFeedbackService } from './internship-feedback.service';
+import { InternshipCaseAttemptsService } from './internship-case-attempts.service'; // NEW
 import { InternshipLogbookService } from './internship-logbook.service';
 import { InternshipStageTrackingService } from './internship-stage-tracking.service';
 import { StageExportService } from './stage-export.service';
@@ -50,6 +51,7 @@ import {
     InternshipCaseService,
     InternshipSessionService,
     InternshipFeedbackService,
+    InternshipCaseAttemptsService, // NEW
     InternshipLogbookService,
     InternshipStageTrackingService,
     StageExportService,
@@ -65,6 +67,7 @@ import {
     InternshipCaseService,
     InternshipSessionService,
     InternshipFeedbackService,
+    InternshipCaseAttemptsService, // NEW
     InternshipLogbookService,
     InternshipStageTrackingService,
     PythonInternshipService,
