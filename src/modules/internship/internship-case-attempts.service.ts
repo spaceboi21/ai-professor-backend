@@ -253,19 +253,24 @@ export class InternshipCaseAttemptsService {
     }
 
     // Build progression history
-    const progressionHistory = progressionDocs.map(doc => ({
-      case_id: doc.case_id._id,
-      case_title: doc.case_id.title,
-      step: doc.step,
-      sequence_in_step: doc.case_id.sequence_in_step,
-      emdr_phase_focus: doc.case_id.emdr_phase_focus,
-      session_narrative: doc.case_id.session_narrative,
-      patient_state: doc.case_id.patient_state,
-      attempts: doc.attempts,
-      best_score: doc.best_score,
-      current_status: doc.current_status,
-      last_attempt_at: doc.last_attempt_at,
-    }));
+    const progressionHistory = progressionDocs.map(doc => {
+      // After populate, case_id is a plain object (not ObjectId)
+      const caseData = doc.case_id as any;
+      
+      return {
+        case_id: caseData._id,
+        case_title: caseData.title,
+        step: doc.step,
+        sequence_in_step: caseData.sequence_in_step,
+        emdr_phase_focus: caseData.emdr_phase_focus,
+        session_narrative: caseData.session_narrative,
+        patient_state: caseData.patient_state,
+        attempts: doc.attempts,
+        best_score: doc.best_score,
+        current_status: doc.current_status,
+        last_attempt_at: doc.last_attempt_at,
+      };
+    });
 
     return {
       found: true,
