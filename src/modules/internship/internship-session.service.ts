@@ -38,11 +38,18 @@ import {
   CaseFeedbackLog,
   CaseFeedbackLogSchema,
 } from 'src/database/schemas/tenant/case-feedback-log.schema';
+import {
+  InternshipCaseAttempts,
+  InternshipCaseAttemptsSchema,
+} from 'src/database/schemas/tenant/internship-case-attempts.schema';
 import { normalizePatientSimulationConfig } from './utils/enum-mapping.util';
 
 @Injectable()
 export class InternshipSessionService {
   private readonly logger = new Logger(InternshipSessionService.name);
+  
+  // NEW: Feature flag for real-time tips (disabled by default for new system)
+  private readonly ENABLE_REALTIME_TIPS = process.env.ENABLE_REALTIME_TIPS === 'true';
 
   constructor(
     @InjectModel(School.name)
@@ -50,7 +57,13 @@ export class InternshipSessionService {
     private readonly tenantConnectionService: TenantConnectionService,
     private readonly errorMessageService: ErrorMessageService,
     private readonly pythonService: PythonInternshipService,
-  ) {}
+  ) {
+    if (!this.ENABLE_REALTIME_TIPS) {
+      this.logger.warn('⚠️ Real-time tips DISABLED via feature flag');
+    } else {
+      this.logger.log('✅ Real-time tips ENABLED');
+    }
+  }
 
   /**
    * Create a new session (patient interview, therapist consultation, etc.)
@@ -473,23 +486,25 @@ export class InternshipSessionService {
         aiResponse = pythonResponse.patient_response;
         aiRole = MessageRoleEnum.AI_PATIENT;
 
-        // Check if supervisor tip should be shown
-        try {
-          const tipResponse = await this.pythonService.getSupervisorRealtimeTip(
-            session.patient_session_id,
-            message,
-            session.messages,
-          );
+        // Check if supervisor tip should be shown (FEATURE FLAG: disabled by default)
+        if (this.ENABLE_REALTIME_TIPS) {
+          try {
+            const tipResponse = await this.pythonService.getSupervisorRealtimeTip(
+              session.patient_session_id,
+              message,
+              session.messages,
+            );
 
-          if (tipResponse.should_show_tip) {
-            session.realtime_tips.push({
-              message: tipResponse.tip_content,
-              context: tipResponse.tip_category || null,
-              timestamp: new Date(),
-            });
+            if (tipResponse.should_show_tip) {
+              session.realtime_tips.push({
+                message: tipResponse.tip_content,
+                context: tipResponse.tip_category || null,
+                timestamp: new Date(),
+              });
+            }
+          } catch (error) {
+            this.logger.warn('Failed to get supervisor tip', error);
           }
-        } catch (error) {
-          this.logger.warn('Failed to get supervisor tip', error);
         }
       } else if (session.session_type === SessionTypeEnum.THERAPIST_CONSULTATION) {
         // Check if therapist_session_id exists (null means degraded mode)
@@ -762,6 +777,44 @@ export class InternshipSessionService {
             await session.save();
 
             this.logger.log(`Feedback auto-generated successfully: ${feedbackResult._id}`);
+
+            // NEW: Track patient session for Steps 2-3 (patient evolution)
+            if (caseData.step >= 2 && caseData.patient_base_id && feedbackResult) {
+              try {
+                const userIdStr = typeof user.id === 'string' ? user.id : user.id.toString();
+                await this.pythonService.trackPatientSession({
+                  internship_id: session.internship_id.toString(),
+                  user_id: userIdStr,
+                  patient_base_id: caseData.patient_base_id,
+                  case_id: session.case_id.toString(),
+                  step: caseData.step,
+                  sequence_in_step: caseData.sequence_in_step,
+                  emdr_phase_focus: caseData.emdr_phase_focus,
+                  patient_state_before: caseData.patient_state || {
+                    current_sud: null,
+                    current_voc: null,
+                    safe_place_established: false,
+                    trauma_targets_resolved: [],
+                    techniques_mastered: [],
+                    progress_trajectory: null,
+                  },
+                  patient_state_after: this.extractPatientStateFromSession(session, feedbackResult),
+                  student_performance: {
+                    score: feedbackResult.ai_feedback.overall_score,
+                    pass_fail: feedbackResult.ai_feedback.pass_fail || 
+                      (feedbackResult.ai_feedback.overall_score >= (caseData.pass_threshold || 70) ? 'PASS' : 'FAIL'),
+                  },
+                  session_narrative: this.generateSessionNarrative(session, caseData),
+                });
+
+                this.logger.log(
+                  `📊 Patient session tracked for ${caseData.patient_base_id} (Step ${caseData.step})`,
+                );
+              } catch (error) {
+                this.logger.warn('Failed to track patient session', error);
+                // Don't fail completion if tracking fails
+              }
+            }
           }
         }
       } catch (error) {
@@ -1688,6 +1741,106 @@ export class InternshipSessionService {
       this.logger.error('Error getting active session', error?.stack || error);
       throw new BadRequestException('Failed to get active session');
     }
+  }
+
+  /**
+   * NEW: Extract patient state from completed session (for Steps 2-3 tracking)
+   */
+  private extractPatientStateFromSession(session: any, feedbackResult: any): any {
+    const messages = session.messages || [];
+    const fullText = messages.map(m => m.content).join(' ').toLowerCase();
+
+    // Extract SUD level from conversation
+    let extractedSUD: number | null = null;
+    const sudMatches = fullText.match(/sud[^\d]*(\d+)/gi);
+    if (sudMatches && sudMatches.length > 0) {
+      // Get the last mentioned SUD (most recent state)
+      const lastSudMatch = sudMatches[sudMatches.length - 1].match(/\d+/);
+      if (lastSudMatch) {
+        extractedSUD = parseInt(lastSudMatch[0], 10);
+      }
+    }
+
+    // Extract VOC level from conversation
+    let extractedVOC: number | null = null;
+    const vocMatches = fullText.match(/voc[^\d]*(\d+)/gi);
+    if (vocMatches && vocMatches.length > 0) {
+      const lastVocMatch = vocMatches[vocMatches.length - 1].match(/\d+/);
+      if (lastVocMatch) {
+        extractedVOC = parseInt(lastVocMatch[0], 10);
+      }
+    }
+
+    // Check if safe place was established
+    const safePlaceEstablished =
+      fullText.includes('lieu sûr') ||
+      fullText.includes('safe place') ||
+      fullText.includes('endroit sûr');
+
+    // Identify techniques used in this session
+    const techniquesMastered: string[] = [];
+    if (fullText.includes('anamnèse') || fullText.includes('anamnesis')) {
+      techniquesMastered.push('anamnesis');
+    }
+    if (safePlaceEstablished) {
+      techniquesMastered.push('safe_place');
+    }
+    if (fullText.includes('sba') || fullText.includes('stimulation bilatérale')) {
+      techniquesMastered.push('bilateral_stimulation');
+    }
+    if (fullText.includes('body scan') || fullText.includes('balayage corporel')) {
+      techniquesMastered.push('body_scan');
+    }
+    if (fullText.includes('container') || fullText.includes('coffre')) {
+      techniquesMastered.push('container');
+    }
+
+    return {
+      current_sud: extractedSUD,
+      current_voc: extractedVOC,
+      safe_place_established: safePlaceEstablished,
+      trauma_targets_resolved: [], // TODO: Extract from conversation
+      techniques_mastered: techniquesMastered,
+      progress_trajectory: this.determineProgressTrajectory(extractedSUD, extractedVOC),
+    };
+  }
+
+  /**
+   * NEW: Determine progress trajectory based on SUD/VOC values
+   */
+  private determineProgressTrajectory(sud: number | null, voc: number | null): string | null {
+    if (sud === null && voc === null) return null;
+
+    if (sud !== null && sud <= 2) return 'breakthrough';
+    if (sud !== null && sud >= 7) return 'regression';
+    if (voc !== null && voc >= 6) return 'improvement';
+    
+    return 'stable';
+  }
+
+  /**
+   * NEW: Generate narrative for session (for Steps 2-3)
+   */
+  private generateSessionNarrative(session: any, caseData: any): string {
+    const messages = session.messages || [];
+    const techniques = this.extractKeyActivities(messages);
+    
+    let narrative = `Session ${session.session_number} with ${caseData.patient_simulation_config?.patient_profile?.name || 'patient'}. `;
+    
+    if (caseData.emdr_phase_focus) {
+      narrative += `Focus: ${caseData.emdr_phase_focus}. `;
+    }
+    
+    if (techniques.length > 0) {
+      narrative += `Techniques: ${techniques.slice(0, 3).join(', ')}. `;
+    }
+    
+    const duration = Math.floor(
+      (new Date(session.ended_at).getTime() - new Date(session.started_at).getTime()) / 60000
+    );
+    narrative += `Duration: ${duration} minutes.`;
+    
+    return narrative;
   }
 
   /**
