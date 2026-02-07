@@ -166,14 +166,18 @@ export class InternshipFeedbackService {
             techniques_learned: memoryResponse.memory.patient_memory?.techniques_learned || [],
             strengths_so_far: memoryResponse.memory.student_progress?.areas_of_strength || [],
             improvement_areas: memoryResponse.memory.student_progress?.areas_for_improvement || [],
-            average_score: memoryResponse.memory.student_progress?.assessment_history
-              ? Math.round(
-                  memoryResponse.memory.student_progress.assessment_history.reduce(
-                    (sum, a) => sum + a.score,
-                    0,
-                  ) / memoryResponse.memory.student_progress.assessment_history.length,
-                )
-              : 0,
+            average_score:
+              memoryResponse.memory.student_progress &&
+              (memoryResponse.memory.student_progress as any).assessment_history &&
+              Array.isArray((memoryResponse.memory.student_progress as any).assessment_history) &&
+              (memoryResponse.memory.student_progress as any).assessment_history.length > 0
+                ? Math.round(
+                    (memoryResponse.memory.student_progress as any).assessment_history.reduce(
+                      (sum: number, a: any) => sum + a.score,
+                      0,
+                    ) / (memoryResponse.memory.student_progress as any).assessment_history.length,
+                  )
+                : 0,
           }
         : {
             total_sessions: 0,

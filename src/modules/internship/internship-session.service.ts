@@ -789,7 +789,7 @@ export class InternshipSessionService {
                   case_id: session.case_id.toString(),
                   step: caseData.step,
                   sequence_in_step: caseData.sequence_in_step,
-                  emdr_phase_focus: caseData.emdr_phase_focus,
+                  emdr_phase_focus: caseData.emdr_phase_focus || undefined,
                   patient_state_before: caseData.patient_state || {
                     current_sud: null,
                     current_voc: null,
