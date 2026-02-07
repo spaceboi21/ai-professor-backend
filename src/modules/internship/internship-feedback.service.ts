@@ -194,9 +194,13 @@ export class InternshipFeedbackService {
 
       // NEW: Use assessment_criteria (or fallback to evaluation_criteria for backward compat)
       // IMPORTANT: Convert null to empty strings for Python API validation
+      // Explicitly map only the fields we need (avoid MongoDB _id, etc.)
       const assessmentCriteria = caseData.assessment_criteria && caseData.assessment_criteria.length > 0
-        ? caseData.assessment_criteria.map(criterion => ({
-            ...criterion,
+        ? caseData.assessment_criteria.map((criterion: any) => ({
+            criterion_id: criterion.criterion_id || '',
+            name: criterion.name || '',
+            description: criterion.description || '',
+            max_points: criterion.max_points || 0,
             reference_literature: criterion.reference_literature || '',
             ko_example: criterion.ko_example || '',
             ok_example: criterion.ok_example || '',
@@ -213,6 +217,10 @@ export class InternshipFeedbackService {
 
       // NEW: Call comprehensive assessment endpoint
       this.logger.log(`🚀 Calling comprehensive assessment endpoint...`);
+      this.logger.debug(
+        `📋 Assessment criteria count: ${assessmentCriteria.length}, ` +
+        `first criterion: ${JSON.stringify(assessmentCriteria[0])}`
+      );
       
       const comprehensiveAssessment = await this.pythonService.generateComprehensiveAssessment(
         session.case_id.toString(),
