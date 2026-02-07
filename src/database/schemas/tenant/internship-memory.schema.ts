@@ -38,6 +38,21 @@ export class InternshipMemory extends Document {
         session_number: number;
         timestamp: string;
       }>;
+      // NEW: Assessment history for cross-session evolution tracking
+      assessment_history?: Array<{
+        case_id: string;
+        case_title: string;
+        step: number;
+        attempt_number: number;
+        score: number;
+        grade: string;
+        pass_fail: string;
+        date: Date;
+        key_learnings: string[];
+      }>;
+      average_score?: number; // NEW: Running average across all assessments
+      cases_passed?: number; // NEW: Count of passed cases
+      cases_total?: number; // NEW: Total cases attempted
     };
   };
 
