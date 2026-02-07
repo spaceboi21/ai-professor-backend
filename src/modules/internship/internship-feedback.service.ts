@@ -42,6 +42,7 @@ import { ProgressStatusEnum } from 'src/common/constants/status.constant';
 import { RoleEnum } from 'src/common/constants/roles.constant';
 import { PythonInternshipService } from './python-internship.service';
 import { InternshipStageTrackingService } from './internship-stage-tracking.service';
+import { InternshipCaseAttemptsService } from './internship-case-attempts.service'; // NEW
 import { PaginationDto } from 'src/common/dto/pagination.dto';
 import {
   getPaginationOptions,
@@ -59,13 +60,15 @@ export class InternshipFeedbackService {
     private readonly errorMessageService: ErrorMessageService,
     private readonly pythonService: PythonInternshipService,
     private readonly stageTrackingService: InternshipStageTrackingService,
+    private readonly caseAttemptsService: InternshipCaseAttemptsService, // NEW
   ) {}
 
   /**
-   * Generate AI feedback for a completed session
+   * Generate COMPREHENSIVE AI ASSESSMENT for a completed session
+   * NEW: Uses comprehensive assessment endpoint with full conversation history
    */
   async generateFeedback(sessionId: string, user: JWTUserPayload) {
-    this.logger.log(`Generating feedback for session: ${sessionId}`);
+    this.logger.log(`🎯 Generating comprehensive assessment for session: ${sessionId}`);
 
     // Validate school exists
     const school = await this.schoolModel.findById(user.school_id);
@@ -82,8 +85,6 @@ export class InternshipFeedbackService {
 
     try {
       // Find session
-      // Professors and admins can generate feedback for any session in their school
-      // Students can only generate feedback for their own sessions
       const query: any = {
         _id: new Types.ObjectId(sessionId),
         deleted_at: null,
@@ -110,13 +111,14 @@ export class InternshipFeedbackService {
       });
 
       if (existingFeedback) {
+        this.logger.log(`Feedback already exists for session ${sessionId}`);
         return {
           message: 'Feedback already exists',
           data: existingFeedback,
         };
       }
 
-      // Get case details for evaluation criteria
+      // Get case details with NEW comprehensive fields
       const caseData = await CaseModel.findOne({
         _id: session.case_id,
         deleted_at: null,
@@ -130,34 +132,133 @@ export class InternshipFeedbackService {
       const sessionStartTime = session.started_at || session.created_at;
       const sessionEndTime = session.ended_at || new Date();
       const durationMs = new Date(sessionEndTime).getTime() - new Date(sessionStartTime).getTime();
-      const sessionDurationMinutes = Math.floor(durationMs / 60000); // Convert to minutes
+      const sessionDurationMinutes = Math.floor(durationMs / 60000);
 
-      // Generate feedback using Python service
-      const pythonResponse = await this.pythonService.generateSupervisorFeedback(
-        session.case_id.toString(),
-        {
-          messages: session.messages,
-          session_type: session.session_type,
-          started_at: session.started_at,
-          ended_at: session.ended_at,
-          session_duration_minutes: sessionDurationMinutes,
-        },
-        caseData.evaluation_criteria || [],
+      this.logger.log(
+        `📊 Session duration: ${sessionDurationMinutes} min, Messages: ${session.messages.length}`
       );
 
-      // Create feedback log
+      // NEW: Get student's attempt history for this case
+      const attemptHistory = await this.caseAttemptsService.getAttemptHistory(
+        school.db_name,
+        session.student_id,
+        session.case_id,
+      );
+
+      // NEW: Get cross-session memory
+      const userIdStr = session.student_id.toString();
+      const internshipIdStr = session.internship_id.toString();
+      const memoryResponse = await this.pythonService.getInternshipMemory(
+        internshipIdStr,
+        userIdStr,
+      );
+
+      const previousAttempts = attemptHistory.attempts.map(attempt => ({
+        attempt_number: attempt.attempt_number,
+        score: attempt.assessment_score,
+        key_mistakes: attempt.mistakes_made,
+        date: attempt.completed_at,
+      }));
+
+      const crossSessionMemory = memoryResponse.found && memoryResponse.memory
+        ? {
+            total_sessions: memoryResponse.memory.total_sessions || 0,
+            techniques_learned: memoryResponse.memory.patient_memory?.techniques_learned || [],
+            strengths_so_far: memoryResponse.memory.student_progress?.areas_of_strength || [],
+            improvement_areas: memoryResponse.memory.student_progress?.areas_for_improvement || [],
+            average_score: memoryResponse.memory.student_progress?.assessment_history
+              ? Math.round(
+                  memoryResponse.memory.student_progress.assessment_history.reduce(
+                    (sum, a) => sum + a.score,
+                    0,
+                  ) / memoryResponse.memory.student_progress.assessment_history.length,
+                )
+              : 0,
+          }
+        : {
+            total_sessions: 0,
+            techniques_learned: [],
+            strengths_so_far: [],
+            improvement_areas: [],
+            average_score: 0,
+          };
+
+      this.logger.log(
+        `📚 Student history: ${previousAttempts.length} previous attempts, ` +
+        `${crossSessionMemory.total_sessions} total sessions`
+      );
+
+      // NEW: Use assessment_criteria (or fallback to evaluation_criteria for backward compat)
+      const assessmentCriteria = caseData.assessment_criteria && caseData.assessment_criteria.length > 0
+        ? caseData.assessment_criteria
+        : (caseData.evaluation_criteria || []).map(criterion => ({
+            criterion_id: criterion.criterion.toLowerCase().replace(/\s+/g, '_'),
+            name: criterion.criterion,
+            description: `Évaluation de ${criterion.criterion}`,
+            max_points: criterion.weight,
+            reference_literature: null,
+            ko_example: null,
+            ok_example: null,
+          }));
+
+      // NEW: Call comprehensive assessment endpoint
+      this.logger.log(`🚀 Calling comprehensive assessment endpoint...`);
+      
+      const comprehensiveAssessment = await this.pythonService.generateComprehensiveAssessment(
+        session.case_id.toString(),
+        {
+          step: caseData.step,
+          case_type: caseData.case_type,
+          student_id: userIdStr,
+          internship_id: internshipIdStr,
+          session_data: {
+            session_number: session.session_number,
+            duration_minutes: sessionDurationMinutes,
+            full_conversation: session.messages,
+            started_at: session.started_at,
+            ended_at: session.ended_at,
+          },
+          assessment_criteria: assessmentCriteria,
+          literature_references: caseData.literature_references || [],
+          student_history: {
+            previous_attempts_this_case: previousAttempts,
+            cross_session_memory: crossSessionMemory,
+          },
+          patient_base: {
+            name: caseData.patient_simulation_config?.patient_profile?.name || 'Patient',
+            age: caseData.patient_simulation_config?.patient_profile?.age || null,
+            trauma_summary: caseData.patient_simulation_config?.patient_profile?.trauma_summary || null,
+            key_symptoms: caseData.patient_simulation_config?.patient_profile?.key_symptoms || [],
+            current_sud_voc: caseData.patient_simulation_config?.patient_profile?.current_sud_voc || {},
+          },
+        },
+      );
+
+      this.logger.log(
+        `✅ Assessment generated: ${comprehensiveAssessment.overall_score}/100 (${comprehensiveAssessment.pass_fail})`
+      );
+
+      // NEW: Create comprehensive feedback log
       const feedbackData = {
         student_id: session.student_id,
         case_id: session.case_id,
         session_id: new Types.ObjectId(sessionId),
         feedback_type: FeedbackTypeEnum.AUTO_GENERATED,
         ai_feedback: {
-          overall_score: pythonResponse.feedback.overall_score,
-          strengths: pythonResponse.feedback.strengths,
-          areas_for_improvement: pythonResponse.feedback.areas_for_improvement,
-          technical_assessment: pythonResponse.feedback.technical_assessment,
-          communication_assessment: pythonResponse.feedback.communication_assessment,
-          clinical_reasoning: pythonResponse.feedback.clinical_reasoning,
+          overall_score: comprehensiveAssessment.overall_score,
+          grade: comprehensiveAssessment.grade,
+          pass_fail: comprehensiveAssessment.pass_fail,
+          pass_threshold: comprehensiveAssessment.pass_threshold || caseData.pass_threshold || 70,
+          criteria_scores: comprehensiveAssessment.criteria_scores || [],
+          strengths: comprehensiveAssessment.strengths || [],
+          areas_for_improvement: comprehensiveAssessment.areas_for_improvement || [],
+          recommendations_next_session: comprehensiveAssessment.recommendations_next_session || [],
+          evolution_vs_previous_attempts: comprehensiveAssessment.evolution_vs_previous_attempts || null,
+          literature_adherence: comprehensiveAssessment.literature_adherence || {},
+          // Keep old fields for backward compatibility
+          technical_assessment: comprehensiveAssessment.technical_assessment || {},
+          communication_assessment: comprehensiveAssessment.communication_assessment || {},
+          clinical_reasoning: comprehensiveAssessment.clinical_reasoning || {},
           generated_at: new Date(),
         },
         professor_feedback: {},
@@ -171,6 +272,47 @@ export class InternshipFeedbackService {
       session.status = SessionStatusEnum.PENDING_VALIDATION;
       await session.save();
 
+      // NEW: Track this attempt in InternshipCaseAttemptsService
+      try {
+        await this.caseAttemptsService.trackAttempt(
+          school.db_name,
+          session.student_id,
+          session.case_id,
+          session.internship_id,
+          session._id,
+          savedFeedback._id,
+          {
+            score: comprehensiveAssessment.overall_score,
+            grade: comprehensiveAssessment.grade,
+            pass_fail: comprehensiveAssessment.pass_fail as 'PASS' | 'FAIL',
+            pass_threshold: comprehensiveAssessment.pass_threshold || caseData.pass_threshold || 70,
+            key_learnings: comprehensiveAssessment.strengths || [],
+            mistakes_made: comprehensiveAssessment.areas_for_improvement || [],
+            strengths: comprehensiveAssessment.strengths || [],
+            areas_for_improvement: comprehensiveAssessment.areas_for_improvement || [],
+          },
+        );
+        this.logger.log(`📝 Attempt tracked successfully`);
+      } catch (error) {
+        this.logger.error(`Failed to track attempt: ${error.message}`);
+        // Don't fail feedback generation if attempt tracking fails
+      }
+
+      // NEW: Save assessment to memory
+      try {
+        await this.pythonService.saveAssessmentToMemory({
+          internship_id: internshipIdStr,
+          user_id: userIdStr,
+          case_id: session.case_id.toString(),
+          step: caseData.step,
+          assessment_result: comprehensiveAssessment,
+        });
+        this.logger.log(`💾 Assessment saved to memory`);
+      } catch (error) {
+        this.logger.error(`Failed to save assessment to memory: ${error.message}`);
+        // Don't fail feedback generation if memory save fails
+      }
+
       // Auto-update stage progress
       try {
         await this.stageTrackingService.autoUpdateStageProgress(
@@ -180,23 +322,23 @@ export class InternshipFeedbackService {
           sessionId,
           school.db_name,
         );
-        this.logger.log(`Stage progress auto-updated for session: ${sessionId}`);
+        this.logger.log(`📈 Stage progress auto-updated`);
       } catch (error) {
-        this.logger.error(
-          `Failed to auto-update stage progress: ${error.message}`,
-        );
+        this.logger.error(`Failed to auto-update stage progress: ${error.message}`);
         // Don't fail the feedback generation if stage tracking fails
       }
 
-      this.logger.log(`Feedback generated: ${savedFeedback._id}`);
+      this.logger.log(`✅ Comprehensive assessment complete: ${savedFeedback._id}`);
 
       return {
-        message: 'Feedback generated successfully',
+        message: 'Comprehensive assessment generated successfully',
         data: savedFeedback,
+        attempt_number: attemptHistory.total_attempts + 1,
+        best_score: Math.max(attemptHistory.best_score, comprehensiveAssessment.overall_score),
       };
     } catch (error) {
-      this.logger.error('Error generating feedback', error?.stack || error);
-      throw new BadRequestException('Failed to generate feedback');
+      this.logger.error('❌ Error generating comprehensive assessment', error?.stack || error);
+      throw new BadRequestException(`Failed to generate assessment: ${error.message}`);
     }
   }
 

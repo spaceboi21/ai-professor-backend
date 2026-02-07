@@ -450,6 +450,216 @@ export class PythonInternshipService {
   }
 
   /**
+   * NEW: Generate comprehensive assessment for completed session
+   * POST /api/v1/internship/assessment/generate-comprehensive
+   */
+  async generateComprehensiveAssessment(
+    caseId: string,
+    assessmentRequest: {
+      step: number;
+      case_type: string;
+      student_id: string;
+      internship_id: string;
+      session_data: {
+        session_number: number;
+        duration_minutes: number;
+        full_conversation: any[];
+        started_at: Date;
+        ended_at: Date;
+      };
+      assessment_criteria: any[];
+      literature_references: any[];
+      student_history: {
+        previous_attempts_this_case: any[];
+        cross_session_memory: any;
+      };
+      patient_base: any;
+    },
+  ): Promise<any> {
+    try {
+      this.logger.log(
+        `🎯 Generating comprehensive assessment for case ${caseId}, step ${assessmentRequest.step}`,
+      );
+
+      const payload = {
+        case_id: caseId,
+        ...assessmentRequest,
+      };
+
+      const response = await this._post(
+        '/internship/assessment/generate-comprehensive',
+        payload,
+        120000, // 120 second timeout for comprehensive assessment
+      );
+
+      if (!response.success) {
+        throw new Error(response.message || 'Assessment generation failed');
+      }
+
+      this.logger.log(
+        `✅ Comprehensive assessment complete: ${response.assessment.overall_score}/100 ` +
+        `(${response.assessment.pass_fail})`,
+      );
+
+      return response.assessment;
+    } catch (error) {
+      this.logger.error(`Failed to generate comprehensive assessment: ${error.message}`);
+      throw error;
+    }
+  }
+
+  /**
+   * NEW: Save assessment to cross-session memory
+   * POST /api/v1/internship/memory/save-assessment
+   */
+  async saveAssessmentToMemory(request: {
+    internship_id: string;
+    user_id: string;
+    case_id: string;
+    step: number;
+    assessment_result: any;
+  }): Promise<any> {
+    try {
+      this.logger.log(
+        `💾 Saving assessment to memory: case=${request.case_id}, step=${request.step}`,
+      );
+
+      // Extract query params
+      const { internship_id, user_id, case_id, step, assessment_result } = request;
+
+      // Build query string
+      const queryParams = new URLSearchParams({
+        internship_id,
+        user_id,
+      }).toString();
+
+      const response = await this._post(
+        `/internship/memory/save-assessment?${queryParams}`,
+        {
+          case_id,
+          step,
+          session_number: assessment_result.session_number || 1,
+          assessment_result,
+        },
+      );
+
+      this.logger.log(`✅ Assessment saved to memory successfully`);
+
+      return response;
+    } catch (error) {
+      this.logger.error(`Failed to save assessment to memory: ${error.message}`);
+      // Don't throw - memory save is non-critical
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * NEW: Track patient session for Steps 2-3 (patient evolution)
+   * POST /api/v1/internship/patient/track-session
+   */
+  async trackPatientSession(request: {
+    internship_id: string;
+    user_id: string;
+    patient_base_id: string;
+    case_id: string;
+    step: number;
+    sequence_in_step: number;
+    emdr_phase_focus?: string;
+    patient_state_before: any;
+    patient_state_after: any;
+    student_performance: {
+      score: number;
+      pass_fail: string;
+    };
+    session_narrative?: string;
+  }): Promise<any> {
+    try {
+      this.logger.log(
+        `📊 Tracking patient session: patient=${request.patient_base_id}, ` +
+        `step=${request.step}, sequence=${request.sequence_in_step}`,
+      );
+
+      // Extract query params
+      const {
+        internship_id,
+        user_id,
+        patient_base_id,
+        case_id,
+        step,
+        sequence_in_step,
+        emdr_phase_focus,
+        ...bodyData
+      } = request;
+
+      // Build query string
+      const queryParams = new URLSearchParams({
+        internship_id,
+        user_id,
+        patient_base_id,
+        case_id,
+        step: step.toString(),
+        sequence_in_step: sequence_in_step.toString(),
+      });
+
+      if (emdr_phase_focus) {
+        queryParams.append('emdr_phase_focus', emdr_phase_focus);
+      }
+
+      const response = await this._post(
+        `/internship/patient/track-session?${queryParams.toString()}`,
+        bodyData,
+      );
+
+      this.logger.log(
+        `✅ Patient session tracked: total_sessions=${response.total_sessions_with_patient}`,
+      );
+
+      return response;
+    } catch (error) {
+      this.logger.error(`Failed to track patient session: ${error.message}`);
+      // Don't throw - tracking is non-critical
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * NEW: Get patient progression across cases (Steps 2-3)
+   * GET /api/v1/internship/patient-progression/{patient_base_id}/{student_id}
+   */
+  async getPatientProgression(
+    patientBaseId: string,
+    studentId: string,
+  ): Promise<any> {
+    try {
+      this.logger.log(
+        `📈 Getting patient progression: patient=${patientBaseId}, student=${studentId}`,
+      );
+
+      const response = await this._get(
+        `/internship/patient-progression/${patientBaseId}/${studentId}`,
+      );
+
+      if (response.found) {
+        this.logger.log(
+          `✅ Patient progression found: ${response.progression_history.length} sessions`,
+        );
+      } else {
+        this.logger.log(`No progression history found for patient ${patientBaseId}`);
+      }
+
+      return response;
+    } catch (error) {
+      this.logger.error(`Failed to get patient progression: ${error.message}`);
+      // Return empty progression instead of throwing
+      return {
+        found: false,
+        patient_base_id: patientBaseId,
+        progression_history: [],
+      };
+    }
+  }
+
+  /**
    * Generic GET helper with improved error handling
    */
   private async _get(path: string) {
@@ -478,15 +688,17 @@ export class PythonInternshipService {
   /**
    * Generic POST helper with improved error handling
    */
-  private async _post(path: string, payload: any) {
+  private async _post(path: string, payload: any, customTimeout?: number) {
     const url = `${this.baseUrl}${path}`;
+    const timeout = customTimeout || 60000; // Default 60 second, or custom timeout
+    
     try {
       this.logger.log(`Making POST request to Python API: ${url}`);
       this.logger.debug(`Request payload: ${JSON.stringify(payload, null, 2)}`);
       
       const response = await firstValueFrom(
         this.httpService.post(url, payload, {
-          timeout: 60000, // 60 second timeout for AI operations
+          timeout, // Use custom or default timeout
           headers: {
             'Content-Type': 'application/json',
           },
