@@ -602,6 +602,13 @@ export class InternshipFeedbackService {
       };
     } catch (error) {
       this.logger.error('Error getting feedback', error?.stack || error);
+      
+      // Re-throw NotFoundException as-is (404)
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
+      
+      // Convert other errors to BadRequestException (400)
       throw new BadRequestException('Failed to retrieve feedback');
     }
   }
@@ -699,6 +706,13 @@ export class InternshipFeedbackService {
       };
     } catch (error) {
       this.logger.error('Error getting feedback', error?.stack || error);
+      
+      // Re-throw NotFoundException as-is (404)
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
+      
+      // Convert other errors to BadRequestException (400)
       throw new BadRequestException('Failed to retrieve feedback');
     }
   }

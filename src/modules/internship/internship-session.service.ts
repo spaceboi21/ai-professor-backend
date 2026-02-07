@@ -34,6 +34,7 @@ import {
 } from 'src/common/constants/internship.constant';
 import { ProgressStatusEnum } from 'src/common/constants/status.constant';
 import { PythonInternshipService } from './python-internship.service';
+import { InternshipFeedbackService } from './internship-feedback.service';
 import {
   CaseFeedbackLog,
   CaseFeedbackLogSchema,
@@ -57,6 +58,7 @@ export class InternshipSessionService {
     private readonly tenantConnectionService: TenantConnectionService,
     private readonly errorMessageService: ErrorMessageService,
     private readonly pythonService: PythonInternshipService,
+    private readonly feedbackService: InternshipFeedbackService,
   ) {
     if (!this.ENABLE_REALTIME_TIPS) {
       this.logger.warn('⚠️ Real-time tips DISABLED via feature flag');
@@ -722,99 +724,18 @@ export class InternshipSessionService {
           this.logger.log(`Feedback already exists for session ${sessionId}`);
           feedbackResult = existingFeedback;
         } else {
-          // Get case details for evaluation criteria
-          const caseData = await CaseModel.findOne({
-            _id: session.case_id,
-            deleted_at: null,
-          });
-
-          if (!caseData) {
-            this.logger.error(`Case not found for session ${sessionId}`);
-          } else {
-            // Calculate session duration in minutes
-            const sessionStartTime = session.started_at || session.created_at;
-            const sessionEndTime = session.ended_at;
-            const durationMs = new Date(sessionEndTime).getTime() - new Date(sessionStartTime).getTime();
-            const sessionDurationMinutes = Math.floor(durationMs / 60000);
-
-            // Generate feedback using Python service
-            const pythonResponse = await this.pythonService.generateSupervisorFeedback(
-              session.case_id.toString(),
-              {
-                messages: session.messages,
-                session_type: session.session_type,
-                started_at: session.started_at,
-                ended_at: session.ended_at,
-                session_duration_minutes: sessionDurationMinutes,
-              },
-              caseData.evaluation_criteria || [],
-            );
-
-            // Create feedback log
-            const feedbackData = {
-              student_id: session.student_id,
-              case_id: session.case_id,
-              session_id: new Types.ObjectId(sessionId),
-              feedback_type: FeedbackTypeEnum.AUTO_GENERATED,
-              ai_feedback: {
-                overall_score: pythonResponse.feedback.overall_score,
-                strengths: pythonResponse.feedback.strengths,
-                areas_for_improvement: pythonResponse.feedback.areas_for_improvement,
-                technical_assessment: pythonResponse.feedback.technical_assessment,
-                communication_assessment: pythonResponse.feedback.communication_assessment,
-                clinical_reasoning: pythonResponse.feedback.clinical_reasoning,
-                generated_at: new Date(),
-              },
-              professor_feedback: {},
-              status: FeedbackStatusEnum.PENDING_VALIDATION,
-            };
-
-            const newFeedback = new FeedbackModel(feedbackData);
-            feedbackResult = await newFeedback.save();
-
-            // Update session status to pending validation
-            session.status = SessionStatusEnum.PENDING_VALIDATION;
-            await session.save();
-
-            this.logger.log(`Feedback auto-generated successfully: ${feedbackResult._id}`);
-
-            // NEW: Track patient session for Steps 2-3 (patient evolution)
-            if (caseData.step >= 2 && caseData.patient_base_id && feedbackResult) {
-              try {
-                const userIdStr = typeof user.id === 'string' ? user.id : user.id.toString();
-                await this.pythonService.trackPatientSession({
-                  internship_id: session.internship_id.toString(),
-                  user_id: userIdStr,
-                  patient_base_id: caseData.patient_base_id,
-                  case_id: session.case_id.toString(),
-                  step: caseData.step,
-                  sequence_in_step: caseData.sequence_in_step,
-                  emdr_phase_focus: caseData.emdr_phase_focus || undefined,
-                  patient_state_before: caseData.patient_state || {
-                    current_sud: null,
-                    current_voc: null,
-                    safe_place_established: false,
-                    trauma_targets_resolved: [],
-                    techniques_mastered: [],
-                    progress_trajectory: null,
-                  },
-                  patient_state_after: this.extractPatientStateFromSession(session, feedbackResult),
-                  student_performance: {
-                    score: feedbackResult.ai_feedback.overall_score,
-                    pass_fail: feedbackResult.ai_feedback.pass_fail || 
-                      (feedbackResult.ai_feedback.overall_score >= (caseData.pass_threshold || 70) ? 'PASS' : 'FAIL'),
-                  },
-                  session_narrative: this.generateSessionNarrative(session, caseData),
-                });
-
-                this.logger.log(
-                  `📊 Patient session tracked for ${caseData.patient_base_id} (Step ${caseData.step})`,
-                );
-              } catch (error) {
-                this.logger.warn('Failed to track patient session', error);
-                // Don't fail completion if tracking fails
-              }
-            }
+          // ✨ NEW: Use comprehensive assessment system
+          this.logger.log(`🎯 Triggering comprehensive assessment for session ${sessionId}`);
+          
+          try {
+            // Call the new comprehensive feedback generation method
+            const feedbackResponse = await this.feedbackService.generateFeedback(sessionId, user);
+            feedbackResult = feedbackResponse.data;
+            
+            this.logger.log(`✅ Comprehensive assessment generated: ${feedbackResult._id}`);
+          } catch (error) {
+            this.logger.error(`❌ Failed to generate comprehensive assessment`, error);
+            throw error;
           }
         }
       } catch (error) {
